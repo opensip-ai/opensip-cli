@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-27
-release: v0.8.4
+release: v0.8.5
 title: "Full Tool plugins"
 audience: [plugin-authors]
 purpose: "Build a Tool plugin — your own opensip-cli subcommand. Use when fit/sim/graph/yagni aren't the right shape and you want something fundamentally different."
@@ -36,7 +36,7 @@ This is the heaviest extension shape. Most teams never need it. If you just want
 a compatibility wrapper for older authored tools, but new scaffolds use
 `defineTool()` plus command-spec drafts directly. Neither path synthesizes
 lifecycle `extensionPoints` — absence is the safe default
-([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
+([ADR-0076](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0076-tool-authoring-template-and-helper-boundary.md)).
 
 Once a Tool exists as a package, the customer-facing management surface is the [`tools` command group](/docs/opensip-cli/70-reference/12-tools-command/): `tools list`, `tools validate`, `tools install`, `tools uninstall`, and `tools data-purge`.
 
@@ -77,8 +77,8 @@ Once a Tool exists as a package, the customer-facing management surface is the [
 	    ]
 	  },
   "peerDependencies": {
-    "@opensip-cli/contracts": "^0.8.4",
-    "@opensip-cli/core": "^0.8.4"
+    "@opensip-cli/contracts": "^0.8.5",
+    "@opensip-cli/core": "^0.8.5"
   }
 }
 ```
@@ -256,7 +256,7 @@ handler: async (opts, cli) => {
 };
 ```
 
-See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
+See [ADR-0077](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
 
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
@@ -335,7 +335,7 @@ main entry:
 The runtime contract is unchanged — the directory's resolved main must export
 `tool: Tool`, and the host runs the same `assertManifestMatchesTool` drift guard.
 Authored discovery, admission, dynamic import, and registration travel the exact
-same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0030-authored-tool-discovery.md)).
+same path bundled and installed tools do ([ADR-0030](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0030-authored-tool-discovery.md)).
 
 > **Sidecar vs `tools install --project`.** `tools install --project` *installs an
 > npm package* into the gitignored `.runtime/plugins/tool/` and keeps provenance
@@ -442,11 +442,11 @@ The child environment is an explicit allowlist plus manifest-declared env
 resources; additional names require `OPENSIP_CLI_TOOL_ENV_PASSTHROUGH`. These
 controls do not reduce the current user's ordinary Node filesystem/network
 authority and must not be described as an OS sandbox
-([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
+([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
 
 **Capability packs** (custom checks, scenario packs, graph adapters loaded via
 `plugins.<domain>`) follow a split posture
-([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)):
+([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)):
 bundled first-party packs load in the host process; admitted external packs run
 through the owning tool's capability worker bridge. That worker's resource
 guard is **sharpened-advisory defense-in-depth**, not containment: it exists to
@@ -458,7 +458,7 @@ process-level plugin-isolation roadmap. The external-tool worker fork above
 does **not** cover capability packs.
 
 For the full extension trust-tier matrix, see
-[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
+[ADR-0061](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0061-tool-platform-launch-posture-and-extension-trust-tiers.md).
 
 What is enforced at admission:
 
@@ -475,9 +475,9 @@ What is enforced at admission:
   override). Trust entries are exact ids. A `*` entry is ignored and emits one
   bounded `cli.trust.tool_wildcard_ignored` warning; it never admits a Tool.
   Managed install records and committed exact project trust remain the normal
-  paths ([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
+  paths ([ADR-0145](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0145-external-worker-datastore-capability-and-exact-worker-mode.md)).
 - Deny-by-default capability packs for in-process extensions
-  ([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
+  ([ADR-0171](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0171-capability-pack-admission-trusts-operator-config.md)).
   Bundled first-party packs are trusted. A `plugins.checkPackages`,
   `plugins.scenarioPackages`, or `plugins.graphAdapters` entry **selects** a
   pack for discovery but never trusts it — the analyzed repo's own config is

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.8.4
+release: v0.8.5
 title: "Impact analysis and trust"
 audience: [contributors, ci-integrators, agent-builders]
 purpose: "How `graph impact` and `fit --changed --include-impacted` report coverage, uncertainty, and conservative fallbacks."
@@ -61,7 +61,7 @@ and `impactStatus` (`available` or `omitted-overflow`). The human Change Impact
 tab joins that session through the parent Run's `RunStep.sessionId` and never
 recomputes impact. See
 [Report — Change Impact](/docs/opensip-cli/70-reference/06-dashboard/#change-impact) and
-[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
+[ADR-0156](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0156-bounded-stored-impact-proof.md).
 
 ## MCP explicit-file impact
 

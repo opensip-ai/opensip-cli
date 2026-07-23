@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-21
-release: v0.8.4
+release: v0.8.5
 title: "Repository layout"
 audience: [contributors]
 purpose: "Why each tracked root entry exists, which paths are discovery contracts, and which generated directories are safe to clean."

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-11
-release: v0.8.4
+release: v0.8.5
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -21,7 +21,7 @@ The six-layer package graph (core → substrates → shared libraries/adapters �
 
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/).
 
-The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs).
+The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/.config/dependency-cruiser.cjs).
 
 ---
 
@@ -68,7 +68,7 @@ Production code can't import test files, and source code can't import undeclared
 
 ## Layer enforcement rules
 
-The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). From-side layer rules are authored as negative-lookahead allowlists ([ADR-0133](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0133-allowlist-form-layer-rules.md)): a rule names the package family it governs and the workspace packages it may import, then forbids every other `packages/` target by construction. Several runtime packages carry their own narrow allowlists in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058), `codebase-imports-core-contracts-targeting-only`, `mcp-imports-allowlist`, `tool-test-kit-imports-core-contracts-only`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit.
+The rules that pin the cross-package layer cake. The set below covers the load-bearing ones (core, datastore, contracts, config, fitness/simulation/graph, language/check/adapter-pack isolation). From-side layer rules are authored as negative-lookahead allowlists ([ADR-0133](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0133-allowlist-form-layer-rules.md)): a rule names the package family it governs and the workspace packages it may import, then forbids every other `packages/` target by construction. Several runtime packages carry their own narrow allowlists in the same shape: `session-store-imports-core-datastore-contracts-only`, `output-imports-core-contracts-only`, `config-imports-core-only`, `targeting-imports-config-core-only` (ADR-0037), `dashboard-imports-only-core-contracts`, `cli-live-imports-core-cli-ui-only` (ADR-0058), `codebase-imports-core-contracts-targeting-only`, `mcp-imports-allowlist`, `tool-test-kit-imports-core-contracts-only`, and `cli-ui-no-workspace-deps` / `cli-ui-no-tools` for the leaf UI kit.
 
 ### `core-imports-nothing-workspace`
 
@@ -150,7 +150,7 @@ future-proof:
 ### Workspace-private black-box harness
 
 `@opensip-cli/agent-eval` sits outside the six runtime layers
-([ADR-0157](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0157-agent-eval-black-box-harness.md)). It
+([ADR-0157](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0157-agent-eval-black-box-harness.md)). It
 measures the built CLI as a customer would, so it has zero workspace source
 edges in either direction; its `opensip-cli` development dependency exists only
 to order Turbo builds. `agent-eval-imports-nothing-workspace` rejects
@@ -209,11 +209,11 @@ The lang layer is below check packs in the implicit ordering, even though both s
 }
 ```
 
-A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-cli/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
+A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typescript → fitness` exception (`@opensip-cli/lang-typescript` re-exporting `filterContent`, `clearFilterCache`, `FilteredContent`) was paid down by moving those symbols into the adapter package itself — they now live in [`packages/languages/lang-typescript/src/filter.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/languages/lang-typescript/src/filter.ts) alongside the rest of the TS-aware string/comment stripping. With that, the rule simplified from the named carve-out (`lang-no-fitness-except-typescript`) to the unconditional form above.
 
 ### Output-boundary rules (ADR-0011)
 
-[ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
+[ADR-0011](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0011-signal-output-currency-formatter-sink.md) makes the `SignalEnvelope` the single output currency: a tool engine *returns* an envelope and **never renders or delivers its own output**. The CLI composition root maps flags → (formatter × sink). Four guards keep that honest — three dependency-cruiser rules plus one fitness check, because the contract has both an *import* shape and a *call* shape:
 
 - **`tool-engines-no-output-formatters`** — a tool engine (`packages/{fitness,graph,simulation}/engine/src/`) must not import an `@opensip-cli/output` formatter (`output/src/format/`). Rendering belongs to the composition root.
 - **`tool-engines-no-output-sinks`** — a tool engine must not import an `@opensip-cli/output` sink (`output/src/sink/`). Cloud/file egress is resolved only at the root.
@@ -221,11 +221,11 @@ A flat rule: *no* lang pack reaches up into fitness. The historical `lang-typesc
 
   All three are production-source-only — test files are globally excluded, so graph's relocated golden SARIF test may import `formatSignalSarif` from the barrel.
 
-- **`no-direct-stdout-in-tool-engine`** (a project-local dogfood fitness check, slug `no-direct-stdout-in-tool-engine`, [`opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, file-export transports) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
+- **`no-direct-stdout-in-tool-engine`** (a project-local dogfood fitness check, slug `no-direct-stdout-in-tool-engine`, [`opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/opensip-cli/fit/checks/no-direct-stdout-in-tool-engine.mjs)) — catches the call shape no import can catch: a tool engine writing run output straight to **stdout** (`process.stdout.write`, `console.log`/`.info`/`.debug`). Scope is **stdout only** — `console.error`/`.warn` are deliberately absent because stderr is the legitimate diagnostics channel (error messages, warnings, failure notices are not run output). The check fires only inside the three tool engines. Legitimate direct stdout (subprocess IPC, file-export transports) is exempted per-file via `@fitness-ignore-file no-direct-stdout-in-tool-engine` with a justification.
 
-- **`one-outcome-shape`** ([`opensip-cli/fit/checks/one-outcome-shape.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/opensip-cli/fit/checks/one-outcome-shape.mjs), ADR-0065) — public machine JSON must go through `renderOutcome` / host emit seams, not `process.stdout.write(JSON.stringify(...))`.
+- **`one-outcome-shape`** ([`opensip-cli/fit/checks/one-outcome-shape.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/opensip-cli/fit/checks/one-outcome-shape.mjs), ADR-0065) — public machine JSON must go through `renderOutcome` / host emit seams, not `process.stdout.write(JSON.stringify(...))`.
 
-- **`raw-stream-output-guarded`** ([`opensip-cli/fit/checks/raw-stream-output-guarded.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/opensip-cli/fit/checks/raw-stream-output-guarded.mjs), ADR-0065) — `output: 'raw-stream'` command specs must document their reason category in-file.
+- **`raw-stream-output-guarded`** ([`opensip-cli/fit/checks/raw-stream-output-guarded.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/opensip-cli/fit/checks/raw-stream-output-guarded.mjs), ADR-0065) — `output: 'raw-stream'` command specs must document their reason category in-file.
 
   The complementary positive contract is the `CommandResult` return type: a tool returns its envelope/result and routes output through the `ToolCliContext` seam (`cli.render` / `cli.emitJson` / `cli.emitEnvelope` / `cli.emitError` / `cli.deliverSignals` / `cli.writeArtifact` / `cli.writeSarif`).
 
@@ -289,7 +289,7 @@ These rules exist because the dashboard ships as a single self-contained `index.
 
 Beyond the hand-authored layer rules above, a family of gates is **derived from
 manifests** so it stays correct as packages are added
-([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)).
+([ADR-0151](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0151-manifest-derived-package-and-export-boundaries.md)).
 These do not name specific packages pairwise; they classify by
 `opensipTools.kind` and by declared exports:
 
@@ -309,7 +309,7 @@ These do not name specific packages pairwise; they classify by
 - **Production-only packed output** — package builds ship runtime bytes only;
   `scripts/verify-published-artifacts.mjs` rejects any test/fixture/coverage path
   or pack hook in the real `dist/` tree and packlist
-  ([ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md)).
+  ([ADR-0150](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0150-production-builds-publish-runtime-artifacts-only.md)).
 
 Every rule above has both a firing probe and a legal-edge control in
 `scripts/verify-gate-live.mjs`, each cleaned up after success and forced failure,

@@ -104,7 +104,7 @@ Fallbacks stay the normal surfaces: `--json` emits the `SignalEnvelope`, gate
 runs use the host baseline seams, suite steps capture the shared dispatch
 outcome, and non-TTY runs render the static run presentation. The private bridge
 is enforced by `external-adapter-progress-private-bridge`; see
-[ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md).
+[ADR-0139](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0139-host-owned-external-adapter-live-view.md).
 
 ## Observability
 
@@ -123,4 +123,4 @@ is enforced by `external-adapter-progress-private-bridge`; see
 | tool engines | 4 | `cli-live`, `cli-ui`, `core`, `contracts` |
 
 See [architecture-map.md](/docs/opensip-cli/80-implementation/architecture-map/) and
-[ADR-0058](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0058-shared-live-run-shell.md).
+[ADR-0058](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0058-shared-live-run-shell.md).
