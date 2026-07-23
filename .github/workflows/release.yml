@@ -1156,15 +1156,18 @@ jobs:
   # (Phase 4, after the burn-in bar), the SAME change MUST add `qualify-linux` to
   # `promote-release.needs` and extend the promote job's evidence recheck with the
   # Linux tuple flags — status and gate move together or not at all. The
-  # `linux-release-qualification-workflow.test.mjs` structure test enforces that
-  # lockstep against the registry row status, so a `supported` flip cannot land
-  # with an advisory gate.
+  # `linux-qualification-workflow.test.mjs` structure test enforces that lockstep
+  # against the registry row status, so a `supported` flip cannot land with an
+  # advisory gate.
   #
   # It is a SIBLING job, not a `strategy.matrix` leg of qualify-macos, precisely
   # because the gate posture is asymmetric: qualify-macos is a hard promote
   # dependency and qualify-linux is (during burn-in) advisory. A matrix job is one
   # job id; `promote.needs` cannot depend on a single leg. Trust posture is
   # identical: `contents: read`, no publish/promotion credential.
+  #
+  # The burn-in/lockstep decision + rejected alternatives are recorded in
+  # docs/decisions/ADR-0182-linux-qualification-burn-in-lockstep.md.
   # ===========================================================================
   qualify-linux:
     needs: stage-release
