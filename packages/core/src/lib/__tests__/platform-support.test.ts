@@ -412,6 +412,9 @@ describe('assessHostSupport', () => {
     const assessment = assessHostSupport({
       osPlatform: 'linux',
       arch: 'x64',
+      // Ubuntu's calendar version has a leading-zero minor ("04"); the major
+      // parser must still extract 24 (regression: it used to reject "24.04").
+      osVersion: '24.04',
       nodeVersion: 'v24.16.0',
       nodeAbi: '137',
     });

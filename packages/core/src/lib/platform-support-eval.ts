@@ -54,11 +54,17 @@ function majorOf(version: string | undefined): number | undefined {
     prereleaseAt === -1 ? versionAndPrerelease : versionAndPrerelease.slice(0, prereleaseAt);
   const prerelease = prereleaseAt === -1 ? undefined : versionAndPrerelease.slice(prereleaseAt + 1);
   if (prerelease !== undefined && !validVersionIdentifiers(prerelease, true)) return undefined;
-  const coreParts = core.split('.');
-  if (coreParts.length === 0 || coreParts.some((part) => !NUMERIC_VERSION_PART.test(part))) {
+  // The major must be strict (no leading zero); later numeric components may be
+  // plain digits, including a leading-zero calendar minor like Ubuntu's "24.04".
+  const [major, ...rest] = core.split('.');
+  if (
+    major === undefined ||
+    !NUMERIC_VERSION_PART.test(major) ||
+    rest.some((part) => !DECIMAL_IDENTIFIER.test(part))
+  ) {
     return undefined;
   }
-  const value = Number.parseInt(coreParts[0] ?? '', 10);
+  const value = Number.parseInt(major, 10);
   return Number.isSafeInteger(value) ? value : undefined;
 }
 
