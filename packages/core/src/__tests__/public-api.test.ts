@@ -323,6 +323,8 @@ const EXPECTED_VALUE_EXPORTS = [
   'stripCommentOpener',
   'tryCatch',
   'tryCatchAsync',
+  'unwrapOrLog',
+  'matchLog',
   'validateCommandSpec',
   'validateToolIdentity',
   'withLogRef',

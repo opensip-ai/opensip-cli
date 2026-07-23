@@ -14,6 +14,8 @@ export {
 export { ok, err, tryCatchAsync, tryCatch, formatUnknownErrorMessage } from './lib/errors.js';
 export { canonicalToolErrorCode, toolErrorFromCanonicalCode } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
+export { unwrapOrLog, matchLog } from './lib/result-logging.js';
+export type { ResultLogContext } from './lib/result-logging.js';
 export { appendBoundedUtf8Text } from './lib/bounded-text.js';
 export type { BoundedTextAppendResult } from './lib/bounded-text.js';
 export { compareByCodePoint } from './lib/compare-by-code-point.js';
