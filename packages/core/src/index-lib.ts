@@ -10,10 +10,45 @@ export {
   PluginIncompatibleError,
   UnknownCapabilityDomainError,
   CapabilitySchemaMismatchError,
+  createToolError,
+  isToolErrorLike,
+  sanitizeErrorMetadata,
+  TOOL_ERROR_BRAND_VERSION,
 } from './lib/errors.js';
 export { ok, err, tryCatchAsync, tryCatch, formatUnknownErrorMessage } from './lib/errors.js';
 export { canonicalToolErrorCode, toolErrorFromCanonicalCode } from './lib/errors.js';
 export type { Result, ToolErrorCode, ToolErrorOptions } from './lib/errors.js';
+
+// Lib — immutable error definitions / catalogs (Plan 00)
+export {
+  defineErrorCatalog,
+  deepFreeze,
+  normalizeErrorDefinition,
+  assertErrorCodeShape,
+  definitionFromLegacyCode,
+  coreSystemErrorCatalog,
+  CORE_SYSTEM_ERROR_OWNER,
+  ERROR_CATALOG_SCHEMA_VERSION,
+  FAILURE_PROJECTION_SCHEMA_VERSION,
+  MACHINE_CONSUMER_COMPATIBILITY,
+  MAX_DEFINITIONS_PER_CATALOG,
+  ErrorDefinitionError,
+} from './lib/error-definition.js';
+export type {
+  ErrorDefinition,
+  ErrorCatalog,
+  ErrorCatalogOwner,
+  ErrorOwnerIdentity,
+  FailureSource,
+  FailureResponsibility,
+  FailureKind,
+  FailureRetryPosture,
+  ExecutionFailureSeverity,
+  FailureExposure,
+  FailureExitClass,
+  ErrorCodeStability,
+  ErrorCodeLifecycle,
+} from './lib/error-definition.js';
 export { unwrapOrLog, matchLog } from './lib/result-logging.js';
 export type { ResultLogContext } from './lib/result-logging.js';
 export { appendBoundedUtf8Text } from './lib/bounded-text.js';
