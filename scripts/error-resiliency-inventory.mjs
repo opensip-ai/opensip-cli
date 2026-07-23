@@ -886,22 +886,19 @@ function buildShards(productionFiles) {
   // Stable order: package shards by id, then bundles
   raw.sort((a, b) => compareByCodePointLocal(a.id, b.id));
 
-  // Secondary: next shard in ordered list
-  return raw.map((shard, index) => {
-    const secondary =
-      raw.length === 1 ? shard.primaryPaths : raw[(index + 1) % raw.length].primaryPaths;
-    return {
-      id: shard.id,
-      role: 'primary',
-      strategy: shard.strategy,
-      packages: shard.packages,
-      primaryPaths: shard.primaryPaths,
-      secondaryPaths: secondary,
-      primaryCount: shard.primaryPaths.length,
-      secondaryCount: secondary.length,
-      totalWeight: shard.totalWeight,
-    };
-  });
+  // Secondary reviews the SAME files as primary (blind dual full-file review).
+  // A different reviewer identity is required at submission time; paths must match.
+  return raw.map((shard) => ({
+    id: shard.id,
+    role: 'primary',
+    strategy: shard.strategy,
+    packages: shard.packages,
+    primaryPaths: shard.primaryPaths,
+    secondaryPaths: [...shard.primaryPaths],
+    primaryCount: shard.primaryPaths.length,
+    secondaryCount: shard.primaryPaths.length,
+    totalWeight: shard.totalWeight,
+  }));
 }
 
 /**
