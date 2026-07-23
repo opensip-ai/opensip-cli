@@ -8,6 +8,8 @@ import {
   ACCEPTED_DISPOSITIONS,
   BOUNDS,
   DISPOSITIONS,
+  INVENTORY_COOP_DIR,
+  INVENTORY_TEST_FIXTURE_DIR,
   SCHEMA_VERSION,
   assertSafeRepoRelativePath,
   canonicalStringify,
@@ -33,17 +35,26 @@ import {
 } from '../lib/error-resiliency-sites.mjs';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+/** Tracked fixtures only — campaign root under docs/internal is gitignored. */
+const FIXTURE_ROOT = {
+  inventoryRoot: join(REPO_ROOT, INVENTORY_TEST_FIXTURE_DIR),
+};
 
 test('schema.json declares schemaVersion const 1', () => {
-  const schema = loadSchemaDocument(REPO_ROOT);
+  const schema = loadSchemaDocument(REPO_ROOT, FIXTURE_ROOT);
   assert.equal(schema.properties.schemaVersion.const, SCHEMA_VERSION);
   assert.ok(schema.definitions.fileRecord);
   assert.ok(schema.definitions.siteRecord);
 });
 
 test('rubric version is readable and matches library constant shape', () => {
-  const version = loadRubricVersion(REPO_ROOT);
+  const version = loadRubricVersion(REPO_ROOT, FIXTURE_ROOT);
   assert.match(version, /^\d+\.\d+\.\d+$/u);
+});
+
+test('campaign root constant is under gitignored docs/internal coop', () => {
+  assert.equal(INVENTORY_COOP_DIR, 'docs/internal/coop/error-resiliency-inventory');
+  assert.match(INVENTORY_COOP_DIR, /^docs\/internal\//u);
 });
 
 test('parseJsonSafe rejects oversized and deep payloads', () => {
@@ -232,11 +243,8 @@ test('formatInventoryDiagnostic includes repair hints', () => {
   assert.match(diagnostic.repair, /C3/);
 });
 
-test('schema file is valid JSON and present on disk', () => {
-  const text = readFileSync(
-    join(REPO_ROOT, '.config/error-resiliency-inventory/schema.json'),
-    'utf8',
-  );
+test('tracked schema fixture is valid JSON (campaign schema is not git-tracked)', () => {
+  const text = readFileSync(join(REPO_ROOT, INVENTORY_TEST_FIXTURE_DIR, 'schema.json'), 'utf8');
   const parsed = parseJsonSafe(text);
   assert.equal(typeof parsed, 'object');
 });

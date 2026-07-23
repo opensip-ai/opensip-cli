@@ -26,6 +26,7 @@ import { pathToFileURL } from 'node:url';
 import {
   BOUNDS,
   DETECTOR_VERSION,
+  INVENTORY_COOP_DIR,
   InventoryError,
   RUBRIC_VERSION,
   SCHEMA_VERSION,
@@ -38,6 +39,7 @@ import {
   loadRubricVersion,
   loadSchemaDocument,
   parseJsonSafe,
+  resolveInventoryRoot,
   sortByKey,
 } from './lib/error-resiliency-inventory.mjs';
 import { extractStructuralSites, isStructurallySupportedPath } from './lib/error-resiliency-sites.mjs';
@@ -45,9 +47,7 @@ import { extractStructuralSites, isStructurallySupportedPath } from './lib/error
 const require = createRequire(import.meta.url);
 const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
 
-const CONFIG_DIR = '.config/error-resiliency-inventory';
-const PRE_INFRA = `${CONFIG_DIR}/snapshots/pre-infra`;
-const REVIEW_POLICY_PATH = `${CONFIG_DIR}/review-policy.json`;
+const REVIEW_POLICY_REL = `${INVENTORY_COOP_DIR}/review-policy.json`;
 
 /**
  * @param {string[]} argv
@@ -100,8 +100,13 @@ export async function main(argv = process.argv.slice(2), env = {}) {
 function usage() {
   return `Usage: node scripts/error-resiliency-inventory.mjs <command> [options]
 
+Ephemeral Plan 00 inventory campaign (NOT product config).
+Campaign root (gitignored): ${INVENTORY_COOP_DIR}/
+  schema.json, rubric.md, review-policy.json, decision-log.md,
+  snapshots/<name>/scope-manifest.json, shard-manifest.json, submissions/
+
 Commands:
-  schema-check              Validate committed schema.json + rubric version
+  schema-check              Validate campaign schema.json + rubric version
   generate [--commit SHA] [--dry-run] [--snapshot pre-infra]
   check [--scope-only] [--policy] [--strict] [--changed]
   status                    Coverage/progress summary for a snapshot
@@ -110,9 +115,9 @@ Commands:
 Options:
   --commit <sha>   Freeze inventory to this git commit (default HEAD)
   --dry-run        Compute manifests without writing
-  --snapshot <id>  Snapshot name under snapshots/ (default pre-infra)
+  --snapshot <id>  Snapshot name under campaign snapshots/ (default pre-infra)
   --scope-only     Only verify scope/shard manifests
-  --policy         Verify review-policy.json
+  --policy         Verify campaign review-policy.json
   --strict         Full artifact + detector coverage honesty checks
   --changed        Local changed-scope mode (tracked changes only)
 `;
@@ -256,8 +261,9 @@ function runGenerate(repoRoot, flags, stdout) {
   const shardDigest = digestCanonical(shardManifest);
   const shardWithDigest = { ...shardManifest, digest: shardDigest };
 
+  const inventoryRoot = resolveInventoryRoot(repoRoot);
   if (!dryRun) {
-    const outDir = join(repoRoot, CONFIG_DIR, 'snapshots', snapshot);
+    const outDir = join(inventoryRoot, 'snapshots', snapshot);
     atomicWriteJson(join(outDir, 'scope-manifest.json'), scopeWithDigest);
     atomicWriteJson(join(outDir, 'shard-manifest.json'), shardWithDigest);
   }
@@ -269,6 +275,8 @@ function runGenerate(repoRoot, flags, stdout) {
         dryRun,
         commit,
         snapshot,
+        inventoryRoot: INVENTORY_COOP_DIR,
+        tracked: false,
         packageCount: packages.length,
         fileCount: sortedFiles.length,
         productionFileCount: productionFiles.length,
@@ -298,9 +306,9 @@ function runCheck(repoRoot, flags, stdout) {
   const problems = [];
 
   if (flags.policy || flags.strict) {
-    const policyPath = join(repoRoot, REVIEW_POLICY_PATH);
+    const policyPath = join(repoRoot, REVIEW_POLICY_REL);
     if (!existsSync(policyPath)) {
-      problems.push(`missing ${REVIEW_POLICY_PATH}`);
+      problems.push(`missing ${REVIEW_POLICY_REL} (local campaign; gitignored)`);
     } else {
       const policy = parseJsonSafe(readFileSync(policyPath, 'utf8'), { label: 'review-policy' });
       const p = /** @type {any} */ (policy);
@@ -333,11 +341,14 @@ function runCheck(repoRoot, flags, stdout) {
 
   if (flags['scope-only'] || flags.strict || !flags.policy) {
     const snapshot = typeof flags.snapshot === 'string' ? flags.snapshot : 'pre-infra';
-    const scopePath = join(repoRoot, CONFIG_DIR, 'snapshots', snapshot, 'scope-manifest.json');
-    const shardPath = join(repoRoot, CONFIG_DIR, 'snapshots', snapshot, 'shard-manifest.json');
+    const inventoryRoot = resolveInventoryRoot(repoRoot);
+    const scopePath = join(inventoryRoot, 'snapshots', snapshot, 'scope-manifest.json');
+    const shardPath = join(inventoryRoot, 'snapshots', snapshot, 'shard-manifest.json');
     if (!existsSync(scopePath) || !existsSync(shardPath)) {
       if (flags['scope-only'] || flags.strict) {
-        problems.push(`missing scope/shard manifests for snapshot ${snapshot}`);
+        problems.push(
+          `missing scope/shard manifests for snapshot ${snapshot} under ${INVENTORY_COOP_DIR} (local campaign)`,
+        );
       }
     } else {
       const scope = parseJsonSafe(readFileSync(scopePath, 'utf8'), { label: 'scope-manifest' });
@@ -455,10 +466,17 @@ function runCheck(repoRoot, flags, stdout) {
  */
 function runStatus(repoRoot, flags, stdout) {
   const snapshot = typeof flags.snapshot === 'string' ? flags.snapshot : 'pre-infra';
-  const scopePath = join(repoRoot, CONFIG_DIR, 'snapshots', snapshot, 'scope-manifest.json');
-  const shardPath = join(repoRoot, CONFIG_DIR, 'snapshots', snapshot, 'shard-manifest.json');
+  const inventoryRoot = resolveInventoryRoot(repoRoot);
+  const scopePath = join(inventoryRoot, 'snapshots', snapshot, 'scope-manifest.json');
+  const shardPath = join(inventoryRoot, 'snapshots', snapshot, 'shard-manifest.json');
   if (!existsSync(scopePath)) {
-    stdout(JSON.stringify({ ok: true, snapshot, state: 'missing-scope' }, null, 2) + '\n');
+    stdout(
+      JSON.stringify(
+        { ok: true, snapshot, inventoryRoot: INVENTORY_COOP_DIR, state: 'missing-scope' },
+        null,
+        2,
+      ) + '\n',
+    );
     return 0;
   }
   const scope = /** @type {any} */ (
@@ -502,12 +520,13 @@ function runReconcile(repoRoot, flags, stdout) {
       'reconcile requires --from <snapshot> and --to <snapshot>',
     );
   }
-  const fromPath = join(repoRoot, CONFIG_DIR, 'snapshots', from, 'scope-manifest.json');
-  const toPath = join(repoRoot, CONFIG_DIR, 'snapshots', to, 'scope-manifest.json');
+  const inventoryRoot = resolveInventoryRoot(repoRoot);
+  const fromPath = join(inventoryRoot, 'snapshots', from, 'scope-manifest.json');
+  const toPath = join(inventoryRoot, 'snapshots', to, 'scope-manifest.json');
   if (!existsSync(fromPath) || !existsSync(toPath)) {
     throw new InventoryError(
       'INVENTORY.RECONCILE.MISSING',
-      `both snapshots must exist: ${from}, ${to}`,
+      `both snapshots must exist under ${INVENTORY_COOP_DIR}: ${from}, ${to}`,
     );
   }
   const fromScope = /** @type {any} */ (parseJsonSafe(readFileSync(fromPath, 'utf8')));

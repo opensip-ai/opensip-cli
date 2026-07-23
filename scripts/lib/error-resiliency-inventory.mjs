@@ -14,6 +14,15 @@ export const SCHEMA_VERSION = 1;
 export const RUBRIC_VERSION = '1.0.0';
 export const DETECTOR_VERSION = '1.0.0';
 
+/**
+ * Ephemeral Plan 00 inventory campaign root (gitignored under docs/internal/).
+ * Not product config — scope/shards, policy, schema copies, and C0–C5 notes live here.
+ */
+export const INVENTORY_COOP_DIR = 'docs/internal/coop/error-resiliency-inventory';
+
+/** Tracked test fixtures only (schema/rubric samples for unit tests). */
+export const INVENTORY_TEST_FIXTURE_DIR = 'scripts/__tests__/fixtures/error-resiliency-inventory';
+
 /** @type {Readonly<Record<string, number>>} */
 export const BOUNDS = Object.freeze({
   maxPathLength: 512,
@@ -467,20 +476,41 @@ export function findDuplicates(files) {
 }
 
 /**
- * Load and lightly validate the committed schema document.
+ * Resolve the inventory campaign directory (ephemeral coop), with optional override.
  * @param {string} [repoRoot]
+ * @param {{ inventoryRoot?: string }} [opts]
  */
-export function loadSchemaDocument(repoRoot = defaultRepoRoot()) {
-  const schemaPath = join(repoRoot, '.config/error-resiliency-inventory/schema.json');
-  const text = readFileSync(schemaPath, 'utf8');
-  const schema = parseJsonSafe(text, { label: 'schema.json' });
-  if (!isPlainObject(schema) || schema.schemaVersion !== SCHEMA_VERSION) {
-    // schema document uses properties.schemaVersion.const; top-level may not have schemaVersion field as value
+export function resolveInventoryRoot(repoRoot = defaultRepoRoot(), opts = {}) {
+  if (typeof opts.inventoryRoot === 'string' && opts.inventoryRoot.length > 0) {
+    return opts.inventoryRoot.startsWith('/')
+      ? opts.inventoryRoot
+      : join(repoRoot, opts.inventoryRoot);
   }
+  return join(repoRoot, INVENTORY_COOP_DIR);
+}
+
+/**
+ * Load and lightly validate the campaign schema document (coop or explicit root).
+ * @param {string} [repoRoot]
+ * @param {{ inventoryRoot?: string }} [opts]
+ */
+export function loadSchemaDocument(repoRoot = defaultRepoRoot(), opts = {}) {
+  const root = resolveInventoryRoot(repoRoot, opts);
+  const schemaPath = join(root, 'schema.json');
+  let text;
+  try {
+    text = readFileSync(schemaPath, 'utf8');
+  } catch {
+    throw new InventoryError(
+      'INVENTORY.SCHEMA.MISSING',
+      `schema.json not found under ${relative(repoRoot, root) || root} (ephemeral campaign path; not product config)`,
+    );
+  }
+  const schema = parseJsonSafe(text, { label: 'schema.json' });
   if (!isPlainObject(schema) || schema.title === undefined) {
     throw new InventoryError('INVENTORY.SCHEMA.INVALID', 'schema.json is missing required shape');
   }
-  const constVersion = schema.properties?.schemaVersion?.const;
+  const constVersion = /** @type {any} */ (schema).properties?.schemaVersion?.const;
   if (constVersion !== SCHEMA_VERSION) {
     throw new InventoryError(
       'INVENTORY.SCHEMA.VERSION',
@@ -491,12 +521,22 @@ export function loadSchemaDocument(repoRoot = defaultRepoRoot()) {
 }
 
 /**
- * Load rubric metadata (version line).
+ * Load rubric metadata (version line) from the campaign root.
  * @param {string} [repoRoot]
+ * @param {{ inventoryRoot?: string }} [opts]
  */
-export function loadRubricVersion(repoRoot = defaultRepoRoot()) {
-  const rubricPath = join(repoRoot, '.config/error-resiliency-inventory/rubric.md');
-  const text = readFileSync(rubricPath, 'utf8');
+export function loadRubricVersion(repoRoot = defaultRepoRoot(), opts = {}) {
+  const root = resolveInventoryRoot(repoRoot, opts);
+  const rubricPath = join(root, 'rubric.md');
+  let text;
+  try {
+    text = readFileSync(rubricPath, 'utf8');
+  } catch {
+    throw new InventoryError(
+      'INVENTORY.RUBRIC.MISSING',
+      `rubric.md not found under ${relative(repoRoot, root) || root}`,
+    );
+  }
   const match = /\*\*Rubric version:\*\*\s*`([^`]+)`/u.exec(text);
   if (!match) {
     throw new InventoryError('INVENTORY.RUBRIC.VERSION', 'rubric.md missing Rubric version line');
@@ -541,7 +581,7 @@ function repairHint(code) {
     case 'INVENTORY.SCHEMA.VERSION':
       return 'Regenerate inventory artifacts with the current schema version 1 tooling.';
     default:
-      return 'See .config/error-resiliency-inventory/rubric.md and re-run pnpm error-inventory:check.';
+      return `See ${INVENTORY_COOP_DIR}/rubric.md (local campaign) and re-run pnpm error-inventory:check.`;
   }
 }
 
