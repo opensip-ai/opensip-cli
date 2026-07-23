@@ -2,6 +2,8 @@
  * Typed error classes and Result pattern for opensip-cli.
  */
 
+import { type ErrorDefinition, definitionFromLegacyCode } from './error-definition.js';
+
 // =============================================================================
 // ERROR CLASSES
 // =============================================================================
@@ -25,14 +27,97 @@ export type ToolErrorCode =
   | 'PLUGIN_INCOMPATIBLE'
   | 'UNKNOWN_LIVE_VIEW';
 
-/** Constructor options for {@link ToolError}: `code` plus arbitrary diagnostic metadata. */
+/** Structural brand version for cross-copy recognition (not instanceof-only). */
+export const TOOL_ERROR_BRAND_VERSION = 1;
+const TOOL_ERROR_BRAND = Symbol.for('@opensip-cli/core/tool-error-brand');
+
+const MAX_METADATA_KEYS = 32;
+const MAX_METADATA_DEPTH = 4;
+const MAX_METADATA_STRING = 2048;
+const MAX_STDERR_TAIL = 4096;
+
+const SENSITIVE_KEY =
+  /pass(word)?|secret|token|authorization|api[_-]?key|cookie|credential|private[_-]?key/i;
+
+/** Constructor options for {@link ToolError}: `code` plus bounded diagnostic metadata. */
 export interface ToolErrorOptions extends ErrorOptions {
   code?: string;
   /** Supervisor/worker failure taxonomy (ADR-0054 resource-control diagnostics). */
   failureClass?: string;
   /** Truncated child stderr tail for operator triage on worker fault. */
   stderrTail?: string;
+  /**
+   * Bounded JSON-safe diagnostic metadata. Sensitive keys are stripped.
+   * Prefer catalog `publicMetadataKeys` for anything that may leave the process.
+   */
+  metadata?: Readonly<Record<string, unknown>>;
+  /**
+   * Legacy open bag — preserved only in {@link ToolError.legacyCompatibility}
+   * during migration; never treated as safe metadata. Marked for Plan 01 removal.
+   */
   [key: string]: unknown;
+}
+
+/**
+ * Sanitize unknown metadata into a plain, bounded, JSON-safe object.
+ * Hostile getters/cycles become sentinels; sensitive keys are dropped.
+ */
+export function sanitizeErrorMetadata(
+  input: unknown,
+  depth = 0,
+): Readonly<Record<string, unknown>> {
+  if (depth > MAX_METADATA_DEPTH || input === null || typeof input !== 'object') {
+    return Object.freeze({});
+  }
+  /** @type {Record<string, unknown>} */
+  const out: Record<string, unknown> = {};
+  let count = 0;
+  try {
+    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+      if (count >= MAX_METADATA_KEYS) break;
+      if (SENSITIVE_KEY.test(key)) continue;
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+      const sanitized = sanitizeMetadataValue(value, depth + 1);
+      if (sanitized === undefined) continue;
+      out[key.slice(0, 64)] = sanitized;
+      count += 1;
+    }
+  } catch {
+    return Object.freeze({ _meta: 'hostile-metadata' });
+  }
+  return Object.freeze(out);
+}
+
+function sanitizeMetadataValue(value: unknown, depth: number): unknown {
+  if (value === null) return null;
+  if (typeof value === 'string') return value.slice(0, MAX_METADATA_STRING);
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'bigint') return value.toString();
+  if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'undefined') {
+    return undefined;
+  }
+  if (Array.isArray(value)) {
+    if (depth > MAX_METADATA_DEPTH) return '[TruncatedArray]';
+    return Object.freeze(
+      value.slice(0, 32).map((item) => sanitizeMetadataValue(item, depth + 1) ?? null),
+    );
+  }
+  if (typeof value === 'object') {
+    return sanitizeErrorMetadata(value, depth);
+  }
+  return undefined;
+}
+
+function isErrorDefinition(value: unknown): value is ErrorDefinition {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as ErrorDefinition).code === 'string' &&
+    typeof (value as ErrorDefinition).source === 'string' &&
+    typeof (value as ErrorDefinition).kind === 'string' &&
+    typeof (value as ErrorDefinition).exitClass === 'string'
+  );
 }
 
 /** Base class for all opensip-cli errors; carries a `code` for programmatic dispatch. */
@@ -45,18 +130,106 @@ export class ToolError extends Error {
    * after an `instanceof` check.
    */
   readonly code: string;
+  /** Resolved immutable definition (legacy codes map through the core adapter). */
+  readonly definition: ErrorDefinition;
   /** Machine-filterable failure class when the error originated at a worker boundary. */
   readonly failureClass?: string;
   /** Captured child stderr tail (truncated) when available. */
   readonly stderrTail?: string;
+  /** Bounded JSON-safe metadata retained for diagnostics (not necessarily public). */
+  readonly metadata: Readonly<Record<string, unknown>>;
+  /**
+   * Unrecognized legacy option fields parked for Plan 01 removal — operator-only,
+   * never wire-safe.
+   */
+  readonly legacyCompatibility?: Readonly<Record<string, unknown>>;
 
-  constructor(message: string, code: string, options?: ToolErrorOptions) {
+  /**
+   * @param messageOrDefinition Human message, or an {@link ErrorDefinition} (new form).
+   * @param codeOrMessage Definition form: message. Legacy form: code string.
+   * @param options Optional cause/metadata (both forms).
+   */
+  constructor(
+    messageOrDefinition: string | ErrorDefinition,
+    codeOrMessage?: string,
+    options?: ToolErrorOptions,
+  ) {
+    const fromDefinition = isErrorDefinition(messageOrDefinition);
+    const message = fromDefinition
+      ? String(codeOrMessage ?? messageOrDefinition.code)
+      : String(messageOrDefinition);
+    const code = fromDefinition
+      ? messageOrDefinition.code
+      : String(codeOrMessage ?? options?.code ?? 'SYSTEM_ERROR');
+    const definition = fromDefinition
+      ? messageOrDefinition
+      : definitionFromLegacyCode(options?.code ?? code);
+
     super(message, options);
     this.name = 'ToolError';
-    this.code = code;
-    this.failureClass = options?.failureClass;
-    this.stderrTail = options?.stderrTail;
+    this.code = options?.code ?? code;
+    this.definition = definition;
+    this.failureClass =
+      typeof options?.failureClass === 'string' ? options.failureClass.slice(0, 128) : undefined;
+    this.stderrTail =
+      typeof options?.stderrTail === 'string'
+        ? options.stderrTail.slice(0, MAX_STDERR_TAIL)
+        : undefined;
+
+    const known = new Set(['code', 'failureClass', 'stderrTail', 'metadata', 'cause']);
+    /** @type {Record<string, unknown>} */
+    const legacy: Record<string, unknown> = {};
+    if (options) {
+      for (const [key, value] of Object.entries(options)) {
+        if (known.has(key)) continue;
+        legacy[key] = value;
+      }
+    }
+    this.legacyCompatibility =
+      Object.keys(legacy).length > 0 ? sanitizeErrorMetadata(legacy) : undefined;
+    this.metadata = sanitizeErrorMetadata(options?.metadata ?? {});
+
+    Object.defineProperty(this, TOOL_ERROR_BRAND, {
+      value: TOOL_ERROR_BRAND_VERSION,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
   }
+
+  /**
+   * Operator-only string form — never wire-safe. Prefer normalized envelope
+   * projections for public/persisted/worker sinks (Phase 3).
+   */
+  override toString(): string {
+    return `${this.name} [${this.code}]: ${this.message}`;
+  }
+}
+
+/**
+ * Structural recognition of ToolError across duplicate physical @opensip-cli/core
+ * copies. Validates brand version + plain shape; does not trust arbitrary brands.
+ */
+export function isToolErrorLike(value: unknown): value is ToolError {
+  if (value instanceof ToolError) return true;
+  if (typeof value !== 'object' || value === null) return false;
+  const brand = (value as Record<symbol, unknown>)[TOOL_ERROR_BRAND];
+  if (brand !== TOOL_ERROR_BRAND_VERSION) return false;
+  const candidate = value as Partial<ToolError>;
+  return (
+    typeof candidate.message === 'string' &&
+    typeof candidate.code === 'string' &&
+    isErrorDefinition(candidate.definition)
+  );
+}
+
+/** Preferred constructor: definition + message + options. */
+export function createToolError(
+  definition: ErrorDefinition,
+  message: string,
+  options?: ToolErrorOptions,
+): ToolError {
+  return new ToolError(definition, message, options);
 }
 
 /** Thrown when user-supplied input (config, CLI flags, recipes) fails schema or domain validation. */

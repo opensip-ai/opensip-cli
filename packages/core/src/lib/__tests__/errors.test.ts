@@ -13,11 +13,15 @@ import {
   CapabilitySchemaMismatchError,
   canonicalToolErrorCode,
   toolErrorFromCanonicalCode,
+  createToolError,
+  isToolErrorLike,
+  sanitizeErrorMetadata,
   ok,
   err,
   tryCatch,
   tryCatchAsync,
 } from '../../lib/errors.js';
+import { coreSystemErrorCatalog } from '../../lib/error-definition.js';
 
 import type { Result } from '../../lib/errors.js';
 
@@ -27,6 +31,7 @@ describe('ToolError', () => {
     expect(err.message).toBe('something broke');
     expect(err.code).toBe('CUSTOM_CODE');
     expect(err.name).toBe('ToolError');
+    expect(err.definition.code).toBe('CORE.SYSTEM.UNKNOWN_FAILURE');
   });
 
   it('is an instance of Error', () => {
@@ -45,6 +50,35 @@ describe('ToolError', () => {
     const err = new ToolError('traced', 'T');
     expect(err.stack).toBeDefined();
     expect(err.stack).toContain('traced');
+  });
+
+  it('preserves bounded metadata and strips secrets', () => {
+    const err = new ToolError('x', 'VALIDATION_ERROR', {
+      metadata: {
+        check: 'demo',
+        password: 'secret',
+        nested: { token: 'nope', ok: 1 },
+      },
+    });
+    expect(err.metadata).toEqual({ check: 'demo', nested: { ok: 1 } });
+    expect(err.definition.kind).toBe('validation');
+  });
+
+  it('supports definition-first construction', () => {
+    const def = coreSystemErrorCatalog.require('NOT_FOUND');
+    const err = createToolError(def, 'missing recipe');
+    expect(err.code).toBe('NOT_FOUND');
+    expect(err.definition).toBe(def);
+    expect(isToolErrorLike(err)).toBe(true);
+  });
+
+  it('sanitizeErrorMetadata is total on hostile input', () => {
+    const hostile = {
+      get boom() {
+        throw new Error('nope');
+      },
+    };
+    expect(sanitizeErrorMetadata(hostile)).toEqual({ _meta: 'hostile-metadata' });
   });
 });
 
