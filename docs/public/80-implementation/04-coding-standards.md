@@ -113,6 +113,15 @@ Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatch(fn)`
 - **Return `Result<T, E>`** in tight loops where allocating exception objects is hot, or where multiple error kinds are equally first-class.
 - **Throw plain `Error`** *never*. Always one of the typed subclasses, with a `code`.
 
+### Handling a Result error observably
+
+A `Result` failure must never be *silently* discarded. The `error-handling-quality` fitness check flags a `!r.ok` / `r.ok === false` (or `r.isErr()`) branch that returns a bare sentinel (`null` / `undefined` / `false` / `[]` / `{}`) with no logging, propagation, or marker. Handle it one of these ways:
+
+- **Propagate** — `return` / `throw` the error (or a value derived from it) so the caller sees it.
+- **Log it** — `logger.warn({ evt: 'x.failed', err: r.error })` before returning a fallback.
+- **Use a logging-forcing helper** for the *value-selection* shapes: `unwrapOrLog(result, fallback, { evt })` (continue with the value or a logged fallback) or `matchLog(result, onOk, onErr, { evt })` (map both branches, logging the error). They make the failure observable by construction — reach for them where you'd otherwise write `r.ok ? r.value : fallback`. They do **not** model early-return/propagation guards, so keep the manual `if (!r.ok) { … return … }` form for those.
+- **Mark it** — `// @swallow-ok <reason>` when the degradation is genuinely intentional (a best-effort probe), which documents the intent at the site.
+
 ### Error codes
 
 Each error subclass ships with a sensible default: `VALIDATION_ERROR`, `NOT_FOUND`, `SYSTEM_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `CONFIGURATION_ERROR`. Call sites that want a more specific code pass `{ code: '...' }` as the second argument, e.g. `new ValidationError('bad', { code: 'SCHEMA_FAIL' })`. Most production throws today use the defaults; the shape is in place for future scoped codes.

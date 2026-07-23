@@ -284,6 +284,7 @@ export async function invokeBoundedTargetResolution(
   if (!invoked.ok) {
     if (signal?.aborted === true) reasons.add(INVENTORY_CANCELLED_REASON);
     reasons.add(reasonCodes.failure);
+    // @swallow-ok: the failure is surfaced as a bounded reason code; the error detail is intentionally not logged here.
     return undefined;
   }
   const validated = validateBoundedTargetResolution(invoked.value, maximumFiles);
@@ -308,6 +309,7 @@ export async function invokeBoundedTargetMembershipResolution(input: {
   if (!invoked.ok) {
     if (input.signal?.aborted === true) input.reasons.add(INVENTORY_CANCELLED_REASON);
     input.reasons.add(input.reasonCodes.failure);
+    // @swallow-ok: the failure is surfaced as a bounded reason code; the error detail is intentionally not logged here.
     return undefined;
   }
   const validated = validateBoundedTargetMembershipResolution(

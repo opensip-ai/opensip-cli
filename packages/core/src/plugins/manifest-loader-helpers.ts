@@ -195,11 +195,17 @@ export function validateManifest(
   if (requires === 'invalid') return undefined;
 
   const pluginLayoutResult = validateOptionalPluginLayout(block.pluginLayout, normalizedIdentity);
-  if (!pluginLayoutResult.ok) return undefined;
+  if (!pluginLayoutResult.ok) {
+    // @swallow-ok: an invalid pluginLayout rejects the whole tool block, consistent with the `=== 'invalid'` guards above.
+    return undefined;
+  }
   const pluginLayout = pluginLayoutResult.value;
 
   const configResult = validateOptionalConfig(block.config, normalizedIdentity);
-  if (!configResult.ok) return undefined;
+  if (!configResult.ok) {
+    // @swallow-ok: an invalid config block rejects the whole tool block (see pluginLayout above).
+    return undefined;
+  }
   const config = configResult.value;
 
   return {

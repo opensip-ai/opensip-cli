@@ -51,7 +51,10 @@ export function canonicalFile(
   else if (lexicallyInside(filePath, lexicalProjectRoot)) identityRoot = lexicalProjectRoot;
   if (identityRoot === undefined) return undefined;
   const canonical = tryCatch(() => realpathSync(filePath));
-  if (!canonical.ok) return undefined;
+  if (!canonical.ok) {
+    // @swallow-ok: realpath probe — an unresolvable path is treated as "not in project", not an error.
+    return undefined;
+  }
   const absolutePath = canonical.value;
   if (!isPathInside(absolutePath, projectRoot)) return undefined;
   // Realpath is the containment/stat authority, but the configured lexical path

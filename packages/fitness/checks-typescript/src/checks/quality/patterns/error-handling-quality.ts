@@ -33,6 +33,9 @@ const LOGGING_PATTERNS = [
   /handleErr\s*\(/,
   /reportFailure\s*\(/,
   /handleGraphError\s*\(/,
+  // Domain error-reporting seams (e.g. `emitShowError`, `emitGraphShowError`) that
+  // surface the failure's reason/detail to the user before returning.
+  /\bemit\w*Error\s*\(/,
 ];
 
 /**
@@ -342,13 +345,43 @@ function checkCatchClause(node: ts.CatchClause, sourceFile: ts.SourceFile): Chec
 }
 
 /**
- * Check Result.isErr() usage for violations
+ * True when an `if` condition tests a Result's error branch in the bare-union
+ * style OpenSIP uses — `!<x>.ok` or `<x>.ok === false` — as opposed to the
+ * method style (`<x>.isErr()`). Kept AST-precise so a compound condition like
+ * `if (!x.ok && y)` is not matched (only a clean discriminant guard is).
+ */
+function isNativeResultErrCondition(expr: ts.Expression): boolean {
+  if (ts.isPrefixUnaryExpression(expr) && expr.operator === ts.SyntaxKind.ExclamationToken) {
+    return ts.isPropertyAccessExpression(expr.operand) && expr.operand.name.text === 'ok';
+  }
+  if (
+    ts.isBinaryExpression(expr) &&
+    expr.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+  ) {
+    return (
+      ts.isPropertyAccessExpression(expr.left) &&
+      expr.left.name.text === 'ok' &&
+      expr.right.kind === ts.SyntaxKind.FalseKeyword
+    );
+  }
+  return false;
+}
+
+/**
+ * Check a Result error-branch guard for a silently discarded error. Covers both
+ * the method style (`<x>.isErr()`) and OpenSIP's native bare-union style
+ * (`!<x>.ok` / `<x>.ok === false`). A branch that logs, propagates
+ * (return/throw the error or a derived value), uses `unwrapOrLog`/`matchLog`, or
+ * carries a `@swallow-ok` marker is accepted; a branch whose only effect is
+ * returning a bare sentinel (`null`/`undefined`/`false`/`[]`/`{}`) is flagged.
  */
 function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): CheckViolation[] {
   const violations: CheckViolation[] = [];
   const cond = node.expression.getText(sourceFile);
   // @fitness-ignore-next-line error-handling-quality -- String literal check for '.isErr()', not actual Result error handling
-  if (!cond.includes('.isErr()')) return violations;
+  const isMethodStyle = cond.includes('.isErr()');
+  const isNativeStyle = isNativeResultErrCondition(node.expression);
+  if (!isMethodStyle && !isNativeStyle) return violations;
 
   const thenText = node.thenStatement.getText(sourceFile);
   /* v8 ignore next -- defensive AST/type guard */
@@ -365,8 +398,9 @@ function checkResultIsErr(node: ts.IfStatement, sourceFile: ts.SourceFile): Chec
           column: 0,
           message: `Result error silently discarded - returns ${val}`,
           severity: 'error',
-          suggestion: `Use: \`result.unwrapOrLog(${val}, { evt: 'operation.failed' })\``,
-          match: 'isErr()',
+          suggestion:
+            'Log it, propagate it (return/throw the error), use `unwrapOrLog`/`matchLog`, or mark `@swallow-ok <reason>` if the degradation is intentional.',
+          match: isMethodStyle ? 'isErr()' : '!ok',
         });
       }
     }
@@ -530,7 +564,7 @@ export const errorHandlingQuality = defineCheck({
 **Detects:** Analyzes each file individually using TypeScript AST. Checks for:
 - Empty catch blocks (no logging, no rethrow, no \`@swallow-ok\` marker)
 - Catch blocks that return sentinel values (\`false\`, \`null\`, \`undefined\`, \`[]\`, \`{}\`) without logging
-- \`result.isErr()\` branches that silently return sentinel values
+- Result error-branch guards — \`result.isErr()\`, \`!result.ok\`, or \`result.ok === false\` — that silently return sentinel values
 - \`mapErr()\` callbacks without logging
 - \`match()\` error handlers without logging (suggests \`matchLog()\` instead)
 

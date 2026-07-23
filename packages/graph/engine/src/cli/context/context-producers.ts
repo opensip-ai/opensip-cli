@@ -214,7 +214,10 @@ async function ensuredCatalog(
   const root = projectRoot(cli, opts.cwd);
   const scope = graphScope(cli);
   const loadedResult = scope.contextCatalog.load();
-  if (!loadedResult.ok) return;
+  if (!loadedResult.ok) {
+    // @swallow-ok: graph context catalog is best-effort; an unreadable catalog degrades to "no context".
+    return;
+  }
   const loaded = loadedResult.value;
   if (loaded !== null) {
     const verified = await verifyCatalogInputs({
@@ -234,9 +237,15 @@ async function ensuredCatalog(
     }
   }
   const rebuilt = await rebuildCatalog({ cwd: root });
-  if (!rebuilt.ok) return;
+  if (!rebuilt.ok) {
+    // @swallow-ok: graph context is best-effort; a failed rebuild degrades to "no context".
+    return;
+  }
   const replaced = scope.contextCatalog.replace(rebuilt.value);
-  if (!replaced.ok) return;
+  if (!replaced.ok) {
+    // @swallow-ok: graph context is best-effort; a failed catalog replace degrades to "no context".
+    return;
+  }
   return { catalog: rebuilt.value, status: 'rebuilt' };
 }
 
