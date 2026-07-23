@@ -1438,7 +1438,12 @@ function verifyAcceptance(profile, evidenceRaw, evidenceByteLength, expected) {
   }
   if (expected.kernelMajor !== undefined) {
     const value = evidence.host.kernelRelease;
-    const major = typeof value === 'string' ? versionMajor(value) : null;
+    // A kernel release carries a build/vendor suffix after the first hyphen
+    // (`6.11.0-1015-azure`, `7.0.11-orbstack`, `25.5.0` is suffix-free on Darwin).
+    // The dotted-numeric portion before it holds the major; versionMajor's strict
+    // full-string match would otherwise reject the whole string as malformed.
+    const core = typeof value === 'string' ? value.split('-', 1)[0] : null;
+    const major = core === null ? null : versionMajor(core);
     if (major === null || major !== expected.kernelMajor) fail('host-kernel-major-mismatch');
   }
   if (expected.unameArch !== undefined && evidence.host.unameArch !== expected.unameArch) {

@@ -304,6 +304,9 @@ export function assessHostSupport(
  * Among rows sharing the host's (platform, arch), pick the one the host best
  * matches: a contradiction-free candidate always beats a contradicted one; ties
  * break toward the most observed dimensions, then registry order.
+ *
+ * @throws {Error} When `candidates` is empty (unreachable — every caller passes a
+ *   non-empty candidate list already filtered by platform + arch).
  */
 function selectBestCandidate(
   observed: ObservedHost,

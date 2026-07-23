@@ -83,10 +83,10 @@
     { "id": "resilience.isolated-home", "required": true, "requiredPorts": [] },
     { "id": "resilience.signals", "required": true, "requiredPorts": [] },
     { "id": "resilience.timeout-cleanup", "required": true, "requiredPorts": [] },
-    { "id": "lifecycle.cli-state-uninstall", "required": true, "requiredPorts": [] },
-    { "id": "lifecycle.package-uninstall", "required": true, "requiredPorts": [] },
     { "id": "linux.tuple-crosscheck", "required": true, "requiredPorts": [] },
     { "id": "linux.native-sqlite", "required": true, "requiredPorts": [] },
-    { "id": "linux.case-sensitivity", "required": true, "requiredPorts": [] }
+    { "id": "linux.case-sensitivity", "required": true, "requiredPorts": [] },
+    { "id": "lifecycle.cli-state-uninstall", "required": true, "requiredPorts": [] },
+    { "id": "lifecycle.package-uninstall", "required": true, "requiredPorts": [] }
   ]
 }
