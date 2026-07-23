@@ -158,14 +158,17 @@ contradiction. Agents must distinguish the registry row's published `status`
 }
 ```
 
-A non-macOS host projects `status: "unqualified"`, `match: "none"`, and
-`reasonCodes: ["non-macos-host"]`. Process-only facts cannot establish every
-dimension of the exact Intel exclusion row, so Intel/x64 projects
-`status: "unqualified"` with `reasonCodes: ["insufficient-host-facts"]` unless
-a fuller assessment observes the complete published tuple. Only that exact tuple
-is `unsupported`, with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and
-MCP surfaces map the same core projection through one shared helper, so they emit
-a byte-identical `hostSupport` for identical process facts.
+A host whose `(platform, arch)` has no registry row projects
+`status: "unqualified"`, `match: "none"`, and `reasonCodes: ["unqualified-host"]`.
+A host that matches a row's `(platform, arch)` projects that row's published
+status at `match: "partial"` (process-only facts leave the other dimensions
+unobserved) — e.g. a Linux x64 host projects the `preview` ubuntu row. The exact
+Intel/x64 tuple projects `status: "unqualified"` with
+`reasonCodes: ["insufficient-host-facts"]` until a fuller assessment observes
+every dimension; only that complete tuple is `unsupported`, with
+`reasonCodes: ["unsupported-tuple"]`. The CLI and MCP surfaces map the same core
+projection through one shared helper, so they emit a byte-identical `hostSupport`
+for identical process facts.
 
 ## `engines` is not a support claim
 

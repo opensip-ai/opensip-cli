@@ -404,7 +404,7 @@ describe('hostSupportFromRuntimeProjection', () => {
         rowStatus: null,
         profile: null,
         docsUrl: null,
-        reasonCodes: ['non-macos-host'],
+        reasonCodes: ['unqualified-host'],
         observed: ['os-platform', 'arch', 'node-major', 'node-abi'],
         unobserved: [],
       },
@@ -414,7 +414,7 @@ describe('hostSupportFromRuntimeProjection', () => {
     expect(mapped.match).toBe('none');
     expect(mapped.profile).toBeNull();
     expect(mapped.matrixUrl).toBeNull();
-    expect(mapped.reasonCodes).toEqual(['non-macos-host']);
+    expect(mapped.reasonCodes).toEqual(['unqualified-host']);
   });
 
   it('preserves the stable reason-code, observed, and unobserved ordering (copies, not aliases)', () => {

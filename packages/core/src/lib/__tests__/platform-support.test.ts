@@ -9,7 +9,11 @@ import {
   type PlatformQualification,
   type PlatformSupportRow,
 } from '../../index.js';
-import { MACOS_INTEL_ROW, MACOS_PREVIEW_ROW } from '../platform-support-rows.js';
+import {
+  MACOS_INTEL_ROW,
+  MACOS_PREVIEW_ROW,
+  UBUNTU_2404_PREVIEW_ROW,
+} from '../platform-support-rows.js';
 import { assertPlatformSupportRowsValid } from '../platform-support-validate.js';
 
 /** The exact supported tuple (spec §4), fully observed. */
@@ -378,7 +382,7 @@ describe('assessHostSupport', () => {
     const assessment = assessHostSupport({ ...EXACT_MACOS, arch: 'x64' });
     expect(assessment.status).toBe('unsupported');
     expect(assessment.row?.id).toBe('macos-26-intel-unsupported');
-    expect(assessment.reasonCodes).toEqual(['macos-intel-unsupported']);
+    expect(assessment.reasonCodes).toEqual(['unsupported-tuple']);
   });
 
   it('does not broaden the Intel exclusion row across older macOS releases', () => {
@@ -396,24 +400,34 @@ describe('assessHostSupport', () => {
     expect(assessment.reasonCodes).toEqual(['node-major-mismatch']);
   });
 
-  it('keeps non-x64 macOS architectures unqualified', () => {
+  it('keeps a macOS host on an unlisted architecture unqualified', () => {
     const assessment = assessHostSupport({ ...EXACT_MACOS, arch: 'ia32' });
     expect(assessment.status).toBe('unqualified');
     expect(assessment.row).toBeUndefined();
-    expect(assessment.reasonCodes).toEqual(['arch-mismatch']);
+    // No (darwin, ia32) row exists — an unlisted (platform, arch) is unqualified.
+    expect(assessment.reasonCodes).toEqual(['unqualified-host']);
   });
 
-  it('classifies a non-macOS (Linux) host as unqualified, never "cannot run"', () => {
+  it('classifies a matching Linux host against the ubuntu preview row', () => {
     const assessment = assessHostSupport({
       osPlatform: 'linux',
       arch: 'x64',
       nodeVersion: 'v24.16.0',
       nodeAbi: '137',
     });
+    // The registry-driven classifier now selects the Linux row (partial match on
+    // the observed subset), not a blanket non-macOS "unqualified".
+    expect(assessment.status).toBe('preview');
+    expect(assessment.row?.id).toBe('ubuntu-2404-x64-node24-npm11-v1');
+    expect(assessment.match).toBe('partial');
+    expect(assessment.reasonCodes).toEqual([]);
+  });
+
+  it('keeps a Linux host on an unlisted architecture unqualified', () => {
+    const assessment = assessHostSupport({ osPlatform: 'linux', arch: 'arm64' });
     expect(assessment.status).toBe('unqualified');
     expect(assessment.row).toBeUndefined();
-    expect(assessment.match).toBe('none');
-    expect(assessment.reasonCodes).toEqual(['non-macos-host']);
+    expect(assessment.reasonCodes).toEqual(['unqualified-host']);
   });
 
   it('does not select the macOS row without both platform and architecture identity', () => {
@@ -474,25 +488,19 @@ describe('assessHostSupport', () => {
     }
   });
 
-  it('rejects incomplete or canonically misidentified injected registries', () => {
-    expect(() => assessHostSupport(EXACT_MACOS, [MACOS_INTEL_ROW])).toThrow(
-      /missing required row: macos-26-arm64-node24-npm11-v1/u,
+  it('validates registry structure but no longer requires the macOS rows', () => {
+    // A registry without the macOS rows is valid for the generalized classifier:
+    // an unlisted (platform, arch) is unqualified, not a throw.
+    const linuxOnly = assessHostSupport(EXACT_MACOS, [UBUNTU_2404_PREVIEW_ROW]);
+    expect(linuxOnly.status).toBe('unqualified');
+    expect(linuxOnly.reasonCodes).toEqual(['unqualified-host']);
+    // The macOS rows still classify correctly when present.
+    const onMac = assessHostSupport(EXACT_MACOS, [MACOS_PREVIEW_ROW, MACOS_INTEL_ROW]);
+    expect(onMac.status).toBe('preview');
+    // Structural invariants remain enforced (duplicate ids fail closed).
+    expect(() => assessHostSupport(EXACT_MACOS, [MACOS_PREVIEW_ROW, MACOS_PREVIEW_ROW])).toThrow(
+      /Duplicate platform-support row id/u,
     );
-    expect(() => assessHostSupport(EXACT_MACOS, [MACOS_PREVIEW_ROW])).toThrow(
-      /missing required row: macos-26-intel-unsupported/u,
-    );
-    expect(() =>
-      assessHostSupport(EXACT_MACOS, [
-        { ...MACOS_PREVIEW_ROW, tuple: { ...MACOS_PREVIEW_ROW.tuple, arch: 'ia32' } },
-        MACOS_INTEL_ROW,
-      ]),
-    ).toThrow(/invalid macOS qualification row/u);
-    expect(() =>
-      assessHostSupport(EXACT_MACOS, [
-        MACOS_PREVIEW_ROW,
-        { ...MACOS_INTEL_ROW, tuple: { ...MACOS_INTEL_ROW.tuple, arch: 'ia32' } },
-      ]),
-    ).toThrow(/invalid macOS Intel exclusion row/u);
   });
 
   it('classifies Windows as unqualified (a later OS profile owns it), never "cannot run"', () => {
@@ -505,7 +513,7 @@ describe('assessHostSupport', () => {
     expect(assessment.status).toBe('unqualified');
     expect(assessment.row).toBeUndefined();
     expect(assessment.match).toBe('none');
-    expect(assessment.reasonCodes).toEqual(['non-macos-host']);
+    expect(assessment.reasonCodes).toEqual(['unqualified-host']);
   });
 
   it('classifies a wrong Node major and a wrong install channel as unqualified', () => {
@@ -610,16 +618,16 @@ describe('projectRuntimeHostSupport', () => {
     expect(Object.isFrozen(projection)).toBe(true);
   });
 
-  it('projects Linux as unqualified with no advertised row', () => {
+  it('projects a Linux host against the ubuntu preview row (partial)', () => {
     const projection = projectRuntimeHostSupport({
       platform: 'linux',
       arch: 'x64',
     });
-    expect(projection.status).toBe('unqualified');
-    expect(projection.match).toBe('none');
-    expect(projection.rowId).toBeNull();
-    expect(projection.profile).toBeNull();
-    expect(projection.reasonCodes).toEqual(['non-macos-host']);
+    expect(projection.status).toBe('preview');
+    expect(projection.match).toBe('partial');
+    expect(projection.rowId).toBe('ubuntu-2404-x64-node24-npm11-v1');
+    expect(projection.profile).toEqual({ id: 'ubuntu-2404-x64-node24-npm11-v2', version: 2 });
+    expect(projection.reasonCodes).toEqual([]);
   });
 
   it('does not advertise a support row when runtime identity is incomplete', () => {
