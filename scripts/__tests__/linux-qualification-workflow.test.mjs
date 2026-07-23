@@ -10,17 +10,23 @@
  * topology is Phase 3's gate.
  *
  * It asserts the properties a broken split would silently regress:
- *   1. the lane pins the exact runner/actions, is least-privilege, always
- *      uploads evidence, and binds the exact Ubuntu profile + support row; and
+ *   1. the scheduled lane pins the exact runner/actions, is least-privilege,
+ *      always uploads evidence, and binds the exact Ubuntu profile + support row;
  *   2. the independent verifier binds the full Linux tuple (linux / x64 / ABI
  *      137 / ext4 / case-sensitive / kernel 6 / os 24 / npm 11) and no macOS
- *      token leaks into the Linux lane.
+ *      token leaks into the Linux lane; and
+ *   3. (Phase 3) the release-topology `qualify-linux` job is a least-privilege
+ *      sibling of `qualify-macos`, and its promotion gating moves in LOCKSTEP
+ *      with the registry row status — advisory (out of `promote.needs`) while the
+ *      row is `preview`, a hard promote dependency once it is `supported`. The
+ *      lockstep is read from the committed, gate-synced supported-platforms doc,
+ *      so a `supported` flip cannot land with an advisory gate.
  *
- * `--expect-shell` is DELIBERATELY absent: macOS proves /bin/zsh by executing
- * it, but on Linux the shell fact is only the recorded `$SHELL` basename and is
- * not a tuple dimension — gating it would risk a mystery-red (the backlog-19
- * anti-pattern). This test pins that omission so a later edit cannot reintroduce
- * a fragile shell gate unreviewed.
+ * `--expect-shell` is DELIBERATELY absent from both lanes: macOS proves /bin/zsh
+ * by executing it, but on Linux the shell fact is only the recorded `$SHELL`
+ * basename and is not a tuple dimension — gating it would risk a mystery-red (the
+ * backlog-19 anti-pattern). This test pins that omission so a later edit cannot
+ * reintroduce a fragile shell gate unreviewed.
  */
 
 import assert from 'node:assert/strict';
@@ -45,6 +51,32 @@ function stripComments(text) {
     .split('\n')
     .filter((line) => !line.trimStart().startsWith('#'))
     .join('\n');
+}
+
+/** Slice a workflow into `Map<jobId, segment>` by 2-space-indented job headers. */
+function sliceJobs(content) {
+  const headerRe = /^ {2}([A-Za-z0-9_-]+):[ \t]*$/gm;
+  const headers = [];
+  for (let m = headerRe.exec(content); m !== null; m = headerRe.exec(content)) {
+    headers.push({ name: m[1], start: m.index });
+  }
+  const jobs = new Map();
+  for (const [i, header] of headers.entries()) {
+    const end = i + 1 < headers.length ? headers[i + 1].start : content.length;
+    jobs.set(header.name, content.slice(header.start, end));
+  }
+  return jobs;
+}
+
+/** The ubuntu row's status as published in the committed, gate-synced matrix. */
+function ubuntuRowStatus() {
+  const doc = readFileSync(
+    join(REPO_ROOT, 'docs', 'public', '70-reference', '17-supported-platforms.md'),
+    'utf8',
+  );
+  const match = doc.match(/\|\s*`ubuntu-2404-x64-node24-npm11-v1`\s*\|\s*`(\w+)`\s*\|/);
+  assert.ok(match, 'the generated supported-platforms matrix must list the ubuntu row + status');
+  return match[1];
 }
 
 test('linux-qualification.yml pins the exact runner and never floats a label', () => {
@@ -214,5 +246,91 @@ test('linux-qualification artifact/evidence names use controlled identifiers, no
     stripComments(wf),
     /artifact="linux-qualification-c\$\{SUPPORT_CONTRACT_VERSION\}/,
     'the evidence artifact name is built from controlled identifiers',
+  );
+});
+
+// ===========================================================================
+// Release topology — .github/workflows/release.yml qualify-linux (Phase 3)
+// ===========================================================================
+
+test('release qualify-linux is a pinned, least-privilege sibling of qualify-macos', () => {
+  const linux = stripComments(sliceJobs(readWorkflow('release.yml')).get('qualify-linux'));
+  assert.ok(linux, 'release.yml must define a qualify-linux job');
+  assert.match(linux, /runs-on:\s*ubuntu-24\.04\b/, 'qualify-linux must pin ubuntu-24.04');
+  assert.match(linux, /needs:\s*stage-release\b/, 'qualify-linux must depend on stage-release');
+  assert.match(linux, /permissions:\s*\n\s*contents:\s*read/, 'contents: read only');
+  assert.match(
+    linux,
+    /ref:\s*\$\{\{\s*needs\.stage-release\.outputs\.git-sha\s*\}\}/,
+    'checkout the exact staged SHA, never a branch or latest',
+  );
+  assert.match(linux, /persist-credentials:\s*false/, 'checkout must not persist credentials');
+  assert.doesNotMatch(linux, /id-token:\s*write/, 'no OIDC publish token');
+  assert.doesNotMatch(linux, /attestations:\s*write/, 'no attestation permission');
+  assert.doesNotMatch(linux, /secrets\./, 'no secret of any kind in the qualification job');
+  assert.doesNotMatch(linux, /\bnpm\s+publish\b/, 'the Linux gate must never publish');
+  assert.doesNotMatch(linux, /npm\s+dist-tag\s+add/, 'the Linux gate must never promote');
+  assert.doesNotMatch(linux, /softprops\/action-gh-release/, 'the Linux gate must never cut a Release');
+});
+
+test('release qualify-linux runs the published-version profile with the full Linux tuple', () => {
+  const linux = stripComments(sliceJobs(readWorkflow('release.yml')).get('qualify-linux'));
+  for (const flag of [
+    '--published-version',
+    '--expected-candidate-kind published-version',
+    '--expected-registry https://registry.npmjs.org/',
+    '--expected-runner-label ubuntu-24.04',
+    '--expect-platform linux',
+    '--expect-arch x64',
+    '--expect-node-abi 137',
+    '--expect-fs-type ext4',
+    '--expected-node-major 24',
+    '--expected-npm-major 11',
+    '--expected-sw-vers-major 24',
+    '--expected-kernel-major 6',
+    '--expect-uname-arch x86_64',
+    '--expect-case-sensitive true',
+    '--expected-support-row',
+    '--registry-integrity-inventory',
+  ]) {
+    assert.ok(linux.includes(flag), `qualify-linux is missing ${flag}`);
+  }
+  assert.doesNotMatch(linux, /--expect-shell/, 'the Linux gate must not gate the fragile shell dimension');
+  for (const macToken of [/\barm64\b/, /\bapfs\b/, /\bdarwin\b/, /macos-\d+/, /--expected-kernel-major 25/]) {
+    assert.doesNotMatch(linux, macToken, `macOS token ${macToken} must not appear in qualify-linux`);
+  }
+  assert.match(linux, /opensip-cli-linux-qualification\.v2\.json/, 'qualify-linux seals the Linux evidence');
+});
+
+test('status↔gate lockstep: qualify-linux gates promotion iff the ubuntu row is supported', () => {
+  const status = ubuntuRowStatus();
+  const promote = stripComments(sliceJobs(readWorkflow('release.yml')).get('promote-release'));
+  const inNeeds = /needs:\s*\[[^\]]*\bqualify-linux\b[^\]]*\]/.test(promote);
+  if (status === 'supported') {
+    assert.ok(
+      inNeeds,
+      'a `supported` ubuntu row REQUIRES qualify-linux in promote-release.needs — a supported row with an advisory gate is a false promise',
+    );
+    assert.match(promote, /qualify-linux/, 'a supported row must have promotion consume the qualify-linux evidence');
+  } else {
+    assert.ok(
+      !inNeeds,
+      `a \`${status}\` ubuntu row must NOT gate promotion — qualify-linux stays out of promote-release.needs during burn-in`,
+    );
+  }
+  // macOS remains a hard promote dependency regardless of the Linux row status.
+  assert.match(
+    promote,
+    /needs:\s*\[[^\]]*\bqualify-macos\b[^\]]*\]/,
+    'macOS must remain a hard promote dependency',
+  );
+});
+
+test('release qualify-linux npm@11 seam precedes registry inventory and acceptance', () => {
+  const linux = sliceJobs(readWorkflow('release.yml')).get('qualify-linux');
+  const seam = linux.indexOf('OPENSIP_ACCEPTANCE_NPM_CLI=');
+  assert.ok(
+    seam >= 0 && linux.indexOf('id: registry-integrity', seam) > seam,
+    'the pinned npm seam must precede registry inventory and acceptance execution',
   );
 });
