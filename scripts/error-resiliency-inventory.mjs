@@ -243,7 +243,8 @@ function runGenerate(repoRoot, flags, stdout) {
     files: sortedFiles,
   };
 
-  const scopeDigest = digestCanonical(scopeManifest);
+  // Digests omit createdAt so re-generate of the same commit is stable.
+  const scopeDigest = digestCanonical(digestableManifest(scopeManifest));
   const scopeWithDigest = { ...scopeManifest, digest: scopeDigest };
 
   const shardManifest = {
@@ -253,12 +254,20 @@ function runGenerate(repoRoot, flags, stdout) {
     commit,
     snapshot,
     scopeDigest,
+    assignmentStrategy: 'hybrid-package-first',
+    assignmentRules: {
+      splitAboveFiles: 80,
+      bundleAtMostFiles: 15,
+      subshardWeightBudget: 750_000,
+      bundleMaxFiles: 80,
+      bundleMaxWeight: 900_000,
+    },
     createdAt: scopeManifest.createdAt,
     shardCount: shards.length,
     productionFileCount: productionFiles.length,
     shards,
   };
-  const shardDigest = digestCanonical(shardManifest);
+  const shardDigest = digestCanonical(digestableManifest(shardManifest));
   const shardWithDigest = { ...shardManifest, digest: shardDigest };
 
   const inventoryRoot = resolveInventoryRoot(repoRoot);
@@ -367,17 +376,15 @@ function runCheck(repoRoot, flags, stdout) {
       if (Array.isArray(scopeObj.files) && scopeObj.files.length > BOUNDS.maxFilesPerSnapshot) {
         problems.push('scope-manifest exceeds maxFilesPerSnapshot');
       }
-      // Digest integrity: recompute without stored digest field
+      // Digest integrity: recompute without stored digest / volatile createdAt
       if (scopeObj.digest) {
-        const { digest: _d, ...rest } = scopeObj;
-        const expected = digestCanonical(rest);
+        const expected = digestCanonical(digestableManifest(scopeObj));
         if (expected !== scopeObj.digest) {
           problems.push('scope-manifest digest mismatch');
         }
       }
       if (shardObj.digest) {
-        const { digest: _d, ...rest } = shardObj;
-        const expected = digestCanonical(rest);
+        const expected = digestCanonical(digestableManifest(shardObj));
         if (expected !== shardObj.digest) {
           problems.push('shard-manifest digest mismatch');
         }
@@ -758,62 +765,172 @@ function computeWeight(pathValue, byteLength, classification) {
 }
 
 /**
- * Deterministic shards: primary partitions production files by weight budget.
- * Secondary shards rotate so every file has a different secondary owner id.
+ * Hybrid package-first assignment (C1 strategy H):
+ * - Primary unit is package ownership (plus `(operational)`).
+ * - Packages with > SPLIT_FILES production files are sub-sharded by weight.
+ * - Packages with ≤ BUNDLE_FILES are packed into bundle shards (still listed).
+ * - Medium packages get one shard each.
+ * Secondary coverage rotates to the next shard (blind second reviewer).
+ *
  * @param {readonly { path: string, weight: number, packageName: string }[]} productionFiles
  */
 function buildShards(productionFiles) {
-  const sorted = sortByKey(productionFiles, (f) => f.path);
-  const TARGET = 750_000; // weight budget per primary shard
-  /** @type {{ id: string, primaryPaths: string[], secondaryOf: string[], totalWeight: number }[]} */
-  const shards = [];
-  /** @type {string[]} */
-  let current = [];
-  let currentWeight = 0;
-  let shardIndex = 0;
+  const SPLIT_FILES = 80;
+  const BUNDLE_FILES = 15;
+  const SUBSHARD_WEIGHT = 750_000;
+  const BUNDLE_MAX_FILES = 80;
+  const BUNDLE_MAX_WEIGHT = 900_000;
 
-  const flush = () => {
-    if (current.length === 0) return;
-    const id = `primary-${String(shardIndex).padStart(3, '0')}`;
-    shards.push({
-      id,
-      primaryPaths: [...current],
-      secondaryOf: [],
-      totalWeight: currentWeight,
+  /** @type {Map<string, { path: string, weight: number, packageName: string }[]>} */
+  const byPackage = new Map();
+  for (const file of productionFiles) {
+    const name = file.packageName || '(root)';
+    if (!byPackage.has(name)) byPackage.set(name, []);
+    byPackage.get(name).push(file);
+  }
+
+  /** @type {{ id: string, strategy: string, packages: string[], primaryPaths: string[], totalWeight: number }[]} */
+  const raw = [];
+
+  /** @type {{ name: string, files: typeof productionFiles }[]} */
+  const small = [];
+  const packageNames = [...byPackage.keys()].sort(compareByCodePointLocal);
+
+  for (const name of packageNames) {
+    const files = sortByKey(byPackage.get(name) ?? [], (f) => f.path);
+    if (files.length === 0) continue;
+
+    if (files.length > SPLIT_FILES) {
+      // Sub-shard large packages by weight, keeping package identity in the id.
+      /** @type {typeof files} */
+      let bucket = [];
+      let bucketWeight = 0;
+      let part = 0;
+      const flushPart = () => {
+        if (bucket.length === 0) return;
+        const slug = packageSlug(name);
+        raw.push({
+          id: `pkg-${slug}-${String(part).padStart(2, '0')}`,
+          strategy: 'package-subshard',
+          packages: [name],
+          primaryPaths: bucket.map((f) => f.path),
+          totalWeight: bucketWeight,
+        });
+        part += 1;
+        bucket = [];
+        bucketWeight = 0;
+      };
+      for (const file of files) {
+        if (bucket.length > 0 && bucketWeight + file.weight > SUBSHARD_WEIGHT) {
+          flushPart();
+        }
+        bucket.push(file);
+        bucketWeight += file.weight;
+      }
+      flushPart();
+      continue;
+    }
+
+    if (files.length <= BUNDLE_FILES) {
+      small.push({ name, files });
+      continue;
+    }
+
+    // Medium: one shard per package
+    raw.push({
+      id: `pkg-${packageSlug(name)}`,
+      strategy: 'package',
+      packages: [name],
+      primaryPaths: files.map((f) => f.path),
+      totalWeight: files.reduce((sum, f) => sum + f.weight, 0),
     });
-    shardIndex += 1;
-    current = [];
-    currentWeight = 0;
+  }
+
+  // Bundle tiny packages into coherent multi-package shards
+  /** @type {{ name: string, files: typeof productionFiles }[]} */
+  let bundle = [];
+  let bundleFiles = 0;
+  let bundleWeight = 0;
+  let bundleIndex = 0;
+  const flushBundle = () => {
+    if (bundle.length === 0) return;
+    const packages = bundle.map((b) => b.name);
+    const paths = bundle.flatMap((b) => b.files.map((f) => f.path));
+    raw.push({
+      id: `bundle-${String(bundleIndex).padStart(2, '0')}`,
+      strategy: 'small-package-bundle',
+      packages,
+      primaryPaths: paths,
+      totalWeight: bundleWeight,
+    });
+    bundleIndex += 1;
+    bundle = [];
+    bundleFiles = 0;
+    bundleWeight = 0;
   };
-
-  for (const file of sorted) {
-    if (current.length > 0 && currentWeight + file.weight > TARGET) {
-      flush();
+  for (const entry of small) {
+    const entryWeight = entry.files.reduce((sum, f) => sum + f.weight, 0);
+    if (
+      bundle.length > 0 &&
+      (bundleFiles + entry.files.length > BUNDLE_MAX_FILES ||
+        bundleWeight + entryWeight > BUNDLE_MAX_WEIGHT)
+    ) {
+      flushBundle();
     }
-    current.push(file.path);
-    currentWeight += file.weight;
+    bundle.push(entry);
+    bundleFiles += entry.files.length;
+    bundleWeight += entryWeight;
   }
-  flush();
+  flushBundle();
 
-  // Assign secondary coverage: each file appears in secondaryOf of the next shard
-  if (shards.length === 1) {
-    shards[0].secondaryOf = [...shards[0].primaryPaths];
-  } else {
-    for (let i = 0; i < shards.length; i++) {
-      const next = shards[(i + 1) % shards.length];
-      next.secondaryOf = [...shards[i].primaryPaths];
-    }
-  }
+  // Stable order: package shards by id, then bundles
+  raw.sort((a, b) => compareByCodePointLocal(a.id, b.id));
 
-  return shards.map((shard) => ({
-    id: shard.id,
-    role: 'primary',
-    primaryPaths: shard.primaryPaths,
-    secondaryPaths: shard.secondaryOf,
-    primaryCount: shard.primaryPaths.length,
-    secondaryCount: shard.secondaryOf.length,
-    totalWeight: shard.totalWeight,
-  }));
+  // Secondary: next shard in ordered list
+  return raw.map((shard, index) => {
+    const secondary =
+      raw.length === 1 ? shard.primaryPaths : raw[(index + 1) % raw.length].primaryPaths;
+    return {
+      id: shard.id,
+      role: 'primary',
+      strategy: shard.strategy,
+      packages: shard.packages,
+      primaryPaths: shard.primaryPaths,
+      secondaryPaths: secondary,
+      primaryCount: shard.primaryPaths.length,
+      secondaryCount: secondary.length,
+      totalWeight: shard.totalWeight,
+    };
+  });
+}
+
+/**
+ * @param {string} packageName
+ */
+function packageSlug(packageName) {
+  return packageName
+    .replace(/^@opensip-cli\//u, '')
+    .replace(/[^A-Za-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .toLowerCase() || 'pkg';
+}
+
+/**
+ * @param {string} a
+ * @param {string} b
+ */
+function compareByCodePointLocal(a, b) {
+  if (a === b) return 0;
+  return a < b ? -1 : 1;
+}
+
+/**
+ * Manifest body used for digests: drop volatile/self fields.
+ * @param {Record<string, unknown>} manifest
+ */
+function digestableManifest(manifest) {
+  const { digest: _digest, createdAt: _createdAt, ...rest } = manifest;
+  return rest;
 }
 
 /**
