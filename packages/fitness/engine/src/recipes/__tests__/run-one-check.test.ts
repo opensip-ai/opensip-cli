@@ -11,7 +11,7 @@
  * controller, these tests will catch the regression.
  */
 
-import { applyToolContributeScope, enterScope, RunScope } from '@opensip-cli/core';
+import { applyToolContributeScope, enterScope, runWithScope, RunScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
@@ -85,6 +85,52 @@ function makeProcessorContext(callbacks: FitnessRecipeServiceCallbacks = {}): Pr
     recipe: makeRecipe(),
   };
 }
+
+describe('runOneCheck — host OS-interrupt cancellation (Plan 00 Phase 4)', () => {
+  it('cancels a check via the host scope abortSignal (not a timeout, body never runs)', async () => {
+    // The host interrupt signal lives on scope.abortSignal; runOneCheck threads
+    // it as runWithTimeout's parentSignal. With it already aborted, the unit is
+    // cancelled to a non-timeout error and the check body never executes. Were the
+    // wiring absent, the check would run and pass — so this discriminates wired.
+    const analyze = vi.fn(() => Promise.resolve([]));
+    const check = defineCheck({
+      id: uid(),
+      slug: 'host-cancelled',
+      description: 'would pass if it ran',
+      tags: ['quality'],
+      analyzeAll: analyze,
+    });
+
+    const hostController = new AbortController();
+    hostController.abort();
+    const hostScope = new RunScope({ abortSignal: hostController.signal });
+    applyToolContributeScope(hostScope, fitnessTool);
+    try {
+      const outcome = await runWithScope(hostScope, () =>
+        runOneCheck(
+          check,
+          {
+            cwd: process.cwd(),
+            checkIndex: 1,
+            totalChecks: 1,
+            recipeTimeoutMs: 5000,
+            retryEnabled: false,
+            maxRetries: 0,
+          },
+          makeProcessorContext(),
+        ),
+      );
+
+      const cr = outcome.processOutput?.checkResult;
+      expect(cr?.passed).toBe(false);
+      expect(cr?.timedOut).toBe(false);
+      expect(cr?.error).toBeDefined();
+      expect(analyze).not.toHaveBeenCalled();
+    } finally {
+      hostScope.dispose();
+    }
+  });
+});
 
 describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
   it('flags timedOut=true when the per-check timeout fires', async () => {

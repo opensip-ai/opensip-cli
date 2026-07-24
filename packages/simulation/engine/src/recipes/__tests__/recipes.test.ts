@@ -6,7 +6,7 @@
  * resolving each selector type against the live scenario registry.
  */
 
-import { enterScope } from '@opensip-cli/core';
+import { enterScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { noopTarget } from '../../__tests__/test-utils/targets.js';
@@ -146,6 +146,62 @@ describe('SimulationRecipeService — execution.timeout', () => {
     expect(result.failedScenarios).toBe(1);
     expect(result.scenarios[0]?.passed).toBe(false);
     expect(result.scenarios[0]?.error).toContain('timed out after 50ms');
+  });
+});
+
+// =============================================================================
+// SimulationRecipeService — host OS-interrupt cancellation (Plan 00 Phase 4)
+// =============================================================================
+
+describe('SimulationRecipeService — host OS-interrupt', () => {
+  it('cancels an in-flight scenario via the host scope abortSignal (not a timeout)', async () => {
+    // The host interrupt lives on scope.abortSignal; the shared substrate
+    // (runWithTimeout) composes it as parentSignal for free — no per-tool wiring.
+    // The scenario fires the interrupt mid-run and waits on its (composed) signal,
+    // so ONLY the host cancel can end it, deterministically. It must surface as a
+    // non-timeout failure.
+    const hostController = new AbortController();
+    const hostScope = makeSimTestScope({ abortSignal: hostController.signal });
+    try {
+      await runWithScope(hostScope, async () => {
+        const scenario: RunnableScenario = {
+          id: 'host-cancelled',
+          name: 'host-cancelled',
+          description: 'cancelled by a host OS-interrupt mid-run',
+          kind: 'load',
+          tags: [],
+          run: (signal: AbortSignal) =>
+            new Promise((_resolve, reject) => {
+              // Register the abort listener BEFORE firing the interrupt, else the
+              // synchronous abort would land on an already-aborted signal and the
+              // listener would never run.
+              signal.addEventListener('abort', () => reject(new Error('cancelled')), {
+                once: true,
+              });
+              hostController.abort(); // simulate Ctrl-C while the scenario is running
+            }),
+        };
+        currentScenarioRegistry().register(scenario);
+        const recipe = defineSimulationRecipe({
+          id: 'URCP_host_cancel',
+          name: 'host-cancel',
+          displayName: 'Host cancel',
+          description: 'host interrupt cancels an in-flight scenario',
+          scenarios: { type: 'all' },
+          execution: { mode: 'sequential', timeout: 5000 },
+        });
+
+        const result = await new SimulationRecipeService().runRecipe(recipe);
+
+        expect(result.totalScenarios).toBe(1);
+        expect(result.failedScenarios).toBe(1);
+        expect(result.scenarios[0]?.passed).toBe(false);
+        expect(result.scenarios[0]?.error ?? '').not.toContain('timed out');
+      });
+    } finally {
+      hostScope.dispose();
+      clearScenarioRegistry();
+    }
   });
 });
 

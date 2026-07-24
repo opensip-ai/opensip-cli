@@ -115,6 +115,10 @@ export async function runOneCheck(
     'opensip-cli-fitness',
     'fitness.check.execute',
     async () => {
+      // Host OS-interrupt (Plan 00 Phase 4) is composed by `runWithTimeout` itself
+      // (it defaults parentSignal to the per-invocation root cancel signal), so a
+      // Ctrl-C aborts an in-flight check for free — no wiring here. `opts.abortSignal`
+      // below is the separate recipe-level stop.
       return await runWithTimeout({
         run: (timeoutSignal) =>
           check.run(opts.cwd, {

@@ -209,6 +209,10 @@ async function runScenarioUnit(
   timeoutMs: number,
   abortSignal?: AbortSignal,
 ): Promise<SimulationScenarioResult> {
+  // Host OS-interrupt (Plan 00 Phase 4) is composed by `runWithTimeout` itself
+  // (it defaults parentSignal to the per-invocation root cancel signal), so a
+  // Ctrl-C aborts an in-flight scenario for free. `abortSignal` is the separate
+  // recipe-level stop.
   const outcome = await runWithTimeout({
     run: (timeoutSignal) =>
       scenario.run(abortSignal ? AbortSignal.any([timeoutSignal, abortSignal]) : timeoutSignal),

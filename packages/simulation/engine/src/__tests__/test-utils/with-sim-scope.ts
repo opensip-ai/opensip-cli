@@ -20,15 +20,21 @@ import { simulationTool } from '../../tool.js';
  *  `@opensip-cli/core/test-utils` helper (ADR-0040: that sugar moved to
  *  `@opensip-cli/test-support`, which this package's tests cannot use
  *  without coupling its test graph to the fitness engine). */
-const makeTestScope = (): RunScope =>
+const makeTestScope = (opts: SimTestScopeOptions = {}): RunScope =>
   new RunScope({
     languages: new LanguageRegistry(),
     tools: new ToolRegistry(),
+    ...(opts.abortSignal ? { abortSignal: opts.abortSignal } : {}),
   });
 
+interface SimTestScopeOptions {
+  /** Host OS-interrupt signal to place on `scope.abortSignal` (Plan 00 Phase 4). */
+  readonly abortSignal?: AbortSignal;
+}
+
 /** Build a fresh RunScope with `scope.simulation` populated. */
-export function makeSimTestScope(): RunScope {
-  const scope = makeTestScope();
+export function makeSimTestScope(opts: SimTestScopeOptions = {}): RunScope {
+  const scope = makeTestScope(opts);
   applyToolContributeScope(scope, simulationTool);
   return scope;
 }

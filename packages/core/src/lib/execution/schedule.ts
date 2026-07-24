@@ -16,6 +16,8 @@
  * on stop).
  */
 
+import { currentScope } from '../scope-storage.js';
+
 /**
  * Hand control back to the event loop's macrotask queue. `await runUnit()` only
  * yields to the MICROtask queue, so a `setInterval` timer (the 80ms live-progress
@@ -89,10 +91,13 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   // Shared abort observation that also latches a local flag so that once an
   // external abort is seen we treat it as a terminal drain condition (prevents
   // the "no more refills + active drains but resolve condition never fires"
-  // hang when there are still unlaunched units).
+  // hang when there are still unlaunched units). Besides the caller's own
+  // `shouldAbort` (e.g. a recipe-level stop), we also observe the host-owned
+  // per-invocation root cancel signal (Plan 00 Phase 4) so an OS interrupt stops
+  // scheduling new units for free on every substrate-based tool — no wiring.
   let aborted = false;
   const observeAbort = (): boolean => {
-    if (shouldAbort?.() === true) {
+    if (shouldAbort?.() === true || currentScope()?.abortSignal?.aborted === true) {
       aborted = true;
       return true;
     }

@@ -7,6 +7,8 @@
 import { describe, it, expect, vi } from 'vitest';
 
 import { deriveRecipeId } from '../../recipe-id.js';
+import { RunScope } from '../../run-scope-class.js';
+import { runWithScope } from '../../scope-storage.js';
 import { executePipeline } from '../pipeline.js';
 import { runWithRetry } from '../retry.js';
 import { runWithTimeout } from '../run-with-timeout.js';
@@ -75,13 +77,34 @@ describe('runWithTimeout', () => {
     const removeSpy = vi.spyOn(parent.signal, 'removeEventListener');
     const out = await runWithTimeout({
       // Never settles and ignores abort → only the hard timeout ends the race.
-      run: () => new Promise<number>(() => {}),
+      run: () =>
+        new Promise<number>(() => {
+          /* intentionally never settles */
+        }),
       timeoutMs: 10,
       parentSignal: parent.signal,
     });
     expect(out.status).toBe('timeout');
     expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
     removeSpy.mockRestore();
+  });
+
+  it('defaults parentSignal to the host scope abortSignal (cancellation for free)', async () => {
+    // The substrate composes currentScope().abortSignal when no parentSignal is
+    // passed, so every tool running through runWithTimeout inherits OS-interrupt
+    // cancellation with zero wiring. A pre-aborted host signal short-circuits the
+    // unit to a cancelled error and the domain run never executes.
+    const host = new AbortController();
+    host.abort();
+    const scope = new RunScope({ abortSignal: host.signal });
+    const run = vi.fn(() => Promise.resolve(42));
+    try {
+      const out = await runWithScope(scope, () => runWithTimeout({ run, timeoutMs: 1000 }));
+      expect(out.status).toBe('error');
+      expect(run).not.toHaveBeenCalled();
+    } finally {
+      scope.dispose();
+    }
   });
 
   describe('with a retry policy (the retry branch)', () => {
@@ -218,6 +241,24 @@ describe('runWithRetry', () => {
 });
 
 describe('scheduleUnits', () => {
+  it('stops scheduling when the host scope abortSignal is aborted (for free)', async () => {
+    // Besides the caller's shouldAbort, the scheduler observes the host-owned root
+    // cancel signal, so an OS interrupt stops launching new units on every
+    // substrate-based tool with no wiring. A pre-aborted host signal launches none.
+    const host = new AbortController();
+    host.abort();
+    const scope = new RunScope({ abortSignal: host.signal });
+    const runUnit = vi.fn(() => Promise.resolve({ shouldStop: false }));
+    try {
+      await runWithScope(scope, () =>
+        scheduleUnits<number>({ units: [1, 2, 3], mode: 'sequential', runUnit }),
+      );
+      expect(runUnit).not.toHaveBeenCalled();
+    } finally {
+      scope.dispose();
+    }
+  });
+
   it('runs sequential in order and stops on shouldStop', async () => {
     const seen: number[] = [];
     await scheduleUnits<number>({

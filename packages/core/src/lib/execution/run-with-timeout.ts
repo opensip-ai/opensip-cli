@@ -13,6 +13,8 @@
  * `execution.timeout` but never installed one.
  */
 
+import { currentScope } from '../scope-storage.js';
+
 import { runWithRetry, type PipelineRetryOptions } from './retry.js';
 
 /** Result of one unit run. `timeout` and `error` are distinct so callers can map each. */
@@ -37,8 +39,12 @@ export interface RunWithTimeoutOptions<R> {
   /** Optional retry (fitness); omitted ⇒ the run executes exactly once. */
   readonly retry?: PipelineRetryOptions;
   /**
-   * Parent cancel signal (Plan 00). Composed with the timeout controller so
-   * OS interrupt / outer deadline aborts unit work without leaking listeners.
+   * Parent cancel signal (Plan 00). Composed with the timeout controller so an
+   * outer deadline / OS interrupt aborts unit work without leaking listeners.
+   * When omitted it DEFAULTS to the host-owned per-invocation root cancel signal
+   * (`currentScope()?.abortSignal`), so every tool that runs on this substrate
+   * gets OS-interrupt cancellation for free — no per-tool wiring. Pass an
+   * explicit signal to compose an additional outer deadline.
    */
   readonly parentSignal?: AbortSignal;
 }
@@ -78,7 +84,12 @@ export async function runWithTimeout<R>(
   opts: RunWithTimeoutOptions<R>,
 ): Promise<UnitRunOutcome<R>> {
   const controller = new AbortController();
-  const detachParent = composeAbortSignals(opts.parentSignal, controller);
+  // Host-owned cancellation plane (Plan 00 Phase 4): default the parent to the
+  // per-invocation root cancel signal so OS interrupt / outer deadline aborts
+  // this unit for free — every substrate-based tool inherits it, no per-tool
+  // wiring. An explicit opts.parentSignal (an additional outer deadline) wins.
+  const parentSignal = opts.parentSignal ?? currentScope()?.abortSignal;
+  const detachParent = composeAbortSignals(parentSignal, controller);
   const startTime = Date.now();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -92,11 +103,11 @@ export async function runWithTimeout<R>(
   };
 
   // Parent already aborted → cancelled-as-error (distinct from unit timeout).
-  if (opts.parentSignal?.aborted) {
+  if (parentSignal?.aborted) {
     const durationMs = finish();
     return {
       status: 'error',
-      error: opts.parentSignal.reason ?? new Error('Parent signal aborted'),
+      error: parentSignal.reason ?? new Error('Parent signal aborted'),
       durationMs,
     };
   }
@@ -111,13 +122,13 @@ export async function runWithTimeout<R>(
           signal: controller.signal,
         });
         const durationMs = finish();
-        if (controller.signal.aborted && !opts.parentSignal?.aborted) {
+        if (controller.signal.aborted && !parentSignal?.aborted) {
           return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
         }
-        if (opts.parentSignal?.aborted) {
+        if (parentSignal?.aborted) {
           return {
             status: 'error',
-            error: opts.parentSignal.reason ?? retry.lastError,
+            error: parentSignal.reason ?? retry.lastError,
             durationMs,
           };
         }
@@ -131,20 +142,20 @@ export async function runWithTimeout<R>(
       const durationMs = finish();
       // A run that resolved AFTER the timeout fired is reported as a timeout
       // (single-source abort invariant), matching fitness's post-run check.
-      if (controller.signal.aborted && !opts.parentSignal?.aborted) {
+      if (controller.signal.aborted && !parentSignal?.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
       }
-      if (opts.parentSignal?.aborted) {
+      if (parentSignal?.aborted) {
         return {
           status: 'error',
-          error: opts.parentSignal.reason ?? new Error('Parent signal aborted'),
+          error: parentSignal.reason ?? new Error('Parent signal aborted'),
           durationMs,
         };
       }
       return { status: 'ok', result, durationMs };
     } catch (error) {
       const durationMs = finish();
-      if (controller.signal.aborted && !opts.parentSignal?.aborted) {
+      if (controller.signal.aborted && !parentSignal?.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
       }
       return { status: 'error', error, durationMs };
