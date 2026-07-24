@@ -34,11 +34,15 @@ export function unifiedDiff(relativePath: string, before: string, after: string)
 
   const beforeChunk = beforeLines.slice(prefix, beforeLines.length - suffix);
   const afterChunk = afterLines.slice(prefix, afterLines.length - suffix);
-  const start = prefix + 1;
+  // Unified-diff convention: a zero-count side anchors on the line BEFORE the
+  // hunk (e.g. a pure insert after line 5 is `@@ -5,0 +6,3 @@`), so strict
+  // consumers (git apply, patch) accept the hunk.
+  const beforeStart = beforeChunk.length === 0 ? prefix : prefix + 1;
+  const afterStart = afterChunk.length === 0 ? prefix : prefix + 1;
   return [
     `--- a/${relativePath}`,
     `+++ b/${relativePath}`,
-    `@@ -${rangeHeader(start, beforeChunk.length)} +${rangeHeader(start, afterChunk.length)} @@`,
+    `@@ -${rangeHeader(beforeStart, beforeChunk.length)} +${rangeHeader(afterStart, afterChunk.length)} @@`,
     ...beforeChunk.map((line) => `-${line}`),
     ...afterChunk.map((line) => `+${line}`),
   ].join('\n');

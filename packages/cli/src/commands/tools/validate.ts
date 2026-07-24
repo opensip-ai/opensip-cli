@@ -107,25 +107,32 @@ function stageCandidate(opts: ToolValidationOptions): StagedCandidate {
   }
   const tempHost = mkdtempSync(join(tmpdir(), 'ost-tools-validate-'));
   const cleanup = (): void => rmSync(tempHost, { recursive: true, force: true });
-  ensureHostDir(tempHost, 'tool');
-  const spec = localDir && !isAbsolute(opts.spec) ? resolve(opts.cwd, opts.spec) : opts.spec;
-  const outcome = npmInstallIntoHost(tempHost, spec);
-  if (!outcome.ok) {
+  // A throw between mkdtemp and returning the cleanup closure would orphan the
+  // temp dir (the caller can only clean up what it received) — reap it here.
+  try {
+    ensureHostDir(tempHost, 'tool');
+    const spec = localDir && !isAbsolute(opts.spec) ? resolve(opts.cwd, opts.spec) : opts.spec;
+    const outcome = npmInstallIntoHost(tempHost, spec);
+    if (!outcome.ok) {
+      return {
+        pkgDir: '',
+        cleanup,
+        stagedByInstall: true,
+        source: 'installed',
+        stagingError: outcome.error,
+      };
+    }
+    const pkgDir = join(tempHost, 'node_modules', outcome.installedName);
     return {
-      pkgDir: '',
+      pkgDir,
       cleanup,
       stagedByInstall: true,
-      source: 'installed',
-      stagingError: outcome.error,
+      source: manifestSourceFor(pkgDir),
     };
+  } catch (error) {
+    cleanup();
+    throw error;
   }
-  const pkgDir = join(tempHost, 'node_modules', outcome.installedName);
-  return {
-    pkgDir,
-    cleanup,
-    stagedByInstall: true,
-    source: manifestSourceFor(pkgDir),
-  };
 }
 
 function section(
