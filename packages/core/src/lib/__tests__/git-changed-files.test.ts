@@ -142,6 +142,33 @@ describe('resolveChangedFiles', () => {
     }
   });
 
+  it('preserves non-ASCII paths against core.quotepath C-quoting', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opensip-git-'));
+    dirs.push(dir);
+    git(dir, ['init']);
+    git(dir, ['config', 'user.email', 't@example.com']);
+    git(dir, ['config', 'user.name', 'T']);
+    // Force the default quoting behavior the -z parser must be immune to.
+    git(dir, ['config', 'core.quotepath', 'true']);
+    // Cyrillic/CJK names have no NFD decomposition, so APFS stores them as written.
+    writeFileSync(join(dir, '数据.txt'), '1\n', 'utf8');
+    git(dir, ['add', '数据.txt']);
+    git(dir, ['commit', '-m', 'init']);
+    writeFileSync(join(dir, '数据.txt'), 'changed\n', 'utf8');
+    writeFileSync(join(dir, 'скетч.txt'), '2\n', 'utf8');
+
+    const r = resolveChangedFiles(dir);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.entries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ path: '数据.txt', status: 'modified' }),
+          expect.objectContaining({ path: 'скетч.txt', status: 'untracked' }),
+        ]),
+      );
+    }
+  });
+
   it('rejects bad since refs', () => {
     const dir = mkdtempSync(join(tmpdir(), 'opensip-git-'));
     dirs.push(dir);

@@ -57,30 +57,32 @@ export type ChangedFilesResult =
       readonly message: string;
     };
 
+/** Large diffs (monorepo-wide renames) overflow Node's 1 MiB default. */
+const GIT_MAX_BUFFER_BYTES = 64 * 1024 * 1024;
+
 function git(
   cwd: string,
   args: readonly string[],
+  opts?: { readonly raw?: boolean },
 ): { readonly ok: true; readonly out: string } | { readonly ok: false } {
   try {
     const out = execFileSync('git', args, {
       cwd,
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
+      maxBuffer: GIT_MAX_BUFFER_BYTES,
       // @fitness-ignore-next-line no-hardcoded-timeouts -- bounded safety cap on a local git shell-out (never hangs the CLI)
       timeout: 5000,
-    }).trim();
-    return { ok: true, out };
+    });
+    return { ok: true, out: opts?.raw === true ? out : out.trim() };
   } catch {
     return { ok: false };
   }
 }
 
-function parseNameOnlyOutput(output: string): string[] {
+function parseNulSeparated(output: string): string[] {
   if (!output) return [];
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+  return output.split('\0').filter((token) => token.length > 0);
 }
 
 function statusFromGitCode(code: string): ChangedFileStatus {
@@ -106,27 +108,34 @@ function statusFromGitCode(code: string): ChangedFileStatus {
   }
 }
 
+/**
+ * Parse `git diff --name-status -z` records: `STATUS NUL path NUL`, with two
+ * path fields for renames/copies. NUL separation is load-bearing — newline/tab
+ * parsing of unquoted output mangles any path that `core.quotepath` C-quotes
+ * (all non-ASCII by default).
+ */
 function parseNameStatusOutput(output: string): ChangedFileEntry[] {
-  if (!output) return [];
-  return output
-    .split('\n')
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0)
-    .map((line) => {
-      const [code = '', first = '', second] = line.split('\t');
-      const status = statusFromGitCode(code);
-      if ((status === 'renamed' || status === 'copied') && second !== undefined) {
-        return {
-          path: second,
-          status,
-          previousPath: first,
-        };
-      }
-      return {
-        path: first,
-        status,
-      };
-    });
+  const tokens = output.split('\0');
+  const entries: ChangedFileEntry[] = [];
+  let index = 0;
+  while (index < tokens.length) {
+    const code = tokens[index];
+    index += 1;
+    if (code === undefined || code.length === 0) continue;
+    const status = statusFromGitCode(code);
+    const first = tokens[index];
+    index += 1;
+    if (first === undefined || first.length === 0) break;
+    if (status === 'renamed' || status === 'copied') {
+      const second = tokens[index];
+      index += 1;
+      if (second === undefined || second.length === 0) break;
+      entries.push({ path: second, status, previousPath: first });
+      continue;
+    }
+    entries.push({ path: first, status });
+  }
+  return entries;
 }
 
 function toRelativeEntries(cwd: string, entries: readonly ChangedFileEntry[]): ChangedFileEntry[] {
@@ -196,7 +205,9 @@ function okResult(
 }
 
 function diffNameStatus(cwd: string, ref: string): ReturnType<typeof git> {
-  return git(cwd, ['diff', '--name-status', '--find-renames', '--diff-filter=ACMDR', ref]);
+  return git(cwd, ['diff', '--name-status', '-z', '--find-renames', '--diff-filter=ACMDR', ref], {
+    raw: true,
+  });
 }
 
 function basisWithWarnings(input: {
@@ -263,7 +274,7 @@ function resolveWorkingTreeChangedFiles(cwd: string): ChangedFilesResult {
     };
   }
 
-  const untracked = git(cwd, ['ls-files', '--others', '--exclude-standard']);
+  const untracked = git(cwd, ['ls-files', '--others', '--exclude-standard', '-z'], { raw: true });
   if (!untracked.ok) {
     return {
       ok: false,
@@ -273,7 +284,7 @@ function resolveWorkingTreeChangedFiles(cwd: string): ChangedFilesResult {
   }
 
   const entries = toRelativeEntries(cwd, parseNameStatusOutput(diff.out));
-  const untrackedEntries = parseNameOnlyOutput(untracked.out).map((f): ChangedFileEntry => {
+  const untrackedEntries = parseNulSeparated(untracked.out).map((f): ChangedFileEntry => {
     const path = toPosixRelative(cwd, f);
     return { path, status: 'untracked' };
   });
