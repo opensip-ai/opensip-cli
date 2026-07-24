@@ -8,6 +8,7 @@ import {
   SystemError,
   ToolError,
   formatCliDiagnosticHuman,
+  isToolErrorLike,
   normalizeFailure,
   toMachineFailureProjection,
   toSafeDiagnosticRecord,
@@ -38,10 +39,14 @@ function deriveErrorDefaults(error: unknown): {
 } {
   // Single normalize path (Plan 00) — definition axes drive exit/code/action.
   const envelope = normalizeFailure(error);
+  // Prefer subclass ladder for true ToolError instances; branded cross-copy
+  // shapes and untyped throws use the normalized definition exitClass.
   const exitCode =
     error instanceof ToolError
       ? mapToolErrorToExitCode(error)
-      : mapExitClassToExitCode(envelope.definition.exitClass);
+      : isToolErrorLike(error)
+        ? mapExitClassToExitCode(error.definition.exitClass)
+        : mapExitClassToExitCode(envelope.definition.exitClass);
   return {
     message: truncateDerivedMessage(envelope.message),
     exitCode,

@@ -50,6 +50,23 @@ describe('installInterruptAbortCoordinator', () => {
     vi.useRealTimers();
   });
 
+  it('second interrupt after the grace window still force-exits', async () => {
+    vi.useFakeTimers();
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const coord = installInterruptAbortCoordinator({ secondInterruptWindowMs: 50 });
+    process.emit('SIGINT');
+    // Let the grace timer fire once (exit mocked → process stays alive).
+    await vi.advanceTimersByTimeAsync(50);
+    expect(exitSpy).toHaveBeenCalledWith(130);
+    exitSpy.mockClear();
+    // Late second signal must still escalate even though the window elapsed.
+    process.emit('SIGINT');
+    expect(exitSpy).toHaveBeenCalledWith(130);
+    exitSpy.mockRestore();
+    coord.dispose();
+    vi.useRealTimers();
+  });
+
   it('cleanup callbacks that throw do not rethrow from the signal handler', () => {
     const coord = installInterruptAbortCoordinator({
       onFirstInterrupt: () => {

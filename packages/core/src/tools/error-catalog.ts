@@ -51,7 +51,19 @@ export function validateToolErrorCatalogContribution(
   ) {
     const catalog = value.catalog as ErrorCatalog;
     if (catalog.owner?.id !== owner.id) {
-      // Allow contribution if owner id matches tool stable identity at call site
+      throw new ErrorDefinitionError(
+        `errorCatalog owner id '${catalog.owner?.id ?? '<missing>'}' does not match tool owner '${owner.id}'`,
+      );
+    }
+    return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
+  }
+  // Bare ErrorCatalog shape (matches ToolExtensionPoints.errorCatalog).
+  if ('definitions' in value && 'list' in value && 'owner' in value) {
+    const catalog = value as unknown as ErrorCatalog;
+    if (catalog.owner?.id !== owner.id) {
+      throw new ErrorDefinitionError(
+        `errorCatalog owner id '${catalog.owner?.id ?? '<missing>'}' does not match tool owner '${owner.id}'`,
+      );
     }
     return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
   }

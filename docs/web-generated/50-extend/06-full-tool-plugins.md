@@ -250,12 +250,7 @@ exit code, and diagnostics — the host owns routing. Example with an optional
 immutable error catalog:
 
 ```ts
-import {
-  createToolError,
-  defineErrorCatalog,
-  defineTool,
-  ERROR_CATALOG_SCHEMA_VERSION,
-} from '@opensip-cli/core';
+import { createToolError, defineErrorCatalog, defineTool } from '@opensip-cli/core';
 
 const errorCatalog = defineErrorCatalog(
   { id: '11111111-1111-4111-8111-111111111111', displayName: 'audit-sec', packageName: '@my-co/audit-sec' },
@@ -279,10 +274,8 @@ const errorCatalog = defineErrorCatalog(
 export const tool = defineTool({
   // … identity, commandSpecs …
   extensionPoints: {
-    errorCatalog: {
-      schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
-      catalog: errorCatalog,
-    },
+    // Attach the immutable catalog directly (matches ToolExtensionPoints.errorCatalog).
+    errorCatalog,
   },
   // handlers throw createToolError(errorCatalog.require('AUDIT.TARGET.MISSING'), '…')
 });

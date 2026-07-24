@@ -95,6 +95,11 @@ describe('defineErrorCatalog', () => {
       'configuration',
     );
   });
+
+  it('registers CORE.SYSTEM.CANCELLED as a first-class catalog entry', () => {
+    expect(coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED').exitClass).toBe('cancelled');
+    expect(definitionFromLegacyCode('CORE.SYSTEM.CANCELLED').kind).toBe('cancelled');
+  });
 });
 
 describe('deepFreeze', () => {

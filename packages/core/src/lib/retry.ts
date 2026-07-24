@@ -84,23 +84,7 @@ const defaultClock: RetryClock = {
 
 /** Typed cancellation failure (definition-backed). */
 export function createCancelledError(message = 'Operation cancelled'): ToolError {
-  const base = coreSystemErrorCatalog.get('TIMEOUT');
-  const def = {
-    ...(base ?? coreSystemErrorCatalog.require('SYSTEM_ERROR')),
-    code: 'CORE.SYSTEM.CANCELLED',
-    kind: 'cancelled' as const,
-    retry: 'never' as const,
-    exitClass: 'cancelled' as const,
-    operatorAction: 'The operation was cancelled. Re-run if the work is still needed.',
-    source: 'application' as const,
-    defaultResponsibility: 'user' as const,
-    severity: 'error' as const,
-    exposure: 'public' as const,
-    stability: 'public' as const,
-    lifecycle: 'active' as const,
-    owner: coreSystemErrorCatalog.owner,
-  };
-  return createToolError(def, message);
+  return createToolError(coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED'), message);
 }
 
 /** Deadline / outer budget exhaustion. */

@@ -54,10 +54,47 @@ export class ToolRegistry {
    */
   register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     const key = tool.metadata.name ?? tool.metadata.id;
+    // Validate catalog aggregation *before* commit so a colliding catalog cannot
+    // leave a half-registered tool in the registry.
+    if (tool.extensionPoints?.errorCatalog) {
+      const provisional = aggregateErrorCatalogs([
+        ...this.collectToolCatalogs(),
+        {
+          toolName: tool.metadata.name,
+          toolId: tool.metadata.id,
+          catalog: tool.extensionPoints.errorCatalog,
+        },
+      ]);
+      if (provisional.collisions.length > 0) {
+        const first = provisional.collisions[0];
+        throw new ErrorDefinitionError(
+          `error catalog collision on ${first.code} between ${first.owners.join(' and ')}`,
+        );
+      }
+    }
     this.inner.register({ id: key, name: key, tool }, { sourcePackage: opts.sourcePackage });
     this.catalogIndex = undefined;
-    // Validate catalogs eagerly so bootstrap fails before commands mount.
+    // Warm the index so subsequent reads hit the cache (and re-throw if needed).
     this.getErrorCatalogIndex();
+  }
+
+  private collectToolCatalogs(): {
+    toolName: string;
+    toolId: string;
+    catalog: ErrorCatalog;
+  }[] {
+    const toolCatalogs: { toolName: string; toolId: string; catalog: ErrorCatalog }[] = [];
+    for (const registered of this.values()) {
+      const catalog = registered.extensionPoints?.errorCatalog;
+      if (catalog) {
+        toolCatalogs.push({
+          toolName: registered.metadata.name,
+          toolId: registered.metadata.id,
+          catalog,
+        });
+      }
+    }
+    return toolCatalogs;
   }
 
   /**
@@ -77,18 +114,7 @@ export class ToolRegistry {
       return this.catalogIndex;
     }
 
-    const toolCatalogs: { toolName: string; toolId: string; catalog: ErrorCatalog }[] = [];
-    for (const tool of this.values()) {
-      const catalog = tool.extensionPoints?.errorCatalog;
-      if (catalog) {
-        toolCatalogs.push({
-          toolName: tool.metadata.name,
-          toolId: tool.metadata.id,
-          catalog,
-        });
-      }
-    }
-    this.catalogIndex = aggregateErrorCatalogs(toolCatalogs);
+    this.catalogIndex = aggregateErrorCatalogs(this.collectToolCatalogs());
     if (this.catalogIndex.collisions.length > 0) {
       const first = this.catalogIndex.collisions[0];
       throw new ErrorDefinitionError(

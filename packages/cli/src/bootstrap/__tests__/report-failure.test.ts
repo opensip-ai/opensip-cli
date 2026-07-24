@@ -34,7 +34,8 @@ describe('resolveReportFailure', () => {
     });
     expect(resolveReportFailure({ error: { reason: 'plain' } })).toMatchObject({
       exitCode: EXIT_CODES.RUNTIME_ERROR,
-      message: '[object Object]',
+      // Total normalizer avoids String(object) → "[object Object]"; type name only.
+      message: 'object',
     });
   });
 

@@ -63,6 +63,18 @@ describe('validateToolErrorCatalogContribution', () => {
       validateToolErrorCatalogContribution({ schemaVersion: ERROR_CATALOG_SCHEMA_VERSION }, ownerA),
     ).toThrow(ErrorDefinitionError);
   });
+
+  it('rejects catalog owner id that does not match the tool owner', () => {
+    const foreign = defineErrorCatalog(ownerB, {
+      'B.ONLY.X': { ...def, code: 'B.ONLY.X' },
+    });
+    expect(() =>
+      validateToolErrorCatalogContribution(
+        { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog: foreign },
+        ownerA,
+      ),
+    ).toThrow(/does not match tool owner/);
+  });
 });
 
 describe('aggregateErrorCatalogs', () => {

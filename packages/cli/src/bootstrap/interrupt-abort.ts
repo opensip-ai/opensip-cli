@@ -75,16 +75,14 @@ export function installInterruptAbortCoordinator(
 
   const onSignal = (name: InterruptSignal) => {
     if (disposed) return;
-    const now = Date.now();
     if (firstAt !== undefined) {
-      // Second interrupt (any signal) while still in the grace window → escalate.
-      if (now - firstAt <= windowMs) {
-        clearGrace();
-        forceExit(name);
-      }
+      // Second interrupt always escalates (even after the grace window), so a
+      // hung process cannot ignore repeated Ctrl-C / SIGTERM once cancel started.
+      clearGrace();
+      forceExit(name);
       return;
     }
-    firstAt = now;
+    firstAt = Date.now();
     firstSignal = name;
     if (!controller.signal.aborted) {
       controller.abort(createCancelledError(`Received ${name}`));
