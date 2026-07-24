@@ -45,9 +45,24 @@ export function readConfigSchemaVersion(configPath: string): number {
   if (!existsSync(configPath)) return 1;
   const doc = readYamlFile(configPath);
   if (doc === null || typeof doc !== 'object' || Array.isArray(doc)) return 1;
-  const raw = (doc as Record<string, unknown>).schemaVersion;
-  if (typeof raw !== 'number' || !Number.isInteger(raw) || raw < 1) return 1;
-  return raw;
+  return coerceSchemaVersion((doc as Record<string, unknown>).schemaVersion) ?? 1;
+}
+
+/**
+ * Coerce a declared `schemaVersion` value to a positive integer, or
+ * `undefined` when nothing was declared. A QUOTED numeric (`"999"`) still
+ * declares a version — treating it as "couldn't read" would silently bypass
+ * the cli-too-old refusal for a config this CLI cannot safely load.
+ */
+export function coerceSchemaVersion(raw: unknown): number | undefined {
+  if (typeof raw === 'number') {
+    return Number.isInteger(raw) && raw >= 1 ? raw : undefined;
+  }
+  if (typeof raw === 'string' && /^\d+$/.test(raw.trim())) {
+    const value = Number.parseInt(raw.trim(), 10);
+    return value >= 1 ? value : undefined;
+  }
+  return undefined;
 }
 
 /**

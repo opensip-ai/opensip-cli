@@ -50,14 +50,24 @@ describe('config migration', () => {
   });
 
   it('normalizes invalid schemaVersion scalars to the supported number', () => {
-    const result = migrateConfigText({ text: 'schemaVersion: "1"\ntargets: {}\n' });
+    const result = migrateConfigText({ text: 'schemaVersion: latest\ntargets: {}\n' });
     expect(result.changed).toBe(true);
     expect(result.operations[0]?.kind).toBe('normalize-schema-version');
     expect(result.migratedText).toContain('schemaVersion: 1');
   });
 
+  it('treats a quoted numeric schemaVersion as the version it declares', () => {
+    // "1" is already the supported version — nothing to migrate.
+    const current = migrateConfigText({ text: 'schemaVersion: "1"\ntargets: {}\n' });
+    expect(current.changed).toBe(false);
+  });
+
   it('refuses configs newer than this CLI can migrate', () => {
     expect(() => migrateConfigText({ text: 'schemaVersion: 99\ntargets: {}\n' })).toThrow(
+      ConfigurationError,
+    );
+    // A QUOTED newer version must refuse too — not silently downgrade to 1.
+    expect(() => migrateConfigText({ text: 'schemaVersion: "999"\ntargets: {}\n' })).toThrow(
       ConfigurationError,
     );
   });

@@ -412,6 +412,7 @@ export type { UiContext } from './lib/ui-context.js';
 export {
   CLI_SUPPORTED_SCHEMA_VERSION,
   readConfigSchemaVersion,
+  coerceSchemaVersion,
   checkSchemaCompat,
 } from './lib/config-version.js';
 export type { SchemaCompat } from './lib/config-version.js';

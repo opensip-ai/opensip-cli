@@ -607,6 +607,7 @@ const EXPORT_ALLOWLIST = {
   WorkflowExecutionOptions: 'run-kernel',
   WorkflowRetryOptions: 'run-kernel',
   checkSchemaCompat: 'run-kernel',
+  coerceSchemaVersion: 'run-kernel',
   configureLogger: 'run-kernel',
   correlationFromEnv: 'run-kernel',
   correlationToEnv: 'run-kernel',

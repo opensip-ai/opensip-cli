@@ -54,10 +54,21 @@ describe('readConfigSchemaVersion (permissive)', () => {
     expect(readConfigSchemaVersion(p)).toBe(1);
   });
 
-  it('returns 1 when the field is a string (non-integer)', () => {
+  it('returns 1 when the field is a non-numeric string', () => {
     const p = join(testDir, 'string.yml');
-    writeFileSync(p, 'schemaVersion: "1"\n', 'utf8');
+    writeFileSync(p, 'schemaVersion: latest\n', 'utf8');
     expect(readConfigSchemaVersion(p)).toBe(1);
+  });
+
+  it('honours a QUOTED numeric string — it still declares a version', () => {
+    // "999" downgrading to 1 would silently bypass the cli-too-old refusal.
+    const p = join(testDir, 'quoted.yml');
+    writeFileSync(p, 'schemaVersion: "999"\n', 'utf8');
+    expect(readConfigSchemaVersion(p)).toBe(999);
+
+    const p1 = join(testDir, 'quoted-1.yml');
+    writeFileSync(p1, 'schemaVersion: "1"\n', 'utf8');
+    expect(readConfigSchemaVersion(p1)).toBe(1);
   });
 
   it('returns 1 when the field is a float (non-integer)', () => {

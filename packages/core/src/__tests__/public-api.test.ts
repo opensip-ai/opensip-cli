@@ -135,6 +135,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'commandProducesVerdict',
   'commandProducesEvidenceSnapshot',
   'checkSchemaCompat',
+  'coerceSchemaVersion',
   'classifyIntegrityFailure',
   'classifyModuleError',
   'formatCliDiagnosticHuman',

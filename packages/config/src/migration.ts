@@ -1,6 +1,10 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 
-import { CLI_SUPPORTED_SCHEMA_VERSION, ConfigurationError } from '@opensip-cli/core';
+import {
+  CLI_SUPPORTED_SCHEMA_VERSION,
+  coerceSchemaVersion,
+  ConfigurationError,
+} from '@opensip-cli/core';
 import { isMap, isScalar, parseDocument, type Document as YAMLDocument, type YAMLMap } from 'yaml';
 
 /** Maximum project-config size accepted by the migration command. */
@@ -71,11 +75,12 @@ function readSchemaVersion(root: YAMLMap): SchemaVersionRead {
   if (!root.has('schemaVersion')) return { status: 'missing', version: 1 };
   const node = root.get('schemaVersion', true);
   if (!isScalar(node)) return { status: 'invalid', version: 1 };
-  const value = node.value;
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) {
-    return { status: 'invalid', version: 1 };
-  }
-  return { status: 'valid', version: value };
+  // Shared coercion: a QUOTED numeric ("999") still declares a version — the
+  // old typeof check classified it 'invalid' → version 1, silently downgrading
+  // a config the CLI_TOO_OLD refusal should have rejected.
+  const version = coerceSchemaVersion(node.value);
+  if (version === undefined) return { status: 'invalid', version: 1 };
+  return { status: 'valid', version };
 }
 
 function parseConfigDocument(text: string, configPath: string | undefined) {
