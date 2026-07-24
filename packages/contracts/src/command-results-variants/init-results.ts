@@ -95,7 +95,12 @@ export interface InitResult {
    * together with `created: false`.
    */
   partialStateError?: {
-    readonly state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized';
+    /**
+     * The OBSERVED working-dir state at refusal time. `'pristine'` appears for
+     * argument-validation refusals (e.g. `--keep --remove`) on an untouched
+     * directory — the state is reported truthfully, never fabricated.
+     */
+    readonly state: 'pristine' | 'partial-config-only' | 'partial-dir-only' | 'fully-initialized';
     readonly preExistingFiles: readonly PreExistingFile[];
     readonly message: string;
   };

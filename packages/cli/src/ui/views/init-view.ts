@@ -29,12 +29,14 @@ function verbatim(message: string): ViewNode {
 }
 
 function partialStateHeadline(
-  state: 'partial-config-only' | 'partial-dir-only' | 'fully-initialized',
+  state: NonNullable<InitResult['partialStateError']>['state'],
   cfg: string,
 ): string {
   if (state === 'fully-initialized') return 'Already initialized';
   if (state === 'partial-config-only') return `${cfg} present but opensip-cli/ missing`;
-  return `opensip-cli/ present but ${cfg} missing`;
+  if (state === 'partial-dir-only') return `opensip-cli/ present but ${cfg} missing`;
+  // 'pristine' — an argument-validation refusal on an untouched directory.
+  return 'Init refused';
 }
 
 function createdHeadline(state: InitResult['state']): string {

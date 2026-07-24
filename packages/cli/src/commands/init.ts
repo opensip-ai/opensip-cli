@@ -181,11 +181,16 @@ function invalidInitInput(
   baseResult: BaseInitResult,
 ): InitResult | undefined {
   if (args.keep === true && args.remove === true) {
+    // Report the OBSERVED state — this refusal used to fabricate
+    // 'fully-initialized' regardless of what was actually on disk.
+    const observedState = existsSync(args.cwd)
+      ? classifyWorkingDir(resolveProjectPaths(args.cwd))
+      : 'pristine';
     return {
       ...baseResult,
       created: false,
       partialStateError: {
-        state: 'fully-initialized',
+        state: observedState,
         preExistingFiles: [],
         message: '--keep and --remove are mutually exclusive. Pick one.',
       },

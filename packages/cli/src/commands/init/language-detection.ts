@@ -50,6 +50,7 @@ const MARKERS: readonly DetectionMarker[] = [
   { language: 'go', file: 'go.mod', description: 'Go module' },
   { language: 'java', file: 'pom.xml', description: 'Maven project' },
   { language: 'java', file: 'build.gradle', description: 'Gradle project' },
+  { language: 'java', file: 'build.gradle.kts', description: 'Gradle project (Kotlin DSL)' },
   { language: 'cpp', file: 'CMakeLists.txt', description: 'CMake project' },
   { language: 'cpp', file: 'Makefile', description: 'Make project' },
 ];
