@@ -12,6 +12,8 @@ import {
   IpcPayloadTooLargeError,
   sendWorkerIpcMessage,
   sendWorkerIpcMessageAndDrain,
+  toWorkerFailureWire,
+  WORKER_FAILURE_WIRE_VERSION,
   type WorkerMessage,
 } from '@opensip-cli/core';
 
@@ -63,25 +65,39 @@ export async function sendTerminal(msg: DispatchWorkerMessage): Promise<void> {
 }
 
 /**
- * Build a structured `error` IPC message with a failure class (+ stack when
- * present). `code` carries the canonical exit class while `detailCode` carries
- * the original stable subcode, so the supervisor can rebuild the right subclass
- * without discarding machine-readable capability diagnostics.
+ * Build a structured `error` IPC message with a failure class and Plan 00
+ * machine failure projection. `code` carries the canonical exit class while
+ * `detailCode` carries the original stable subcode. Raw stacks are not wired
+ * (operator-only); parent reconstructs via `failure` projection.
  */
 export function errorMessage(
   message: string,
   failureClass: ToolCommandFailureClass,
-  stack?: string,
+  _stack?: string,
   code?: string,
   detailCode?: string,
+  cause?: unknown,
 ): DispatchWorkerMessage {
+  const wire = toWorkerFailureWire(
+    cause ??
+      Object.assign(new Error(message), {
+        failureClass,
+        ...(code === undefined ? {} : { code }),
+      }),
+  );
   return {
     kind: 'error',
-    message,
-    failureClass,
-    ...(stack === undefined ? {} : { stack }),
-    ...(code === undefined ? {} : { code }),
-    ...(detailCode === undefined ? {} : { detailCode }),
+    message: wire.message || message,
+    failureClass: (wire.failureClass as ToolCommandFailureClass | undefined) ?? failureClass,
+    ...(code === undefined && wire.code === undefined
+      ? {}
+      : { code: code ?? wire.code }),
+    ...(detailCode === undefined && wire.detailCode === undefined
+      ? {}
+      : { detailCode: detailCode ?? wire.detailCode }),
+    ...(wire.failure === undefined
+      ? {}
+      : { failure: wire.failure, failureWireVersion: WORKER_FAILURE_WIRE_VERSION }),
   };
 }
 

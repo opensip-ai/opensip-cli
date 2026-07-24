@@ -271,7 +271,11 @@ export class McpStdioServer {
     //   - stdin EOF (`end`/`close`): the client hung up the transport.
     //   - SIGINT: Ctrl-C. No `process.exit` here — the command handler resolves
     //     cleanly and the host sets the final exit code (ADR-0084 §shutdown).
+    // Plan 00: one terminal settlement — double SIGINT/EOF must not re-enter close.
+    let shutdownStarted = false;
     const shutdown = (): void => {
+      if (shutdownStarted) return;
+      shutdownStarted = true;
       void this.mcp.close();
     };
     process.stdin.once('end', shutdown);

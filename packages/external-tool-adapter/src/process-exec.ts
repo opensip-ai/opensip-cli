@@ -16,7 +16,35 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
+import { SystemError } from '@opensip-cli/core';
+
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
+
 import type { BinaryResolveDeps } from './binary-resolver.js';
+
+/**
+ * Plan 00: coded spawn failure (binary missing vs other errno) with safe metadata.
+ */
+export function spawnFailureError(
+  command: string,
+  errno: string,
+  cause?: unknown,
+): SystemError {
+  if (errno === 'ENOENT') {
+    return new SystemError(`scanner '${command}' binary not found (ENOENT)`, {
+      code: 'EXTERNAL.SCANNER.BINARY_MISSING',
+      definition: externalToolErrorCatalog.require('EXTERNAL.SCANNER.BINARY_MISSING'),
+      metadata: { command, errno, layer: 'path' },
+      cause: cause instanceof Error ? cause : undefined,
+    });
+  }
+  return new SystemError(`scanner '${command}' failed to spawn (${errno})`, {
+    code: 'EXTERNAL.SCANNER.SPAWN_FAILED',
+    definition: externalToolErrorCatalog.require('EXTERNAL.SCANNER.SPAWN_FAILED'),
+    metadata: { command, errno },
+    cause: cause instanceof Error ? cause : undefined,
+  });
+}
 
 /** The captured outcome of a scanner process run. */
 export interface ProcessResult {
@@ -91,11 +119,7 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
         }
         // A string `code` (`ENOENT`/`EACCES`) is a spawn failure, not an exit code.
         if (typeof failure.code === 'string') {
-          reject(
-            error instanceof Error
-              ? error
-              : new Error(`scanner '${input.command}' failed to spawn (${failure.code})`),
-          );
+          reject(spawnFailureError(input.command, failure.code, error));
           return;
         }
         resolve({

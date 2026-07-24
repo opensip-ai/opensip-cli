@@ -6,6 +6,8 @@ import {
   IpcPayloadTooLargeError,
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
+  toWorkerFailureWire,
+  WORKER_FAILURE_WIRE_VERSION,
   type CommandSpec,
   type WorkerMessage,
 } from '@opensip-cli/core';
@@ -86,10 +88,16 @@ export async function executeCapabilityWorker(specPath: string): Promise<void> {
       value: await runCapabilityWorker(readSpec(specPath)),
     });
   } catch (error) {
+    const wire = toWorkerFailureWire(error);
     await send({
       kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
+      message: wire.message,
+      ...(wire.failureClass === undefined ? {} : { failureClass: wire.failureClass }),
+      ...(wire.code === undefined ? {} : { code: wire.code }),
+      ...(wire.detailCode === undefined ? {} : { detailCode: wire.detailCode }),
+      ...(wire.failure === undefined
+        ? {}
+        : { failure: wire.failure, failureWireVersion: WORKER_FAILURE_WIRE_VERSION }),
     });
   } finally {
     stopHeartbeat();

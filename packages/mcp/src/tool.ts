@@ -13,6 +13,7 @@
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
 import { mcpCommandSpec } from './command.js';
+import { mcpErrorCatalog } from './errors/mcp-error-catalog.js';
 import { registerMcpGraphAdapter } from './register-mcp-graph-adapters.js';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
@@ -33,6 +34,7 @@ export const mcpTool: Tool = defineTool({
   },
   commandSpecs: [mcpCommandSpec],
   extensionPoints: {
+    errorCatalog: mcpErrorCatalog,
     capabilityRegistrars: { 'mcp-graph-adapter': registerMcpGraphAdapter },
   },
 });
