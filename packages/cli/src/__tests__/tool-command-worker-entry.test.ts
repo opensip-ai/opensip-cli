@@ -157,7 +157,8 @@ describe('runToolCommandWorker', () => {
     expect(msg.kind).toBe('error');
     if (msg.kind !== 'error') throw new Error('expected error');
     expect(msg.failureClass).toBe('tool-handler-throw');
-    expect(msg.message).toContain('handler returned undefined');
+    expect(msg.message).toBe('The operation failed.');
+    expect(msg.message).not.toContain('handler returned undefined');
   });
 
   it('returns a bad-spec error for an unreadable spec file', async () => {
@@ -188,7 +189,8 @@ describe('runToolCommandWorker', () => {
     expect(msg.kind).toBe('error');
     if (msg.kind !== 'error') throw new Error('expected error');
     expect(msg.failureClass).toBe('tool-handler-throw');
-    expect(msg.message).toContain('external handler boom');
+    expect(msg.message).toBe('The operation failed.');
+    expect(msg.message).not.toContain('external handler boom');
     // Plan 00: worker wire omits raw stacks; machine failure projection is the
     // structured operator surface (see errorMessage / toWorkerFailureWire).
     expect(msg.stack).toBeUndefined();
@@ -237,7 +239,8 @@ describe('runToolCommandWorker', () => {
     expect(msg.kind).toBe('error');
     if (msg.kind !== 'error') throw new Error('expected error');
     expect(msg.failureClass).toBe('unsupported-seam');
-    expect(msg.message).toContain("seam 'registerLiveView'");
+    expect(msg.message).toBe('The operation failed.');
+    expect(msg.message).not.toContain("seam 'registerLiveView'");
   });
 
   it('config deep pass: a config block the tool schema rejects returns config-invalid', async () => {
@@ -393,7 +396,8 @@ describe('runToolCommandWorker', () => {
       expect(msg.kind).toBe('error');
       if (msg.kind !== 'error') throw new Error('expected error');
       expect(msg.failureClass).toBe('payload_too_large');
-      expect(msg.message).toContain('reportedFailure output exceeds cap');
+      expect(msg.message).toBe('The operation failed.');
+      expect(msg.message).not.toContain('reportedFailure output exceeds cap');
     } finally {
       if (previous === undefined) {
         delete process.env.OPENSIP_CLI_WORKER_MAX_CAPTURED_OUTPUT_BYTES;

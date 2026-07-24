@@ -157,6 +157,7 @@ export function createCapturingContext(
       exitCode: detail.exitCode,
       ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
       ...(detail.code === undefined ? {} : { code: detail.code }),
+      ...(detail.failure === undefined ? {} : { failure: detail.failure }),
       ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
     };
   };

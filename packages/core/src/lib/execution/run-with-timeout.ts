@@ -90,6 +90,7 @@ export async function runWithTimeout<R>(
   // wiring. An explicit opts.parentSignal (an additional outer deadline) wins.
   const parentSignal = opts.parentSignal ?? currentScope()?.abortSignal;
   const detachParent = composeAbortSignals(parentSignal, controller);
+  let detachParentRace = noopCleanup;
   const startTime = Date.now();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -99,6 +100,7 @@ export async function runWithTimeout<R>(
       timeoutId = undefined;
     }
     detachParent();
+    detachParentRace();
     return Date.now() - startTime;
   };
 
@@ -179,10 +181,30 @@ export async function runWithTimeout<R>(
     timeoutId.unref?.();
   });
 
+  // Parent cancellation is a terminal race of its own. Merely aborting the
+  // child signal is insufficient when a non-cooperative domain function ignores
+  // it; without this arm an OS interrupt can remain stuck until the unit timeout.
+  const hardParentAbort = new Promise<UnitRunOutcome<R>>((resolve) => {
+    if (parentSignal === undefined) return;
+    const onAbort = () => {
+      resolve({
+        status: 'error',
+        error: parentSignal.reason ?? new Error('Parent signal aborted'),
+        durationMs: Date.now() - startTime,
+      });
+    };
+    if (parentSignal.aborted) {
+      onAbort();
+      return;
+    }
+    parentSignal.addEventListener('abort', onAbort, { once: true });
+    detachParentRace = () => parentSignal.removeEventListener('abort', onAbort);
+  });
+
   // Race so a non-settling domain cannot hang the scheduler/recipe.
   let outcome: UnitRunOutcome<R>;
   try {
-    outcome = await Promise.race([workPromise, hardTimeout]);
+    outcome = await Promise.race([workPromise, hardTimeout, hardParentAbort]);
   } finally {
     // Release the parent-signal listener + timer even when the hard timeout wins
     // and the (non-cooperative) domain promise never settles. Otherwise `finish()`

@@ -1,4 +1,10 @@
-import { UnknownLiveViewError, createRunTimer } from '@opensip-cli/core';
+import {
+  UnknownLiveViewError,
+  createRunTimer,
+  deepFreeze,
+  normalizeFailure,
+  toMachineFailureProjection,
+} from '@opensip-cli/core';
 
 import { makeTestScope } from './scope.js';
 
@@ -24,6 +30,7 @@ export interface CapturedEmitError {
   readonly exitCode: number;
   readonly suggestion?: string;
   readonly code?: string;
+  readonly failure?: Readonly<Record<string, unknown>>;
   readonly diagnostic?: unknown;
 }
 
@@ -147,6 +154,19 @@ function toolStateBucket(captured: ToolCliContextCaptured, tool: string): Map<st
   return bucket;
 }
 
+function snapshotReportFailure(detail: ReportFailureDetail): ReportFailureDetail {
+  try {
+    return deepFreeze(structuredClone(detail));
+  } catch {
+    return deepFreeze({
+      ...detail,
+      ...(detail.error === undefined
+        ? {}
+        : { error: toMachineFailureProjection(normalizeFailure(detail.error)) }),
+    });
+  }
+}
+
 export function createToolCliContextDouble(
   opts: ToolCliContextDoubleOptions = {},
 ): ToolCliContextDouble {
@@ -197,7 +217,7 @@ export function createToolCliContextDouble(
     },
     logger,
     reportFailure: (detail) => {
-      captured.reportFailures.push(detail);
+      captured.reportFailures.push(snapshotReportFailure(detail));
       return Promise.resolve();
     },
     setExitCode: (code) => {

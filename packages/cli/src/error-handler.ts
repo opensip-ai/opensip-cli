@@ -6,36 +6,33 @@
  *  - One `process.exitCode` write path: route every exit-code change
  *    through the supplied `setExitCode` callback (which `cli-context.ts`
  *    centralises).
- *  - Match on `instanceof` against the typed error hierarchy in
- *    `@opensip-cli/core`; fall back to the data-driven
- *    `getErrorSuggestion` (Layer 2 Phase 1) for unknown shapes.
- *  - The typed-error → exit-code policy lives in contracts'
- *    `mapToolErrorToExitCode` (audit-round-2 Finding C). This handler
- *    keeps only the *CLI-specific* layer: per-class action hints (e.g.
- *    "Run opensip fit --list...") that don't belong in the
- *    headless contracts package.
+ *  - Normalize a caught value once and derive public wording, catalog action,
+ *    machine outcome, and definition-owned exit class from that envelope.
+ *  - Retain the narrow legacy suggestion table only for otherwise-unknown
+ *    errors; known definitions own their action and never need message matching.
  *  - Keep the renderer pluggable so unit tests can capture the rendered
  *    `ErrorResult` without touching Ink.
  */
 
 import {
   EXIT_CODES,
-  getErrorSuggestion,
-  mapToolErrorToExitCode,
+  getErrorSuggestionFromMessage,
+  mapExitClassToExitCode,
   type ErrorResult,
-  type ErrorSuggestion,
 } from '@opensip-cli/contracts';
 import {
-  ConfigurationError,
-  NetworkError,
-  NotFoundError,
-  PluginIncompatibleError,
-  ToolError,
+  neutralizeTerminalText,
+  normalizeFailure,
+  toOperatorFailureProjection,
+  toPublicFailureProjection,
 } from '@opensip-cli/core';
 import { CommanderError } from 'commander';
 
 import { BootstrapError } from './bootstrap/bootstrap-error.js';
-import { outcomeFromError, outcomeFromErrorMessage } from './commands/assemble-outcome.js';
+import {
+  outcomeFromErrorMessage,
+  outcomeFromFailureEnvelope,
+} from './commands/assemble-outcome.js';
 import { renderOutcome } from './commands/render-outcome.js';
 
 /**
@@ -66,43 +63,6 @@ function commanderExitCode(error: CommanderError): number {
     : error.exitCode;
 }
 
-/**
- * Per-class action hints. Adding a new ToolError subclass with a
- * suggested user action is one tuple here; the exit code comes from
- * `mapToolErrorToExitCode` so the policy stays in one place.
- */
-const ACTION_HINTS: readonly {
-  readonly is: (e: ToolError) => boolean;
-  readonly action: string;
-}[] = [
-  {
-    is: (e) => e instanceof NotFoundError,
-    action: 'Run opensip fit --list to see available checks.',
-  },
-  {
-    is: (e) => e instanceof ConfigurationError,
-    action: 'Check opensip-cli.config.yml or your --language flag.',
-  },
-  {
-    is: (e) => e instanceof NetworkError,
-    action: 'Check the --report-to URL and your network connection.',
-  },
-  {
-    is: (e) => e instanceof PluginIncompatibleError,
-    action:
-      'Upgrade OpenSIP CLI (or the tool), or trust a project-local tool via tools.trusted / OPENSIP_CLI_ALLOW_PROJECT_TOOLS.',
-  },
-];
-
-function suggestionFromTypedError(error: unknown): ErrorSuggestion | null {
-  if (!(error instanceof ToolError)) return null;
-  const hint = ACTION_HINTS.find((rule) => rule.is(error));
-  return {
-    message: error.message,
-    ...(hint ? { action: hint.action } : {}),
-  };
-}
-
 export interface HandleParseErrorOptions {
   readonly setExitCode: (code: number) => void;
   readonly render: (result: ErrorResult) => Promise<void>;
@@ -118,6 +78,14 @@ export interface HandleParseErrorOptions {
 
 /** Inert renderer for the `--json` paths — `renderOutcome` never renders in JSON mode. */
 const NOOP_RENDER = (): Promise<void> => Promise.resolve();
+
+function safeInstanceOf<T>(value: unknown, ctor: abstract new (...args: never[]) => T): value is T {
+  try {
+    return value instanceof ctor;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The catch handler for `program.parseAsync()`. Maps the thrown error to a
@@ -136,7 +104,7 @@ export async function handleParseError(
   // legacy-identical stderr for unknown-command/option/missing-arg cases. Only
   // the invalid-argument-value codes are re-mapped to exit 2 (ValidationError
   // parity); every other code keeps Commander's exit code.
-  if (error instanceof CommanderError) {
+  if (safeInstanceOf(error, CommanderError)) {
     opts.setExitCode(commanderExitCode(error));
     return;
   }
@@ -146,7 +114,7 @@ export async function handleParseError(
   // own exit code, a clean message, and the original multi-line human text. In
   // human mode we write that text to stderr verbatim — byte-identical to the
   // legacy guard output; in `--json` we emit a structured `bootstrap.error`.
-  if (error instanceof BootstrapError) {
+  if (safeInstanceOf(error, BootstrapError)) {
     opts.setExitCode(error.exitCode);
     if (opts.jsonRequested) {
       await renderOutcome(
@@ -164,24 +132,15 @@ export async function handleParseError(
     return;
   }
 
-  if (error instanceof ToolError) {
-    await renderTypedParseError(error, opts);
-    return;
-  }
-
-  await renderUntypedParseError(error, opts);
-}
-
-async function renderTypedParseError(
-  error: ToolError,
-  opts: HandleParseErrorOptions,
-): Promise<void> {
-  const suggestion = suggestionFromTypedError(error);
-  const message = error.message;
-  const exitCode = mapToolErrorToExitCode(error);
+  const envelope = normalizeFailure(error);
+  const failure = toPublicFailureProjection(envelope);
+  const message = typeof failure.message === 'string' ? failure.message : 'The operation failed.';
+  const legacySuggestion = getErrorSuggestionFromMessage(envelope.message);
+  const action = envelope.known === 'known' ? envelope.operatorAction : legacySuggestion?.action;
+  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
   opts.setExitCode(exitCode);
   if (opts.jsonRequested) {
-    await renderOutcome(outcomeFromError(error, { kind: 'command.error' }), {
+    await renderOutcome(outcomeFromFailureEnvelope(envelope, { kind: 'command.error' }), {
       jsonRequested: true,
       render: NOOP_RENDER,
     });
@@ -189,31 +148,8 @@ async function renderTypedParseError(
   }
   await opts.render({
     type: 'error',
-    message: suggestion?.message ?? message,
-    ...(suggestion?.action ? { suggestion: suggestion.action } : {}),
-    exitCode,
-  });
-}
-
-async function renderUntypedParseError(
-  error: unknown,
-  opts: HandleParseErrorOptions,
-): Promise<void> {
-  const message = error instanceof Error ? error.message : String(error);
-  const suggestion = getErrorSuggestion(error);
-  const exitCode = EXIT_CODES.RUNTIME_ERROR;
-  opts.setExitCode(exitCode);
-  if (opts.jsonRequested) {
-    await renderOutcome(outcomeFromError(error, { kind: 'command.error' }), {
-      jsonRequested: true,
-      render: NOOP_RENDER,
-    });
-    return;
-  }
-  await opts.render({
-    type: 'error',
-    message: suggestion?.message ?? message,
-    ...(suggestion?.action ? { suggestion: suggestion.action } : {}),
+    message,
+    ...(action === undefined ? {} : { suggestion: action }),
     exitCode,
   });
 }
@@ -227,11 +163,8 @@ async function renderUntypedParseError(
  * stderr, and emits a `cli.bootstrap.failed` log event so observability
  * pipelines see the failure. Audit 2026-05-23 G1.
  *
- * Exit code: a typed `ToolError` (e.g. the `PluginIncompatibleError` the
- * Phase-3 fail-closed admission path throws) routes through the canonical
- * `mapToolErrorToExitCode` policy so a fail-closed plugin yields exit 5
- * (`PLUGIN_INCOMPATIBLE`) even when it surfaces from bootstrap rather than
- * Commander's parse loop. Untyped errors keep the historical exit 1.
+ * Exit code comes from the normalized definition, including structurally
+ * recognized duplicate-core ToolErrors and the plugin-incompatible class.
  *
  * Synchronous because every step here is sync — stderr write,
  * structured-log call, exit-code set. The top-level caller doesn't
@@ -243,16 +176,33 @@ export function handleFatalBootstrapError(
   error: unknown,
   log: { error: (entry: Record<string, unknown>) => void },
 ): void {
-  const message = error instanceof Error ? error.message : String(error);
-  const exitCode =
-    error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
-  process.stderr.write(`opensip: fatal error: ${message}\n`);
-  log.error({
-    evt: 'cli.bootstrap.failed',
-    module: 'cli:bootstrap',
-    error: message,
-    exitCode,
-    stack: error instanceof Error ? error.stack : undefined,
-  });
-  process.exitCode = exitCode;
+  const envelope = normalizeFailure(error);
+  const publicProjection = toPublicFailureProjection(envelope);
+  const operatorProjection = toOperatorFailureProjection(envelope);
+  const message =
+    typeof publicProjection.message === 'string'
+      ? neutralizeTerminalText(publicProjection.message)
+      : 'The operation failed.';
+  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
+  try {
+    process.stderr.write(`opensip: fatal error [${envelope.code}]: ${message}\n`);
+  } catch {
+    // @swallow-ok intentional degradation: a broken stderr cannot prevent the deterministic fatal status.
+  }
+  try {
+    log.error({
+      evt: 'cli.bootstrap.failed',
+      module: 'cli:bootstrap',
+      code: envelope.code,
+      exitCode,
+      failure: operatorProjection,
+    });
+  } catch {
+    // @swallow-ok cleanup/observer isolation: logging cannot replace the primary failure or exit status.
+  }
+  try {
+    process.exitCode = exitCode;
+  } catch {
+    // @swallow-ok intentional degradation: no remaining effect is safe if the host rejects exitCode assignment.
+  }
 }

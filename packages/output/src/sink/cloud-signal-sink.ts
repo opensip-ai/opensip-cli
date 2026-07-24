@@ -8,7 +8,13 @@
  * the CLI uses `accepted` for the "Sent N signals" line and `authRejected` to
  * bust the entitlement cache.
  */
-import { logger, withSpanAsync } from '@opensip-cli/core';
+import {
+  currentScope,
+  logger,
+  normalizeFailure,
+  toPublicFailureProjection,
+  withSpanAsync,
+} from '@opensip-cli/core';
 
 import { postChunked } from './http-egress.js';
 
@@ -95,15 +101,21 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
               policy: POLICY,
               evtPrefix: 'cli.signal-sync',
               fetchImpl: opts.fetchImpl,
+              signal: currentScope()?.abortSignal,
             });
-            span.setAttributes({
-              tool: batch.tool,
-              runId: batch.runId,
-              'signal.count': batch.signals.length,
-              'chunk.count': chunks.length,
-              throttled: r.throttled,
-              outcome: r.outcome,
-            });
+            try {
+              span.setAttributes({
+                tool: batch.tool,
+                runId: batch.runId,
+                'signal.count': batch.signals.length,
+                'chunk.count': chunks.length,
+                throttled: r.throttled,
+                outcome: r.outcome,
+              });
+            } catch {
+              // Telemetry is secondary; an exporter/span fault cannot turn a
+              // successful upload into a reported delivery failure.
+            }
             return r;
           },
           { tool: batch.tool, runId: batch.runId },
@@ -113,13 +125,17 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
           (n, c, i) => (result.chunkResults[i] ? n + c.signals.length : n),
           0,
         );
-        logger.info({
-          evt: 'cli.signal-sync.done',
-          module: MODULE_TAG,
-          accepted,
-          outcome: result.outcome,
-          authRejected: result.authRejected,
-        });
+        try {
+          logger.info({
+            evt: 'cli.signal-sync.done',
+            module: MODULE_TAG,
+            accepted,
+            outcome: result.outcome,
+            authRejected: result.authRejected,
+          });
+        } catch {
+          // Preserve the successful transport result when the log sink fails.
+        }
         return {
           accepted,
           authRejected: result.authRejected,
@@ -129,11 +145,16 @@ export function createCloudSignalSink(opts: CloudSignalSinkOptions): SignalSink 
         };
       } catch (error) {
         // Defense in depth — postChunked never throws, but emit MUST NOT either.
-        logger.warn({
-          evt: 'cli.signal-sync.error',
-          module: MODULE_TAG,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        try {
+          const failure = toPublicFailureProjection(normalizeFailure(error));
+          logger.warn({
+            evt: 'cli.signal-sync.error',
+            module: MODULE_TAG,
+            failure,
+          });
+        } catch {
+          // The non-blocking sink contract outranks observability.
+        }
         return { accepted: 0, authRejected: false, skippedReason: 'error' };
       }
     },

@@ -118,6 +118,30 @@ describe('withRetry', () => {
     expect(fn.mock.calls.length).toBeLessThan(5);
   });
 
+  it('aborts even when an injected sleep implementation ignores the signal', async () => {
+    const controller = new AbortController();
+    const fn = vi.fn().mockRejectedValue(new Error('transient'));
+    const clock = {
+      now: () => 0,
+      random: () => 0,
+      sleep: () => {
+        queueMicrotask(() => controller.abort());
+        return new Promise<void>(() => {
+          /* deliberately non-cooperative */
+        });
+      },
+    };
+    await expect(
+      withRetry(fn, {
+        maxAttempts: 5,
+        signal: controller.signal,
+        clock,
+        useDefinitionRetry: false,
+      }),
+    ).rejects.toMatchObject({ code: 'CORE.SYSTEM.CANCELLED' });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
   it('does not retry ToolError with retry:never', async () => {
     const { ValidationError } = await import('../../lib/errors.js');
     const fn = vi.fn().mockRejectedValue(new ValidationError('bad'));
@@ -178,5 +202,19 @@ describe('withRetry', () => {
       }),
     ).rejects.toThrow();
     expect(fn.mock.calls.length).toBeLessThan(10);
+  });
+
+  it('enforces the deadline while a non-cooperative attempt is still pending', async () => {
+    const started = Date.now();
+    await expect(
+      withRetry(() => new Promise<never>(() => undefined), {
+        maxAttempts: 3,
+        deadlineMs: Date.now() + 25,
+      }),
+    ).rejects.toMatchObject({
+      code: 'CORE.SYSTEM.DEADLINE_EXCEEDED',
+      definition: { retry: 'never' },
+    });
+    expect(Date.now() - started).toBeLessThan(500);
   });
 });

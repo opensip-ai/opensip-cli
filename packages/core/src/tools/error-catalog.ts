@@ -14,6 +14,7 @@ import {
   type ErrorCatalogOwner,
 } from '../lib/error-definition.js';
 import { coreSystemErrorCatalog } from '../lib/error-definition.js';
+import { isPlainDataObject } from '../lib/plain-data-object.js';
 
 /** Wire shape for optional tool catalog contribution. */
 export interface ToolErrorCatalogContribution {
@@ -21,10 +22,26 @@ export interface ToolErrorCatalogContribution {
   readonly catalog: ErrorCatalog;
 }
 
+/** @throws {ErrorDefinitionError} When a contribution field cannot be safely inspected. */
+function ownData(value: object, key: string): unknown {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    throw new ErrorDefinitionError(`errorCatalog.${key} could not be inspected`);
+  }
+  if (descriptor === undefined) return undefined;
+  if (!('value' in descriptor)) {
+    throw new ErrorDefinitionError(`errorCatalog.${key} must be a data property`);
+  }
+  return descriptor.value;
+}
+
 /**
  * Validate an optional tool catalog contribution (hostile plugin input).
  * @throws {ErrorDefinitionError} When the value is missing/not a plain object, the schemaVersion is unsupported, the owner id mismatches, or neither a catalog nor definitions are present.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Hostile plugin admission validates each independent schema/owner/plain-data invariant before copying.
 export function validateToolErrorCatalogContribution(
   raw: unknown,
   owner: ErrorCatalogOwner,
@@ -32,51 +49,64 @@ export function validateToolErrorCatalogContribution(
   if (raw === undefined || raw === null) {
     throw new ErrorDefinitionError('errorCatalog contribution is required when provided');
   }
-  if (typeof raw !== 'object' || Array.isArray(raw)) {
+  if (!isPlainDataObject(raw)) {
     throw new ErrorDefinitionError('errorCatalog must be a plain object');
   }
-  const value = raw as Record<string, unknown>;
-  const schemaVersion = value.schemaVersion;
+  const value = raw;
+  const schemaVersion = ownData(value, 'schemaVersion');
   if (schemaVersion !== ERROR_CATALOG_SCHEMA_VERSION) {
     throw new ErrorDefinitionError(
       `unsupported errorCatalog schemaVersion (expected ${ERROR_CATALOG_SCHEMA_VERSION})`,
     );
   }
-  // Accept either a full catalog or a definitions bag to normalize.
-  if (
-    value.catalog &&
-    typeof value.catalog === 'object' &&
-    value.catalog !== null &&
-    'definitions' in value.catalog &&
-    'list' in value.catalog
-  ) {
-    const catalog = value.catalog as ErrorCatalog;
-    if (catalog.owner?.id !== owner.id) {
-      throw new ErrorDefinitionError(
-        `errorCatalog owner id '${catalog.owner?.id ?? '<missing>'}' does not match tool owner '${owner.id}'`,
-      );
-    }
-    return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
+  // Accept either `{ schemaVersion, catalog }`, a bare ErrorCatalog, or a
+  // definitions contribution. Every accepted form is copied through
+  // defineErrorCatalog; a plugin-provided get/require/list implementation is
+  // never retained by the host.
+  const nestedCatalog = ownData(value, 'catalog');
+  const candidate = nestedCatalog ?? value;
+  if (!isPlainDataObject(candidate)) {
+    throw new ErrorDefinitionError('errorCatalog.catalog must be a plain object');
   }
-  // Bare ErrorCatalog shape (matches ToolExtensionPoints.errorCatalog).
-  if ('definitions' in value && 'list' in value && 'owner' in value) {
-    const catalog = value as unknown as ErrorCatalog;
-    if (catalog.owner?.id !== owner.id) {
-      throw new ErrorDefinitionError(
-        `errorCatalog owner id '${catalog.owner?.id ?? '<missing>'}' does not match tool owner '${owner.id}'`,
-      );
-    }
-    return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
-  }
-  if (value.definitions && typeof value.definitions === 'object') {
-    const catalog = defineErrorCatalog(
-      owner,
-      value.definitions as Parameters<typeof defineErrorCatalog>[1],
-      { allowLegacyCodes: true },
+  if (ownData(candidate, 'schemaVersion') !== ERROR_CATALOG_SCHEMA_VERSION) {
+    throw new ErrorDefinitionError(
+      `unsupported nested errorCatalog schemaVersion (expected ${ERROR_CATALOG_SCHEMA_VERSION})`,
     );
-    return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
   }
-  throw new ErrorDefinitionError('errorCatalog requires catalog or definitions');
+
+  const declaredOwner = ownData(candidate, 'owner');
+  let declaredPackageName: string | undefined;
+  if (declaredOwner !== undefined) {
+    if (!isPlainDataObject(declaredOwner)) {
+      throw new ErrorDefinitionError('errorCatalog owner must be a plain object');
+    }
+    const declaredId = ownData(declaredOwner, 'id');
+    if (declaredId !== owner.id) {
+      throw new ErrorDefinitionError(
+        `errorCatalog owner id '${typeof declaredId === 'string' ? declaredId : '<missing>'}' does not match tool owner '${owner.id}'`,
+      );
+    }
+    const packageName = ownData(declaredOwner, 'packageName');
+    if (typeof packageName === 'string') declaredPackageName = packageName;
+  }
+
+  const definitions = ownData(candidate, 'definitions');
+  if (!isPlainDataObject(definitions)) {
+    throw new ErrorDefinitionError('errorCatalog requires catalog or definitions');
+  }
+  const effectiveOwner: ErrorCatalogOwner = {
+    id: owner.id,
+    displayName: owner.displayName,
+    ...(owner.packageName === undefined && declaredPackageName === undefined
+      ? {}
+      : { packageName: owner.packageName ?? declaredPackageName }),
+  };
+  const catalog = defineErrorCatalog(
+    effectiveOwner,
+    definitions as Parameters<typeof defineErrorCatalog>[1],
+    { allowLegacyCodes: true },
+  );
+  return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
 }
 
 /**
@@ -99,14 +129,18 @@ export function aggregateErrorCatalogs(
   for (const entry of toolCatalogs) {
     for (const def of entry.catalog.list) {
       const existing = byCode.get(def.code);
-      if (existing && existing.owner.id !== def.owner.id) {
+      if (
+        def.owner.id !== entry.toolId ||
+        (existing !== undefined &&
+          (existing.owner.id !== def.owner.id || existing.toolName !== entry.toolName))
+      ) {
         collisions.push({
           code: def.code,
-          owners: [existing.owner.id, def.owner.id],
+          owners: [existing?.owner.id ?? entry.toolId, def.owner.id],
         });
         continue;
       }
-      byCode.set(def.code, { ...def, toolName: entry.toolName });
+      byCode.set(def.code, Object.freeze({ ...def, toolName: entry.toolName }));
     }
   }
 

@@ -9,6 +9,7 @@ import {
   getMeter,
   logger,
   SystemError,
+  toolErrorFromWorkerFailureWire,
   type WorkerMessage,
 } from '@opensip-cli/core';
 
@@ -75,7 +76,7 @@ function forkAndAwait(args: {
         cwd: args.cwd,
         timeoutMs: args.timeoutMs,
         enableHeartbeat: true,
-        enableSigintCancellation: true,
+        cancellationSignal: scope?.abortSignal,
         buildChildEnv: (parentEnv) =>
           buildCapabilityWorkerChildEnv({
             parentEnv,
@@ -93,7 +94,13 @@ function forkAndAwait(args: {
           } else if (typed.kind === 'error') {
             handle.done(() => {
               recordDuration(args.spec, 'error', started);
-              reject(workerError(args.spec, typed.message, handle.getStderrTail()));
+              reject(
+                toolErrorFromWorkerFailureWire({
+                  ...typed,
+                  stderrTail: handle.getStderrTail(),
+                  expectedOwnerId: args.spec.ownerToolId,
+                }) ?? workerError(args.spec, typed.message, handle.getStderrTail()),
+              );
             });
           }
         },

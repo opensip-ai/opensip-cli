@@ -17,6 +17,7 @@ import {
 } from './command-spec-draft.js';
 import { assertCommandSpec } from './command-spec-validate.js';
 import { deriveCommandsFromSpecs } from './derive-commands-from-specs.js';
+import { validateToolErrorCatalogContribution } from './error-catalog.js';
 import { validateToolIdentity } from './identity.js';
 
 import type { ToolConfigContribution } from './capability.js';
@@ -162,12 +163,20 @@ export function defineTool(input: DefineToolInput): Tool {
 
   const commandSpecs = normalizeCommandSpecs(input.commandSpecs, identity);
   const commands = deriveCommandsFromSpecs(commandSpecs);
+  const normalizedErrorCatalog =
+    input.extensionPoints?.errorCatalog === undefined
+      ? undefined
+      : validateToolErrorCatalogContribution(input.extensionPoints.errorCatalog, {
+          id: input.metadata.id,
+          displayName: identity.name,
+        }).catalog;
 
   const extensionPoints: ToolExtensionPoints | undefined =
     input.extensionPoints === undefined
       ? undefined
       : ({
           ...input.extensionPoints,
+          ...(normalizedErrorCatalog === undefined ? {} : { errorCatalog: normalizedErrorCatalog }),
           ...(input.extensionPoints.config === undefined
             ? {}
             : {

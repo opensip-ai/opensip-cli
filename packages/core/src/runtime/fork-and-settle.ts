@@ -13,6 +13,7 @@ import { isIpcPayloadTooLarge, measureIpcPayloadBytes } from './ipc-payload.js';
 import { killTree } from './kill-tree.js';
 import { startRssWatchdog } from './rss-watchdog.js';
 import { CapturedStderr } from './stderr-capture.js';
+import { WORKER_CONTROL_WIRE_VERSION } from './worker-cancellation-control.js';
 import {
   getWorkerLimits,
   workerExecArgv,
@@ -35,7 +36,12 @@ export interface ForkAndSettleDescriptor {
   readonly limits?: Partial<WorkerLimits>;
   readonly timeoutMs?: number;
   readonly enableHeartbeat?: boolean;
-  readonly enableSigintCancellation?: boolean;
+  /** Parent/root cancellation source. No process signal listeners are installed here. */
+  readonly cancellationSignal?: AbortSignal;
+  /** Time allowed for a cancel acknowledgement before SIGTERM. Default: 250ms. */
+  readonly cancelAckGraceMs?: number;
+  /** Time allowed after SIGTERM before the process tree receives SIGKILL. Default: 1000ms. */
+  readonly terminationGraceMs?: number;
   readonly onMessage?: (msg: unknown) => void;
   readonly onLimitFailure?: (failureClass: string, detail?: string) => void;
 }
@@ -56,6 +62,25 @@ function isHeartbeatMessage(msg: unknown): boolean {
   return (
     typeof msg === 'object' && msg !== null && (msg as { kind?: unknown }).kind === 'heartbeat'
   );
+}
+
+function isCancelAckMessage(msg: unknown): boolean {
+  if (typeof msg !== 'object' || msg === null) return false;
+  try {
+    const kind = Object.getOwnPropertyDescriptor(msg, 'kind');
+    const version = Object.getOwnPropertyDescriptor(msg, 'controlVersion');
+    return (
+      kind !== undefined &&
+      'value' in kind &&
+      kind.value === 'cancel-ack' &&
+      version !== undefined &&
+      'value' in version &&
+      version.value === WORKER_CONTROL_WIRE_VERSION
+    );
+  } catch {
+    // @swallow-ok probe/optional capability: malformed or hostile IPC messages are not cancellation acknowledgements.
+    return false;
+  }
 }
 
 function buildStdio(stderrInherit: boolean): ['ignore', 'ignore', 'inherit' | 'pipe', 'ipc'] {
@@ -79,67 +104,6 @@ function resolveForkChildEnv(
     env.OPENSIP_RUN_ID = ctx.runId;
   }
   return env;
-}
-
-/**
- * Process-global SIGINT cancellation fan-out (plan 09 Task 5.5).
- *
- * One listener per PROCESS instead of one per concurrent child: >10 parallel
- * forks previously tripped Node's MaxListenersExceededWarning on every
- * parallel fit/graph run. This is process-lifecycle infrastructure (SIGINT is
- * delivered once per process — a RunScope-owned handler cannot exist), the
- * sanctioned singleton case peer to the pinned ALS container in run-scope.ts:
- * the Symbol.for slot keeps duplicate physical core copies
- * (injectWorkspacePackages) on ONE registry, it holds only opaque per-child
- * cancellation callbacks (never scope-derived data), and every child
- * unregisters on settle. The listener installs on the FIRST active child and
- * uninstalls on the LAST, so an idle process keeps Node's default Ctrl-C
- * termination exactly as before.
- */
-interface SigintCancellationRegistry {
-  readonly callbacks: Set<() => void>;
-  handler: (() => void) | undefined;
-}
-
-const SIGINT_REGISTRY_SLOT = Symbol.for('@opensip-cli/core/sigintCancellationRegistry');
-
-function sigintCancellationRegistry(): SigintCancellationRegistry {
-  const holder = globalThis as Record<PropertyKey, unknown>;
-  let registry = holder[SIGINT_REGISTRY_SLOT] as SigintCancellationRegistry | undefined;
-  if (registry === undefined) {
-    registry = { callbacks: new Set(), handler: undefined };
-    holder[SIGINT_REGISTRY_SLOT] = registry;
-  }
-  return registry;
-}
-
-/** Register a child's cancellation; returns the unregister latch. */
-function registerSigintCancellation(cancel: () => void): () => void {
-  const registry = sigintCancellationRegistry();
-  registry.callbacks.add(cancel);
-  if (registry.handler === undefined) {
-    registry.handler = (): void => {
-      // Iterate a snapshot: a callback unregisters itself during fan-out.
-      for (const callback of [...registry.callbacks]) {
-        try {
-          callback();
-        } catch {
-          /* @swallow-ok cancellation must reach every remaining child */
-        }
-      }
-    };
-    process.on('SIGINT', registry.handler);
-  }
-  let unregistered = false;
-  return (): void => {
-    if (unregistered) return;
-    unregistered = true;
-    registry.callbacks.delete(cancel);
-    if (registry.callbacks.size === 0 && registry.handler !== undefined) {
-      process.off('SIGINT', registry.handler);
-      registry.handler = undefined;
-    }
-  };
 }
 
 /**
@@ -179,7 +143,10 @@ export function forkAndSettle(
   let timeoutTimer: NodeJS.Timeout | undefined;
   let heartbeatTimer: NodeJS.Timeout | undefined;
   let idleRpcTimer: NodeJS.Timeout | undefined;
-  let unregisterSigint: (() => void) | undefined;
+  let detachCancellation: (() => void) | undefined;
+  let cancelAckTimer: NodeJS.Timeout | undefined;
+  let terminationTimer: NodeJS.Timeout | undefined;
+  let cancellationRequested = false;
 
   const clearTimers = (): void => {
     if (timeoutTimer !== undefined) clearTimeout(timeoutTimer);
@@ -194,15 +161,41 @@ export function forkAndSettle(
     killTree(child, signal);
   };
 
+  const clearCancellationTimers = (): void => {
+    if (cancelAckTimer !== undefined) clearTimeout(cancelAckTimer);
+    if (terminationTimer !== undefined) clearTimeout(terminationTimer);
+    cancelAckTimer = undefined;
+    terminationTimer = undefined;
+  };
+
+  const terminateWithEscalation = (): void => {
+    cancellationRequested = false;
+    if (cancelAckTimer !== undefined) {
+      clearTimeout(cancelAckTimer);
+      cancelAckTimer = undefined;
+    }
+    kill('SIGTERM');
+    if (terminationTimer !== undefined) clearTimeout(terminationTimer);
+    const graceMs = Math.max(0, descriptor.terminationGraceMs ?? 1000);
+    terminationTimer = setTimeout(() => {
+      terminationTimer = undefined;
+      if (child.exitCode === null && child.signalCode === null) kill('SIGKILL');
+    }, graceMs);
+    terminationTimer.unref?.();
+  };
+
   const done = (apply: () => void): void => {
     if (settled) return;
     settled = true;
     clearTimers();
     rssWatchdog.stop();
-    unregisterSigint?.();
-    unregisterSigint = undefined;
-    apply();
-    kill();
+    detachCancellation?.();
+    detachCancellation = undefined;
+    try {
+      apply();
+    } finally {
+      terminateWithEscalation();
+    }
   };
 
   const onLimit = (failureClass: string, detail?: string): void => {
@@ -241,13 +234,6 @@ export function forkAndSettle(
     idleRpcTimer.unref?.();
   };
 
-  if (descriptor.enableSigintCancellation === true) {
-    unregisterSigint = registerSigintCancellation(() => {
-      kill('SIGKILL');
-      onLimit('cancelled');
-    });
-  }
-
   const rssWatchdog = startRssWatchdog({
     child,
     maxRssMb: limits.maxRssMb,
@@ -256,7 +242,57 @@ export function forkAndSettle(
     },
   });
 
+  const cancellationSignal = descriptor.cancellationSignal;
+  if (cancellationSignal !== undefined) {
+    const cancel = (): void => {
+      if (settled) return;
+      cancellationRequested = true;
+      let requestSent = false;
+      if (child.connected) {
+        try {
+          child.send({
+            kind: 'cancel-request',
+            controlVersion: WORKER_CONTROL_WIRE_VERSION,
+          });
+          requestSent = true;
+        } catch {
+          // @swallow-ok cleanup/observer isolation: closed/racing IPC falls through to immediate SIGTERM.
+        }
+      }
+      // Settle the caller now so a late result cannot win. Unlike ordinary
+      // `done`, cancellation defers SIGTERM briefly for the request/ack phase.
+      settled = true;
+      clearTimers();
+      rssWatchdog.stop();
+      detachCancellation?.();
+      detachCancellation = undefined;
+      try {
+        descriptor.onLimitFailure?.('cancelled');
+      } finally {
+        if (requestSent) {
+          const graceMs = Math.max(0, descriptor.cancelAckGraceMs ?? 250);
+          cancelAckTimer = setTimeout(terminateWithEscalation, graceMs);
+          cancelAckTimer.unref?.();
+        } else {
+          terminateWithEscalation();
+        }
+      }
+    };
+    if (cancellationSignal.aborted) {
+      // Callers commonly close over the returned handle in onLimitFailure.
+      // Defer a pre-aborted signal until the handle assignment completes.
+      queueMicrotask(cancel);
+    } else {
+      cancellationSignal.addEventListener('abort', cancel, { once: true });
+      detachCancellation = () => cancellationSignal.removeEventListener('abort', cancel);
+    }
+  }
+
   child.on('message', (msg: unknown) => {
+    if (cancellationRequested && isCancelAckMessage(msg)) {
+      terminateWithEscalation();
+      return;
+    }
     if (settled) return;
 
     if (isHeartbeatMessage(msg)) {
@@ -284,6 +320,7 @@ export function forkAndSettle(
   });
 
   child.on('exit', () => {
+    clearCancellationTimers();
     // Premature exit is handled by protocol supervisors via their own done() paths.
   });
 
@@ -311,9 +348,9 @@ export function forkAndSettle(
         settled = true;
         clearTimers();
         rssWatchdog.stop();
-        unregisterSigint?.();
-        unregisterSigint = undefined;
-        kill();
+        detachCancellation?.();
+        detachCancellation = undefined;
+        terminateWithEscalation();
       }
     },
   };

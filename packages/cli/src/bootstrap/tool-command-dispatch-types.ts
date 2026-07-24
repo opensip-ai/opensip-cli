@@ -130,14 +130,12 @@ export type ToolCommandFailureClass =
   | 'payload_too_large';
 
 /**
- * The final-result-return payload the worker posts back over IPC once the
- * command handler resolves. The host replays it through the REAL host
+ * The final-result payload the worker posts back over IPC. The host replays it through the REAL host
  * `ToolCliContext` seams so the output contract stays byte-identical to the
  * in-process path. Every field is optional: a handler that only set an exit code
  * (or returned void) yields a sparse result.
  *
- * `output` mirrors the command's declared {@link CommandOutputMode} so the host
- * knows which dispatch arm to drive.
+ * `output` mirrors the declared {@link CommandOutputMode} and selects the host dispatch arm.
  */
 export interface ToolCommandResult {
   readonly output: CommandOutputMode;
@@ -155,6 +153,7 @@ export interface ToolCommandResult {
     readonly exitCode: number;
     readonly suggestion?: string;
     readonly code?: string;
+    readonly failure?: Readonly<Record<string, unknown>>;
   };
   /**
    * `ctx.reportFailure(...)` resolved detail — replayed host-side through the
@@ -165,6 +164,7 @@ export interface ToolCommandResult {
     readonly exitCode: number;
     readonly suggestion?: string;
     readonly code?: string;
+    readonly failure?: Readonly<Record<string, unknown>>;
     readonly diagnostic?: CliDiagnostic;
     readonly jsonRequested?: boolean;
     readonly log?: {

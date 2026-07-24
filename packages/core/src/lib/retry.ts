@@ -7,7 +7,13 @@
  */
 
 import { coreSystemErrorCatalog } from './error-definition.js';
-import { ToolError, createToolError } from './errors.js';
+import {
+  createToolError,
+  formatUnknownErrorMessage,
+  isToolErrorLike,
+  normalizeToolErrorDefinition,
+  type ToolError,
+} from './errors.js';
 import { normalizeFailure } from './failure-envelope.js';
 
 const ABSOLUTE_ATTEMPT_BACKSTOP = 100;
@@ -45,6 +51,8 @@ export interface RetryOptions {
   useDefinitionRetry?: boolean;
   /** Override classification; return false to stop retrying. */
   shouldRetry?: (error: unknown, attempt: number) => boolean;
+  /** Override a computed delay (for example an HTTP Retry-After hint). */
+  retryDelayMs?: (error: unknown, attempt: number, computedDelayMs: number) => number | undefined;
   /**
    * Called before each retry. Isolated — throws are swallowed and cannot
    * change the operation outcome.
@@ -92,7 +100,7 @@ export function createCancelledError(message = 'Operation cancelled'): ToolError
 
 /** Deadline / outer budget exhaustion. */
 export function createDeadlineError(message = 'Operation deadline exceeded'): ToolError {
-  const def = coreSystemErrorCatalog.require('TIMEOUT');
+  const def = coreSystemErrorCatalog.require('CORE.SYSTEM.DEADLINE_EXCEEDED');
   return createToolError(def, message);
 }
 
@@ -102,16 +110,18 @@ export function createDeadlineError(message = 'Operation deadline exceeded'): To
  * Known ToolError definitions drive never/transient/caller-policy.
  */
 export function defaultShouldRetry(error: unknown): boolean {
-  if (error instanceof ToolError) {
+  if (isToolErrorLike(error)) {
+    const definition = normalizeToolErrorDefinition(error.definition);
+    if (definition === undefined) return false;
     if (error.code === 'CORE.SYSTEM.CANCELLED') return false;
-    if (error.definition.kind === 'cancelled') return false;
-    if (error.definition.retry === 'never') return false;
-    if (error.definition.retry === 'transient') return true;
+    if (definition.kind === 'cancelled') return false;
+    if (definition.retry === 'never') return false;
+    if (definition.retry === 'transient') return true;
     // caller-policy: skip permanent user/application classes
     if (
-      error.definition.kind === 'validation' ||
-      error.definition.kind === 'not-found' ||
-      error.definition.kind === 'permission'
+      definition.kind === 'validation' ||
+      definition.kind === 'not-found' ||
+      definition.kind === 'permission'
     ) {
       return false;
     }
@@ -139,7 +149,14 @@ function computeDelay(
     options.initialDelayMs * Math.pow(options.backoffMultiplier, exp),
     options.maxDelayMs,
   );
-  const r = options.random();
+  let random = 0;
+  try {
+    random = options.random();
+  } catch {
+    // @swallow-ok intentional degradation: a broken jitter source becomes zero
+    // rather than masking the operation failure being retried.
+  }
+  const r = Number.isFinite(random) ? Math.min(1, Math.max(0, random)) : 0;
   switch (options.jitter) {
     case 'none': {
       return Math.min(base, options.maxDelayMs);
@@ -161,6 +178,79 @@ function computeDelay(
   }
 }
 
+/** @throws {unknown} The attempt failure, cancellation reason, or deadline failure. */
+async function runAbortableAttempt<T>(
+  fn: () => Promise<T>,
+  signal?: AbortSignal,
+  deadline?: { readonly at: number; readonly now: () => number },
+): Promise<T> {
+  if (signal?.aborted) throw createCancelledError('Retry aborted before attempt');
+  if (deadline !== undefined && deadline.now() >= deadline.at) throw createDeadlineError();
+
+  let detach = (): void => undefined;
+  const races: Promise<T>[] = [Promise.resolve().then(fn)];
+  if (signal !== undefined) {
+    races.push(
+      new Promise<never>((_resolve, reject) => {
+        const onAbort = () => reject(createCancelledError('Retry aborted during attempt'));
+        signal.addEventListener('abort', onAbort, { once: true });
+        detach = () => signal.removeEventListener('abort', onAbort);
+      }),
+    );
+  }
+  let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+  if (deadline !== undefined) {
+    races.push(
+      new Promise<never>((_resolve, reject) => {
+        const checkDeadline = (): void => {
+          const remaining = deadline.at - deadline.now();
+          if (remaining <= 0) {
+            reject(createDeadlineError());
+            return;
+          }
+          deadlineTimer = setTimeout(checkDeadline, Math.min(remaining, 2_147_483_647));
+        };
+        checkDeadline();
+      }),
+    );
+  }
+  try {
+    return await Promise.race(races);
+  } finally {
+    detach();
+    if (deadlineTimer !== undefined) clearTimeout(deadlineTimer);
+  }
+}
+
+function callerAllowsRetry(
+  shouldRetry: RetryOptions['shouldRetry'],
+  error: unknown,
+  attempt: number,
+): boolean {
+  if (shouldRetry === undefined) return true;
+  try {
+    return shouldRetry(error, attempt);
+  } catch {
+    // @swallow-ok probe/optional capability: a broken policy callback stops retry and preserves the original failure.
+    return false;
+  }
+}
+
+function callerDelay(
+  override: RetryOptions['retryDelayMs'],
+  error: unknown,
+  attempt: number,
+  computed: number,
+): number {
+  if (override === undefined) return computed;
+  try {
+    const value = override(error, attempt, computed);
+    return value !== undefined && Number.isFinite(value) ? Math.max(0, value) : computed;
+  } catch {
+    return computed;
+  }
+}
+
 function safeOnRetry(
   onRetry: RetryOptions['onRetry'],
   attempt: number,
@@ -178,7 +268,7 @@ function safeOnRetry(
 /**
  * Execute an async function with exponential backoff retry.
  * Throws the last error if all attempts fail, or a cancellation/deadline error.
- * @throws {ToolError} CORE.SYSTEM.CANCELLED when the signal aborts, or TIMEOUT when the deadline is exceeded.
+ * @throws {ToolError} CORE.SYSTEM.CANCELLED when the signal aborts, or CORE.SYSTEM.DEADLINE_EXCEEDED when the deadline is exceeded.
  * @throws The last thrown error when all attempts are exhausted or retry is declined.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- attempt/deadline/signal branches are load-bearing and clearer inline
@@ -193,6 +283,7 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     deadlineMs,
     useDefinitionRetry = true,
     shouldRetry: shouldRetryOverride,
+    retryDelayMs,
     onRetry,
     clock = defaultClock,
   } = options;
@@ -201,6 +292,13 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     ? Math.max(1, Math.floor(maxAttempts))
     : 1;
   const hardCap = Math.min(effectiveMaxAttempts, ABSOLUTE_ATTEMPT_BACKSTOP);
+  const effectiveInitialDelay =
+    Number.isFinite(initialDelayMs) && initialDelayMs >= 0 ? initialDelayMs : 500;
+  const effectiveMaxDelay = Number.isFinite(maxDelayMs) && maxDelayMs >= 0 ? maxDelayMs : 10_000;
+  const effectiveMultiplier =
+    Number.isFinite(backoffMultiplier) && backoffMultiplier >= 1 ? backoffMultiplier : 2;
+  const effectiveDeadlineMs =
+    deadlineMs !== undefined && Number.isFinite(deadlineMs) ? deadlineMs : undefined;
   let lastError: Error | undefined;
   let prevDelay: number | undefined;
 
@@ -208,42 +306,58 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     if (signal?.aborted) {
       throw createCancelledError('Retry aborted before attempt');
     }
-    if (deadlineMs !== undefined && clock.now() >= deadlineMs) {
+    if (effectiveDeadlineMs !== undefined && clock.now() >= effectiveDeadlineMs) {
       throw createDeadlineError();
     }
 
     try {
-      return await fn();
+      return await runAbortableAttempt(
+        fn,
+        signal,
+        effectiveDeadlineMs === undefined ? undefined : { at: effectiveDeadlineMs, now: clock.now },
+      );
     } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
+      try {
+        lastError = error instanceof Error ? error : new Error(formatUnknownErrorMessage(error));
+      } catch {
+        lastError = new Error(formatUnknownErrorMessage(error));
+      }
 
       if (attempt >= hardCap) break;
 
       const allowByDef = useDefinitionRetry ? defaultShouldRetry(error) : true;
-      const allowByCaller =
-        shouldRetryOverride === undefined ? true : shouldRetryOverride(error, attempt);
+      const allowByCaller = callerAllowsRetry(shouldRetryOverride, error, attempt);
       if (!allowByDef || !allowByCaller) {
         throw lastError;
       }
 
       let delay = computeDelay(attempt, {
-        initialDelayMs,
-        maxDelayMs,
-        backoffMultiplier,
+        initialDelayMs: effectiveInitialDelay,
+        maxDelayMs: effectiveMaxDelay,
+        backoffMultiplier: effectiveMultiplier,
         jitter,
         random: clock.random,
         prevDelay,
       });
+      delay = callerDelay(retryDelayMs, error, attempt, delay);
+      delay = Math.min(delay, effectiveMaxDelay);
       prevDelay = delay;
 
-      if (deadlineMs !== undefined) {
-        const remaining = deadlineMs - clock.now();
+      if (effectiveDeadlineMs !== undefined) {
+        const remaining = effectiveDeadlineMs - clock.now();
         if (remaining <= 0) throw createDeadlineError();
         delay = Math.min(delay, remaining);
       }
 
       safeOnRetry(onRetry, attempt, lastError, delay);
-      await clock.sleep(delay, signal);
+      // Enforce cancellation even when an injected/adapted clock accidentally
+      // ignores the signal. The losing sleep promise remains observed by the
+      // race, so a late rejection cannot become unhandled.
+      await runAbortableAttempt(
+        () => clock.sleep(delay, signal),
+        signal,
+        effectiveDeadlineMs === undefined ? undefined : { at: effectiveDeadlineMs, now: clock.now },
+      );
     }
   }
 

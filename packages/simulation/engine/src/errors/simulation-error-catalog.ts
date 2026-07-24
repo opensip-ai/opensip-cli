@@ -4,9 +4,12 @@
 
 import { defineErrorCatalog } from '@opensip-cli/core';
 
+/** Must match packages/simulation/engine/src/tool.ts SIMULATION_STABLE_ID. */
+const SIMULATION_OWNER_ID = '715d32c2-692c-4ed4-985b-a35deaf186aa';
+
 export const simulationErrorCatalog = defineErrorCatalog(
   {
-    id: 'simulation',
+    id: SIMULATION_OWNER_ID,
     displayName: 'simulation',
     packageName: '@opensip-cli/simulation',
   },

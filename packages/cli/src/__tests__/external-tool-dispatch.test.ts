@@ -178,7 +178,10 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
 
   it('isolation: a handler throw crosses IPC as a structured failure', async () => {
     const cap = makeDispatchHostCtx();
-    await expect(dispatch(cap, 'throw')).rejects.toThrow(/external handler boom/);
+    const failure = await dispatch(cap, 'throw').catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ToolError);
+    expect((failure as Error).message).toContain('The operation failed.');
+    expect((failure as Error).message).not.toContain('external handler boom');
   });
 
   it('isolation: a hung handler is SIGKILLed by the supervisor timeout', async () => {
@@ -321,9 +324,10 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
       { cwd: project.projectDir, env, encoding: 'utf8' },
     );
     expect(child.status).not.toBe(0);
-    expect(`${child.stdout}${child.stderr}`).toContain(
-      'Worker command path without OPENSIP_CLI_IN_TOOL_WORKER=1',
-    );
+    const output = `${child.stdout}${child.stderr}`;
+    expect(output).toContain('SYSTEM.WORKER.MODE_MISMATCH');
+    expect(output).toContain('The operation failed.');
+    expect(output).not.toContain('Worker command path without OPENSIP_CLI_IN_TOOL_WORKER=1');
     expect(runtimeDbSnapshot()).toEqual(before);
   });
 
@@ -340,10 +344,13 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
       encoding: 'utf8',
     });
     expect(child.status).not.toBe(0);
-    expect(`${child.stdout}${child.stderr}`).toContain(
+    const output = `${child.stdout}${child.stderr}`;
+    expect(output).toContain('SYSTEM.WORKER.MODE_MISMATCH');
+    expect(output).toContain('The operation failed.');
+    expect(output).not.toContain(
       'OPENSIP_CLI_IN_TOOL_WORKER=1 without an authorized internal worker command path',
     );
-    expect(`${child.stdout}${child.stderr}`).not.toContain('"type":"tools-list"');
+    expect(output).not.toContain('"type":"tools-list"');
     expect(malicious.importSentinelPath).toBeDefined();
     expect(existsSync(malicious.importSentinelPath ?? '')).toBe(false);
     expect(runtimeDbSnapshot(malicious.projectDir)).toEqual(before);

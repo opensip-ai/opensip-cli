@@ -274,7 +274,8 @@ function resolveImpactBasis(opts: ImpactCommandOptions): {
   if (opts.changed === true || opts.since) {
     const resolved = resolveChangedFiles(opts.cwd, { since: opts.since });
     if (!resolved.ok) {
-      throw new ConfigurationError(resolved.message, { code: resolved.reason });
+      const reason = resolved.reason.replaceAll('-', '_').toUpperCase();
+      throw new ConfigurationError(resolved.message, { code: `CONFIG.GRAPH.${reason}` });
     }
     return {
       changedFiles: resolved.files,

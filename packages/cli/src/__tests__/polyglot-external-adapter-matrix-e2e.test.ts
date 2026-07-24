@@ -463,7 +463,8 @@ describe('polyglot external adapters — doctor and version matrix', () => {
 
       expect(run.status).not.toBe(0);
       expect(outcome.kind).toBe('command.error');
-      expect(outcome.errors?.[0]?.message).toContain(`${adapter.id} scan failed (exit 2)`);
+      expect(outcome.errors?.[0]?.message).toBe('The operation failed.');
+      expect(outcome.errors?.[0]?.message).not.toContain(`${adapter.id} scan failed (exit 2)`);
     });
   }
 });

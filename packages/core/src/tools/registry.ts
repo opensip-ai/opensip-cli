@@ -19,7 +19,7 @@
 import { ErrorDefinitionError } from '../lib/error-definition.js';
 import { Registry, type Registerable } from '../lib/registry.js';
 
-import { aggregateErrorCatalogs } from './error-catalog.js';
+import { aggregateErrorCatalogs, validateToolErrorCatalogContribution } from './error-catalog.js';
 
 import type { Tool } from './types.js';
 import type { ErrorCatalog, ErrorDefinition } from '../lib/error-definition.js';
@@ -55,15 +55,36 @@ export class ToolRegistry {
    */
   register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     const key = tool.metadata.name ?? tool.metadata.id;
+    // Preserve the registry's documented first-writer-wins behavior before
+    // inspecting any fields on a duplicate plugin object. A duplicate cannot
+    // make an already-admitted tool fail by attaching a hostile catalog.
+    if (this.inner.getById(key) !== undefined) {
+      this.inner.register({ id: key, name: key, tool }, { sourcePackage: opts.sourcePackage });
+      return;
+    }
+
+    let admittedTool = tool;
     // Validate catalog aggregation *before* commit so a colliding catalog cannot
     // leave a half-registered tool in the registry.
     if (tool.extensionPoints?.errorCatalog) {
+      const validated = validateToolErrorCatalogContribution(tool.extensionPoints.errorCatalog, {
+        id: tool.metadata.id,
+        displayName: tool.metadata.name,
+        ...(opts.sourcePackage === undefined ? {} : { packageName: opts.sourcePackage }),
+      });
+      admittedTool = {
+        ...tool,
+        extensionPoints: {
+          ...tool.extensionPoints,
+          errorCatalog: validated.catalog,
+        },
+      };
       const provisional = aggregateErrorCatalogs([
         ...this.collectToolCatalogs(),
         {
           toolName: tool.metadata.name,
           toolId: tool.metadata.id,
-          catalog: tool.extensionPoints.errorCatalog,
+          catalog: validated.catalog,
         },
       ]);
       if (provisional.collisions.length > 0) {
@@ -73,7 +94,10 @@ export class ToolRegistry {
         );
       }
     }
-    this.inner.register({ id: key, name: key, tool }, { sourcePackage: opts.sourcePackage });
+    this.inner.register(
+      { id: key, name: key, tool: admittedTool },
+      { sourcePackage: opts.sourcePackage },
+    );
     this.catalogIndex = undefined;
     // Warm the index so subsequent reads hit the cache (and re-throw if needed).
     this.getErrorCatalogIndex();
@@ -148,7 +172,9 @@ export class ToolRegistry {
 
   /** Remove one registered Tool by its registry key (normally metadata.name). */
   remove(id: string): boolean {
-    return this.inner.remove(id);
+    const removed = this.inner.remove(id);
+    if (removed) this.catalogIndex = undefined;
+    return removed;
   }
 
   clear(): void {

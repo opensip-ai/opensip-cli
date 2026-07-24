@@ -6,6 +6,7 @@ import {
   IpcPayloadTooLargeError,
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
+  startWorkerCancellationControl,
   toWorkerFailureWire,
   WORKER_FAILURE_WIRE_VERSION,
   type CommandSpec,
@@ -82,6 +83,7 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
 
 export async function executeCapabilityWorker(specPath: string): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
+  const stopCancellationControl = startWorkerCancellationControl();
   try {
     await send({
       kind: 'result',
@@ -100,6 +102,7 @@ export async function executeCapabilityWorker(specPath: string): Promise<void> {
         : { failure: wire.failure, failureWireVersion: WORKER_FAILURE_WIRE_VERSION }),
     });
   } finally {
+    stopCancellationControl();
     stopHeartbeat();
     // Give the parent event loop a beat to receive the drained IPC message
     // before this process exits. Without this, Linux under load can still

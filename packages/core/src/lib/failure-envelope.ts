@@ -6,12 +6,31 @@
  */
 
 import {
-  type ErrorDefinition,
   definitionFromLegacyCode,
   coreSystemErrorCatalog,
+  deepFreeze,
   FAILURE_PROJECTION_SCHEMA_VERSION,
 } from './error-definition.js';
-import { isToolErrorLike, sanitizeErrorMetadata, type ToolError } from './errors.js';
+import {
+  isToolErrorLike,
+  normalizeToolErrorDefinition,
+  sanitizeErrorMetadata,
+  type ToolError,
+} from './errors.js';
+
+import type {
+  FailureCauseSummary,
+  FailureEnvelope,
+  FailureKnownStatus,
+  NormalizeFailureContext,
+} from './failure-envelope-types.js';
+
+export type {
+  FailureCauseSummary,
+  FailureEnvelope,
+  FailureKnownStatus,
+  NormalizeFailureContext,
+} from './failure-envelope-types.js';
 
 export const FAILURE_ENVELOPE_VERSION = FAILURE_PROJECTION_SCHEMA_VERSION;
 
@@ -33,46 +52,6 @@ const MAX_TOTAL_NODES = 1000;
 /** Shared mutable work counter threaded through the recursion (parallel to `seen`). */
 interface NodeBudget {
   remaining: number;
-}
-
-/** Whether a normalized failure matched a known error definition or degraded to unknown. */
-export type FailureKnownStatus = 'known' | 'unknown';
-
-/** One entry in a failure's bounded cause chain (see {@link FailureEnvelope.causes}). */
-export interface FailureCauseSummary {
-  readonly code?: string;
-  readonly name?: string;
-  readonly message: string;
-  readonly known: FailureKnownStatus;
-}
-
-/**
- * Canonical, frozen representation of any thrown value produced by
- * {@link normalizeFailure}. Projection helpers render it for a specific audience
- * (public / machine / operator) without leaking operator-only detail.
- */
-export interface FailureEnvelope {
-  readonly schemaVersion: typeof FAILURE_ENVELOPE_VERSION;
-  readonly known: FailureKnownStatus;
-  readonly message: string;
-  readonly operatorAction: string;
-  readonly code: string;
-  readonly definition: ErrorDefinition;
-  readonly metadata: Readonly<Record<string, unknown>>;
-  readonly failureClass?: string;
-  readonly causes: readonly FailureCauseSummary[];
-  /** Sibling failures from parallel fan-in (not a cause chain). */
-  readonly aggregate?: readonly FailureEnvelope[];
-  readonly aggregateTruncated?: boolean;
-  /** Operator-only detail (never public/worker by default). */
-  readonly operatorDetail?: string;
-}
-
-/** Optional context passed to {@link normalizeFailure} (project root, sibling failures). */
-export interface NormalizeFailureContext {
-  readonly projectRoot?: string;
-  /** Optional sibling failures for aggregate envelopes. */
-  readonly siblings?: readonly unknown[];
 }
 
 const UNKNOWN = coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
@@ -153,153 +132,301 @@ function normalizeFailureInner(
     return unknownEnvelope('max-depth', undefined);
   }
 
-  // AggregateError or explicit siblings
-  if (typeof AggregateError !== 'undefined' && value instanceof AggregateError) {
-    return fromAggregateError(value, context, seen, depth, budget);
+  const aggregatePlan = prepareAggregatePlan(value, context, depth, seen);
+  if (aggregatePlan !== undefined) {
+    if (aggregatePlan.kind === 'terminal') return aggregatePlan.envelope;
+    const aggregate = normalizeNestedValues({
+      values: aggregatePlan.members,
+      context: { ...context, siblings: undefined },
+      seen,
+      depth: depth + 1,
+      budget,
+    });
+    return buildAggregate({
+      aggregate,
+      memberCount: aggregatePlan.memberCount,
+      headline: aggregatePlan.headline,
+      truncated: aggregatePlan.truncated,
+    });
   }
-  if (context.siblings && context.siblings.length > 0 && depth === 0) {
-    return buildAggregate(
-      [value, ...context.siblings],
+
+  const errorPlan = prepareErrorPlan(value, seen);
+  if (errorPlan !== undefined) {
+    if (errorPlan.kind === 'terminal') return errorPlan.envelope;
+    const nested = normalizeNestedValues({
+      values: boundedCauseMembers(errorPlan.cause, depth),
       context,
       seen,
-      depth,
+      depth: depth + 1,
       budget,
-      'aggregate failure',
-    );
-  }
-
-  if (isToolErrorLike(value)) {
-    return fromToolError(value, context, seen, depth, budget);
-  }
-
-  if (value instanceof Error) {
-    return fromNativeError(value, context, seen, depth, budget);
+    })[0];
+    const causes = nested === undefined ? [] : summarizeCause(nested, depth + 1);
+    return fromPreparedError(errorPlan, causes);
   }
 
   if (typeof value === 'object' && value !== null) {
-    if (seen.has(value)) {
-      return unknownEnvelope('circular', undefined);
-    }
-    seen.add(value);
-    // AbortSignal reason / DOMException-like
-    const name = readField(
-      value,
-      'name',
-      () => {
-        const n = (value as { name?: unknown }).name;
-        return typeof n === 'string' ? n : '';
-      },
-      '',
-    );
-    const message = readField(
-      value,
-      'message',
-      () => {
-        const m = (value as { message?: unknown }).message;
-        return typeof m === 'string' ? m : safeMessage(value);
-      },
-      safeMessage(value),
-    );
-    if (name === 'AbortError' || message === 'This operation was aborted') {
-      const def = definitionFromLegacyCode('TIMEOUT');
-      // Prefer cancelled when we add it; map timeout-like abort for now via kind
-      return freezeEnvelope({
-        schemaVersion: FAILURE_ENVELOPE_VERSION,
-        known: 'known',
-        message: truncate(message || 'Operation aborted', MAX_MESSAGE),
-        operatorAction: 'The operation was cancelled or aborted.',
-        code: 'CORE.SYSTEM.CANCELLED',
-        definition: {
-          ...def,
-          code: 'CORE.SYSTEM.CANCELLED',
-          kind: 'cancelled',
-          exitClass: 'cancelled',
-          retry: 'never',
-        },
-        metadata: {},
-        causes: [],
-      });
-    }
+    return fromUnknownObject(value, seen);
   }
 
   return unknownEnvelope(safeMessage(value), value);
 }
 
-function fromToolError(
-  error: ToolError,
+interface TerminalNormalizationPlan {
+  readonly kind: 'terminal';
+  readonly envelope: FailureEnvelope;
+}
+
+interface AggregateNormalizationPlan {
+  readonly kind: 'aggregate';
+  readonly members: readonly unknown[];
+  readonly memberCount: number;
+  readonly headline: string;
+  readonly truncated: boolean;
+}
+
+function prepareAggregatePlan(
+  value: unknown,
   context: NormalizeFailureContext,
-  seen: WeakSet<object>,
   depth: number,
-  budget: NodeBudget,
+  seen: WeakSet<object>,
+): AggregateNormalizationPlan | TerminalNormalizationPlan | undefined {
+  if (typeof AggregateError !== 'undefined' && value instanceof AggregateError) {
+    if (seen.has(value)) {
+      return { kind: 'terminal', envelope: unknownEnvelope('circular-aggregate', undefined) };
+    }
+    seen.add(value);
+    const inspected = inspectAggregateMembers(value);
+    return {
+      kind: 'aggregate',
+      members: inspected.members,
+      memberCount: inspected.total,
+      headline: safeMessage(value),
+      truncated: inspected.total > MAX_AGGREGATE,
+    };
+  }
+  if (context.siblings === undefined || context.siblings.length === 0 || depth !== 0) {
+    return undefined;
+  }
+  const memberCount = context.siblings.length + 1;
+  return {
+    kind: 'aggregate',
+    members: [value, ...context.siblings.slice(0, MAX_AGGREGATE - 1)],
+    memberCount,
+    headline: 'aggregate failure',
+    truncated: memberCount > MAX_AGGREGATE,
+  };
+}
+
+interface ToolErrorNormalizationPlan {
+  readonly kind: 'tool';
+  readonly error: ToolError;
+  readonly cause: unknown;
+}
+
+interface NativeErrorNormalizationPlan {
+  readonly kind: 'native';
+  readonly error: Error;
+  readonly cause: unknown;
+}
+
+function boundedCauseMembers(cause: unknown, depth: number): readonly unknown[] {
+  return cause === undefined || cause === null || depth >= MAX_CAUSE_DEPTH ? [] : [cause];
+}
+
+function fromPreparedError(
+  plan: ToolErrorNormalizationPlan | NativeErrorNormalizationPlan,
+  causes: readonly FailureCauseSummary[],
 ): FailureEnvelope {
-  const definition = error.definition ?? definitionFromLegacyCode(error.code);
-  const causes = collectCauses(error.cause, context, seen, depth + 1, budget);
-  const metadata = sanitizeErrorMetadata(error.metadata ?? {});
+  return plan.kind === 'tool'
+    ? fromToolError(plan.error, causes)
+    : fromNativeError(plan.error, causes);
+}
+
+function prepareErrorPlan(
+  value: unknown,
+  seen: WeakSet<object>,
+):
+  | ToolErrorNormalizationPlan
+  | NativeErrorNormalizationPlan
+  | TerminalNormalizationPlan
+  | undefined {
+  const toolError = isToolErrorLike(value) ? value : undefined;
+  if (toolError !== undefined) {
+    if (seen.has(toolError)) {
+      return { kind: 'terminal', envelope: unknownEnvelope('circular-error', undefined) };
+    }
+    seen.add(toolError);
+    return {
+      kind: 'tool',
+      error: toolError,
+      cause: readField(toolError, 'cause', () => toolError.cause, undefined),
+    };
+  }
+  if (!(value instanceof Error)) return undefined;
+  if (seen.has(value)) {
+    return { kind: 'terminal', envelope: unknownEnvelope('circular-error', undefined) };
+  }
+  seen.add(value);
+  return {
+    kind: 'native',
+    error: value,
+    cause: readField(value, 'cause', () => value.cause, undefined),
+  };
+}
+
+interface NestedNormalizationInput {
+  readonly values: readonly unknown[];
+  readonly context: NormalizeFailureContext;
+  readonly seen: WeakSet<object>;
+  readonly depth: number;
+  readonly budget: NodeBudget;
+}
+
+function normalizeNestedValues(input: NestedNormalizationInput): readonly FailureEnvelope[] {
+  const normalized: FailureEnvelope[] = [];
+  for (const value of input.values) {
+    normalized.push(
+      normalizeFailureInner(value, input.context, input.seen, input.depth, input.budget),
+    );
+  }
+  return normalized;
+}
+
+function fromUnknownObject(value: object, seen: WeakSet<object>): FailureEnvelope {
+  if (seen.has(value)) return unknownEnvelope('circular', undefined);
+  seen.add(value);
+  const name = readField(
+    value,
+    'name',
+    () => {
+      const candidate = (value as { name?: unknown }).name;
+      return typeof candidate === 'string' ? candidate : '';
+    },
+    '',
+  );
+  const message = readField(
+    value,
+    'message',
+    () => {
+      const candidate = (value as { message?: unknown }).message;
+      return typeof candidate === 'string' ? candidate : safeMessage(value);
+    },
+    safeMessage(value),
+  );
+  if (name !== 'AbortError' && message !== 'This operation was aborted') {
+    return unknownEnvelope(safeMessage(value), value);
+  }
+  const definition = coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED');
   return freezeEnvelope({
     schemaVersion: FAILURE_ENVELOPE_VERSION,
     known: 'known',
-    message: truncate(error.message || definition.code, MAX_MESSAGE),
+    message: truncate(message || 'Operation aborted', MAX_MESSAGE),
     operatorAction: definition.operatorAction,
-    code: error.code || definition.code,
+    code: definition.code,
     definition,
-    metadata,
-    ...(error.failureClass === undefined ? {} : { failureClass: error.failureClass }),
-    causes,
-    ...(typeof error.stderrTail === 'string'
-      ? { operatorDetail: truncate(error.stderrTail, MAX_OPERATOR_DETAIL) }
-      : {}),
+    metadata: {},
+    causes: [],
   });
 }
 
-function fromNativeError(
-  error: Error,
-  context: NormalizeFailureContext,
-  seen: WeakSet<object>,
-  depth: number,
-  budget: NodeBudget,
-): FailureEnvelope {
-  if (seen.has(error)) {
-    return unknownEnvelope('circular-error', undefined);
-  }
-  seen.add(error);
+function fromToolError(error: ToolError, causes: readonly FailureCauseSummary[]): FailureEnvelope {
+  const code = readField(
+    error,
+    'code',
+    () => (typeof error.code === 'string' ? error.code : 'SYSTEM_ERROR'),
+    'SYSTEM_ERROR',
+  );
+  const definition =
+    readField(
+      error,
+      'definition',
+      () => normalizeToolErrorDefinition(error.definition),
+      undefined,
+    ) ?? definitionFromLegacyCode(code);
+  const metadataInput = readField(error, 'metadata', () => error.metadata, {});
+  const metadata = sanitizeErrorMetadata(metadataInput);
+  const message = readField(
+    error,
+    'message',
+    () => (typeof error.message === 'string' ? error.message : definition.code),
+    definition.code,
+  );
+  const failureClass = readField(
+    error,
+    'failureClass',
+    () => (typeof error.failureClass === 'string' ? error.failureClass : undefined),
+    undefined,
+  );
+  const stderrTail = readField(
+    error,
+    'stderrTail',
+    () => (typeof error.stderrTail === 'string' ? error.stderrTail : undefined),
+    undefined,
+  );
+  return freezeEnvelope({
+    schemaVersion: FAILURE_ENVELOPE_VERSION,
+    known: 'known',
+    message: truncate(message || definition.code, MAX_MESSAGE),
+    operatorAction: definition.operatorAction,
+    code: code || definition.code,
+    definition,
+    metadata,
+    ...(failureClass === undefined ? {} : { failureClass }),
+    causes,
+    ...(stderrTail === undefined
+      ? {}
+      : { operatorDetail: truncate(stderrTail, MAX_OPERATOR_DETAIL) }),
+  });
+}
 
-  const errno = (error as NodeJS.ErrnoException).code;
+function fromNativeError(error: Error, causes: readonly FailureCauseSummary[]): FailureEnvelope {
+  const errno = readField(
+    error,
+    'code',
+    () => {
+      const code = (error as NodeJS.ErrnoException).code;
+      return typeof code === 'string' ? code : undefined;
+    },
+    undefined,
+  );
   let definition = definitionFromLegacyCode('SYSTEM_ERROR');
+  let known: FailureKnownStatus = 'unknown';
   if (typeof errno === 'string') {
     if (errno === 'ENOENT' || errno === 'ENOTDIR') {
       definition = definitionFromLegacyCode('NOT_FOUND');
+      known = 'known';
     } else if (errno === 'EACCES' || errno === 'EPERM') {
-      definition = {
-        ...definitionFromLegacyCode('SYSTEM_ERROR'),
-        kind: 'permission',
-        code: 'CORE.SYSTEM.PERMISSION',
-        exitClass: 'runtime',
-        operatorAction: 'Check filesystem permissions for the affected path.',
-      };
+      definition = coreSystemErrorCatalog.require('CORE.SYSTEM.PERMISSION');
+      known = 'known';
     } else if (errno === 'ENOSPC' || errno === 'EMFILE' || errno === 'ENOMEM') {
-      definition = {
-        ...definitionFromLegacyCode('SYSTEM_ERROR'),
-        kind: 'resource',
-        code: 'CORE.SYSTEM.RESOURCE',
-        source: 'infrastructure',
-        defaultResponsibility: 'environment',
-        operatorAction: 'Free resources (disk, FDs, memory) and retry.',
-      };
+      definition = coreSystemErrorCatalog.require('CORE.SYSTEM.RESOURCE');
+      known = 'known';
     }
   }
 
-  const causes = collectCauses(error.cause, context, seen, depth + 1, budget);
+  const name = readField(
+    error,
+    'name',
+    () => (typeof error.name === 'string' ? error.name : 'Error'),
+    'Error',
+  );
+  const message = readField(
+    error,
+    'message',
+    () => (typeof error.message === 'string' ? error.message : name),
+    name,
+  );
   return freezeEnvelope({
     schemaVersion: FAILURE_ENVELOPE_VERSION,
-    known: 'unknown',
-    message: truncate(error.message || error.name || 'Error', MAX_MESSAGE),
+    known,
+    message: truncate(message || name || 'Error', MAX_MESSAGE),
     operatorAction: definition.operatorAction,
     code: definition.code,
     definition,
     metadata: typeof errno === 'string' ? { errno } : {},
     causes,
     operatorDetail: truncate(
-      [error.name, error.message, typeof errno === 'string' ? `errno=${errno}` : '']
+      [name, message, typeof errno === 'string' ? `errno=${errno}` : '']
         .filter(Boolean)
         .join(' | '),
       MAX_OPERATOR_DETAIL,
@@ -307,15 +434,7 @@ function fromNativeError(
   });
 }
 
-function collectCauses(
-  cause: unknown,
-  context: NormalizeFailureContext,
-  seen: WeakSet<object>,
-  depth: number,
-  budget: NodeBudget,
-): FailureCauseSummary[] {
-  if (cause === undefined || cause === null || depth > MAX_CAUSE_DEPTH) return [];
-  const nested = normalizeFailure(cause, context, seen, depth, budget);
+function summarizeCause(nested: FailureEnvelope, depth: number): FailureCauseSummary[] {
   return [
     {
       ...(nested.code ? { code: nested.code } : {}),
@@ -326,36 +445,33 @@ function collectCauses(
   ].slice(0, MAX_CAUSE_DEPTH);
 }
 
-function fromAggregateError(
-  value: AggregateError,
-  context: NormalizeFailureContext,
-  seen: WeakSet<object>,
-  depth: number,
-  budget: NodeBudget,
-): FailureEnvelope {
-  // Dedup the aggregate node itself: a shared-node DAG re-references the same
-  // AggregateError under many parents; expanding it once collapses width^depth
-  // fan-out to O(distinct nodes) (the object/native-Error branches already do this).
-  if (seen.has(value)) {
-    return unknownEnvelope('circular-aggregate', undefined);
-  }
-  seen.add(value);
-  return buildAggregate(value.errors, context, seen, depth, budget, safeMessage(value));
+interface InspectedAggregateMembers {
+  readonly members: readonly unknown[];
+  readonly total: number;
 }
 
-function buildAggregate(
-  members: readonly unknown[],
-  context: NormalizeFailureContext,
-  seen: WeakSet<object>,
-  depth: number,
-  budget: NodeBudget,
-  headline: string,
-): FailureEnvelope {
-  const sliced = members.slice(0, MAX_AGGREGATE);
-  const aggregate = sliced.map((m) =>
-    normalizeFailure(m, { ...context, siblings: undefined }, seen, depth + 1, budget),
+function inspectAggregateMembers(value: AggregateError): InspectedAggregateMembers {
+  return readField(
+    value,
+    'errors',
+    () => {
+      const errors: unknown = value.errors;
+      if (!Array.isArray(errors)) return { members: [], total: 0 };
+      return { members: errors.slice(0, MAX_AGGREGATE), total: errors.length };
+    },
+    { members: [], total: 0 },
   );
-  const truncated = members.length > MAX_AGGREGATE;
+}
+
+interface AggregateBuildInput {
+  readonly aggregate: readonly FailureEnvelope[];
+  readonly memberCount: number;
+  readonly headline: string;
+  readonly truncated: boolean;
+}
+
+function buildAggregate(input: AggregateBuildInput): FailureEnvelope {
+  const { aggregate, headline, memberCount, truncated } = input;
   const first = aggregate[0] ?? unknownEnvelope(headline, undefined);
   return freezeEnvelope({
     schemaVersion: FAILURE_ENVELOPE_VERSION,
@@ -365,7 +481,7 @@ function buildAggregate(
     code: first.code,
     definition: first.definition,
     metadata: {
-      aggregateCount: members.length,
+      aggregateCount: memberCount,
       ...(truncated ? { aggregateTruncated: true } : {}),
     },
     causes: [],
@@ -390,5 +506,5 @@ function unknownEnvelope(message: string, original: unknown): FailureEnvelope {
 }
 
 function freezeEnvelope(envelope: FailureEnvelope): FailureEnvelope {
-  return Object.freeze(envelope);
+  return deepFreeze(envelope);
 }

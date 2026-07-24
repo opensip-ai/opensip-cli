@@ -37,14 +37,13 @@ import { readFileSync } from 'node:fs';
 
 import {
   assertCapturedOutputFits,
-  canonicalToolErrorCode,
   createRunTimer,
   currentScope,
   defineCommand,
   getWorkerLimits,
   resolveToolHooks,
+  startWorkerCancellationControl,
   startWorkerHeartbeat,
-  ToolError,
   type CommandSpec,
   type Tool,
   type ToolSessionRecord,
@@ -290,24 +289,11 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
     return stampWorkerDiagnostics(await runLoadedCommand(spec));
   } catch (error) {
     return stampWorkerDiagnostics(
-      errorMessage(
-        error instanceof Error ? error.message : String(error),
-        classifyThrow(error),
-        error instanceof Error ? error.stack : undefined,
-        // Carry the canonical exit-class code for a typed ToolError so the host
-        // rebuilds the right subclass (NotFound → 3, Network → 4, …) instead of the
-        // SystemError → exit 1 fallthrough. ConfigurationError ALSO rides
-        // `failureClass: 'config-invalid'` above; this carry generalizes the rest.
-        error instanceof ToolError ? canonicalToolErrorCode(error) : undefined,
-        // Keep the stable subcode separate from the canonical class. In particular,
-        // ADR-0145's direct-datastore denial must remain machine-identifiable after
-        // the worker boundary.
-        error instanceof ToolError ? error.code : undefined,
-        // Normalize the REAL thrown error (B#5): the machine `failure` projection
-        // then reflects the true definition/metadata/cause chain/stderrTail instead
-        // of a synthetic `new Error(message)`.
-        error,
-      ),
+      errorMessage('tool command worker failed', classifyThrow(error), {
+        // Normalize the REAL thrown error (B#5), preserving its definition,
+        // metadata, cause chain, and stderr tail in the machine projection.
+        cause: error,
+      }),
     );
   }
 }
@@ -320,9 +306,11 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
  */
 export async function executeToolCommandWorker(specPath: string): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
+  const stopCancellationControl = startWorkerCancellationControl();
   try {
     await sendTerminal(await runToolCommandWorker(specPath));
   } finally {
+    stopCancellationControl();
     stopHeartbeat();
   }
 }

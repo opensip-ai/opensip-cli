@@ -6,7 +6,6 @@ import {
   TimeoutError,
   ToolError,
   ValidationError,
-  isToolErrorLike,
   normalizeFailure,
 } from '@opensip-cli/core';
 
@@ -100,11 +99,13 @@ export function mapToolErrorToExitCode(error: ToolError): number {
  * 3. {@link normalizeFailure} definition axes for natives/primitives/hostile input
  */
 export function mapFailureToExitCode(error: unknown): number {
-  if (error instanceof ToolError) {
-    return mapToolErrorToExitCode(error);
-  }
-  if (isToolErrorLike(error)) {
-    return mapExitClassToExitCode(error.definition.exitClass);
+  try {
+    if (error instanceof ToolError) {
+      return mapToolErrorToExitCode(error);
+    }
+  } catch {
+    // @swallow-ok probe/optional capability: hostile instanceof failure degrades
+    // to the total unknown-definition normalizer below.
   }
   return mapExitClassToExitCode(normalizeFailure(error).definition.exitClass);
 }
@@ -271,8 +272,15 @@ const SUGGESTION_RULES: readonly SuggestionRule[] = [
  * Returns null if no rule fires.
  */
 export function getErrorSuggestion(err: unknown): ErrorSuggestion | null {
-  const message = err instanceof Error ? err.message : String(err);
+  return getErrorSuggestionFromMessage(normalizeFailure(err).message);
+}
 
+/**
+ * Evaluate the narrow legacy suggestion table against an already-normalized
+ * message. Host fan-out paths use this overload so one caught value is never
+ * normalized repeatedly by independent presentation helpers.
+ */
+export function getErrorSuggestionFromMessage(message: string): ErrorSuggestion | null {
   for (const rule of SUGGESTION_RULES) {
     const result = rule.match(message);
     if (result !== null) {

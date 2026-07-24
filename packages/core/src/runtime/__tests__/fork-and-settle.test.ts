@@ -1,3 +1,4 @@
+import { setMaxListeners } from 'node:events';
 import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -205,53 +206,103 @@ describe('forkAndSettle', () => {
     handle.dispose();
   });
 
-  it('settles as cancelled on SIGINT', async () => {
-    let failureClass: string | undefined;
-    const handle = forkAndSettle({
-      command: FIXTURE,
-      argv: ['timeout-sleep'],
-      enableSigintCancellation: true,
-      onLimitFailure: (fc) => {
-        failureClass = fc;
-      },
+  it('settles from the caller-owned cancellation signal without a process listener', async () => {
+    const controller = new AbortController();
+    const baseline = process.listenerCount('SIGINT');
+    let handle: ReturnType<typeof forkAndSettle> | undefined;
+    const failure = new Promise<string>((resolve) => {
+      handle = forkAndSettle({
+        command: FIXTURE,
+        argv: ['cancel-no-ack-ignore-term'],
+        cancellationSignal: controller.signal,
+        cancelAckGraceMs: 20,
+        terminationGraceMs: 20,
+        onMessage: (message) => {
+          if ((message as { kind?: unknown }).kind === 'ready') controller.abort();
+        },
+        onLimitFailure: resolve,
+      });
     });
-    process.emit('SIGINT');
-    await new Promise((r) => setTimeout(r, 100));
-    expect(failureClass).toBe('cancelled');
-    handle.dispose();
+    try {
+      await expect(waitFor(failure, 1000, 'cancellation did not settle')).resolves.toBe(
+        'cancelled',
+      );
+      expect(process.listenerCount('SIGINT')).toBe(baseline);
+    } finally {
+      handle?.dispose();
+    }
   });
 
-  it('shares ONE process SIGINT listener across concurrent children and removes it when idle', async () => {
-    // Plan 09 Task 5.5: per-child process.on('SIGINT') listeners tripped
-    // MaxListenersExceededWarning on any run with >10 concurrent forks. The
-    // fan-out registry keeps exactly one listener while children are active
-    // and restores default Ctrl-C behavior (zero listeners) once all settle.
+  it('fans one root AbortSignal out to concurrent children without process signal ownership', async () => {
     const baseline = process.listenerCount('SIGINT');
+    const controller = new AbortController();
+    setMaxListeners(0, controller.signal);
     const cancelled: string[] = [];
     const handles = Array.from({ length: 12 }, (_, index) =>
       forkAndSettle({
         command: FIXTURE,
         argv: ['timeout-sleep'],
-        enableSigintCancellation: true,
+        cancellationSignal: controller.signal,
+        cancelAckGraceMs: 10,
+        terminationGraceMs: 10,
         onLimitFailure: (fc) => {
           cancelled.push(`${String(index)}:${fc}`);
         },
       }),
     );
     try {
-      expect(process.listenerCount('SIGINT')).toBe(baseline + 1);
-
-      process.emit('SIGINT');
+      expect(process.listenerCount('SIGINT')).toBe(baseline);
+      controller.abort();
       await new Promise((r) => setTimeout(r, 150));
       // Every active child received the cancellation.
       expect(cancelled).toHaveLength(12);
       expect(cancelled.every((entry) => entry.endsWith(':cancelled'))).toBe(true);
-      // All settled → the shared listener is gone (default Ctrl-C restored).
       expect(process.listenerCount('SIGINT')).toBe(baseline);
     } finally {
       for (const handle of handles) handle.dispose();
     }
   });
+
+  it.each(['cancel-ack-ignore-term', 'cancel-no-ack-ignore-term'])(
+    'escalates %s from cooperative cancellation to SIGKILL',
+    async (mode) => {
+      const controller = new AbortController();
+      let handle: ReturnType<typeof forkAndSettle> | undefined;
+      let resolveReady = (): void => undefined;
+      const ready = new Promise<void>((resolve) => {
+        resolveReady = resolve;
+      });
+      const cancelled = new Promise<string>((resolve) => {
+        handle = forkAndSettle({
+          command: FIXTURE,
+          argv: [mode],
+          cancellationSignal: controller.signal,
+          cancelAckGraceMs: 30,
+          terminationGraceMs: 30,
+          onMessage: (message) => {
+            if ((message as { kind?: unknown }).kind === 'ready') resolveReady();
+          },
+          onLimitFailure: resolve,
+        });
+      });
+      if (handle === undefined) throw new Error('worker handle was not created');
+      const childExit = new Promise<NodeJS.Signals | null>((resolve) => {
+        handle?.child.once('exit', (_code, signal) => resolve(signal));
+      });
+      try {
+        await waitFor(ready, 1000, 'worker did not become ready');
+        controller.abort();
+        await expect(waitFor(cancelled, 1000, 'cancellation did not settle')).resolves.toBe(
+          'cancelled',
+        );
+        await expect(waitFor(childExit, 1000, 'worker was not hard-killed')).resolves.toBe(
+          'SIGKILL',
+        );
+      } finally {
+        handle.dispose();
+      }
+    },
+  );
 
   it('converts child process errors into spawn failures once', async () => {
     let failureClass: string | undefined;

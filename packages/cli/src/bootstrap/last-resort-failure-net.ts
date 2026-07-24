@@ -9,7 +9,11 @@
  * write so the process cannot resume with undefined state (Plan 00 consider).
  */
 
-import { normalizeFailure } from '@opensip-cli/core';
+import {
+  neutralizeTerminalText,
+  normalizeFailure,
+  toPublicFailureProjection,
+} from '@opensip-cli/core';
 
 let installed = false;
 
@@ -26,7 +30,12 @@ function writeMinimal(line: string): void {
 function projectFatal(reason: unknown, kind: 'uncaughtException' | 'unhandledRejection'): void {
   try {
     const envelope = normalizeFailure(reason);
-    writeMinimal(`opensip: fatal ${kind} [${envelope.code}] ${envelope.message.slice(0, 200)}`);
+    const projection = toPublicFailureProjection(envelope);
+    const message =
+      typeof projection.message === 'string'
+        ? neutralizeTerminalText(projection.message).slice(0, 200)
+        : 'The operation failed.';
+    writeMinimal(`opensip: fatal ${kind} [${envelope.code}] ${message}`);
   } catch {
     writeMinimal(`opensip: fatal ${kind} [CORE.SYSTEM.UNKNOWN_FAILURE]`);
   }

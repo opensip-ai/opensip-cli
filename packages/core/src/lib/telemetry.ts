@@ -35,6 +35,60 @@ import {
   type Tracer,
 } from '@opentelemetry/api';
 
+import { normalizeFailure } from './failure-envelope.js';
+import { toPublicFailureProjection } from './failure-projection.js';
+
+function safelySetAttributes(span: Span, attributes: Attributes | undefined): void {
+  if (attributes === undefined) return;
+  try {
+    span.setAttributes(attributes);
+  } catch {
+    // @swallow-ok cleanup/observer isolation: observability cannot change the operation outcome.
+  }
+}
+
+function safelyRecordFailure(span: Span, error: unknown): void {
+  const envelope = normalizeFailure(error);
+  const publicProjection = toPublicFailureProjection(envelope);
+  try {
+    span.setAttributes({
+      'opensip.failure.code': envelope.code,
+      'opensip.failure.source': envelope.definition.source,
+      'opensip.failure.responsibility': envelope.definition.defaultResponsibility,
+      'opensip.failure.kind': envelope.definition.kind,
+      'opensip.failure.retry': envelope.definition.retry,
+      'opensip.failure.severity': envelope.definition.severity,
+      'opensip.failure.known': envelope.known,
+    });
+  } catch {
+    // @swallow-ok cleanup/observer isolation: instrumentation cannot replace the application failure.
+  }
+  try {
+    span.recordException({
+      name: envelope.code,
+      message:
+        typeof publicProjection.message === 'string'
+          ? publicProjection.message
+          : 'The operation failed.',
+    });
+  } catch {
+    // @swallow-ok cleanup/observer isolation: raw Error fallback would leak stack/cause data.
+  }
+  try {
+    span.setStatus({ code: SpanStatusCode.ERROR });
+  } catch {
+    // @swallow-ok cleanup/observer isolation: span status cannot replace the primary result/error.
+  }
+}
+
+function safelyEndSpan(span: Span): void {
+  try {
+    span.end();
+  } catch {
+    // @swallow-ok cleanup/observer isolation: span shutdown cannot mask a return or throw.
+  }
+}
+
 /**
  * Resolve a `Tracer` for a given instrumentation scope name (e.g.
  * `'opensip-cli-graph'`). Reads the *global* tracer provider set by the SDK
@@ -70,18 +124,14 @@ export function withSpan<T>(
   attrs?: Attributes,
 ): T {
   return getTracer(tracerName).startActiveSpan(spanName, (span) => {
-    if (attrs) span.setAttributes(attrs);
+    safelySetAttributes(span, attrs);
     try {
       return fn(span);
     } catch (error) {
-      // Normalize before recording: a thrown non-Error (string, object) must
-      // record as a message rather than be unsafely cast to Error. OTel's
-      // `recordException` accepts `string | Exception`, so this is type-safe.
-      span.recordException(error instanceof Error ? error : String(error));
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      safelyRecordFailure(span, error);
       throw error;
     } finally {
-      span.end();
+      safelyEndSpan(span);
     }
   });
 }
@@ -110,15 +160,14 @@ export async function withSpanAsync<T>(
   attrs?: Attributes,
 ): Promise<T> {
   return getTracer(tracerName).startActiveSpan(spanName, async (span) => {
-    if (attrs) span.setAttributes(attrs);
+    safelySetAttributes(span, attrs);
     try {
       return await fn(span);
     } catch (error) {
-      span.recordException(error instanceof Error ? error : String(error));
-      span.setStatus({ code: SpanStatusCode.ERROR });
+      safelyRecordFailure(span, error);
       throw error;
     } finally {
-      span.end();
+      safelyEndSpan(span);
     }
   });
 }

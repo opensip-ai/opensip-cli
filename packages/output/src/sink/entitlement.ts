@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { logger, withRetry } from '@opensip-cli/core';
 
 import { isHttpsUrl } from './https-url.js';
 
@@ -45,6 +45,8 @@ export interface CheckEntitlementInput {
   readonly now: number;
   readonly cacheDir: string;
   readonly fetchImpl?: typeof fetch;
+  /** Parent/root cancellation for the entitlement request. */
+  readonly signal?: AbortSignal;
 }
 
 function cacheFileFor(cacheDir: string, apiKey: string): string {
@@ -108,12 +110,16 @@ async function writeCache(
 
 function log(result: EntitlementResult): EntitlementResult {
   // Structured event doubles as the metric signal (labelled by source); never the key.
-  logger.info({
-    evt: 'cli.signal-sync.entitlement',
-    module: MODULE_TAG,
-    entitled: result.entitled,
-    source: result.source,
-  });
+  try {
+    logger.info({
+      evt: 'cli.signal-sync.entitlement',
+      module: MODULE_TAG,
+      entitled: result.entitled,
+      source: result.source,
+    });
+  } catch {
+    // Entitlement remains fail-closed even if its observer is unavailable.
+  }
   return result;
 }
 
@@ -138,15 +144,28 @@ export async function checkEntitlement(input: CheckEntitlementInput): Promise<En
     const url = normalizedEndpoint.endsWith('/entitlements')
       ? normalizedEndpoint
       : `${normalizedEndpoint}/entitlements`;
-    const res = await fetchImpl(url, {
-      method: 'GET',
-      // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
-      // token only (the api-key strategy matches `Bearer osk_`); the historical
-      // `X-API-Key` header never reached a route (DEC-587). Keep this probe
-      // consistent with the SARIF egress in http-egress.ts.
-      headers: { Authorization: `Bearer ${apiKey}` },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    const requestSignal =
+      input.signal === undefined
+        ? AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+        : AbortSignal.any([input.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)]);
+    const res = await withRetry(
+      () =>
+        fetchImpl(url, {
+          method: 'GET',
+          // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
+          // token only (the api-key strategy matches `Bearer osk_`); the historical
+          // `X-API-Key` header never reached a route (DEC-587). Keep this probe
+          // consistent with the SARIF egress in http-egress.ts.
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: requestSignal,
+        }),
+      {
+        maxAttempts: 1,
+        useDefinitionRetry: false,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        deadlineMs: Date.now() + REQUEST_TIMEOUT_MS,
+      },
+    );
 
     if (res.status === 401 || res.status === 403) {
       await writeCache(file, endpoint, false, now); // real negative

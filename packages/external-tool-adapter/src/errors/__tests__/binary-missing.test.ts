@@ -8,9 +8,11 @@ describe('scanner binary-missing (Plan 00 Phase 5.6)', () => {
   it('codes ENOENT as EXTERNAL.SCANNER.BINARY_MISSING with public action', () => {
     const error = spawnFailureError('gitleaks', 'ENOENT');
     expect(error.code).toBe('EXTERNAL.SCANNER.BINARY_MISSING');
-    expect(error.definition).toBe(
-      externalToolErrorCatalog.require('EXTERNAL.SCANNER.BINARY_MISSING'),
-    );
+    const catalogDefinition = externalToolErrorCatalog.require('EXTERNAL.SCANNER.BINARY_MISSING');
+    expect(error.definition).toStrictEqual(catalogDefinition);
+    // ToolError validates and copies definitions at its trust boundary instead
+    // of retaining a caller-owned object, even when the source is a catalog.
+    expect(error.definition).not.toBe(catalogDefinition);
     expect(error.metadata).toMatchObject({ command: 'gitleaks', errno: 'ENOENT' });
     expect(error.definition.operatorAction).toMatch(/PATH|binary/i);
 

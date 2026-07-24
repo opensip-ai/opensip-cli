@@ -4,9 +4,12 @@
 
 import { defineErrorCatalog } from '@opensip-cli/core';
 
+/** Must match packages/mcp/src/tool.ts MCP_STABLE_ID. */
+const MCP_OWNER_ID = 'f313c020-5b48-4e17-a579-e303907b6392';
+
 export const mcpErrorCatalog = defineErrorCatalog(
   {
-    id: 'mcp',
+    id: MCP_OWNER_ID,
     displayName: 'mcp',
     packageName: '@opensip-cli/mcp',
   },

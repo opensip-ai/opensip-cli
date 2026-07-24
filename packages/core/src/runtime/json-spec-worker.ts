@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 
+import { startWorkerCancellationControl } from './worker-cancellation-control.js';
 import { toWorkerFailureWire, WORKER_FAILURE_WIRE_VERSION } from './worker-failure-wire.js';
 import { startWorkerHeartbeat } from './worker-heartbeat.js';
 import { sendWorkerIpcMessage, sendWorkerIpcMessageAndDrain } from './worker-ipc-send.js';
@@ -58,6 +59,10 @@ function stopJsonSpecWorkerHeartbeat(stopHeartbeat: () => void): void {
   stopHeartbeat();
 }
 
+function stopJsonSpecWorkerCancellation(stopCancellationControl: () => void): void {
+  stopCancellationControl();
+}
+
 /**
  * Execute a worker from a JSON spec file and communicate only through the shared
  * `WorkerMessage` IPC protocol used by off-thread live runs.
@@ -66,6 +71,7 @@ export async function runJsonSpecWorker<TArgs, TEvent, TResult>(
   options: JsonSpecWorkerOptions<TArgs, TEvent, TResult>,
 ): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
+  const stopCancellationControl = startWorkerCancellationControl();
   try {
     const args = readJsonSpec<TArgs>(options.specPath);
     const emit: WorkerEmit<TEvent> = (event) =>
@@ -81,6 +87,7 @@ export async function runJsonSpecWorker<TArgs, TEvent, TResult>(
   } catch (error) {
     await sendJsonSpecWorkerTerminalMessage(toWorkerErrorMessage<TEvent, TResult>(error));
   } finally {
+    stopJsonSpecWorkerCancellation(stopCancellationControl);
     stopJsonSpecWorkerHeartbeat(stopHeartbeat);
   }
 }

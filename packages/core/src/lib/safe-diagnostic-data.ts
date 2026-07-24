@@ -5,7 +5,7 @@
  * and HTML encoding stay at final sinks — not here.
  */
 
-import { sanitizeErrorMetadata } from './errors.js';
+import { redactCredentialText, sanitizeErrorMetadata } from './errors.js';
 import { toJsonRecord, toJsonValue, type JsonRecord, type JsonValue } from './json-value.js';
 
 // Control-character ranges are intentional for diagnostic scrubbing.
@@ -13,7 +13,6 @@ import { toJsonRecord, toJsonValue, type JsonRecord, type JsonValue } from './js
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
 // eslint-disable-next-line no-control-regex -- strip CSI ANSI sequences (ESC is a control)
 const ANSI = /\u001B\[[0-9;]*[A-Za-z]/gu;
-const CREDENTIAL_IN_URL = /:\/\/([^/@\s]+):([^@/\s]+)@/gu;
 
 /**
  * Bound and scrub a value for structured logs / public diagnostics.
@@ -22,12 +21,17 @@ const CREDENTIAL_IN_URL = /:\/\/([^/@\s]+):([^@/\s]+)@/gu;
 // JsonValue is a union of scalar/object/array arms — each branch is a valid arm.
 // eslint-disable-next-line sonarjs/function-return-type -- intentionally multi-arm JsonValue
 export function toSafeDiagnosticData(value: unknown): JsonValue {
-  if (value instanceof Error) {
-    return toJsonRecord({
-      name: value.name,
-      message: scrubText(value.message),
-      note: 'error-object-redacted',
-    });
+  try {
+    if (value instanceof Error) {
+      return toJsonRecord({
+        name: scrubText(value.name, 128),
+        message: scrubText(value.message),
+        note: 'error-object-redacted',
+      });
+    }
+  } catch {
+    // @swallow-ok probe/optional capability: hostile instanceof failure falls
+    // through to descriptor-based metadata sanitization.
   }
   if (typeof value === 'object' && value !== null) {
     return toJsonRecord(sanitizeErrorMetadata(value));
@@ -47,10 +51,13 @@ export function toSafeDiagnosticRecord(value: unknown): JsonRecord {
   return toJsonRecord({ value: v });
 }
 
-/** Strip controls and credential URL userinfo; keep ordinary text. */
+/** Strip controls and known credential values; keep ordinary text. */
 export function scrubText(text: string, max = 2000): string {
-  let out = text.replace(CONTROL_CHARS, '').replace(CREDENTIAL_IN_URL, '://***:***@');
-  if (out.length > max) out = `${out.slice(0, max - 1)}…`;
+  const limit = Number.isFinite(max) ? Math.max(0, Math.floor(max)) : 2000;
+  let out = redactCredentialText(text).replace(CONTROL_CHARS, '');
+  if (out.length > limit) {
+    out = limit === 0 ? '' : `${out.slice(0, Math.max(0, limit - 1))}…`;
+  }
   return out;
 }
 

@@ -49,6 +49,8 @@ export interface ErrorDetail {
   readonly message: string;
   readonly suggestion?: string;
   readonly code?: string;
+  /** Versioned machine-safe failure axes (definition identity + policy fields). */
+  readonly failure?: Readonly<Record<string, unknown>>;
   /** Optional structured diagnostic substrate when the error is host-classified (ADR-0060). */
   readonly diagnostic?: CliDiagnostic;
 }

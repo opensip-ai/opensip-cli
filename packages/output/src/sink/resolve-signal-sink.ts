@@ -11,7 +11,14 @@
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { logger, noopSignalSink } from '@opensip-cli/core';
+import {
+  currentScope,
+  logger,
+  noopSignalSink,
+  normalizeFailure,
+  scrubText,
+  toOperatorFailureProjection,
+} from '@opensip-cli/core';
 
 import { createCloudSignalSink } from './cloud-signal-sink.js';
 import { checkEntitlement, invalidateEntitlement } from './entitlement.js';
@@ -29,18 +36,11 @@ const MODULE_TAG = 'resolve-signal-sink';
 // header value in its message. Never log the API key or a request/response
 // body — only this scrubbed, truncated cause.
 const MAX_ERR_CHARS = 300;
-const CREDENTIAL_PATTERNS = [
-  /bearer\s+[\w.~+/-]+=*/gi,
-  /x-api-key['":\s=]+[\w.~+/-]+=*/gi,
-  /(?:api[_-]?key|token|secret)=[^\s&'"]+/gi,
-];
-
 /** Scrubbed, length-bounded error cause for `output.sink.emit.error`. */
 function scrubbedErrorCause(error: unknown): string {
-  let message = error instanceof Error ? error.message : String(error);
-  for (const pattern of CREDENTIAL_PATTERNS) {
-    message = message.replaceAll(pattern, '[redacted]');
-  }
+  const projection = toOperatorFailureProjection(normalizeFailure(error));
+  const message =
+    typeof projection.message === 'string' ? projection.message : 'The operation failed.';
   return message.length > MAX_ERR_CHARS ? `${message.slice(0, MAX_ERR_CHARS)}…` : message;
 }
 
@@ -89,7 +89,15 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
   const endpoint = input.cloud?.endpoint ?? DEFAULT_CLOUD_ENDPOINT;
   if (!isHttpsUrl(endpoint)) {
     // Never send the credential-bearing X-API-Key over plaintext.
-    logger.warn({ evt: 'cli.signal-sync.insecure-endpoint', module: MODULE_TAG, endpoint });
+    try {
+      logger.warn({
+        evt: 'cli.signal-sync.insecure-endpoint',
+        module: MODULE_TAG,
+        endpoint: scrubText(endpoint, 512),
+      });
+    } catch {
+      // The opt-out decision must remain synchronous and non-throwing.
+    }
     return noopSignalSink;
   }
 
@@ -99,12 +107,14 @@ export function resolveSignalSink(input: ResolveSignalSinkInput): SignalSink {
   return {
     async emit(batch: SignalBatch): Promise<EmitResult> {
       try {
+        const rootSignal = currentScope()?.abortSignal;
         const ent = await checkEntitlement({
           apiKey,
           endpoint,
           now: Date.now(),
           cacheDir: input.cacheDir,
           fetchImpl: input.fetchImpl,
+          ...(rootSignal === undefined ? {} : { signal: rootSignal }),
         });
         if (!ent.entitled) return { accepted: 0, authRejected: false, skippedReason: 'unentitled' };
 

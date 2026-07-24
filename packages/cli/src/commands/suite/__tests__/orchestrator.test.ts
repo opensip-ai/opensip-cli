@@ -2027,7 +2027,7 @@ describe('runSuite', () => {
       expect(result.steps[0]).toMatchObject({
         command: 'typed-error',
         exitCode: mapToolErrorToExitCode(thrown),
-        error: thrown.message,
+        error: thrown.definition.exposure === 'public' ? thrown.message : 'The operation failed.',
         errorCode: thrown.code,
       });
       expect(result.exitCode).toBe(mapToolErrorToExitCode(thrown));

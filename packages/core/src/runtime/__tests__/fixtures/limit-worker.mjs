@@ -71,6 +71,24 @@ switch (mode) {
     setInterval(() => {}, 60_000).unref?.();
     break;
   }
+  case 'cancel-ack-ignore-term': {
+    process.on('message', (message) => {
+      if (message?.kind === 'cancel-request' && message.controlVersion === 1) {
+        send({ kind: 'cancel-ack', controlVersion: 1 });
+      }
+    });
+    process.on('SIGTERM', () => {});
+    send({ kind: 'ready' });
+    setInterval(() => {}, 60_000);
+    break;
+  }
+  case 'cancel-no-ack-ignore-term': {
+    process.on('message', () => {});
+    process.on('SIGTERM', () => {});
+    send({ kind: 'ready' });
+    setInterval(() => {}, 60_000);
+    break;
+  }
   case 'rss-hold': {
     setInterval(() => {}, 60_000);
     break;

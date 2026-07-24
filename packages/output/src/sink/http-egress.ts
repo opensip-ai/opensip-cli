@@ -13,68 +13,20 @@
  * and sends a stable `Idempotency-Key` per chunk so a retried-but-stored chunk
  * is de-duplicated server-side.
  */
-import { logger } from '@opensip-cli/core';
+import {
+  NetworkError,
+  logger,
+  normalizeFailure,
+  scrubText,
+  toOperatorFailureProjection,
+  withRetry,
+} from '@opensip-cli/core';
 
 import { isHttpsUrl } from './https-url.js';
 
-/** Per-caller retry/throttle policy. */
-export interface RetryPolicy {
-  /** Max attempts per chunk. */
-  readonly maxAttempts: number;
-  /** Whole-batch wall-clock budget; once exceeded, stop and return partial. */
-  readonly overallDeadlineMs: number;
-  /** Parse + honor `Retry-After` on `429`/`503`. */
-  readonly honorRetryAfter: boolean;
-}
+import type { EgressResult, PostChunkedArgs } from './http-egress-types.js';
 
-/** Structured outcome of a chunked POST. Never thrown — always returned. */
-export interface EgressResult {
-  /** Count of chunks the server acked with 2xx. */
-  readonly acceptedChunks: number;
-  /** Per-chunk success, indexed by ordinal (lets callers sum item counts). */
-  readonly chunkResults: readonly boolean[];
-  readonly outcome: 'ok' | 'partial' | 'failed';
-  /** Saw a 401/403 — caller should bust any auth/entitlement cache. */
-  readonly authRejected: boolean;
-  /**
-   * The auth-rejection status when `authRejected` is true, so callers branch on
-   * a typed value rather than string-sniffing `errors[]`: `401` = the key was
-   * not authenticated (unknown/bad key); `403` = authenticated but lacking the
-   * required permission (e.g. `ingest:write`). Undefined when no auth rejection
-   * occurred.
-   */
-  readonly authStatus?: 401 | 403;
-  /** Saw a 429. */
-  readonly throttled: boolean;
-  /** Stopped early because the overall deadline elapsed. */
-  readonly deadlineExceeded: boolean;
-  readonly errors: readonly string[];
-}
-
-/** Arguments for posting pre-chunked SARIF/signal bodies to a cloud receiver, one POST per body, under the retry policy. */
-export interface PostChunkedArgs {
-  readonly url: string;
-  readonly apiKey?: string;
-  /** JSON-serializable bodies, one POST each. */
-  readonly chunks: readonly unknown[];
-  /** Stable idempotency key for the chunk at `ordinal` (same across its retries). */
-  readonly idempotencyKeyFor: (ordinal: number) => string;
-  /** Per-chunk request timeout in ms. */
-  readonly timeoutFor: (chunk: unknown, ordinal: number) => number;
-  readonly policy: RetryPolicy;
-  /** Log event prefix, e.g. `cli.report` or `cli.signal-sync`. */
-  readonly evtPrefix: string;
-  /**
-   * Extra request headers merged into every chunk POST (e.g.
-   * `x-opensip-repo`). The transport-owned `Content-Type`, `Authorization`,
-   * and `Idempotency-Key` headers always win.
-   */
-  readonly extraHeaders?: Readonly<Record<string, string>>;
-  readonly fetchImpl?: typeof fetch;
-  /** Injectable clock/sleep for deterministic tests. */
-  readonly now?: () => number;
-  readonly sleep?: (ms: number) => Promise<void>;
-}
+export type { EgressResult, PostChunkedArgs, RetryPolicy } from './http-egress-types.js';
 
 const MODULE_TAG = 'http-egress';
 const TRANSPORT_HEADER_NAMES = new Set(['authorization', 'content-type', 'idempotency-key']);
@@ -92,13 +44,99 @@ function parseRetryAfter(headerVal: string | null, now: number): number | undefi
   return Number.isNaN(when) ? undefined : Math.max(0, when - now);
 }
 
-/** Exponential backoff with jitter (mirrors core's withRetry shape). */
-function backoffMs(attempt: number): number {
-  const base = 500 * 2 ** (attempt - 1);
-  return Math.min(base + Math.random() * base * 0.5, 5000);
+const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+class HttpResponseError extends NetworkError {
+  constructor(
+    readonly status: number,
+    readonly statusText: string,
+    readonly retryAfterMs?: number,
+  ) {
+    super(`${String(status)} ${statusText}`.trim(), {
+      statusCode: status,
+      metadata: { status },
+    });
+    this.name = 'HttpResponseError';
+  }
 }
 
-const defaultSleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+function asHttpResponseError(error: unknown): HttpResponseError | undefined {
+  try {
+    return error instanceof HttpResponseError ? error : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function safeOperatorMessage(error: unknown): string {
+  const projection = toOperatorFailureProjection(normalizeFailure(error));
+  return scrubText(
+    typeof projection.message === 'string' ? projection.message : 'The operation failed.',
+    300,
+  );
+}
+
+function safeLog(level: 'info' | 'warn', entry: Readonly<Record<string, unknown>>): void {
+  try {
+    logger[level](entry);
+  } catch {
+    // Egress is best-effort; a diagnostic sink cannot violate never-throws.
+  }
+}
+
+function requestSignal(timeoutMs: number, parent?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(
+    Number.isFinite(timeoutMs) ? Math.min(2_147_483_647, Math.max(0, Math.floor(timeoutMs))) : 0,
+  );
+  return parent === undefined ? timeout : AbortSignal.any([parent, timeout]);
+}
+
+function signalError(signal: AbortSignal, fallback: string): Error {
+  try {
+    if (signal.reason instanceof Error) return signal.reason;
+    if (typeof signal.reason === 'string') return new Error(scrubText(signal.reason, 300));
+  } catch {
+    // Hostile reason access falls through to a constant failure.
+  }
+  return new Error(fallback);
+}
+
+/** @throws {unknown} When fetch rejects, cancellation wins, or the request deadline elapses. */
+async function waitForFetch(response: Promise<Response>, signal: AbortSignal): Promise<Response> {
+  if (signal.aborted) throw signalError(signal, 'request aborted');
+  let detach = (): void => undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    const onAbort = () => reject(signalError(signal, 'request aborted'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    detach = () => signal.removeEventListener('abort', onAbort);
+  });
+  try {
+    return await Promise.race([response, aborted]);
+  } finally {
+    detach();
+  }
+}
+
+/** @throws {unknown} When sleep rejects or cancellation wins. */
+async function sleepWithSignal(
+  sleep: (ms: number) => Promise<void>,
+  ms: number,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (signal === undefined) return await sleep(ms);
+  if (signal.aborted) throw signalError(signal, 'egress cancelled');
+  let detach = (): void => undefined;
+  const aborted = new Promise<never>((_resolve, reject) => {
+    const onAbort = () => reject(signalError(signal, 'egress cancelled'));
+    signal.addEventListener('abort', onAbort, { once: true });
+    detach = () => signal.removeEventListener('abort', onAbort);
+  });
+  try {
+    await Promise.race([sleep(ms), aborted]);
+  } finally {
+    detach();
+  }
+}
 
 /**
  * POST each chunk with bounded per-chunk retries on `429`/`5xx`/transport
@@ -112,13 +150,17 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   const now = args.now ?? Date.now;
   const sleep = args.sleep ?? defaultSleep;
   const started = now();
+  const overallDeadlineMs =
+    Number.isFinite(policy.overallDeadlineMs) && policy.overallDeadlineMs > 0
+      ? policy.overallDeadlineMs
+      : 0;
 
   if (args.apiKey && !isHttpsUrl(args.url)) {
     const detail = 'credential-bearing egress requires an https:// URL';
-    logger.warn({
+    safeLog('warn', {
       evt: `${evtPrefix}.insecure-endpoint`,
       module: MODULE_TAG,
-      url: args.url,
+      url: scrubText(args.url, 512),
     });
     return {
       acceptedChunks: 0,
@@ -135,8 +177,20 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   // Otherwise Fetch combines `authorization` + `Authorization` into one value
   // instead of letting the transport's auth/idempotency values win.
   const headersBase: Record<string, string> = {};
-  for (const [name, value] of Object.entries(args.extraHeaders ?? {})) {
-    if (!TRANSPORT_HEADER_NAMES.has(name.toLowerCase())) headersBase[name] = value;
+  try {
+    for (const [name, value] of Object.entries(args.extraHeaders ?? {})) {
+      if (!TRANSPORT_HEADER_NAMES.has(name.toLowerCase())) headersBase[name] = value;
+    }
+  } catch {
+    return {
+      acceptedChunks: 0,
+      chunkResults: Array.from({ length: chunks.length }, () => false),
+      outcome: 'failed',
+      authRejected: false,
+      throttled: false,
+      deadlineExceeded: false,
+      errors: ['request headers could not be inspected'],
+    };
   }
   headersBase['Content-Type'] = 'application/json';
   // OpenSIP Cloud authenticates the `osk_` key as an `Authorization: Bearer`
@@ -147,6 +201,30 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   // plain HTTP.
   if (args.apiKey) headersBase.Authorization = `Bearer ${args.apiKey}`;
 
+  // Evaluate idempotency keys exactly once before any request. A retried POST
+  // must reuse a non-empty bounded key; a stateful callback cannot silently
+  // generate a different key on each attempt and amplify writes.
+  const idempotencyKeys: string[] = [];
+  try {
+    for (let ordinal = 0; ordinal < chunks.length; ordinal += 1) {
+      const key = args.idempotencyKeyFor(ordinal);
+      if (typeof key !== 'string' || key.length === 0 || key.length > 256) {
+        throw new Error('invalid idempotency key');
+      }
+      idempotencyKeys.push(key);
+    }
+  } catch {
+    return {
+      acceptedChunks: 0,
+      chunkResults: Array.from({ length: chunks.length }, () => false),
+      outcome: 'failed',
+      authRejected: false,
+      throttled: false,
+      deadlineExceeded: false,
+      errors: ['a stable bounded idempotency key is required for POST retries'],
+    };
+  }
+
   const chunkResults: boolean[] = Array.from({ length: chunks.length }, () => false);
   const errors: string[] = [];
   let acceptedChunks = 0;
@@ -155,104 +233,156 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
   let throttled = false;
   let deadlineExceeded = false;
 
-  const deadlineLeft = (): number => policy.overallDeadlineMs - (now() - started);
+  const deadlineLeft = (): number => overallDeadlineMs - (now() - started);
 
-  outer: for (let ci = 0; ci < chunks.length; ci++) {
-    for (let attempt = 1; attempt <= policy.maxAttempts; attempt++) {
-      if (deadlineLeft() <= 0) {
-        deadlineExceeded = true;
-        break outer;
-      }
+  for (let ci = 0; ci < chunks.length; ci++) {
+    if (deadlineLeft() <= 0) {
+      deadlineExceeded = true;
+      break;
+    }
+    const idempotencyKey = idempotencyKeys[ci];
+    if (idempotencyKey === undefined) {
+      errors.push('idempotency key resolution failed');
+      break;
+    }
 
-      let retryAfterMs: number | undefined;
-      try {
-        const requestTimeoutMs = Math.min(
-          args.timeoutFor(chunks[ci], ci),
-          Math.max(0, deadlineLeft()),
-        );
-        const res = await fetchImpl(args.url, {
-          method: 'POST',
-          headers: { ...headersBase, 'Idempotency-Key': args.idempotencyKeyFor(ci) },
-          body: JSON.stringify(chunks[ci]),
-          signal: AbortSignal.timeout(requestTimeoutMs),
-        });
+    try {
+      const responseStatus = await withRetry(
+        async () => {
+          if (deadlineLeft() <= 0) throw new Error('egress deadline exceeded');
+          const requestTimeoutMs = Math.min(
+            args.timeoutFor(chunks[ci], ci),
+            Math.max(0, deadlineLeft()),
+          );
+          const signal = requestSignal(requestTimeoutMs, args.signal);
+          let res: Response;
+          try {
+            res = await waitForFetch(
+              fetchImpl(args.url, {
+                method: 'POST',
+                headers: { ...headersBase, 'Idempotency-Key': idempotencyKey },
+                body: JSON.stringify(chunks[ci]),
+                signal,
+              }),
+              signal,
+            );
+          } catch (error) {
+            if (args.signal?.aborted) throw error;
+            throw new NetworkError(`HTTP request failed: ${safeOperatorMessage(error)}`, {
+              cause: error,
+            });
+          }
 
-        if (res.ok) {
-          chunkResults[ci] = true;
-          acceptedChunks++;
-          logger.info({
-            evt: `${evtPrefix}.chunk`,
-            module: MODULE_TAG,
-            chunk: `${ci + 1}/${chunks.length}`,
-            status: res.status,
-          });
-          continue outer;
-        }
+          if (res.ok) return res.status;
 
-        errors.push(`${res.status} ${res.statusText}`.trim());
-
-        if (res.status === 401 || res.status === 403) {
-          authRejected = true;
-          authStatus = res.status;
-          logger.warn({
-            evt: `${evtPrefix}.auth-rejected`,
-            module: MODULE_TAG,
-            status: res.status,
-          });
-          break outer; // permanent auth failure — stop everything
-        }
-        if (!isTransient(res.status)) {
-          logger.warn({
-            evt: `${evtPrefix}.abort`,
-            module: MODULE_TAG,
-            status: res.status,
-            remaining: chunks.length - ci - 1,
-          });
-          break outer; // other 4xx — retrying won't help; abort remaining
-        }
-        if (res.status === 429) {
-          throttled = true;
-          if (policy.honorRetryAfter)
-            retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'), now());
-        } else if (res.status === 503 && policy.honorRetryAfter) {
-          retryAfterMs = parseRetryAfter(res.headers.get('Retry-After'), now());
-        }
-      } catch (error) {
-        // Network error / timeout — transient.
-        errors.push(error instanceof Error ? error.message : String(error));
-      }
-
-      // Transient: retry if attempts remain and the deadline allows.
-      if (attempt >= policy.maxAttempts) {
-        logger.warn({
-          evt: `${evtPrefix}.error`,
-          module: MODULE_TAG,
-          chunk: `${ci + 1}/${chunks.length}`,
-          attempts: attempt,
-        });
-        continue outer; // give up on this chunk, try the next
-      }
-      const wanted = retryAfterMs ?? backoffMs(attempt);
-      const delay = Math.min(wanted, Math.max(0, deadlineLeft()));
-      if (deadlineLeft() - delay <= 0) {
-        deadlineExceeded = true;
-        break outer;
-      }
-      logger.info({
-        evt: throttled ? `${evtPrefix}.throttled` : `${evtPrefix}.retry`,
+          if (res.status === 429) throttled = true;
+          const retryAfterMs =
+            policy.honorRetryAfter && (res.status === 429 || res.status === 503)
+              ? parseRetryAfter(res.headers.get('Retry-After'), now())
+              : undefined;
+          throw new HttpResponseError(res.status, res.statusText, retryAfterMs);
+        },
+        {
+          maxAttempts: policy.maxAttempts,
+          initialDelayMs: 500,
+          maxDelayMs: 5000,
+          backoffMultiplier: 2,
+          jitter: 'equal',
+          useDefinitionRetry: false,
+          signal: args.signal,
+          deadlineMs: started + overallDeadlineMs,
+          shouldRetry: (error) => {
+            const responseError = asHttpResponseError(error);
+            return responseError === undefined ? true : isTransient(responseError.status);
+          },
+          retryDelayMs: (error, _attempt, computed) => {
+            const responseError = asHttpResponseError(error);
+            return responseError?.retryAfterMs ?? computed;
+          },
+          onRetry: (attempt, error, delayMs) => {
+            const responseError = asHttpResponseError(error);
+            const retryAfterMs = responseError?.retryAfterMs;
+            safeLog('info', {
+              evt: responseError?.status === 429 ? `${evtPrefix}.throttled` : `${evtPrefix}.retry`,
+              module: MODULE_TAG,
+              chunk: `${ci + 1}/${chunks.length}`,
+              attempt,
+              delayMs,
+              ...(retryAfterMs === undefined ? {} : { retryAfterMs }),
+            });
+          },
+          clock: {
+            now,
+            random: Math.random,
+            sleep: (ms, signal) => sleepWithSignal(sleep, ms, signal),
+          },
+        },
+      );
+      chunkResults[ci] = true;
+      acceptedChunks += 1;
+      safeLog('info', {
+        evt: `${evtPrefix}.chunk`,
         module: MODULE_TAG,
         chunk: `${ci + 1}/${chunks.length}`,
-        attempt,
-        delayMs: delay,
-        retryAfterMs,
+        status: responseStatus,
       });
-      await sleep(delay);
+    } catch (error) {
+      if (args.signal?.aborted) {
+        errors.push('egress cancelled');
+        break;
+      }
+      const responseError = asHttpResponseError(error);
+      if (responseError === undefined) {
+        errors.push(safeOperatorMessage(error));
+      } else {
+        errors.push(scrubText(responseError.message, 300));
+        if (responseError.status === 401 || responseError.status === 403) {
+          authRejected = true;
+          authStatus = responseError.status;
+          safeLog('warn', {
+            evt: `${evtPrefix}.auth-rejected`,
+            module: MODULE_TAG,
+            status: responseError.status,
+          });
+          break;
+        }
+        if (!isTransient(responseError.status)) {
+          safeLog('warn', {
+            evt: `${evtPrefix}.abort`,
+            module: MODULE_TAG,
+            status: responseError.status,
+            remaining: chunks.length - ci - 1,
+          });
+          break;
+        }
+      }
+      if (deadlineLeft() <= 0) {
+        deadlineExceeded = true;
+        break;
+      }
+      safeLog('warn', {
+        evt: `${evtPrefix}.error`,
+        module: MODULE_TAG,
+        chunk: `${ci + 1}/${chunks.length}`,
+        attempts: policy.maxAttempts,
+      });
     }
   }
 
   let outcome: EgressResult['outcome'] = 'partial';
   if (acceptedChunks === chunks.length) outcome = 'ok';
   else if (acceptedChunks === 0) outcome = 'failed';
+
+  safeLog(outcome === 'ok' ? 'info' : 'warn', {
+    evt: `${evtPrefix}.complete`,
+    module: MODULE_TAG,
+    outcome,
+    acceptedChunks,
+    chunkCount: chunks.length,
+    throttled,
+    deadlineExceeded,
+    cancelled: args.signal?.aborted === true,
+  });
 
   return {
     acceptedChunks,

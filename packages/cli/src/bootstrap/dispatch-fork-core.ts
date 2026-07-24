@@ -27,14 +27,11 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
 import {
-  ConfigurationError,
   currentScope,
   currentTraceparent,
   forkAndSettle,
   getWorkerLimits,
   SystemError,
-  toolErrorFromCanonicalCode,
-  type ToolError,
   type ToolProvenance,
   type WorkerMessage,
 } from '@opensip-cli/core';
@@ -43,6 +40,7 @@ import { buildExternalWorkerChildEnv } from './build-external-worker-child-env.j
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { handleHostRpc } from './dispatch-host-rpc-handler.js';
 import { type DispatchHostCtx } from './dispatch-replay-result.js';
+import { dispatchError, workerErrorToToolError } from './dispatch-worker-failure.js';
 
 import type {
   DispatchProgressEvent,
@@ -62,22 +60,7 @@ export const WORKER_SUBCOMMAND = '__tool-command-worker';
 /** The dispatch IPC binding: host-RPC requests stream on `progress`. */
 type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandResult>;
 
-/** Narrowing helper: a worker `error` IPC message carries an optional failureClass/stack. */
-type DispatchWorkerError = Extract<DispatchWorkerMessage, { kind: 'error' }>;
-
-const MAX_WORKER_DETAIL_CODE_LENGTH = 128;
-const ALLOWED_WORKER_DETAIL_CODES = new Set(['PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS']);
-
-function allowlistedWorkerDetailCode(detailCode: string | undefined): string | undefined {
-  if (
-    detailCode === undefined ||
-    detailCode.length > MAX_WORKER_DETAIL_CODE_LENGTH ||
-    !ALLOWED_WORKER_DETAIL_CODES.has(detailCode)
-  ) {
-    return undefined;
-  }
-  return detailCode;
-}
+export { dispatchError } from './dispatch-worker-failure.js';
 
 /**
  * Defer acting on a premature worker `exit` across two macrotasks so a final IPC
@@ -208,7 +191,7 @@ function forkAndAwait({
         cwd,
         timeoutMs,
         enableHeartbeat: true,
-        enableSigintCancellation: true,
+        cancellationSignal: scope?.abortSignal,
         buildChildEnv: (parentEnv) =>
           buildExternalWorkerChildEnv({ parentEnv, runId, traceparent }),
         onMessage: (msg: unknown) => {
@@ -334,92 +317,5 @@ function sendRpcReply(child: ChildProcess, reply: RpcReply, spec: ToolCommandWor
       toolId: spec.toolId,
       command: spec.commandName ?? spec.hook ?? 'unknown',
     });
-  });
-}
-
-/**
- * The human label for the dispatched unit — the command name, or (hook mode) the
- * hook name. A valid spec always names one; the final fallback is defensive.
- */
-function specLabel(spec: ToolCommandWorkerSpec): string {
-  /* v8 ignore next -- defensive: a valid spec always carries a commandName OR a hook (the worker entry rejects one that has neither as bad-spec); the 'unknown' fallback is structurally unreachable. */
-  return spec.commandName ?? spec.hook ?? 'unknown';
-}
-
-/**
- * Build a structured supervisor-side dispatch error, logged with its failure
- * class. `code` is the worker error's canonical exit-class `ToolErrorCode` (when
- * the worker threw a typed `ToolError`); it preserves the typed exit code across
- * the fork boundary, which flattens the prototype chain. Reconstruction order:
- *
- *   1. `config-invalid` → `ConfigurationError` (exit 2). The frozen config
- *      contract — set for a thrown `ConfigurationError` (binary-not-found /
- *      no-project / baseline-missing) AND for the deep-config-pass failure.
- *   2. a recognized canonical `code` → that subclass (NotFound → 3, Network → 4,
- *      Validation/Configuration → 2, PluginIncompatible → 5, Timeout → 1).
- *   3. otherwise → `SystemError` (exit 1) — genuine worker/transport faults
- *      (`spawn` / `exit_nonzero` / `rpc_flood` / `timeout` / `ipc_error`).
- */
-interface DispatchErrorInput {
-  readonly spec: ToolCommandWorkerSpec;
-  readonly message: string;
-  readonly failureClass: string;
-  readonly stderrTail?: string;
-  readonly code?: string;
-  readonly detailCode?: string;
-}
-
-export function dispatchError({
-  spec,
-  message,
-  failureClass,
-  stderrTail,
-  code,
-  detailCode,
-}: DispatchErrorInput): ToolError {
-  const label = specLabel(spec);
-  currentScope()?.logger.error({
-    evt: 'cli.tool.dispatch_failed',
-    module: BOOTSTRAP_MODULE,
-    toolId: spec.toolId,
-    command: label,
-    failureClass,
-  });
-  if (failureClass === 'config-invalid') {
-    return new ConfigurationError(message, {
-      code: 'CONFIGURATION_ERROR',
-      failureClass,
-      stderrTail,
-    });
-  }
-  if (code !== undefined) {
-    const safeDetailCode = allowlistedWorkerDetailCode(detailCode);
-    const rebuilt = toolErrorFromCanonicalCode(code, message, {
-      code: safeDetailCode ?? code,
-      failureClass,
-      stderrTail,
-    });
-    if (rebuilt !== undefined) return rebuilt;
-  }
-  return new SystemError(`external tool '${spec.toolId}' ${label} failed: ${message}`, {
-    code: 'SYSTEM.DISPATCH.WORKER_FAILED',
-    failureClass,
-    stderrTail,
-  });
-}
-
-/** Convert a worker `error` IPC message into a logged, structured {@link ToolError}. */
-function workerErrorToToolError(
-  spec: ToolCommandWorkerSpec,
-  msg: DispatchWorkerError,
-  stderrTail?: string,
-): ToolError {
-  return dispatchError({
-    spec,
-    message: msg.message,
-    failureClass: msg.failureClass ?? 'ipc_error',
-    stderrTail,
-    code: msg.code,
-    detailCode: msg.detailCode,
   });
 }

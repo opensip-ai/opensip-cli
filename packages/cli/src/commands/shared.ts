@@ -165,6 +165,7 @@ export interface CliCommandsContext {
     readonly exitCode: number;
     readonly suggestion?: string;
     readonly code?: string;
+    readonly failure?: Readonly<Record<string, unknown>>;
   }) => void;
   /**
    * Project-local plugin layouts contributed by the registered tools

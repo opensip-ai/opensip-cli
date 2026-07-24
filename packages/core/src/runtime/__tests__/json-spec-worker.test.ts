@@ -66,7 +66,7 @@ describe('runJsonSpecWorker', () => {
     ]);
   });
 
-  it('sends structured error messages with failure class and stack when run throws', async () => {
+  it('sends a redacted structured failure with its failure class', async () => {
     dir = mkdtempSync(join(tmpdir(), 'json-spec-worker-'));
     const specPath = writeSpec(dir, { value: 1 });
     const messages = captureWorkerMessages();
@@ -83,7 +83,7 @@ describe('runJsonSpecWorker', () => {
     expect(messages).toEqual([
       expect.objectContaining({
         kind: 'error',
-        message: 'worker timed out',
+        message: 'The operation failed.',
         failureClass: 'timeout',
         failureWireVersion: 1,
         failure: expect.objectContaining({ schemaVersion: 1 }),
@@ -105,7 +105,7 @@ describe('runJsonSpecWorker', () => {
     expect(messages).toEqual([
       expect.objectContaining({
         kind: 'error',
-        message: 'plain failure',
+        message: 'The operation failed.',
         failureWireVersion: 1,
         failure: expect.objectContaining({ schemaVersion: 1 }),
       }),

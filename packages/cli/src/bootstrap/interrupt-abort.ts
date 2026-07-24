@@ -14,6 +14,8 @@
  * synchronous append, so the force-exit record survives the immediate exit.
  */
 
+import { setMaxListeners } from 'node:events';
+
 import { createCancelledError, currentLogger } from '@opensip-cli/core';
 
 const SECOND_INTERRUPT_WINDOW_MS = 2000;
@@ -84,6 +86,10 @@ export function installInterruptAbortCoordinator(
   activeCoordinator?.dispose();
 
   const controller = new AbortController();
+  // A single invocation may supervise many concurrent workers. They all attach
+  // to this one root signal; disable EventTarget's default 10-listener warning
+  // here at the composition owner rather than reintroducing process listeners.
+  setMaxListeners(0, controller.signal);
   const windowMs = options.secondInterruptWindowMs ?? SECOND_INTERRUPT_WINDOW_MS;
   let firstAt: number | undefined;
   let firstSignal: InterruptSignal | undefined;
@@ -108,6 +114,10 @@ export function installInterruptAbortCoordinator(
     }
     firstAt = Date.now();
     firstSignal = name;
+    // The grace timer is unref'd so cooperative cleanup may let the event loop
+    // drain before it fires. Stamp the POSIX status immediately; otherwise the
+    // expected clean cancellation path exits 0 after the first signal.
+    process.exitCode = forceExitCode(name);
     // Leave a durable, structured trace that the run was interrupted (vs crashed
     // or exited cleanly) — valuable when troubleshooting after the fact.
     try {

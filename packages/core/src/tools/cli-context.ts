@@ -222,6 +222,8 @@ export interface ToolCliContext extends ToolCliHostState {
      * without parsing `message`.
      */
     readonly code?: string;
+    /** Versioned, machine-safe failure axes for JSON consumers. */
+    readonly failure?: Readonly<Record<string, unknown>>;
     /** Structured bootstrap/setup diagnostic (ADR-0060 command-error substrate). */
     readonly diagnostic?: CliDiagnostic;
   }) => void;

@@ -26,8 +26,15 @@ export {
   IpcPayloadTooLargeError,
 } from './runtime/worker-ipc-send.js';
 export { getWorkerErrorFailureClass } from './runtime/worker-error-failure-class.js';
-export { toWorkerFailureWire, WORKER_FAILURE_WIRE_VERSION } from './runtime/worker-failure-wire.js';
-export type { WorkerFailureWire } from './runtime/worker-failure-wire.js';
+export {
+  toWorkerFailureWire,
+  toolErrorFromWorkerFailureWire,
+  WORKER_FAILURE_WIRE_VERSION,
+} from './runtime/worker-failure-wire.js';
+export type {
+  WorkerFailureReconstructionInput,
+  WorkerFailureWire,
+} from './runtime/worker-failure-wire.js';
 export { runJsonSpecWorker } from './runtime/json-spec-worker.js';
 export type { JsonSpecWorkerOptions } from './runtime/json-spec-worker.js';
 export {
@@ -36,6 +43,10 @@ export {
 } from './runtime/result-accumulator-cap.js';
 export { startWorkerHeartbeat } from './runtime/worker-heartbeat.js';
 export type { WorkerHeartbeatMessage, WorkerHeartbeatOptions } from './runtime/worker-heartbeat.js';
+export {
+  startWorkerCancellationControl,
+  WORKER_CONTROL_WIRE_VERSION,
+} from './runtime/worker-cancellation-control.js';
 export type {
   ProgressTransport,
   ProgressRun,

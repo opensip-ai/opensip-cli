@@ -24,6 +24,18 @@ import type {
   ToolCommandWorkerSpec,
 } from './tool-command-dispatch-types.js';
 
+const DEFAULT_THROW_FAILURE_CLASS = 'tool-handler-throw' as const;
+const TOOL_COMMAND_FAILURE_CLASSES: ReadonlySet<string> = new Set([
+  DEFAULT_THROW_FAILURE_CLASS,
+  'unsupported-seam',
+  'host-rpc-failed',
+  'command-not-found',
+  'runtime-load-failed',
+  'bad-spec',
+  'config-invalid',
+  'payload_too_large',
+]);
+
 /**
  * Resolve the dispatched tool from the re-bootstrapped registry. The bootstrap
  * already imported + registered it (the isolation import happened in this worker
@@ -98,9 +110,25 @@ export async function runWorkerInitialize(tool: Tool): Promise<void> {
  * `code` carry (`canonicalToolErrorCode`) — see `errorMessage`/`runToolCommandWorker`.
  */
 export function classifyThrow(error: unknown): ToolCommandFailureClass {
-  if (error instanceof UnsupportedSeamError) return error.failureClass;
-  if (error instanceof CapturedOutputTooLargeError) return error.failureClass;
-  if (error instanceof IpcPayloadTooLargeError) return error.failureClass;
-  if (error instanceof ConfigurationError) return 'config-invalid';
-  return (error as { failureClass?: ToolCommandFailureClass }).failureClass ?? 'tool-handler-throw';
+  try {
+    if (error instanceof UnsupportedSeamError) return error.failureClass;
+    if (error instanceof CapturedOutputTooLargeError) return error.failureClass;
+    if (error instanceof IpcPayloadTooLargeError) return error.failureClass;
+    if (error instanceof ConfigurationError) return 'config-invalid';
+  } catch {
+    return DEFAULT_THROW_FAILURE_CLASS;
+  }
+  if (typeof error !== 'object' || error === null) return DEFAULT_THROW_FAILURE_CLASS;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'failureClass');
+    const candidate =
+      descriptor !== undefined && 'value' in descriptor && typeof descriptor.value === 'string'
+        ? descriptor.value
+        : undefined;
+    return candidate !== undefined && TOOL_COMMAND_FAILURE_CLASSES.has(candidate)
+      ? (candidate as ToolCommandFailureClass)
+      : DEFAULT_THROW_FAILURE_CLASS;
+  } catch {
+    return DEFAULT_THROW_FAILURE_CLASS;
+  }
 }

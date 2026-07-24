@@ -27,10 +27,10 @@ describe('startup failure presentation', () => {
       }),
       EXIT_CODES.RUNTIME_ERROR,
     ],
-  ] as const)('preserves the canonical %s exit code', (_label, error, exitCode) => {
+  ] as const)('preserves the canonical %s exit code', (label, error, exitCode) => {
     const wrapped = startupFailureAsBootstrapError(error);
 
     expect(wrapped.exitCode).toBe(exitCode);
-    expect(wrapped.message).toBe(error.message);
+    expect(wrapped.message).toBe(label === 'system' ? 'The operation failed.' : error.message);
   });
 });

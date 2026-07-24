@@ -194,6 +194,7 @@ export { passRate } from './score.js';
 export {
   EXIT_CODES,
   getErrorSuggestion,
+  getErrorSuggestionFromMessage,
   mapToolErrorToExitCode,
   mapFailureToExitCode,
   mapExitClassToExitCode,

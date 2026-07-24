@@ -302,4 +302,32 @@ describe('McpStdioServer repo scoping observability', () => {
     )?.[0] as Record<string, unknown> | undefined;
     expect(startPayload).not.toHaveProperty('projectRoot');
   });
+
+  it.each(['resolve-without-onclose', 'reject'] as const)(
+    'settles shutdown when transport close %s',
+    async (mode) => {
+      const controller = new AbortController();
+      controller.abort();
+      const fakeMcp = {
+        server: {} as { onclose?: () => void },
+        connect: vi.fn(() => Promise.resolve()),
+        close: vi.fn(() =>
+          mode === 'reject' ? Promise.reject(new Error('broken transport')) : Promise.resolve(),
+        ),
+      };
+      const server = new McpStdioServer({
+        scope: new RunScope({ abortSignal: controller.signal }),
+        graph: {} as GraphReadPort,
+        results: {} as ResultsReadPort,
+        version: '0.0.0-test',
+      });
+      Object.assign(server as unknown as { mcp: typeof fakeMcp; transport: unknown }, {
+        mcp: fakeMcp,
+        transport: {},
+      });
+
+      await expect(server.serve()).resolves.toBeUndefined();
+      expect(fakeMcp.close).toHaveBeenCalledTimes(1);
+    },
+  );
 });

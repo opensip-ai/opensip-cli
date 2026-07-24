@@ -13,19 +13,33 @@
 import { sanitizeErrorMetadata } from './errors.js';
 import { MAX_OPERATOR_DETAIL, truncate, type FailureEnvelope } from './failure-envelope.js';
 import { toJsonRecord, type JsonRecord } from './json-value.js';
+import { scrubText } from './safe-diagnostic-data.js';
+
+function allowlistedMetadata(envelope: FailureEnvelope): Readonly<Record<string, unknown>> {
+  const allow = new Set(envelope.definition.publicMetadataKeys);
+  const metadata: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(envelope.metadata)) {
+    if (allow.has(key)) metadata[key] = value;
+  }
+  return sanitizeErrorMetadata(metadata);
+}
+
+function outwardMessage(envelope: FailureEnvelope): string {
+  if (envelope.definition.exposure === 'public') {
+    return scrubText(envelope.message, 1000);
+  }
+  return envelope.definition.exposure === 'redacted'
+    ? 'The operation failed.'
+    : 'An unexpected internal failure occurred.';
+}
 
 /** Public projection — no operatorDetail, metadata allowlisted by definition. */
 export function toPublicFailureProjection(envelope: FailureEnvelope): JsonRecord {
-  const allow = new Set(envelope.definition.publicMetadataKeys);
-  /** @type {Record<string, unknown>} */
-  const meta: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(envelope.metadata)) {
-    if (allow.has(k)) meta[k] = v;
-  }
+  const metadata = allowlistedMetadata(envelope);
   return toJsonRecord({
     schemaVersion: envelope.schemaVersion,
     code: envelope.code,
-    message: envelope.message,
+    message: outwardMessage(envelope),
     action: envelope.operatorAction,
     source: envelope.definition.source,
     responsibility: envelope.definition.defaultResponsibility,
@@ -33,7 +47,7 @@ export function toPublicFailureProjection(envelope: FailureEnvelope): JsonRecord
     retry: envelope.definition.retry,
     severity: envelope.definition.severity,
     known: envelope.known,
-    ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     ...(envelope.aggregate
       ? { aggregate: envelope.aggregate.map((a) => toPublicFailureProjection(a)) }
       : {}),
@@ -42,10 +56,11 @@ export function toPublicFailureProjection(envelope: FailureEnvelope): JsonRecord
 
 /** Machine / worker-safe projection (redacted metadata, no operatorDetail/stack). */
 export function toMachineFailureProjection(envelope: FailureEnvelope): JsonRecord {
+  const metadata = allowlistedMetadata(envelope);
   return toJsonRecord({
     schemaVersion: envelope.schemaVersion,
     code: envelope.code,
-    message: envelope.message,
+    message: outwardMessage(envelope),
     action: envelope.operatorAction,
     source: envelope.definition.source,
     responsibility: envelope.definition.defaultResponsibility,
@@ -54,11 +69,14 @@ export function toMachineFailureProjection(envelope: FailureEnvelope): JsonRecor
     severity: envelope.definition.severity,
     exposure: envelope.definition.exposure,
     exitClass: envelope.definition.exitClass,
+    owner: envelope.definition.owner,
+    stability: envelope.definition.stability,
+    lifecycle: envelope.definition.lifecycle,
+    publicMetadataKeys: envelope.definition.publicMetadataKeys ?? [],
     known: envelope.known,
     ...(envelope.failureClass === undefined ? {} : { failureClass: envelope.failureClass }),
-    metadata: sanitizeErrorMetadata(envelope.metadata),
+    ...(Object.keys(metadata).length > 0 ? { metadata } : {}),
     causes: envelope.causes.map((c) => ({
-      message: c.message,
       known: c.known,
       ...(c.code ? { code: c.code } : {}),
     })),
@@ -75,8 +93,15 @@ export function toMachineFailureProjection(envelope: FailureEnvelope): JsonRecor
 export function toOperatorFailureProjection(envelope: FailureEnvelope): JsonRecord {
   return toJsonRecord({
     ...toMachineFailureProjection(envelope),
+    message: scrubText(envelope.message, 1000),
+    metadata: sanitizeErrorMetadata(envelope.metadata),
     ...(envelope.operatorDetail === undefined
       ? {}
-      : { operatorDetail: truncate(envelope.operatorDetail, MAX_OPERATOR_DETAIL) }),
+      : {
+          operatorDetail: scrubText(
+            truncate(envelope.operatorDetail, MAX_OPERATOR_DETAIL),
+            MAX_OPERATOR_DETAIL,
+          ),
+        }),
   });
 }

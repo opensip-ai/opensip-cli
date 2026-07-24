@@ -3,7 +3,12 @@
  * Typed error classes and Result pattern for opensip-cli.
  */
 
-import { type ErrorDefinition, definitionFromLegacyCode } from './error-definition.js';
+import {
+  type ErrorCatalogOwner,
+  type ErrorDefinition,
+  definitionFromLegacyCode,
+  normalizeErrorDefinition,
+} from './error-definition.js';
 
 // =============================================================================
 // ERROR CLASSES
@@ -36,9 +41,29 @@ const MAX_METADATA_KEYS = 32;
 const MAX_METADATA_DEPTH = 4;
 const MAX_METADATA_STRING = 2048;
 const MAX_STDERR_TAIL = 4096;
+const MAX_METADATA_NODES = 256;
 
 const SENSITIVE_KEY =
   /pass(word)?|secret|token|authorization|api[_-]?key|cookie|credential|private[_-]?key/i;
+
+const CREDENTIAL_VALUE_PATTERNS: readonly RegExp[] = [
+  /:\/\/([^/@\s]+):([^@/\s]+)@/gu,
+  /\bbearer\s+[\w.~+/-]+=*/giu,
+  /\bx-api-key[\s'":=]+[\w.~+/-]+=*/giu,
+  /\b(?:api[_-]?key|token|secret|password|credential)\s*[:=]\s*[^\s,;&'"}]+/giu,
+  /\b(?:osk_|sk-|gh[pousr]_|github_pat_)[A-Za-z0-9_-]{8,}\b/gu,
+];
+
+/** Content-level credential scrubbing shared by metadata and text projections. */
+export function redactCredentialText(text: string): string {
+  let redacted = text;
+  for (const pattern of CREDENTIAL_VALUE_PATTERNS) {
+    redacted = redacted.replace(pattern, (match) =>
+      match.startsWith('://') ? '://***:***@' : '[redacted]',
+    );
+  }
+  return redacted;
+}
 
 /** Constructor options for {@link ToolError}: `code` plus bounded diagnostic metadata. */
 export interface ToolErrorOptions extends ErrorOptions {
@@ -75,55 +100,263 @@ export function sanitizeErrorMetadata(
   if (depth > MAX_METADATA_DEPTH || input === null || typeof input !== 'object') {
     return Object.freeze({});
   }
-  /** @type {Record<string, unknown>} */
-  const out: Record<string, unknown> = {};
-  let count = 0;
-  try {
-    for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
-      if (count >= MAX_METADATA_KEYS) break;
-      if (SENSITIVE_KEY.test(key)) continue;
-      if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-      const sanitized = sanitizeErrorMetadataValue(value, depth + 1);
-      if (sanitized === undefined) continue;
-      out[key.slice(0, 64)] = sanitized;
-      count += 1;
-    }
-  } catch {
-    return Object.freeze({ _meta: 'hostile-metadata' });
-  }
-  return Object.freeze(out);
+  const state = { seen: new WeakSet<object>(), remaining: MAX_METADATA_NODES };
+  const prepared = prepareMetadataContainer(input, false, depth, state);
+  return (
+    prepared.ok
+      ? sanitizeMetadataChildren(prepared.descriptors, false, depth, state)
+      : prepared.value
+  ) as Readonly<Record<string, unknown>>;
 }
 
-function sanitizeErrorMetadataValue(value: unknown, depth: number): unknown {
+interface MetadataWalkState {
+  readonly seen: WeakSet<object>;
+  remaining: number;
+}
+
+function safeIsArray(value: unknown): boolean | undefined {
+  try {
+    return Array.isArray(value);
+  } catch {
+    return undefined;
+  }
+}
+
+function isSafeMetadataField(key: string, descriptor: PropertyDescriptor): boolean {
+  return (
+    descriptor.enumerable === true &&
+    !SENSITIVE_KEY.test(key) &&
+    key !== '__proto__' &&
+    key !== 'constructor' &&
+    key !== 'prototype'
+  );
+}
+
+function metadataArrayLength(descriptors: Record<string, PropertyDescriptor>): number {
+  const lengthDescriptor = descriptors.length;
+  if (
+    lengthDescriptor === undefined ||
+    !('value' in lengthDescriptor) ||
+    typeof lengthDescriptor.value !== 'number'
+  ) {
+    return 0;
+  }
+  return Math.min(32, Math.max(0, Math.floor(lengthDescriptor.value)));
+}
+
+interface PreparedMetadataContainer {
+  readonly ok: true;
+  readonly descriptors: Record<string, PropertyDescriptor>;
+}
+
+interface RejectedMetadataContainer {
+  readonly ok: false;
+  readonly value: unknown;
+}
+
+function metadataContainerSentinel(
+  isArray: boolean,
+  reason: 'depth' | 'budget' | 'circular' | 'hostile',
+): unknown {
+  if (isArray) {
+    const values = {
+      depth: '[TruncatedArray]',
+      budget: '[NodeBudgetExhausted]',
+      circular: '[Circular]',
+      hostile: '[HostileArray]',
+    } as const;
+    return values[reason];
+  }
+  const values = {
+    depth: {},
+    budget: { _meta: 'node-budget-exhausted' },
+    circular: { _meta: 'circular' },
+    hostile: { _meta: 'hostile-metadata' },
+  } as const;
+  return Object.freeze(values[reason]);
+}
+
+function prepareMetadataContainer(
+  value: object,
+  isArray: boolean,
+  depth: number,
+  state: MetadataWalkState,
+): PreparedMetadataContainer | RejectedMetadataContainer {
+  if (depth > MAX_METADATA_DEPTH) {
+    return { ok: false, value: metadataContainerSentinel(isArray, 'depth') };
+  }
+  if (state.remaining <= 0) {
+    return { ok: false, value: metadataContainerSentinel(isArray, 'budget') };
+  }
+  state.remaining -= 1;
+  if (state.seen.has(value)) {
+    return { ok: false, value: metadataContainerSentinel(isArray, 'circular') };
+  }
+  state.seen.add(value);
+
+  try {
+    return { ok: true, descriptors: Object.getOwnPropertyDescriptors(value) };
+  } catch {
+    return { ok: false, value: metadataContainerSentinel(isArray, 'hostile') };
+  }
+}
+
+interface MetadataChild {
+  readonly key: string;
+  readonly descriptor?: PropertyDescriptor;
+}
+
+function metadataChildren(
+  descriptors: Record<string, PropertyDescriptor>,
+  isArray: boolean,
+): readonly MetadataChild[] {
+  const children: MetadataChild[] = [];
+  if (isArray) {
+    for (let index = 0; index < metadataArrayLength(descriptors); index += 1) {
+      children.push({ key: String(index), descriptor: descriptors[String(index)] });
+    }
+    return children;
+  }
+  for (const [key, descriptor] of Object.entries(descriptors)) {
+    if (!isSafeMetadataField(key, descriptor)) continue;
+    children.push({ key: key.slice(0, 64), descriptor });
+    if (children.length >= MAX_METADATA_KEYS) break;
+  }
+  return children;
+}
+
+function sanitizeMetadataChildren(
+  descriptors: Record<string, PropertyDescriptor>,
+  isArray: boolean,
+  depth: number,
+  state: MetadataWalkState,
+): unknown {
+  const output: unknown[] | Record<string, unknown> = isArray ? [] : {};
+  for (const child of metadataChildren(descriptors, isArray)) {
+    let sanitized: unknown = null;
+    if (child.descriptor !== undefined) {
+      sanitized =
+        'value' in child.descriptor
+          ? sanitizeErrorMetadataValue(child.descriptor.value, depth + 1, state)
+          : '[Accessor]';
+    }
+    if (isArray) {
+      (output as unknown[]).push(sanitized ?? null);
+    } else if (sanitized !== undefined) {
+      (output as Record<string, unknown>)[child.key] = sanitized;
+    }
+  }
+  return Object.freeze(output);
+}
+
+function sanitizeErrorMetadataValue(
+  value: unknown,
+  depth: number,
+  state: MetadataWalkState,
+): unknown {
   if (value === null) return null;
-  if (typeof value === 'string') return value.slice(0, MAX_METADATA_STRING);
+  if (typeof value === 'string') {
+    return redactCredentialText(value).slice(0, MAX_METADATA_STRING);
+  }
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'boolean') return value;
   if (typeof value === 'bigint') return value.toString();
   if (typeof value === 'function' || typeof value === 'symbol' || value === undefined) {
     return undefined;
   }
-  if (Array.isArray(value)) {
-    if (depth > MAX_METADATA_DEPTH) return '[TruncatedArray]';
-    return Object.freeze(
-      value.slice(0, 32).map((item) => sanitizeErrorMetadataValue(item, depth + 1) ?? null),
-    );
-  }
+  const isArray = safeIsArray(value);
+  if (isArray === undefined) return '[HostileObject]';
   if (typeof value === 'object') {
-    return sanitizeErrorMetadata(value, depth);
+    const prepared = prepareMetadataContainer(value, isArray, depth, state);
+    return prepared.ok
+      ? sanitizeMetadataChildren(prepared.descriptors, isArray, depth, state)
+      : prepared.value;
   }
   return undefined;
 }
 
-function isErrorDefinition(value: unknown): value is ErrorDefinition {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as ErrorDefinition).code === 'string' &&
-    typeof (value as ErrorDefinition).source === 'string' &&
-    typeof (value as ErrorDefinition).kind === 'string' &&
-    typeof (value as ErrorDefinition).exitClass === 'string'
-  );
+interface OwnDataRead {
+  readonly ok: boolean;
+  readonly value?: unknown;
+}
+
+function readOwnData(value: object, key: PropertyKey): OwnDataRead {
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined || !('value' in descriptor)) return { ok: false };
+    return { ok: true, value: descriptor.value };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Copy and fully validate a definition without trusting branded object getters. */
+export function normalizeToolErrorDefinition(value: unknown): ErrorDefinition | undefined {
+  if (typeof value !== 'object' || value === null || safeIsArray(value) !== false) return undefined;
+  const ownerRead = readOwnData(value, 'owner');
+  if (!ownerRead.ok || typeof ownerRead.value !== 'object' || ownerRead.value === null) {
+    return undefined;
+  }
+  const id = readOwnData(ownerRead.value, 'id');
+  const displayName = readOwnData(ownerRead.value, 'displayName');
+  const packageName = readOwnData(ownerRead.value, 'packageName');
+  if (
+    !id.ok ||
+    typeof id.value !== 'string' ||
+    !displayName.ok ||
+    typeof displayName.value !== 'string'
+  ) {
+    return undefined;
+  }
+  const owner: ErrorCatalogOwner = {
+    id: id.value,
+    displayName: displayName.value,
+    ...(packageName.ok && typeof packageName.value === 'string'
+      ? { packageName: packageName.value }
+      : {}),
+  };
+  try {
+    return normalizeErrorDefinition(value, owner, { allowLegacyCodes: true });
+  } catch {
+    // @swallow-ok probe/optional capability: malformed cross-copy definitions fail recognition closed.
+    return undefined;
+  }
+}
+
+function definitionMatchesCode(code: string, definition: ErrorDefinition): boolean {
+  if (definition.code === code) return true;
+  // Legacy detail codes intentionally carry the canonical family definition
+  // (for example CONFIGURATION.GATE.* -> CONFIGURATION_ERROR). No other
+  // code/definition mismatch is valid: accepting one would let a forged
+  // cross-copy brand pair a public code with unrelated retry/exposure axes.
+  return definitionFromLegacyCode(code).code === definition.code;
+}
+
+function resolveToolErrorConstruction(
+  messageOrDefinition: string | ErrorDefinition,
+  codeOrMessage: string | undefined,
+  options: ToolErrorOptions | undefined,
+): {
+  readonly message: string;
+  readonly code: string;
+  readonly definition?: ErrorDefinition;
+  readonly definitionFirst: boolean;
+} {
+  const normalizedDefinition = normalizeToolErrorDefinition(messageOrDefinition);
+  if (normalizedDefinition !== undefined) {
+    return {
+      message: codeOrMessage ?? normalizedDefinition.code,
+      code: normalizedDefinition.code,
+      definition: normalizedDefinition,
+      definitionFirst: true,
+    };
+  }
+  return {
+    message: typeof messageOrDefinition === 'string' ? messageOrDefinition : 'SYSTEM_ERROR',
+    code: codeOrMessage ?? options?.code ?? 'SYSTEM_ERROR',
+    definition: normalizeToolErrorDefinition(options?.definition),
+    definitionFirst: false,
+  };
 }
 
 /** Base class for all opensip-cli errors; carries a `code` for programmatic dispatch. */
@@ -160,21 +393,20 @@ export class ToolError extends Error {
     codeOrMessage?: string,
     options?: ToolErrorOptions,
   ) {
-    const fromDefinition = isErrorDefinition(messageOrDefinition);
-    const message = fromDefinition
-      ? String(codeOrMessage ?? messageOrDefinition.code)
-      : String(messageOrDefinition);
-    const code = fromDefinition
-      ? messageOrDefinition.code
-      : String(codeOrMessage ?? options?.code ?? 'SYSTEM_ERROR');
-    const definition = fromDefinition
-      ? messageOrDefinition
-      : (options?.definition ?? definitionFromLegacyCode(options?.code ?? code));
+    const construction = resolveToolErrorConstruction(messageOrDefinition, codeOrMessage, options);
 
-    super(message, options);
+    super(construction.message, options);
     this.name = 'ToolError';
-    this.code = options?.code ?? code;
-    this.definition = definition;
+    // In definition-first form the definition is the authority. Allowing an
+    // options.code override creates an impossible code/axes pair on one error.
+    this.code = construction.definitionFirst
+      ? construction.code
+      : (options?.code ?? construction.code);
+    this.definition =
+      construction.definition !== undefined &&
+      definitionMatchesCode(this.code, construction.definition)
+        ? construction.definition
+        : definitionFromLegacyCode(this.code);
     this.failureClass =
       typeof options?.failureClass === 'string' ? options.failureClass.slice(0, 128) : undefined;
     this.stderrTail =
@@ -224,15 +456,23 @@ export class ToolError extends Error {
  * copies. Validates brand version + plain shape; does not trust arbitrary brands.
  */
 export function isToolErrorLike(value: unknown): value is ToolError {
-  if (value instanceof ToolError) return true;
   if (typeof value !== 'object' || value === null) return false;
-  const brand = (value as Record<symbol, unknown>)[TOOL_ERROR_BRAND];
-  if (brand !== TOOL_ERROR_BRAND_VERSION) return false;
-  const candidate = value as Partial<ToolError>;
+  const brand = readOwnData(value, TOOL_ERROR_BRAND);
+  const message = readOwnData(value, 'message');
+  const code = readOwnData(value, 'code');
+  const definition = readOwnData(value, 'definition');
+  const normalizedDefinition = definition.ok
+    ? normalizeToolErrorDefinition(definition.value)
+    : undefined;
   return (
-    typeof candidate.message === 'string' &&
-    typeof candidate.code === 'string' &&
-    isErrorDefinition(candidate.definition)
+    brand.ok &&
+    brand.value === TOOL_ERROR_BRAND_VERSION &&
+    message.ok &&
+    typeof message.value === 'string' &&
+    code.ok &&
+    typeof code.value === 'string' &&
+    normalizedDefinition !== undefined &&
+    definitionMatchesCode(code.value, normalizedDefinition)
   );
 }
 
@@ -460,7 +700,37 @@ export function toolErrorFromCanonicalCode(
 
 /** Extract a bounded display/log message from an unknown throwable. */
 export function formatUnknownErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  let message: string;
+  try {
+    if (typeof error === 'object' && error !== null) {
+      const ownMessage = readOwnData(error, 'message');
+      message =
+        ownMessage.ok && typeof ownMessage.value === 'string' ? ownMessage.value : typeof error;
+    } else if (typeof error === 'string') {
+      message = error;
+    } else if (
+      typeof error === 'number' ||
+      typeof error === 'boolean' ||
+      typeof error === 'bigint' ||
+      typeof error === 'symbol'
+    ) {
+      message = String(error);
+    } else {
+      message = error === null ? 'null' : 'undefined';
+    }
+  } catch {
+    message = '<unstringifiable>';
+  }
+  return redactCredentialText(message).slice(0, MAX_METADATA_STRING);
+}
+
+function ensureError(error: unknown): Error {
+  try {
+    if (error instanceof Error) return error;
+  } catch {
+    // @swallow-ok probe/optional capability: revoked/hostile instanceof failure falls through to a safe Error.
+  }
+  return new Error(formatUnknownErrorMessage(error));
 }
 
 // =============================================================================
@@ -485,7 +755,7 @@ export async function tryCatchAsync<T>(fn: () => Promise<T>): Promise<Result<T, 
   try {
     return ok(await fn());
   } catch (error) {
-    return err(error instanceof Error ? error : new Error(String(error)));
+    return err(ensureError(error));
   }
 }
 
@@ -494,6 +764,6 @@ export function tryCatch<T>(fn: () => T): Result<T, Error> {
   try {
     return ok(fn());
   } catch (error) {
-    return err(error instanceof Error ? error : new Error(String(error)));
+    return err(ensureError(error));
   }
 }

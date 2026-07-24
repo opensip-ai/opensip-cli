@@ -11,6 +11,23 @@ import type { GraphReadError } from '@opensip-cli/graph/read';
 const MAX_ERROR_MESSAGE = 512;
 const DEFAULT_ERROR_MESSAGE = 'Infrastructure error.';
 const STACK_LINE = /^\s*at(?:\s|$)/u;
+
+function boundaryMessage(error: unknown): string {
+  if (typeof error !== 'object' || error === null) return formatUnknownErrorMessage(error);
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'message');
+    if (
+      descriptor === undefined ||
+      !('value' in descriptor) ||
+      typeof descriptor.value !== 'string'
+    ) {
+      return '';
+    }
+  } catch {
+    return '';
+  }
+  return formatUnknownErrorMessage(error);
+}
 const PATH_BOUNDARY = String.raw`(^|[\s([{:;,='"])`;
 
 function escapeRegExp(value: string): string {
@@ -48,7 +65,7 @@ export function sanitizeMcpErrorMessage(
   options?: { readonly projectRoot?: string; readonly fallback?: string },
 ): string {
   try {
-    const primary = scrubErrorText(formatUnknownErrorMessage(error), options?.projectRoot);
+    const primary = scrubErrorText(boundaryMessage(error), options?.projectRoot);
     const fallback = scrubErrorText(
       options?.fallback ?? DEFAULT_ERROR_MESSAGE,
       options?.projectRoot,

@@ -16,6 +16,7 @@ import {
   toolErrorFromCanonicalCode,
   createToolError,
   isToolErrorLike,
+  normalizeToolErrorDefinition,
   sanitizeErrorMetadata,
   ok,
   err,
@@ -68,7 +69,11 @@ describe('ToolError', () => {
     const def = coreSystemErrorCatalog.require('NOT_FOUND');
     const err = createToolError(def, 'missing recipe');
     expect(err.code).toBe('NOT_FOUND');
-    expect(err.definition).toBe(def);
+    // Constructor copies through the hostile-input validator instead of
+    // retaining a caller-owned mutable object.
+    expect(err.definition).toStrictEqual(def);
+    expect(err.definition).not.toBe(def);
+    expect(Object.isFrozen(err.definition)).toBe(true);
     expect(isToolErrorLike(err)).toBe(true);
   });
 
@@ -78,7 +83,28 @@ describe('ToolError', () => {
         throw new Error('nope');
       },
     };
-    expect(sanitizeErrorMetadata(hostile)).toEqual({ _meta: 'hostile-metadata' });
+    expect(sanitizeErrorMetadata(hostile)).toEqual({ boom: '[Accessor]' });
+  });
+
+  it('is total on revoked Proxy metadata and definition inputs', () => {
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    expect(sanitizeErrorMetadata({ nested: revoked.proxy })).toEqual({
+      nested: '[HostileObject]',
+    });
+    expect(normalizeToolErrorDefinition(revoked.proxy)).toBeUndefined();
+    expect(isToolErrorLike(revoked.proxy)).toBe(false);
+  });
+
+  it('rejects a forged brand whose code and definition axes disagree', () => {
+    const forged = Object.create(ToolError.prototype) as ToolError;
+    Object.defineProperties(forged, {
+      message: { value: 'forged' },
+      code: { value: 'NOT_FOUND' },
+      definition: { value: coreSystemErrorCatalog.require('NETWORK_ERROR') },
+      [Symbol.for('@opensip-cli/core/tool-error-brand')]: { value: 1 },
+    });
+    expect(isToolErrorLike(forged)).toBe(false);
   });
 });
 

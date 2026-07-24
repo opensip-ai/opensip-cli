@@ -8,6 +8,7 @@
  */
 
 import {
+  ConfigurationError,
   currentScope,
   IpcPayloadTooLargeError,
   sendWorkerIpcMessage,
@@ -28,6 +29,12 @@ import type {
  * `progress` arm; the final {@link ToolCommandResult} settles `result`.
  */
 export type DispatchWorkerMessage = WorkerMessage<DispatchProgressEvent, ToolCommandResult>;
+
+export interface WorkerErrorMessageOptions {
+  readonly code?: string;
+  readonly detailCode?: string;
+  readonly cause?: unknown;
+}
 
 /** Post one IPC message to the parent (no-op when not forked — e.g. a unit call). */
 export function send(msg: DispatchWorkerMessage): void {
@@ -73,18 +80,18 @@ export async function sendTerminal(msg: DispatchWorkerMessage): Promise<void> {
 export function errorMessage(
   message: string,
   failureClass: ToolCommandFailureClass,
-  _stack?: string,
-  code?: string,
-  detailCode?: string,
-  cause?: unknown,
+  options: WorkerErrorMessageOptions = {},
 ): DispatchWorkerMessage {
-  const wire = toWorkerFailureWire(
+  const { cause, code, detailCode } = options;
+  const failureCause =
     cause ??
-      Object.assign(new Error(message), {
-        failureClass,
-        ...(code === undefined ? {} : { code }),
-      }),
-  );
+    (failureClass === 'config-invalid'
+      ? new ConfigurationError(message, { failureClass })
+      : Object.assign(new Error(message), {
+          failureClass,
+          ...(code === undefined ? {} : { code }),
+        }));
+  const wire = toWorkerFailureWire(failureCause);
   return {
     kind: 'error',
     message: wire.message || message,

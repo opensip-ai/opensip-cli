@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   defineErrorCatalog,
@@ -54,6 +54,24 @@ describe('validateToolErrorCatalogContribution', () => {
     expect(contrib.catalog.require('A.DEMO.BAG').owner.id).toBe(ownerA.id);
   });
 
+  it('copies mutable contribution data instead of retaining plugin-owned objects', () => {
+    const definition = { ...def, code: 'A.DEMO.COPY' };
+    const definitions = { 'A.DEMO.COPY': definition };
+    const contrib = validateToolErrorCatalogContribution(
+      { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, definitions },
+      ownerA,
+    );
+
+    definition.operatorAction = 'mutated after admission';
+    Object.assign(definitions, {
+      'A.DEMO.LATE': { ...def, code: 'A.DEMO.LATE' },
+    });
+
+    expect(contrib.catalog.require('A.DEMO.COPY').operatorAction).toBe('fix input');
+    expect(contrib.catalog.get('A.DEMO.LATE')).toBeUndefined();
+    expect(Object.isFrozen(contrib.catalog.require('A.DEMO.COPY'))).toBe(true);
+  });
+
   it('rejects unsupported schema versions and malformed shapes', () => {
     expect(() =>
       validateToolErrorCatalogContribution({ schemaVersion: 999, catalog: {} }, ownerA),
@@ -62,6 +80,26 @@ describe('validateToolErrorCatalogContribution', () => {
     expect(() =>
       validateToolErrorCatalogContribution({ schemaVersion: ERROR_CATALOG_SCHEMA_VERSION }, ownerA),
     ).toThrow(ErrorDefinitionError);
+    expect(() =>
+      validateToolErrorCatalogContribution(
+        {
+          schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
+          catalog: { schemaVersion: 999, definitions: {} },
+        },
+        ownerA,
+      ),
+    ).toThrow(/nested errorCatalog schemaVersion/);
+  });
+
+  it('rejects accessors without invoking plugin code', () => {
+    const read = vi.fn(() => ({ schemaVersion: ERROR_CATALOG_SCHEMA_VERSION }));
+    const contribution = { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION } as Record<string, unknown>;
+    Object.defineProperty(contribution, 'catalog', { enumerable: true, get: read });
+
+    expect(() => validateToolErrorCatalogContribution(contribution, ownerA)).toThrow(
+      /must be a data property/,
+    );
+    expect(read).not.toHaveBeenCalled();
   });
 
   it('rejects catalog owner id that does not match the tool owner', () => {

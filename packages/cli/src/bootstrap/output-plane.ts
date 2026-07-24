@@ -126,6 +126,7 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
           exitCode: detail.exitCode,
           ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
           ...(detail.code === undefined ? {} : { code: detail.code }),
+          ...(detail.failure === undefined ? {} : { failure: detail.failure }),
           ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
         }),
         { jsonRequested: true, render: deps.render },

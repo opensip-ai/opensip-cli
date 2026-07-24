@@ -136,6 +136,15 @@ describe('mcp source — no session-record writer (transport, not a run)', () =>
 });
 
 describe('MCP dispatch observability', () => {
+  it('does not let a failing logger change a successful tool result', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {
+      throw new Error('logger unavailable');
+    });
+    await expect(
+      dispatchOf(serverWithScope(new RunScope()))('search_symbols', () => OK_RESULT),
+    ).resolves.toBe(OK_RESULT);
+  });
+
   it('re-enters the captured scope and logs a bounded ok outcome with duration', async () => {
     const scope = new RunScope();
     const info = vi.spyOn(logger, 'info').mockImplementation(() => undefined);
@@ -202,5 +211,17 @@ describe('MCP dispatch observability', () => {
     expect(Object.keys(event).sort()).toEqual(
       ['durationMs', 'evt', 'module', 'outcome', 'tool'].sort(),
     );
+  });
+
+  it('preserves a sanitized tool failure when the error logger also fails', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => {
+      throw new Error('logger unavailable');
+    });
+    await expect(
+      dispatchOf(serverWithScope(new RunScope()))('who_calls', () => {
+        throw new Error('/private/project?token=secret-value');
+      }),
+    ).rejects.toThrow('<path>');
   });
 });

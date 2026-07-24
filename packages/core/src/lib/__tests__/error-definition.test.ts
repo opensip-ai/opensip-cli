@@ -9,6 +9,7 @@ import {
   ErrorDefinitionError,
   MACHINE_CONSUMER_COMPATIBILITY,
   ERROR_CATALOG_SCHEMA_VERSION,
+  normalizeErrorDefinition,
 } from '../error-definition.js';
 
 describe('defineErrorCatalog', () => {
@@ -75,6 +76,14 @@ describe('defineErrorCatalog', () => {
     expect(() => assertErrorCodeShape('not-valid')).toThrow(ErrorDefinitionError);
   });
 
+  it('wraps revoked Proxy inspection as a definition validation error', () => {
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    expect(() =>
+      normalizeErrorDefinition(revoked.proxy, { id: 'test.owner', displayName: 'Test' }),
+    ).toThrow(ErrorDefinitionError);
+  });
+
   it('maps legacy codes through core system catalog', () => {
     expect(coreSystemErrorCatalog.get('VALIDATION_ERROR')?.kind).toBe('validation');
     expect(definitionFromLegacyCode('VALIDATION_ERROR').exitClass).toBe('configuration');
@@ -89,6 +98,7 @@ describe('defineErrorCatalog', () => {
     expect(definitionFromLegacyCode('CONFIGURATION.RECOVERY_REQUIRED').exitClass).toBe(
       'configuration',
     );
+    expect(definitionFromLegacyCode('CONFIG.GRAPH.NOT_A_REPO').exitClass).toBe('configuration');
     expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_ACCESS_COMPOSITE').exitClass).toBe('runtime');
     expect(definitionFromLegacyCode('CAPABILITY.DOMAIN.UNKNOWN').exitClass).toBe('not-found');
     expect(definitionFromLegacyCode('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH').exitClass).toBe(
@@ -96,9 +106,14 @@ describe('defineErrorCatalog', () => {
     );
   });
 
-  it('registers CORE.SYSTEM.CANCELLED as a first-class catalog entry', () => {
+  it('registers cancellation and outer-deadline failures with distinct semantics', () => {
     expect(coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED').exitClass).toBe('cancelled');
     expect(definitionFromLegacyCode('CORE.SYSTEM.CANCELLED').kind).toBe('cancelled');
+    expect(coreSystemErrorCatalog.require('CORE.SYSTEM.DEADLINE_EXCEEDED')).toMatchObject({
+      kind: 'timeout',
+      retry: 'never',
+      exitClass: 'runtime',
+    });
   });
 });
 
@@ -107,6 +122,13 @@ describe('deepFreeze', () => {
     const value = deepFreeze({ a: { b: 1 } });
     expect(Object.isFrozen(value)).toBe(true);
     expect(Object.isFrozen(value.a)).toBe(true);
+  });
+
+  it('terminates on cyclic values', () => {
+    const value: { self?: unknown } = {};
+    value.self = value;
+    expect(() => deepFreeze(value)).not.toThrow();
+    expect(Object.isFrozen(value)).toBe(true);
   });
 });
 
@@ -154,6 +176,20 @@ describe('error definition axes coverage', () => {
         bad: Object.create({ code: 'TEST.HOST.X', ...base }),
       } as never),
     ).toThrow();
+  });
+
+  it('rejects accessors without invoking them', () => {
+    let invoked = false;
+    const definitions = {} as Record<string, unknown>;
+    Object.defineProperty(definitions, 'TEST.HOST.GETTER', {
+      enumerable: true,
+      get() {
+        invoked = true;
+        throw new Error('must not run');
+      },
+    });
+    expect(() => defineErrorCatalog(owner, definitions as never)).toThrow(ErrorDefinitionError);
+    expect(invoked).toBe(false);
   });
 
   it('accepts source × responsibility combinations used by core catalog', () => {

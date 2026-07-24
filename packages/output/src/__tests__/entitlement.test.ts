@@ -224,6 +224,26 @@ describe('checkEntitlement', () => {
     expect(net).not.toHaveBeenCalled();
   });
 
+  it('fails closed promptly when root cancellation races a non-cooperative request', async () => {
+    const cacheDir = await dir();
+    const controller = new AbortController();
+    const net = vi.fn(() => {
+      queueMicrotask(() => controller.abort());
+      return new Promise<Response>(() => undefined);
+    }) as unknown as typeof fetch;
+    const started = Date.now();
+    const result = await checkEntitlement({
+      apiKey: 'k',
+      endpoint: ENDPOINT,
+      now: 0,
+      cacheDir,
+      fetchImpl: net,
+      signal: controller.signal,
+    });
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(result).toEqual({ entitled: false, source: 'fail-closed' });
+  });
+
   it.each([
     ['network error', () => Promise.reject(new Error('ECONNRESET'))],
     ['5xx', () => Promise.resolve(new Response(null, { status: 503 }))],

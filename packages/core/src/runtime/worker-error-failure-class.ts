@@ -7,7 +7,14 @@ export function getWorkerErrorFailureClass(error: unknown): string | undefined {
   // here, escape the caller's catch, and suppress the worker's error IPC —
   // losing the real failure. Mirrors the `instanceof Error` robustness the
   // sibling `toWorkerErrorMessage` already applies to arbitrary throws.
-  return typeof error === 'object' && error !== null
-    ? (error as { failureClass?: string }).failureClass
-    : undefined;
+  if (typeof error !== 'object' || error === null) return undefined;
+  try {
+    const descriptor = Object.getOwnPropertyDescriptor(error, 'failureClass');
+    return descriptor !== undefined && 'value' in descriptor && typeof descriptor.value === 'string'
+      ? descriptor.value.slice(0, 128)
+      : undefined;
+  } catch {
+    // @swallow-ok probe/optional capability: hostile descriptors carry no trusted failure-class tag.
+    return undefined;
+  }
 }

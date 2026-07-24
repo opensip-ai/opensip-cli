@@ -16,13 +16,13 @@
  */
 
 import { EnvRegistry } from '../lib/env-registry.js';
-import { toolErrorFromCanonicalCode } from '../lib/errors.js';
 import { correlationToEnv } from '../lib/run-correlation.js';
 import { currentLogger, currentScope } from '../lib/run-scope.js';
 import { currentTraceparent } from '../lib/telemetry.js';
 
 import { forkAndSettle } from './fork-and-settle.js';
 import { createInProcessTransport } from './in-process-transport.js';
+import { toolErrorFromWorkerFailureWire } from './worker-failure-wire.js';
 
 import type {
   ProgressJob,
@@ -73,17 +73,13 @@ function reconstructWorkerError(
     readonly code?: string;
     readonly detailCode?: string;
     readonly failureClass?: string;
+    readonly failure?: Readonly<Record<string, unknown>>;
+    readonly failureWireVersion?: number;
   },
   stderrTail?: string,
 ): Error {
-  if (typed.code !== undefined) {
-    const rebuilt = toolErrorFromCanonicalCode(typed.code, typed.message, {
-      code: typed.detailCode ?? typed.code,
-      ...(typed.failureClass === undefined ? {} : { failureClass: typed.failureClass }),
-      ...(stderrTail === undefined ? {} : { stderrTail }),
-    });
-    if (rebuilt !== undefined) return rebuilt;
-  }
+  const rebuilt = toolErrorFromWorkerFailureWire({ ...typed, stderrTail });
+  if (rebuilt !== undefined) return rebuilt;
   return workerError(typed.message, stderrTail);
 }
 
@@ -175,7 +171,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       command: descriptor.command,
       argv: descriptor.argv,
       enableHeartbeat: true,
-      enableSigintCancellation: true,
+      cancellationSignal: currentScope()?.abortSignal,
       buildChildEnv: (parentEnv) => {
         const traceparentEnv = traceId === undefined ? {} : { TRACEPARENT: traceId };
         if (descriptor.env || descriptor.correlation || traceId !== undefined) {

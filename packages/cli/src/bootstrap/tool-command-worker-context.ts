@@ -208,6 +208,7 @@ export function buildWorkerContext(input: BuildWorkerContextInput): ToolCliConte
         exitCode: detail.exitCode,
         ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
         ...(detail.code === undefined ? {} : { code: detail.code }),
+        ...(detail.failure === undefined ? {} : { failure: detail.failure }),
       };
     },
     reportFailure: (detail: ReportFailureDetail) => {

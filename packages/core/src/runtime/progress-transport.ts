@@ -83,6 +83,8 @@ export interface SubprocessJobDescriptor {
 export type WorkerMessage<TEvent, TResult> =
   | { readonly kind: 'progress'; readonly event: TEvent }
   | { readonly kind: 'heartbeat' }
+  | { readonly kind: 'cancel-request'; readonly controlVersion: 1 }
+  | { readonly kind: 'cancel-ack'; readonly controlVersion: 1 }
   | { readonly kind: 'result'; readonly value: TResult }
   | {
       readonly kind: 'error';

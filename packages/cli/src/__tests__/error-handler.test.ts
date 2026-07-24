@@ -108,14 +108,14 @@ describe('handleParseError', () => {
     const opts = makeOpts();
     await handleParseError(new Error('totally unrelated'), opts);
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
-    expect(opts.rendered[0]?.message).toBe('totally unrelated');
+    expect(opts.rendered[0]?.message).toBe('The operation failed.');
   });
 
   it('handles non-Error throwables', async () => {
     const opts = makeOpts();
     await handleParseError('plain string', opts);
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.RUNTIME_ERROR);
-    expect(opts.rendered[0]?.message).toBe('plain string');
+    expect(opts.rendered[0]?.message).toBe('An unexpected internal failure occurred.');
   });
 
   it('handleFatalBootstrapError writes to stderr, logs, and sets exitCode=1', () => {
@@ -137,11 +137,16 @@ describe('handleParseError', () => {
       spy.mockRestore();
       process.exitCode = savedExitCode;
     }
-    expect(writes.join('')).toContain('bootstrap exploded');
+    expect(writes.join('')).toContain('fatal error [SYSTEM_ERROR]: The operation failed.');
+    expect(writes.join('')).not.toContain('bootstrap exploded');
     expect(errorLog).toHaveBeenCalledWith(
       expect.objectContaining({
         evt: 'cli.bootstrap.failed',
-        error: 'bootstrap exploded',
+        code: 'SYSTEM_ERROR',
+        failure: expect.objectContaining({
+          message: 'bootstrap exploded',
+          operatorDetail: expect.stringContaining('bootstrap exploded'),
+        }),
       }),
     );
     expect(observedExitCode).toBe(EXIT_CODES.RUNTIME_ERROR);
@@ -159,7 +164,13 @@ describe('handleParseError', () => {
       process.exitCode = savedExitCode;
     }
     expect(errorLog).toHaveBeenCalledWith(
-      expect.objectContaining({ error: 'plain string', stack: undefined }),
+      expect.objectContaining({
+        code: 'CORE.SYSTEM.UNKNOWN_FAILURE',
+        failure: expect.objectContaining({
+          message: 'plain string',
+          operatorDetail: 'plain string',
+        }),
+      }),
     );
   });
 

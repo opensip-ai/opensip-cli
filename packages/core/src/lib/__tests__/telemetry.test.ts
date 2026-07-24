@@ -93,7 +93,10 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
           throw 'string boom';
         }),
       ).toThrow('string boom');
-      expect(recordException).toHaveBeenCalledWith('string boom');
+      expect(recordException).toHaveBeenCalledWith({
+        name: 'CORE.SYSTEM.UNKNOWN_FAILURE',
+        message: 'An unexpected internal failure occurred.',
+      });
     } finally {
       spy.mockRestore();
     }
@@ -120,7 +123,10 @@ describe('telemetry primitive (no-op-until-SDK contract)', () => {
           throw boom;
         }),
       ).toThrow(boom);
-      expect(recordException).toHaveBeenCalledWith(boom);
+      expect(recordException).toHaveBeenCalledWith({
+        name: 'SYSTEM_ERROR',
+        message: 'The operation failed.',
+      });
       // SpanStatusCode.ERROR === 2
       expect(setStatus).toHaveBeenCalledWith({ code: 2 });
       expect(end).toHaveBeenCalledTimes(1);
@@ -184,7 +190,10 @@ describe('withSpanAsync (async-aware span)', () => {
           throw 'async string boom';
         }),
       ).rejects.toBe('async string boom');
-      expect(recordException).toHaveBeenCalledWith('async string boom');
+      expect(recordException).toHaveBeenCalledWith({
+        name: 'CORE.SYSTEM.UNKNOWN_FAILURE',
+        message: 'An unexpected internal failure occurred.',
+      });
     } finally {
       spy.mockRestore();
     }
@@ -212,7 +221,10 @@ describe('withSpanAsync (async-aware span)', () => {
           throw boom;
         }),
       ).rejects.toBe(boom);
-      expect(recordException).toHaveBeenCalledWith(boom);
+      expect(recordException).toHaveBeenCalledWith({
+        name: 'SYSTEM_ERROR',
+        message: 'The operation failed.',
+      });
       expect(setStatus).toHaveBeenCalledWith({ code: 2 }); // SpanStatusCode.ERROR
       expect(end).toHaveBeenCalledTimes(1);
     } finally {

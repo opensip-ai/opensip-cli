@@ -195,5 +195,44 @@ describe('ToolRegistry', () => {
       expect(reg.get('tool-b')).toBeUndefined();
       expect(reg.list().map((t) => t.metadata.name)).toEqual(['tool-a']);
     });
+
+    it('invalidates a warmed catalog index when a tool is removed or the registry is cleared', () => {
+      const tool = stubWithCatalog(
+        'removable',
+        'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        'REMOVABLE.DEMO.CODE',
+      );
+      reg.register(tool);
+      expect(reg.getErrorCatalogIndex().byCode.has('REMOVABLE.DEMO.CODE')).toBe(true);
+
+      expect(reg.remove('removable')).toBe(true);
+      expect(reg.getErrorCatalogIndex().byCode.has('REMOVABLE.DEMO.CODE')).toBe(false);
+
+      reg.register(tool);
+      reg.clear();
+      expect(reg.getErrorCatalogIndex().byCode.has('REMOVABLE.DEMO.CODE')).toBe(false);
+    });
+
+    it('keeps catalog indexes isolated per registry instance', () => {
+      const other = new ToolRegistry();
+      reg.register(
+        stubWithCatalog('only-here', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', 'ONLYHERE.DEMO.CODE'),
+      );
+
+      expect(reg.getErrorCatalogIndex().byCode.has('ONLYHERE.DEMO.CODE')).toBe(true);
+      expect(other.getErrorCatalogIndex().byCode.has('ONLYHERE.DEMO.CODE')).toBe(false);
+    });
+
+    it('does not inspect a hostile catalog attached to a rejected duplicate', () => {
+      const first = stub('duplicate');
+      const duplicate = stub('duplicate');
+      const read = vi.fn();
+      Object.defineProperty(duplicate, 'extensionPoints', { enumerable: true, get: read });
+
+      reg.register(first);
+      expect(() => reg.register(duplicate)).not.toThrow();
+      expect(read).not.toHaveBeenCalled();
+      expect(reg.get('duplicate')).toBe(first);
+    });
   });
 });

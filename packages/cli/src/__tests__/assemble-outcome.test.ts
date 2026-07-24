@@ -106,9 +106,11 @@ describe('outcomeFromError', () => {
   });
 
   it('maps an untyped error to RUNTIME_ERROR (exit 1)', () => {
-    const outcome = outcomeFromError(new Error('kaboom'));
+    const outcome = outcomeFromError(new Error('Authorization: Bearer do-not-leak'));
     expect(outcome.exitCode).toBe(1);
-    expect(outcome.errors?.[0]?.message).toBe('kaboom');
+    expect(outcome.errors?.[0]?.message).toBe('The operation failed.');
+    expect(JSON.stringify(outcome)).not.toContain('do-not-leak');
+    expect(outcome.errors?.[0]?.failure).toMatchObject({ schemaVersion: 1 });
   });
 });
 

@@ -89,6 +89,27 @@ describe('runWithTimeout', () => {
     removeSpy.mockRestore();
   });
 
+  it('settles promptly when the parent aborts a non-cooperative run', async () => {
+    const parent = new AbortController();
+    const pending = runWithTimeout({
+      run: () =>
+        new Promise<number>(() => {
+          /* intentionally ignores the signal and never settles */
+        }),
+      timeoutMs: 60_000,
+      parentSignal: parent.signal,
+    });
+    parent.abort(new Error('parent cancelled'));
+    const out = await Promise.race([
+      pending,
+      new Promise<never>((_resolve, reject) => {
+        setTimeout(() => reject(new Error('parent cancellation did not settle')), 250);
+      }),
+    ]);
+    expect(out.status).toBe('error');
+    expect(out.status === 'error' && (out.error as Error).message).toBe('parent cancelled');
+  });
+
   it('defaults parentSignal to the host scope abortSignal (cancellation for free)', async () => {
     // The substrate composes currentScope().abortSignal when no parentSignal is
     // passed, so every tool running through runWithTimeout inherits OS-interrupt

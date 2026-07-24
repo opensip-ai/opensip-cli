@@ -7,6 +7,8 @@
  * at composition boundaries.
  */
 
+import { isPlainDataObject } from './plain-data-object.js';
+
 /** Where the failure arose. */
 export type FailureSource = 'application' | 'infrastructure' | 'external';
 
@@ -127,17 +129,30 @@ export class ErrorDefinitionError extends Error {
  * Deep-freeze a plain JSON-like value. Used so catalogs are runtime-immutable,
  * not merely TypeScript-readonly.
  */
-export function deepFreeze<T>(value: T): Readonly<T> {
-  if (value === null || typeof value !== 'object') {
+export function deepFreeze<T>(value: T, seen = new WeakSet<object>()): Readonly<T> {
+  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
     return value;
   }
-  if (Object.isFrozen(value)) {
+  const object = value as object;
+  if (seen.has(object)) {
     return value;
   }
-  for (const child of Object.values(value as Record<string, unknown>)) {
-    deepFreeze(child);
+  seen.add(object);
+  try {
+    if (Object.isFrozen(object)) return value;
+    // Descriptors avoid invoking accessors while walking a value supplied by a
+    // plugin. Cycles are cut by `seen`, so this helper stays total for hostile
+    // JSON-like graphs instead of recursing forever.
+    for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(object))) {
+      if ('value' in descriptor) deepFreeze(descriptor.value, seen);
+    }
+    return Object.freeze(value);
+  } catch {
+    // A Proxy may reject descriptor inspection or freezing. Callers that need a
+    // trusted immutable value first copy through the catalog normalizer; this
+    // public utility must not crash merely because inspection was hostile.
+    return value;
   }
-  return Object.freeze(value);
 }
 
 /**
@@ -156,8 +171,66 @@ export function assertErrorCodeShape(code: string, opts: { allowLegacy?: boolean
   );
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+/**
+ * Read one own data property without invoking a plugin-supplied accessor.
+ * @throws {ErrorDefinitionError} When the descriptor cannot be inspected or is an accessor.
+ */
+function ownData(value: object, key: PropertyKey): unknown {
+  let descriptor: PropertyDescriptor | undefined;
+  try {
+    descriptor = Object.getOwnPropertyDescriptor(value, key);
+  } catch {
+    throw new ErrorDefinitionError(`${String(key)} could not be inspected`);
+  }
+  if (descriptor === undefined) return undefined;
+  if (!('value' in descriptor)) {
+    throw new ErrorDefinitionError(`${String(key)} must be a data property`);
+  }
+  return descriptor.value;
+}
+
+/** @throws {ErrorDefinitionError} When catalog owner input is malformed or cannot be inspected. */
+function normalizeCatalogOwner(raw: ErrorCatalogOwner): ErrorCatalogOwner {
+  if (!isPlainDataObject(raw)) {
+    throw new ErrorDefinitionError('catalog owner must be a plain object');
+  }
+  const id = asBoundedString(ownData(raw, 'id'), 'catalog owner id');
+  const displayName = asBoundedString(ownData(raw, 'displayName'), 'catalog owner displayName');
+  const packageNameRaw = ownData(raw, 'packageName');
+  const packageName =
+    packageNameRaw === undefined
+      ? undefined
+      : asBoundedString(packageNameRaw, 'catalog owner packageName');
+  if (id.length === 0 || id.length > 128 || displayName.length === 0 || displayName.length > 128) {
+    throw new ErrorDefinitionError('catalog owner id and displayName must be bounded strings');
+  }
+  if (packageName !== undefined && packageName.length > 214) {
+    throw new ErrorDefinitionError('catalog owner packageName is too long');
+  }
+  return deepFreeze({ id, displayName, ...(packageName === undefined ? {} : { packageName }) });
+}
+
+/** @throws {ErrorDefinitionError} When an array element cannot be safely inspected. */
+function boundedStringList(value: unknown): readonly string[] | undefined {
+  try {
+    if (!Array.isArray(value)) return undefined;
+    const out: string[] = [];
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    const length =
+      lengthDescriptor !== undefined &&
+      'value' in lengthDescriptor &&
+      typeof lengthDescriptor.value === 'number'
+        ? Math.min(32, Math.max(0, Math.floor(lengthDescriptor.value)))
+        : 0;
+    for (let index = 0; index < length; index += 1) {
+      const item = ownData(value, String(index));
+      if (typeof item === 'string') out.push(item.slice(0, 64));
+    }
+    return out;
+  } catch (error) {
+    if (error instanceof ErrorDefinitionError) throw error;
+    throw new ErrorDefinitionError('publicMetadataKeys could not be inspected');
+  }
 }
 
 /**
@@ -230,55 +303,50 @@ function requireEnum<T extends string>(value: unknown, allowed: readonly T[], la
 export function normalizeErrorDefinition(
   raw: unknown,
   owner: ErrorCatalogOwner,
-  opts: { allowLegacyCodes?: boolean } = {},
+  opts: { allowLegacyCodes?: boolean; defaultCode?: string } = {},
 ): ErrorDefinition {
-  if (!isPlainObject(raw)) {
+  if (!isPlainDataObject(raw)) {
     throw new ErrorDefinitionError('definition must be a plain object');
   }
-  // Reject prototype pollution / accessors by reading only own enumerable data fields
-  const code = assertErrorCodeShape(asBoundedString(raw.code, 'code'), {
+  const normalizedOwner = normalizeCatalogOwner(owner);
+  // Reject prototype pollution / accessors by reading only own data fields.
+  const rawCode = ownData(raw, 'code') ?? opts.defaultCode;
+  const code = assertErrorCodeShape(asBoundedString(rawCode, 'code'), {
     allowLegacy: opts.allowLegacyCodes,
   });
-  const operatorAction = asBoundedString(raw.operatorAction, 'operatorAction');
+  const operatorAction = asBoundedString(ownData(raw, 'operatorAction'), 'operatorAction');
   if (operatorAction.length === 0 || operatorAction.length > 512) {
     throw new ErrorDefinitionError(`definition ${code}: operatorAction required`);
   }
 
+  const stability = ownData(raw, 'stability');
+  const lifecycle = ownData(raw, 'lifecycle');
+  const publicPresentationKey = ownData(raw, 'publicPresentationKey');
+  const supersededBy = ownData(raw, 'supersededBy');
+  const publicMetadataKeys = boundedStringList(ownData(raw, 'publicMetadataKeys'));
+
   const definition: ErrorDefinition = {
     code,
-    owner: deepFreeze({
-      id: owner.id,
-      displayName: owner.displayName,
-      ...(owner.packageName === undefined ? {} : { packageName: owner.packageName }),
-    }),
-    source: requireEnum(raw.source, SOURCES, 'source'),
+    owner: normalizedOwner,
+    source: requireEnum(ownData(raw, 'source'), SOURCES, 'source'),
     defaultResponsibility: requireEnum(
-      raw.defaultResponsibility,
+      ownData(raw, 'defaultResponsibility'),
       RESPONSIBILITIES,
       'defaultResponsibility',
     ),
-    kind: requireEnum(raw.kind, KINDS, 'kind'),
-    retry: requireEnum(raw.retry, RETRIES, 'retry'),
-    severity: requireEnum(raw.severity, SEVERITIES, 'severity'),
-    exposure: requireEnum(raw.exposure, EXPOSURES, 'exposure'),
-    exitClass: requireEnum(raw.exitClass, EXIT_CLASSES, 'exitClass'),
+    kind: requireEnum(ownData(raw, 'kind'), KINDS, 'kind'),
+    retry: requireEnum(ownData(raw, 'retry'), RETRIES, 'retry'),
+    severity: requireEnum(ownData(raw, 'severity'), SEVERITIES, 'severity'),
+    exposure: requireEnum(ownData(raw, 'exposure'), EXPOSURES, 'exposure'),
+    exitClass: requireEnum(ownData(raw, 'exitClass'), EXIT_CLASSES, 'exitClass'),
     operatorAction,
-    stability: requireEnum(raw.stability ?? 'internal', STABILITIES, 'stability'),
-    lifecycle: requireEnum(raw.lifecycle ?? 'active', LIFECYCLES, 'lifecycle'),
-    ...(typeof raw.publicPresentationKey === 'string'
-      ? { publicPresentationKey: raw.publicPresentationKey.slice(0, 128) }
+    stability: requireEnum(stability ?? 'internal', STABILITIES, 'stability'),
+    lifecycle: requireEnum(lifecycle ?? 'active', LIFECYCLES, 'lifecycle'),
+    ...(typeof publicPresentationKey === 'string'
+      ? { publicPresentationKey: publicPresentationKey.slice(0, 128) }
       : {}),
-    ...(typeof raw.supersededBy === 'string'
-      ? { supersededBy: raw.supersededBy.slice(0, 128) }
-      : {}),
-    ...(Array.isArray(raw.publicMetadataKeys)
-      ? {
-          publicMetadataKeys: raw.publicMetadataKeys
-            .filter((k): k is string => typeof k === 'string')
-            .slice(0, 32)
-            .map((k) => k.slice(0, 64)),
-        }
-      : {}),
+    ...(typeof supersededBy === 'string' ? { supersededBy: supersededBy.slice(0, 128) } : {}),
+    ...(publicMetadataKeys === undefined ? {} : { publicMetadataKeys }),
   };
 
   if (definition.lifecycle === 'tombstoned' && !definition.supersededBy) {
@@ -298,10 +366,16 @@ export function defineErrorCatalog<
   definitionsInput: TDefs,
   opts: { allowLegacyCodes?: boolean } = {},
 ): ErrorCatalog<Extract<keyof TDefs, string>> {
-  if (!owner?.id || !owner.displayName) {
-    throw new ErrorDefinitionError('catalog owner id and displayName are required');
+  const normalizedOwner = normalizeCatalogOwner(owner);
+  if (!isPlainDataObject(definitionsInput)) {
+    throw new ErrorDefinitionError('catalog definitions must be a plain object');
   }
-  const keys = Object.keys(definitionsInput);
+  let keys: string[];
+  try {
+    keys = Object.keys(definitionsInput);
+  } catch {
+    throw new ErrorDefinitionError('catalog definitions could not be inspected');
+  }
   if (keys.length > MAX_DEFINITIONS_PER_CATALOG) {
     throw new ErrorDefinitionError(`catalog exceeds ${MAX_DEFINITIONS_PER_CATALOG} definitions`);
   }
@@ -311,9 +385,8 @@ export function defineErrorCatalog<
   const seen = new Set<string>();
 
   for (const key of keys) {
-    const raw = definitionsInput[key] as Record<string, unknown>;
-    const withCode = { ...raw, code: typeof raw.code === 'string' ? raw.code : key };
-    const def = normalizeErrorDefinition(withCode, owner, opts);
+    const raw = ownData(definitionsInput, key);
+    const def = normalizeErrorDefinition(raw, normalizedOwner, { ...opts, defaultCode: key });
     if (seen.has(def.code)) {
       throw new ErrorDefinitionError(`duplicate error code in catalog: ${def.code}`);
     }
@@ -328,7 +401,7 @@ export function defineErrorCatalog<
 
   const catalog: ErrorCatalog<Extract<keyof TDefs, string>> = {
     schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
-    owner: deepFreeze({ ...owner }),
+    owner: normalizedOwner,
     definitions: frozenDefs,
     list,
     get(code: string) {
@@ -410,6 +483,19 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
     },
+    'CORE.SYSTEM.DEADLINE_EXCEEDED': {
+      code: 'CORE.SYSTEM.DEADLINE_EXCEEDED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'timeout',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction: 'Increase the outer deadline or reduce the operation workload.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
     'CORE.SYSTEM.CANCELLED': {
       code: 'CORE.SYSTEM.CANCELLED',
       source: 'application',
@@ -423,6 +509,34 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
     },
+    'CORE.SYSTEM.PERMISSION': {
+      code: 'CORE.SYSTEM.PERMISSION',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'permission',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction: 'Check filesystem permissions for the affected path.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['errno'],
+    },
+    'CORE.SYSTEM.RESOURCE': {
+      code: 'CORE.SYSTEM.RESOURCE',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'resource',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction: 'Free resources (disk, file descriptors, or memory) and retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['errno'],
+    },
     NETWORK_ERROR: {
       code: 'NETWORK_ERROR',
       source: 'external',
@@ -435,6 +549,7 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Check network connectivity and the remote endpoint.',
       stability: 'public',
       lifecycle: 'active',
+      publicMetadataKeys: ['status'],
     },
     CONFIGURATION_ERROR: {
       code: 'CONFIGURATION_ERROR',
@@ -503,6 +618,7 @@ function legacyFamilyCode(code: string): string | undefined {
   if (!code.includes('.')) return undefined;
   const head = code.slice(0, code.indexOf('.'));
   switch (head) {
+    case 'CONFIG':
     case 'CONFIGURATION': {
       return 'CONFIGURATION_ERROR';
     }

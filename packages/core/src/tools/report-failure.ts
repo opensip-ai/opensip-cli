@@ -34,6 +34,11 @@ export interface ReportFailureDetail {
   readonly exitCode?: number;
   /** Caught throwable — host derives message/exitCode/code when omitted. */
   readonly error?: unknown;
+  /**
+   * Versioned machine projection supplied by worker replay. Ignored when a live
+   * `error` is also present, because the host re-normalizes the live value.
+   */
+  readonly failure?: Readonly<Record<string, unknown>>;
   /** ADR-0060 structured diagnostic for setup-class failures surfaced mid-handler. */
   readonly diagnostic?: CliDiagnostic;
   /** Whether this command invocation requested JSON output. */

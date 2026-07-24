@@ -118,6 +118,31 @@ describe('postChunked', () => {
     expect(keys).toEqual(['run:0', 'run:1']);
   });
 
+  it('evaluates each idempotency key once and reuses it across retries', async () => {
+    const keys: string[] = [];
+    let attempts = 0;
+    const idempotencyKeyFor = vi.fn((ordinal: number) => `run:${ordinal}:${Date.now()}`);
+    const fetchImpl = vi.fn((_url: unknown, init: RequestInit) => {
+      keys.push((init.headers as Record<string, string>)['Idempotency-Key']);
+      attempts += 1;
+      return Promise.resolve(new Response(null, { status: attempts === 1 ? 503 : 200 }));
+    }) as unknown as typeof fetch;
+
+    const result = await postChunked(args({ fetchImpl, idempotencyKeyFor }));
+    expect(result.outcome).toBe('ok');
+    expect(idempotencyKeyFor).toHaveBeenCalledTimes(1);
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(1);
+  });
+
+  it('refuses retryable POSTs without a stable non-empty idempotency key', async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
+    const result = await postChunked(args({ fetchImpl, idempotencyKeyFor: () => '' }));
+    expect(result.outcome).toBe('failed');
+    expect(result.errors.join(' ')).toContain('idempotency');
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('honors a Retry-After HTTP-date on a 503', async () => {
     let t = 0;
     const delays: number[] = [];
@@ -155,9 +180,9 @@ describe('postChunked', () => {
     const c = clock();
     const r = await postChunked(args({ fetchImpl, now: c.now, sleep: c.sleep }));
     expect(r.outcome).toBe('ok');
-    // Unparseable → default backoff (500ms base for attempt 1, plus jitter ≤ 250ms).
-    expect(c.delays[0]).toBeGreaterThanOrEqual(500);
-    expect(c.delays[0]).toBeLessThanOrEqual(750);
+    // Equal jitter is half-base..base for the first 500ms backoff.
+    expect(c.delays[0]).toBeGreaterThanOrEqual(250);
+    expect(c.delays[0]).toBeLessThanOrEqual(500);
   });
 
   it('stops at the top of a later chunk when a prior chunk spent the deadline', async () => {
@@ -215,6 +240,54 @@ describe('postChunked', () => {
     const r = await postChunked(args({ fetchImpl }));
     expect(r.outcome).toBe('failed');
     expect(r.errors.join(' ')).toContain('ECONNRESET');
+  });
+
+  it('settles promptly when parent cancellation races a non-cooperative fetch', async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn(() => {
+      queueMicrotask(() => controller.abort());
+      return new Promise<Response>(() => undefined);
+    }) as unknown as typeof fetch;
+    const started = Date.now();
+    const result = await postChunked(args({ fetchImpl, signal: controller.signal }));
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(result.outcome).toBe('failed');
+    expect(result.errors).toContain('egress cancelled');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles promptly when cancellation occurs during a non-cooperative backoff', async () => {
+    const controller = new AbortController();
+    const fetchImpl = vi.fn(() =>
+      Promise.resolve(new Response(null, { status: 503 })),
+    ) as unknown as typeof fetch;
+    const sleep = vi.fn(() => {
+      queueMicrotask(() => controller.abort());
+      return new Promise<void>(() => undefined);
+    });
+    const result = await postChunked(args({ fetchImpl, sleep, signal: controller.signal }));
+    expect(result.outcome).toBe('failed');
+    expect(result.errors).toContain('egress cancelled');
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('enforces the overall deadline when fetch ignores its AbortSignal', async () => {
+    const fetchImpl = vi.fn(
+      () => new Promise<Response>(() => undefined),
+    ) as unknown as typeof fetch;
+    const started = Date.now();
+    const result = await postChunked(
+      args({
+        fetchImpl,
+        timeoutFor: () => 10_000,
+        policy: { maxAttempts: 3, overallDeadlineMs: 25, honorRetryAfter: true },
+        now: Date.now,
+        sleep: noopSleep,
+      }),
+    );
+    expect(Date.now() - started).toBeLessThan(500);
+    expect(result.deadlineExceeded).toBe(true);
+    expect(result.outcome).toBe('failed');
   });
 
   it('refuses credential-bearing egress over plaintext http without calling fetch', async () => {

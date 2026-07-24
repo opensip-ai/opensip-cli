@@ -23,8 +23,8 @@
  *
  * The composition root mounts the bounded protocol catalog through
  * {@link McpStdioServer.register}, which guarantees the scope wrapper for every
- * handler. The server resolves its lifetime promise on stdin EOF (or a
- * SIGINT-driven graceful close); it never calls `process.exit`, leaving the
+ * handler. The server resolves its lifetime promise on stdin EOF (or root
+ * cancellation); it never calls `process.exit`, leaving the
  * final exit code to the host command handler.
  */
 
@@ -44,6 +44,15 @@ import type { RunScope } from '@opensip-cli/core';
 const SERVER_NAME = 'opensip-cli-mcp';
 /** `module` field stamped on every structured logger event from this file. */
 const LOG_MODULE = 'mcp:server';
+const MCP_CLOSE_GRACE_MS = 1000;
+
+function safeLog(level: 'info' | 'error', entry: Readonly<Record<string, unknown>>): void {
+  try {
+    logger[level](entry);
+  } catch {
+    // Observability must not change MCP protocol or shutdown correctness.
+  }
+}
 
 /** Max tools that may be registered on one server instance. */
 export const MAX_MCP_REGISTERED_TOOLS = 256;
@@ -203,10 +212,10 @@ export class McpStdioServer {
   ): Promise<CallToolResult> {
     return runWithScope(this.scope, async () => {
       const started = Date.now();
-      logger.info({ evt: 'mcp.tool.dispatch', module: LOG_MODULE, tool: name });
+      safeLog('info', { evt: 'mcp.tool.dispatch', module: LOG_MODULE, tool: name });
       try {
         const result = await run();
-        logger.info({
+        safeLog('info', {
           evt: 'mcp.tool.dispatch.ok',
           module: LOG_MODULE,
           tool: name,
@@ -217,7 +226,7 @@ export class McpStdioServer {
       } catch (error) {
         // The SDK converts a thrown handler into a JSON-RPC error frame; we log
         // the decision point (stderr sink) and re-throw at this infra boundary.
-        logger.error({
+        safeLog('error', {
           evt: 'mcp.tool.dispatch.error',
           module: LOG_MODULE,
           tool: name,
@@ -244,9 +253,13 @@ export class McpStdioServer {
     // is reserved for JSON-RPC frames. The logger never writes stdout; its only
     // non-file destination is stderr, gated behind debug — so we enable it here
     // (the documented `configureLogger` sink seam) and keep stdout pristine.
-    configureLogger({ silent: false, debugMode: true });
+    try {
+      configureLogger({ silent: false, debugMode: true });
+    } catch {
+      // @swallow-ok cleanup/observer isolation: logger configuration cannot take down JSON-RPC.
+    }
     const surface = this.describeSurface();
-    logger.info({
+    safeLog('info', {
       evt: 'mcp.server.start',
       module: LOG_MODULE,
       server: SERVER_NAME,
@@ -258,7 +271,9 @@ export class McpStdioServer {
       projectScope: 'project',
     });
 
+    let resolveClosed = (): void => undefined;
     const closed = new Promise<void>((resolve) => {
+      resolveClosed = resolve;
       // The underlying protocol invokes `onclose` when the transport closes
       // (via an explicit `close()`); resolving here ends `serve()`.
       // eslint-disable-next-line unicorn/prefer-add-event-listener -- the SDK's `Server`/`Protocol` exposes a plain `onclose` callback property, NOT a DOM EventTarget; there is no `addEventListener` to prefer.
@@ -269,29 +284,54 @@ export class McpStdioServer {
     // close on EOF. So we own the graceful-shutdown triggers and translate each
     // into a single `close()` (which drives the protocol `onclose` above):
     //   - stdin EOF (`end`/`close`): the client hung up the transport.
-    //   - SIGINT: Ctrl-C. No `process.exit` here — the command handler resolves
-    //     cleanly and the host sets the final exit code (ADR-0084 §shutdown).
+    //   - root AbortSignal: the executable's sole SIGINT/SIGTERM coordinator
+    //     translates OS signals into cancellation. This server never owns a
+    //     competing process signal listener.
     // Plan 00: one terminal settlement — double SIGINT/EOF must not re-enter close.
     let shutdownStarted = false;
+    let closePromise: Promise<void> | undefined;
     const shutdown = (): void => {
       if (shutdownStarted) return;
       shutdownStarted = true;
-      void this.mcp.close();
+      closePromise = new Promise<void>((resolve) => {
+        const timer = setTimeout(resolve, MCP_CLOSE_GRACE_MS);
+        Promise.resolve()
+          .then(() => this.mcp.close())
+          .then(resolve, resolve)
+          .finally(() => clearTimeout(timer));
+      }).then(() => {
+        // Some broken transports resolve/reject close without driving the SDK's
+        // onclose callback. Shutdown is terminal, so settle the serve lifetime
+        // explicitly and exactly once after the bounded close attempt.
+        resolveClosed();
+      });
     };
     process.stdin.once('end', shutdown);
     process.stdin.once('close', shutdown);
-    process.once('SIGINT', shutdown);
+    const abortSignal = this.scope.abortSignal;
+    abortSignal?.addEventListener('abort', shutdown, { once: true });
 
     try {
       // `connect` starts the transport and begins reading stdin; it throws only
       // at the genuine stdio infra boundary (the transport failing to start).
       await this.mcp.connect(this.transport);
+      if (abortSignal?.aborted || process.stdin.readableEnded || process.stdin.destroyed) {
+        shutdown();
+      }
       await closed;
+    } catch (error) {
+      // A partially connected transport still receives the same bounded close
+      // attempt; preserve the original connect failure after cleanup.
+      shutdown();
+      throw error;
     } finally {
       process.stdin.removeListener('end', shutdown);
       process.stdin.removeListener('close', shutdown);
-      process.removeListener('SIGINT', shutdown);
-      logger.info({
+      abortSignal?.removeEventListener('abort', shutdown);
+      // Observe any in-flight close rejection even when connect/dispatch failed
+      // through another path. `shutdown` already catches and resolves it.
+      await closePromise;
+      safeLog('info', {
         evt: 'mcp.server.stop',
         module: LOG_MODULE,
         server: SERVER_NAME,

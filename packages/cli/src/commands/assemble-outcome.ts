@@ -17,9 +17,8 @@
  */
 
 import {
-  EXIT_CODES,
-  getErrorSuggestion,
-  mapToolErrorToExitCode,
+  getErrorSuggestionFromMessage,
+  mapExitClassToExitCode,
   type CliDiagnostic,
   type CommandOutcome,
   type ErrorDetail,
@@ -27,7 +26,12 @@ import {
   type SignalEnvelope,
   type WarningDetail,
 } from '@opensip-cli/contracts';
-import { ToolError, currentScope, mergeBootstrapIntoRunDiagnostics } from '@opensip-cli/core';
+import {
+  currentScope,
+  mergeBootstrapIntoRunDiagnostics,
+  normalizeFailure,
+  toMachineFailureProjection,
+} from '@opensip-cli/core';
 
 /**
  * Attach the authoritative outcome diagnostics snapshot (north-star §5.10,
@@ -108,9 +112,9 @@ export function outcomeFromResult(value: unknown, exitCode: number): CommandOutc
 
 /**
  * Build a `status:'error'` outcome from a thrown error — the host's error
- * stamper. A typed {@link ToolError} maps to its canonical exit code
- * (`mapToolErrorToExitCode`) and contributes its `code`; an untyped error is a
- * `RUNTIME_ERROR` (exit 1). The actionable `suggestion` comes from the shared
+ * stamper. Every throwable is normalized through the total failure envelope;
+ * definition exit class drives the numeric code and the versioned machine
+ * projection rides with the error detail. The actionable `suggestion` comes from the shared
  * `getErrorSuggestion` rule table — the same diagnosis the legacy
  * `handleParseError` surfaced.
  *
@@ -121,15 +125,28 @@ export function outcomeFromError(
   error: unknown,
   opts: { readonly kind?: string } = {},
 ): CommandOutcome {
-  const message = error instanceof Error ? error.message : String(error);
-  const suggestion = getErrorSuggestion(error)?.action;
+  const envelope = normalizeFailure(error);
+  return outcomeFromFailureEnvelope(envelope, opts);
+}
+
+/** Build an error outcome from a failure already normalized by the host boundary. */
+export function outcomeFromFailureEnvelope(
+  envelope: ReturnType<typeof normalizeFailure>,
+  opts: { readonly kind?: string } = {},
+): CommandOutcome {
+  const failure = toMachineFailureProjection(envelope);
+  const message = typeof failure.message === 'string' ? failure.message : 'The operation failed.';
+  const suggestion =
+    envelope.known === 'known'
+      ? envelope.operatorAction
+      : (getErrorSuggestionFromMessage(envelope.message)?.action ?? envelope.operatorAction);
   const detail: ErrorDetail = {
     message,
     ...(suggestion ? { suggestion } : {}),
-    ...(error instanceof ToolError ? { code: error.code } : {}),
+    code: envelope.code,
+    failure,
   };
-  const exitCode =
-    error instanceof ToolError ? mapToolErrorToExitCode(error) : EXIT_CODES.RUNTIME_ERROR;
+  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
   return withDiagnostics({
     kind: opts.kind ?? 'command.error',
     status: 'error',
@@ -149,6 +166,7 @@ export function outcomeFromErrorMessage(opts: {
   readonly suggestion?: string;
   /** Optional machine-readable error category, surfaced as `ErrorDetail.code`. */
   readonly code?: string;
+  readonly failure?: Readonly<Record<string, unknown>>;
   readonly diagnostic?: CliDiagnostic;
   readonly kind?: string;
 }): CommandOutcome {
@@ -159,6 +177,7 @@ export function outcomeFromErrorMessage(opts: {
         exitCode: opts.exitCode,
         ...(opts.suggestion === undefined ? {} : { suggestion: opts.suggestion }),
         ...(opts.code === undefined ? {} : { code: opts.code }),
+        ...(opts.failure === undefined ? {} : { failure: opts.failure }),
         ...(opts.diagnostic === undefined ? {} : { diagnostic: opts.diagnostic }),
       },
       opts.exitCode,
@@ -174,6 +193,7 @@ function errorOutcomeFromDetail(
     readonly exitCode: number;
     readonly suggestion?: string;
     readonly code?: string;
+    readonly failure?: Readonly<Record<string, unknown>>;
     readonly diagnostic?: CliDiagnostic;
   },
   exitCode: number,
@@ -192,6 +212,7 @@ function errorOutcomeFromDetail(
         message: detail.message,
         ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
         ...(detail.code === undefined ? {} : { code: detail.code }),
+        ...(detail.failure === undefined ? {} : { failure: detail.failure }),
         ...(commandError === undefined ? {} : { diagnostic: commandError }),
       },
     ],

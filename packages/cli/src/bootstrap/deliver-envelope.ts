@@ -215,6 +215,7 @@ async function reportSarif(
       honorRetryAfter: true,
     },
     evtPrefix: 'cli.report',
+    signal: currentScope()?.abortSignal,
     ...(extraHeaders ? { extraHeaders } : {}),
     fetchImpl,
   });

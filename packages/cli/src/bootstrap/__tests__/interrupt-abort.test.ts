@@ -1,11 +1,20 @@
 import { logger } from '@opensip-cli/core';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { installInterruptAbortCoordinator } from '../interrupt-abort.js';
 
 describe('installInterruptAbortCoordinator', () => {
+  let savedExitCode: typeof process.exitCode;
+
+  beforeEach(() => {
+    savedExitCode = process.exitCode;
+    process.exitCode = 0;
+  });
+
   afterEach(() => {
-    // Ensure listeners cleaned between tests
+    process.exitCode = savedExitCode;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('logs a structured record on the first interrupt (troubleshooting trace)', () => {
@@ -44,7 +53,16 @@ describe('installInterruptAbortCoordinator', () => {
     expect(coord.signal.aborted).toBe(false);
     process.emit('SIGINT');
     expect(coord.signal.aborted).toBe(true);
+    expect(process.exitCode).toBe(130);
     expect(onFirst).toHaveBeenCalledWith('SIGINT');
+    coord.dispose();
+  });
+
+  it('stamps the POSIX SIGTERM status before cooperative cleanup completes', () => {
+    const coord = installInterruptAbortCoordinator();
+    process.emit('SIGTERM');
+    expect(coord.signal.aborted).toBe(true);
+    expect(process.exitCode).toBe(143);
     coord.dispose();
   });
 
