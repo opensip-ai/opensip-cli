@@ -115,14 +115,6 @@ export const DataStoreFactory = {
 };
 
 /**
- * Open a backend and run migrations, mapping both failures to
- * {@link DataStoreMigrationError}. Used for the in-memory path (which needs no
- * version guard — it is ephemeral) and shared message handling.
- *
- * @throws {DataStoreMigrationError} When the backend cannot be opened or the
- *   migrations folder fails to apply; the original cause is preserved.
- */
-/**
  * Close before throwing WITHOUT letting the close shadow the real error: a
  * secondary checkpoint failure is swallowed by `closeForLifecycle()` once
  * native closure is proven, while a truly unclosed native handle remains
@@ -136,6 +128,14 @@ function closeWithoutShadowing(handle: {
   if (!closeResult?.closed) handle.close();
 }
 
+/**
+ * Open a backend and run migrations, mapping both failures to
+ * {@link DataStoreMigrationError}. Used for the in-memory path (which needs no
+ * version guard — it is ephemeral) and shared message handling.
+ *
+ * @throws {DataStoreMigrationError} When the backend cannot be opened or the
+ *   migrations folder fails to apply; the original cause is preserved.
+ */
 function openAndMigrate(
   opts: DataStoreOpenOptions,
   migrationsFolder: string,
