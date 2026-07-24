@@ -306,6 +306,39 @@ describe('formatSignalSarif', () => {
     expect(fractionalColumn.locations[0].physicalLocation.region).toEqual({ startLine: 5 });
   });
 
+  it('percent-encodes a filePath with a space and a # into a valid URI reference, preserving separators', () => {
+    // Raw spaces/'#'/'?' produce an invalid RFC 3986 URI reference (GitHub
+    // Code Scanning can mis-locate or reject the result). Each path segment
+    // is encoded independently so literal '/' separators survive.
+    const env: SignalEnvelope = {
+      ...FIXTURE_ENVELOPE,
+      signals: [
+        {
+          ...FIXTURE_ENVELOPE.signals[0],
+          code: undefined,
+          filePath: 'src/weird dir/file#1.ts',
+          line: 3,
+          column: undefined,
+        },
+      ],
+    };
+    const parsed = JSON.parse(formatSignalSarif(env)) as {
+      runs: {
+        results: {
+          locations: {
+            physicalLocation: { artifactLocation: { uri: string } };
+          }[];
+        }[];
+      }[];
+    };
+    const uri = parsed.runs[0].results[0].locations[0].physicalLocation.artifactLocation.uri;
+    expect(uri).toBe('src/weird%20dir/file%231.ts');
+    // The result is a well-formed URI reference: parseable, and round-trips
+    // back to the original path when percent-decoded segment-by-segment.
+    expect(() => new URL(uri, 'file:///base/')).not.toThrow();
+    expect(uri.split('/').map(decodeURIComponent).join('/')).toBe('src/weird dir/file#1.ts');
+  });
+
   it('produces a single run with no results for an empty envelope', () => {
     const parsed = JSON.parse(formatSignalSarif(EMPTY_ENVELOPE)) as {
       version: string;

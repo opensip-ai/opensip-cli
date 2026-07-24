@@ -65,6 +65,19 @@ function atLeastOne(value: number | undefined): number | undefined {
   return typeof value === 'number' && Number.isInteger(value) && value >= 1 ? value : undefined;
 }
 
+/**
+ * Percent-encode a repo-relative file path for use as a SARIF
+ * `artifactLocation.uri` (an RFC 3986 URI reference). Encodes each path
+ * segment independently so literal `/` separators survive — a whole-path
+ * `encodeURIComponent` would also escape them into `%2F`, which is not what a
+ * relative-path URI reference needs. Without this, a space/`#`/`?` in a
+ * filePath produces an invalid URI reference that GitHub Code Scanning can
+ * mis-locate or reject outright.
+ */
+function encodeArtifactUri(filePath: string): string {
+  return filePath.split('/').map(encodeURIComponent).join('/');
+}
+
 /** Minimal SARIF v2.1.0 shape — only the fields this emitter populates. */
 interface SarifLog {
   readonly $schema: string;
@@ -213,7 +226,7 @@ export function buildOpenSipSarif(
     const startColumn = atLeastOne(signal.code?.column ?? signal.column);
 
     const physicalLocation: SarifLocation['physicalLocation'] = {
-      artifactLocation: { uri: filePath },
+      artifactLocation: { uri: encodeArtifactUri(filePath) },
       ...(startLine === undefined
         ? {}
         : {
