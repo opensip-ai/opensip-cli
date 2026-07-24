@@ -528,16 +528,39 @@ describe('runExternalAdapterLiveView', () => {
     expect(mocks.replayResult).not.toHaveBeenCalled();
   });
 
-  it('recognizes only structurally valid completion envelopes', async () => {
-    mocks.runWorkerSpec.mockResolvedValue({
-      output: 'raw-stream',
-      completionEnvelope: { tool: 'gitleaks', verdict: 'invalid' },
-    });
+  it.each([
+    ['string verdict', { tool: 'gitleaks', verdict: 'invalid' }],
+    // typeof null === 'object' slipped through the old guard, then threw on
+    // verdict.passed in the live producer.
+    ['null verdict', { tool: 'gitleaks', verdict: null }],
+    [
+      'missing signals/units arrays',
+      { tool: 'gitleaks', runId: 'r', createdAt: 'c', verdict: { passed: true, summary: {} } },
+    ],
+    [
+      'verdict without summary',
+      {
+        tool: 'gitleaks',
+        runId: 'r',
+        createdAt: 'c',
+        verdict: { passed: true },
+        signals: [],
+        units: [],
+      },
+    ],
+  ])(
+    'recognizes only structurally valid completion envelopes (%s)',
+    async (_label, completionEnvelope) => {
+      mocks.runWorkerSpec.mockResolvedValue({
+        output: 'raw-stream',
+        completionEnvelope,
+      });
 
-    await runExternalAdapterLiveView(invocation());
+      await runExternalAdapterLiveView(invocation());
 
-    expect(liveCaptures[0].outcome.kind).toBe('error');
-  });
+      expect(liveCaptures[0].outcome.kind).toBe('error');
+    },
+  );
 
   it('keeps opaque ToolError failures in the runtime category', async () => {
     mocks.runWorkerSpec.mockRejectedValue(new ToolError('opaque worker failure', 'OPAQUE'));

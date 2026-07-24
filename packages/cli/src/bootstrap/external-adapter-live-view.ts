@@ -1,5 +1,10 @@
 import { runToolLiveView, type LiveRunOutcome } from '@opensip-cli/cli-live';
-import { buildFindingGroups, EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import {
+  buildFindingGroups,
+  EXIT_CODES,
+  isSignalEnvelope,
+  mapToolErrorToExitCode,
+} from '@opensip-cli/contracts';
 import { ToolError, type ToolSource } from '@opensip-cli/core';
 
 import {
@@ -89,12 +94,21 @@ function adapterEventToProgress(event: ExternalAdapterProgressEvent): ProgressEv
   };
 }
 
+/**
+ * Worker output crosses a process boundary, so the guard must cover every
+ * field {@link doneFromResult} dereferences: the canonical envelope shape
+ * (non-null verdict, signals/units arrays) plus the verdict summary the
+ * live summary renders. The old local check accepted `verdict: null`
+ * (`typeof null === 'object'`) and never checked `signals` — a malformed
+ * worker result then threw a TypeError inside the live producer.
+ */
 function isEnvelope(value: unknown): value is SignalEnvelope {
+  if (!isSignalEnvelope(value)) return false;
+  const verdict = value.verdict as Partial<SignalEnvelope['verdict']>;
   return (
-    typeof value === 'object' &&
-    value !== null &&
-    typeof (value as { tool?: unknown }).tool === 'string' &&
-    typeof (value as { verdict?: unknown }).verdict === 'object'
+    typeof verdict.passed === 'boolean' &&
+    typeof verdict.summary === 'object' &&
+    verdict.summary !== null
   );
 }
 
