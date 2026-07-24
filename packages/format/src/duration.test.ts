@@ -14,6 +14,12 @@ describe('formatDuration', () => {
     expect(formatDuration(0.4)).toBe('0ms');
   });
 
+  it('promotes [999.5, 1000) to seconds instead of rendering "1000ms"', () => {
+    expect(formatDuration(999.5)).toBe('1.0s');
+    expect(formatDuration(999.9)).toBe('1.0s');
+    expect(formatDuration(999.4)).toBe('999ms');
+  });
+
   it('renders one second up to one minute as fixed-one-decimal seconds', () => {
     expect(formatDuration(1000)).toBe('1.0s');
     expect(formatDuration(1500)).toBe('1.5s');

@@ -22,7 +22,9 @@ function sanitizeMs(ms: number): number {
  */
 export function formatDuration(ms: number): string {
   const safe = sanitizeMs(ms);
-  if (safe < 1000) return `${String(Math.round(safe))}ms`;
+  // Round before branching: [999.5, 1000) must promote to "1.0s", not "1000ms".
+  const wholeMs = Math.round(safe);
+  if (wholeMs < 1000) return `${String(wholeMs)}ms`;
 
   const totalTenths = Math.round(safe / 100);
   if (totalTenths < 600) return `${(totalTenths / 10).toFixed(1)}s`;
