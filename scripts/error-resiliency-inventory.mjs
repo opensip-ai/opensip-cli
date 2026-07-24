@@ -38,6 +38,7 @@ import {
   loadRubricVersion,
   loadSchemaDocument,
   parseJsonSafe,
+  resolveContainedPath,
   resolveInventoryRoot,
   sortByKey,
 } from './lib/error-resiliency-inventory.mjs';
@@ -535,7 +536,12 @@ function runRatchet(repoRoot, flags, stdout) {
     if (!rel.startsWith('packages/') && !rel.startsWith('scripts/')) continue;
     // Skip tests/fixtures
     if (/\.test\.|\/__tests__\/|\/fixtures\//u.test(rel)) continue;
-    const abs = join(repoRoot, rel);
+    let abs;
+    try {
+      abs = resolveContainedPath(repoRoot, rel);
+    } catch {
+      continue;
+    }
     if (!existsSync(abs)) continue;
     let text;
     try {
