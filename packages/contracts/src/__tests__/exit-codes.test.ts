@@ -21,6 +21,7 @@ describe('EXIT_CODES', () => {
       CHECK_NOT_FOUND: 3,
       REPORT_FAILED: 4,
       PLUGIN_INCOMPATIBLE: 5,
+      CANCELLED: 130,
     });
   });
 

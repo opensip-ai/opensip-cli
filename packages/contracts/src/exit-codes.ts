@@ -22,27 +22,49 @@ export const EXIT_CODES = {
    * exit code alone. Read by the CLI fail-closed admission path (Phase 3).
    */
   PLUGIN_INCOMPATIBLE: 5,
+  /** Cooperative cancellation (SIGINT/SIGTERM after cleanup) — Plan 00. */
+  CANCELLED: 130,
 } as const;
 
 /**
- * Canonical mapping from typed `ToolError` subclasses to CLI exit
- * codes. This is the single source of truth for how typed errors flow
- * into the process exit code — both the CLI's top-level
- * `handleParseError` and any tool that chooses to handle its own
- * `ToolError` locally route through this function.
+ * Map definition exitClass → numeric host exit (Plan 00). Preferred path when
+ * a normalized failure / ToolError.definition is available.
+ */
+export function mapExitClassToExitCode(
+  exitClass: string | undefined,
+): number {
+  switch (exitClass) {
+    case 'success':
+      return EXIT_CODES.SUCCESS;
+    case 'configuration':
+      return EXIT_CODES.CONFIGURATION_ERROR;
+    case 'not-found':
+      return EXIT_CODES.CHECK_NOT_FOUND;
+    case 'report-failed':
+      return EXIT_CODES.REPORT_FAILED;
+    case 'plugin-incompatible':
+      return EXIT_CODES.PLUGIN_INCOMPATIBLE;
+    case 'cancelled':
+      return EXIT_CODES.CANCELLED;
+    case 'fatal':
+    case 'runtime':
+    default:
+      return EXIT_CODES.RUNTIME_ERROR;
+  }
+}
+
+/**
+ * Canonical mapping from typed `ToolError` to CLI exit codes.
  *
- * The mapping policy (see `Tool` interface JSDoc in
- * `@opensip-cli/core` for the full contract):
- *
- *   - `NotFoundError`       → `CHECK_NOT_FOUND` (exit 3)
- *   - `ConfigurationError`  → `CONFIGURATION_ERROR` (exit 2)
- *   - `ValidationError`     → `CONFIGURATION_ERROR` (exit 2)
- *   - `NetworkError`           → `REPORT_FAILED` (exit 4)
- *   - `PluginIncompatibleError`→ `PLUGIN_INCOMPATIBLE` (exit 5)
- *   - `TimeoutError`           → `RUNTIME_ERROR` (exit 1)
- *   - any other `ToolError`    → `RUNTIME_ERROR` (exit 1)
+ * Prefers {@link ToolError.definition}.exitClass when present; falls back to
+ * the legacy instanceof ladder (Plan 01 removal target).
  */
 export function mapToolErrorToExitCode(error: ToolError): number {
+  const fromDefinition = error.definition?.exitClass;
+  if (fromDefinition !== undefined) {
+    return mapExitClassToExitCode(fromDefinition);
+  }
+  // Legacy adapter — keep for subclasses that predate definitions
   if (error instanceof NotFoundError) return EXIT_CODES.CHECK_NOT_FOUND;
   if (error instanceof ConfigurationError) return EXIT_CODES.CONFIGURATION_ERROR;
   if (error instanceof ValidationError) return EXIT_CODES.CONFIGURATION_ERROR;

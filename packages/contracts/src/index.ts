@@ -191,7 +191,12 @@ export type {
 export { passRate } from './score.js';
 
 // Exit codes + error suggestion helper + typed-error → exit-code mapping
-export { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from './exit-codes.js';
+export {
+  EXIT_CODES,
+  getErrorSuggestion,
+  mapToolErrorToExitCode,
+  mapExitClassToExitCode,
+} from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';
 
 // Static tool-plugin manifest + the plugin-API epoch + provenance types +
