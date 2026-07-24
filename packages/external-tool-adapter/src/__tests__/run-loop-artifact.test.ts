@@ -312,3 +312,60 @@ describe('runScanLoop — OBS-SARIF: structural acceptance at the run-loop bound
     expect(spies.writeArtifact).not.toHaveBeenCalled();
   });
 });
+
+describe('runScanLoop — okWithoutArtifact: scanners that write no report on an empty scan', () => {
+  /** Deps whose report file does not exist (osv-scanner exit-128 shape). */
+  function missingReportDeps(code: number): Partial<ScanLoopDeps> {
+    return {
+      binaryDeps: { existsSync: () => true, which: () => '/usr/bin/examplescan' },
+      runProcess: () => Promise.resolve({ code, stdout: '', stderr: '', timedOut: false }),
+      probeVersion: () => '1.2.3',
+      readFile: () => {
+        throw new Error('ENOENT');
+      },
+      fileSize: () => {
+        throw new Error('ENOENT');
+      },
+      env: {},
+    };
+  }
+
+  it('a declared code with a MISSING report is a clean empty scan, not a fault', async () => {
+    const { cli, spies } = makeCli();
+    await runScanLoop(
+      input(
+        cli,
+        jsonCommand({
+          exitCodes: { ok: [0, 128], findings: [1], errorFrom: 2, okWithoutArtifact: [128] },
+        }),
+      ),
+      missingReportDeps(128),
+    );
+    // Delivered as a zero-signal clean envelope; no fabricated empty artifact.
+    expect(spies.deliverSignals).toHaveBeenCalledTimes(1);
+    expect(spies.writeArtifact).not.toHaveBeenCalled();
+  });
+
+  it('an UNDECLARED code with a missing report still faults (A11 unchanged)', async () => {
+    const { cli, spies } = makeCli();
+    await expect(
+      runScanLoop(input(cli, jsonCommand()), missingReportDeps(0)),
+    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    expect(spies.deliverSignals).not.toHaveBeenCalled();
+  });
+
+  it('a declared code with a GARBAGE report still faults (only missing is excused)', async () => {
+    const { cli } = makeCli();
+    await expect(
+      runScanLoop(
+        input(
+          cli,
+          jsonCommand({
+            exitCodes: { ok: [0, 128], findings: [1], errorFrom: 2, okWithoutArtifact: [128] },
+          }),
+        ),
+        makeDeps({ code: 128, artifact: 'not json at all' }),
+      ),
+    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+  });
+});

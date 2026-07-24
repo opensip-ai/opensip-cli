@@ -114,9 +114,13 @@ export const tool: Tool = defineExternalToolAdapter({
       // The exception is `128` ("no packages/lockfiles found") — a genuinely CLEAN
       // no-op (a project with no dependency manifests), NOT a fault, so it joins the
       // `ok` set. With `errorFrom: 2`, `127` (general/usage error) still faults.
-      // VERIFY-against-installed-binary: the exact nothing-scanned code (recollection
-      // 128) across versions.
-      exitCodes: { ok: [0, 128], findings: [1], errorFrom: 2 },
+      // Verified against osv-scanner source (cmd/osv-scanner/scan/source/command.go):
+      // on ErrNoPackagesFound the process returns BEFORE PrintResult ever writes
+      // `--output`, so exit 128 arrives with NO report file — `okWithoutArtifact`
+      // excuses exactly that shape from the A11 missing-artifact fault. Without it,
+      // every dependency-free project (docs repos, empty monorepo leaves) hard-
+      // faulted instead of passing clean.
+      exitCodes: { ok: [0, 128], findings: [1], errorFrom: 2, okWithoutArtifact: [128] },
       parse: parseOsvJson,
       // A3 (no `excludeScan`): OSV-Scanner only parses recognized lockfiles/SBOMs,
       // never an arbitrary JSON report, so it does NOT re-detect opensip's own

@@ -40,6 +40,21 @@ export const externalToolErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['command', 'errno'],
     },
+    'EXTERNAL.SCANNER.KILLED_BY_SIGNAL': {
+      code: 'EXTERNAL.SCANNER.KILLED_BY_SIGNAL',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'The scanner was killed by an external signal (OOM killer, kill -9, container stop). Check system memory and process limits, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['command', 'signal'],
+    },
   },
   { allowLegacyCodes: true },
 );

@@ -29,6 +29,7 @@ export const ADAPTER_DIAG_EVT = {
   GATE_CONFIG_ERROR: 'adapter.gate.config_error',
   BINARY_RESOLVED: 'adapter.binary.resolved',
   SCAN_FAULTED: 'adapter.scan.faulted',
+  SCAN_EMPTY_NOOP: 'adapter.scan.empty_noop',
   ARTIFACT_STORED: 'adapter.artifact.stored',
   SCAN_COMPLETED: 'adapter.scan.completed',
 } as const;

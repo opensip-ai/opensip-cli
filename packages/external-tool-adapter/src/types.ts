@@ -64,6 +64,16 @@ export interface ScannerExitModel {
    * ceiling, every nonzero code is findings-eligible.
    */
   readonly findingsFromNonzero?: boolean;
+  /**
+   * Exit codes that are a clean no-op WITHOUT a report artifact. Some scanners
+   * return before ever writing `--output` on a legitimately empty scan —
+   * osv-scanner exits 128 for "no packages/lockfiles found" and never creates
+   * the report file. A code listed here with a MISSING artifact bypasses the
+   * A11 missing-artifact fault and ingests zero signals (clean pass). Only the
+   * `missing` shape is excused: a present-but-garbage/oversize artifact still
+   * faults. Codes here should normally also appear in {@link ok}.
+   */
+  readonly okWithoutArtifact?: readonly number[];
 }
 
 /**

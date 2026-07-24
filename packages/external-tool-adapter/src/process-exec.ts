@@ -42,6 +42,16 @@ export function spawnFailureError(command: string, errno: string, cause?: unknow
   });
 }
 
+/** Coded external-signal death (OOM kill, `kill -9`, container stop). */
+export function signalDeathError(command: string, signal: string, cause?: unknown): SystemError {
+  return new SystemError(`scanner '${command}' was killed by signal ${signal}`, {
+    code: 'EXTERNAL.SCANNER.KILLED_BY_SIGNAL',
+    definition: externalToolErrorCatalog.require('EXTERNAL.SCANNER.KILLED_BY_SIGNAL'),
+    metadata: { command, signal },
+    cause: cause instanceof Error ? cause : undefined,
+  });
+}
+
 /** The captured outcome of a scanner process run. */
 export interface ProcessResult {
   /** The exit code (`-1` when the process was killed by the timeout). */
@@ -116,6 +126,14 @@ export function runScannerProcess(input: RunProcessInput): Promise<ProcessResult
         // A string `code` (`ENOENT`/`EACCES`) is a spawn failure, not an exit code.
         if (typeof failure.code === 'string') {
           reject(spawnFailureError(input.command, failure.code, error));
+          return;
+        }
+        // External signal death (OOM killer, kill -9, container stop): Node
+        // reports `killed: false`, `code: null`, `signal: '<SIG…>'`. Falling
+        // through would fabricate exit 1 — indistinguishable from an ordinary
+        // findings/fault exit — and send operators to the wrong diagnosis.
+        if (typeof failure.code !== 'number' && typeof failure.signal === 'string') {
+          reject(signalDeathError(input.command, failure.signal, error));
           return;
         }
         resolve({

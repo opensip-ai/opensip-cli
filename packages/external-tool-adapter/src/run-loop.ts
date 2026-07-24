@@ -274,12 +274,33 @@ export async function runScanLoop(
     });
   }
 
+  // Some scanners never write the report on a legitimately empty scan (osv-scanner
+  // exits 128 for "no packages found" BEFORE its --output write). A declared
+  // okWithoutArtifact code with a MISSING report is a clean no-op, not a fault;
+  // any other invalid shape (garbage/oversize/empty file) still faults below.
+  const cleanWithoutArtifact =
+    command.output.kind !== 'stdout' &&
+    !read.artifactValid &&
+    read.invalidReason === 'missing' &&
+    (command.exitCodes?.okWithoutArtifact ?? []).includes(proc.code);
+  if (cleanWithoutArtifact) {
+    emitAdapterDecision({
+      cli,
+      tool,
+      evt: ADAPTER_DIAG_EVT.SCAN_EMPTY_NOOP,
+      phase: 'execute',
+      level: 'info',
+      message: `${tool}: clean no-op (exit ${String(proc.code)}, scanner writes no report for an empty scan)`,
+      data: { reason: 'ok-without-artifact', code: proc.code },
+    });
+  }
+
   // A11: a FILE-backed scanner MUST produce a readable, parseable report. An invalid
   // artifact is a FAULT even under an `ok`/`findings` verdict — otherwise trivy's
   // `ok:[0]` model would read a broken report as a clean PASS and the `writeArtifact`
   // below would overwrite the real report with the empty buffer. We throw BEFORE
   // writeArtifact, so the scanner's report on disk is never destroyed.
-  if (!read.artifactValid) {
+  if (!read.artifactValid && !cleanWithoutArtifact) {
     emitAdapterDecision({
       cli,
       tool,
@@ -296,7 +317,8 @@ export async function runScanLoop(
   const parsed = await progressStep(
     progress,
     'ingest-report',
-    () => parseSignals(command, raw, ctx),
+    // A clean no-artifact no-op has nothing to parse — zero signals by contract.
+    () => (cleanWithoutArtifact ? [] : parseSignals(command, raw, ctx)),
     (signals) => ({ signals: signals.length, findings: signals.length }),
   );
   if (isEmptyReclaimedStdoutFindings(command, proc.code, verdict, parsed.length)) {
@@ -315,16 +337,20 @@ export async function runScanLoop(
   }
 
   // Persist the raw artifact through the HOST seam (0600 + retention, ADR-0080/0091).
-  await cli.writeArtifact(artifactFullPath, raw);
-  emitAdapterDecision({
-    cli,
-    tool,
-    evt: ADAPTER_DIAG_EVT.ARTIFACT_STORED,
-    phase: 'persist',
-    level: 'info',
-    message: `${tool}: artifact stored`,
-    data: { path: artifactFullPath, bytes: raw.length },
-  });
+  // A clean no-artifact no-op has no report to persist — writing the empty read
+  // buffer would fabricate a zero-byte artifact for a scan that produced none.
+  if (!cleanWithoutArtifact) {
+    await cli.writeArtifact(artifactFullPath, raw);
+    emitAdapterDecision({
+      cli,
+      tool,
+      evt: ADAPTER_DIAG_EVT.ARTIFACT_STORED,
+      phase: 'persist',
+      level: 'info',
+      message: `${tool}: artifact stored`,
+      data: { path: artifactFullPath, bytes: raw.length },
+    });
+  }
 
   const provenance: AdapterProvenance = {
     tool,
