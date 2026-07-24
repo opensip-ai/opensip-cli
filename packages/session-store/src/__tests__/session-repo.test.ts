@@ -153,6 +153,31 @@ describe('SessionRepo — list', () => {
     expect(repo.list({ limit: 2 })).toHaveLength(2);
   });
 
+  // limit: 0 must mean "zero rows" in BOTH the plain and cwdWithin paths —
+  // only an absent (undefined) limit means unlimited. `0` is falsy, so a
+  // truthy check on `opts.limit` used to silently treat 0 as "no limit" in
+  // the plain path while the cwdWithin path's `slice(0, 0)` already returned
+  // zero rows, a semantics flip depending on whether cwdWithin was set.
+  it('limit: 0 returns zero rows without cwdWithin', () => {
+    repo.save(makeSession({ id: 'a' }));
+    repo.save(makeSession({ id: 'b' }));
+    expect(repo.list({ limit: 0 })).toEqual([]);
+  });
+
+  it('limit: 0 returns zero rows with cwdWithin', () => {
+    repo.save(makeSession({ id: 'in-scope', cwd: '/repo' }));
+    repo.save(makeSession({ id: 'foreign', cwd: '/other' }));
+    expect(repo.list({ limit: 0, cwdWithin: '/repo' })).toEqual([]);
+  });
+
+  it('limit: undefined stays unlimited in both the plain and cwdWithin paths', () => {
+    for (let i = 0; i < 3; i++) {
+      repo.save(makeSession({ id: `u${String(i)}`, cwd: '/repo' }));
+    }
+    expect(repo.list({ limit: undefined })).toHaveLength(3);
+    expect(repo.list({ limit: undefined, cwdWithin: '/repo' })).toHaveLength(3);
+  });
+
   it('honors tool filter', () => {
     repo.save(makeSession({ id: 'fit-1', tool: 'fit' }));
     repo.save(makeSession({ id: 'sim-1', tool: 'sim' }));

@@ -30,7 +30,7 @@ export class SessionReadRepo {
       const ordered = baseQuery.orderBy(desc(sessions.timestamp));
       let sessionRows: (typeof sessions.$inferSelect)[];
       if (opts.cwdWithin === undefined) {
-        sessionRows = opts.limit ? ordered.limit(opts.limit).all() : ordered.all();
+        sessionRows = opts.limit === undefined ? ordered.all() : ordered.limit(opts.limit).all();
       } else {
         const root = opts.cwdWithin;
         const filteredRows = ordered.all().filter((row) => isSessionCwdWithin(row.cwd, root));

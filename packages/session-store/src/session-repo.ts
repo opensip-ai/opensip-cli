@@ -46,10 +46,6 @@ export class SessionRepo {
     return this.read.count();
   }
 
-  pruneToCount(keep: number): number {
-    return this.maintenance.pruneToCount(keep);
-  }
-
   pruneToCountBatch(keep: number, batchSize?: number): number {
     return this.maintenance.pruneToCountBatch(keep, batchSize);
   }

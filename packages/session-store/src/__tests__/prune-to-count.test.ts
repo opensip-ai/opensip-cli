@@ -41,58 +41,6 @@ function tableCount(
   return requireDrizzleHandle(datastore).db.select().from(table).all().length;
 }
 
-describe('SessionRepo.pruneToCount', () => {
-  it('keeps the newest sessions and cascades payload/host-metrics rows', () => {
-    withRepo((repo, datastore) => {
-      for (let i = 0; i < 10; i += 1) {
-        const id = `s${i}`;
-        repo.save(makeSession(id, i + 1));
-        repo.upsertHostMetrics(id, { persistMs: i });
-      }
-
-      expect(repo.pruneToCount(3)).toBe(7);
-      expect(repo.list().map((session) => session.id)).toEqual(['s9', 's8', 's7']);
-      expect(tableCount(datastore, sessionToolPayload)).toBe(3);
-      expect(tableCount(datastore, sessionHostMetrics)).toBe(3);
-    });
-  });
-
-  it('treats zero and negative keep values as disabled', () => {
-    withRepo((repo) => {
-      repo.save(makeSession('a', 1));
-      repo.save(makeSession('b', 2));
-
-      expect(repo.pruneToCount(0)).toBe(0);
-      expect(repo.pruneToCount(-1)).toBe(0);
-      expect(repo.count()).toBe(2);
-    });
-  });
-
-  it('composes with age purge', () => {
-    withRepo((repo) => {
-      for (let i = 0; i < 5; i += 1) {
-        repo.save(makeSession(`s${i}`, i + 1));
-      }
-
-      expect(repo.pruneToCount(4)).toBe(1);
-      expect(repo.purge(new Date('2026-01-04T00:00:00.000Z'))).toBe(2);
-      expect(repo.list().map((session) => session.id)).toEqual(['s4', 's3']);
-    });
-  });
-
-  it('rethrows prune failures after logging', () => {
-    withRepo((repo, datastore) => {
-      repo.save(makeSession('a', 1));
-      const handle = requireDrizzleHandle(datastore);
-      vi.spyOn(handle.db, 'select').mockImplementation(() => {
-        throw new Error('select-failed');
-      });
-
-      expect(() => repo.pruneToCount(1)).toThrow(/select-failed/);
-    });
-  });
-});
-
 describe('SessionRepo bounded maintenance batches', () => {
   it('prunes at most one batch in deterministic timestamp/ID order', () => {
     withRepo((repo, datastore) => {
@@ -145,7 +93,7 @@ describe('SessionRepo bounded maintenance batches', () => {
     });
   });
 
-  it('normalizes fractional keep values consistently with pruneToCount', () => {
+  it('normalizes fractional keep values (Math.trunc)', () => {
     withRepo((repo) => {
       for (let day = 1; day <= 4; day += 1) {
         repo.save(makeSession(`s${String(day)}`, day));
