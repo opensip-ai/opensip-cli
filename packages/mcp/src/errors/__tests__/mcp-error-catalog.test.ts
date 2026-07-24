@@ -1,7 +1,6 @@
 import { SystemError, normalizeFailure } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-
 import { mcpErrorCatalog } from '../mcp-error-catalog.js';
 
 describe('mcpErrorCatalog (Plan 00 Phase 5.6)', () => {

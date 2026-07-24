@@ -45,7 +45,7 @@ describe('safe-diagnostic-data', () => {
   });
 
   it('bounds long text and strips control characters', () => {
-    const ctrl = String.fromCharCode(1, 2);
+    const ctrl = String.fromCodePoint(1, 2);
     const long = `${'a'.repeat(3000)}${ctrl}`;
     const scrubbed = scrubText(long, 100);
     expect(scrubbed.length).toBeLessThanOrEqual(100);

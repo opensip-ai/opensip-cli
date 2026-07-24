@@ -1,7 +1,6 @@
 import { NotFoundError, normalizeFailure } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-
 import { fitnessErrorCatalog } from '../fitness-error-catalog.js';
 
 describe('fitnessErrorCatalog', () => {
