@@ -778,7 +778,28 @@ When a run fails before producing an envelope (config invalid, plugin failed to 
 }
 ```
 
-Each `ErrorDetail` carries a `message`, an optional actionable `suggestion`, and an optional machine `code`. The `exitCode` is 2 (configuration/runtime error) or whatever the throwing code specified — and it matches the top-level `exitCode` field as well as the process exit code.
+Each `ErrorDetail` carries a `message`, an optional actionable `suggestion`, and an optional machine `code`. The `exitCode` is 2 (configuration/runtime error), **130** for cooperative cancellation (`EXIT_CODES.CANCELLED`), or whatever the throwing code specified — and it matches the top-level `exitCode` field as well as the process exit code.
+
+### Failure axes (host-normalized)
+
+Command failures are normalized once into a versioned failure envelope
+([ADR-0181](../../decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md)).
+Public `--json` keeps the stable `ErrorDetail` surface above. Machine / worker /
+operator sinks may also carry definition axes from the envelope:
+
+| Field | Public JSON? | Notes |
+|---|---|---|
+| `code` | yes (when known) | Registered or legacy-adapted code |
+| `message` | yes | Bounded, control-scrubbed |
+| `suggestion` | yes (optional) | Operator action / recovery hint |
+| `source` / `kind` / `retry` / `exitClass` | machine sinks | Orthogonal axes; not required on every public `errors[]` row yet |
+| `metadata` (allowlisted keys only) | selective | Secrets and non-allowlisted keys never public |
+| `operatorDetail` / stacks / raw `cause` | **no** | Operator/log only; never worker public wire |
+
+`SignalSeverity` on findings is **not** a failure-envelope field and does not
+decide `ToolRunOutcome`. Full catalog of registered codes:
+[error code index](./18-error-code-index.md). Contributor model:
+[error and resiliency model](../80-implementation/09-error-and-resiliency-model.md).
 
 ---
 

@@ -448,6 +448,9 @@ jobs:
       - name: Check generated checks index in sync
         run: pnpm docs:checks-index:check
 
+      - name: Check generated error-code index in sync
+        run: pnpm docs:error-index:check
+
       - name: Check generated package READMEs in sync
         run: pnpm docs:readmes:check
 

@@ -27,7 +27,7 @@ Pure types, registries, errors, IDs, logger, paths. No tool-specific knowledge.
 
 | Package | Path | Role | Key exports |
 |---|---|---|---|
-| `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, errors, logger, IDs, retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `renderGateCompareLines`, `projectJsonScalarMetadata`, `logger`, `ToolError`, `ValidationError` |
+| `@opensip-cli/core` | `packages/core/` | Kernel — language adapters, plugin loader, structured errors/catalogs, failure envelope, logger, IDs, abort-aware retry, project config, per-invocation execution scope | `Tool`, `ToolRegistry`, `LanguageAdapter`, `LanguageRegistry`, `RunScope`, `runWithScope`, `currentScope`, `Registry`, `Signal`, `createSignal`, `discoverPlugins`, `discoverToolPackages`, `resolveProjectPaths`, `resolveUserPaths`, `renderGateCompareLines`, `projectJsonScalarMetadata`, `logger`, `ToolError`, `createToolError`, `defineErrorCatalog`, `normalizeFailure`, `withRetry`, `ValidationError` |
 
 ## Layer 2 — datastore, contracts, authoring helpers, tree-sitter, clone-detection, format, and cli-ui
 

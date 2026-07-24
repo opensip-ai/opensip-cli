@@ -747,6 +747,18 @@
       "purpose": "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."
     },
     {
+      "file": "docs/web-generated/70-reference/18-error-code-index.md",
+      "path": "/docs/opensip-cli/70-reference/18-error-code-index/",
+      "section": "70-reference",
+      "title": "Error code index",
+      "audience": [
+        "contributors",
+        "operators",
+        "agents"
+      ],
+      "purpose": "Generated registry of registered OpenSIP error codes with axes and operator actions."
+    },
+    {
       "file": "docs/web-generated/80-implementation/00-repository-layout.md",
       "path": "/docs/opensip-cli/80-implementation/00-repository-layout/",
       "section": "80-implementation",
@@ -832,6 +844,17 @@
       "path": "/docs/opensip-cli/80-implementation/08-tool-live-view/",
       "section": "80-implementation",
       "title": "Tool Live View"
+    },
+    {
+      "file": "docs/web-generated/80-implementation/09-error-and-resiliency-model.md",
+      "path": "/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/",
+      "section": "80-implementation",
+      "title": "Error and resiliency model",
+      "audience": [
+        "contributors",
+        "tool-authors"
+      ],
+      "purpose": "How failures are defined, constructed, normalized, retried, cancelled, and projected across CLI, workers, logs, and JSON."
     },
     {
       "file": "docs/web-generated/80-implementation/architecture-map.md",
@@ -959,7 +982,8 @@
         "/docs/opensip-cli/70-reference/14-detection-quality/",
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
         "/docs/opensip-cli/70-reference/16-performance-profiling/",
-        "/docs/opensip-cli/70-reference/17-supported-platforms/"
+        "/docs/opensip-cli/70-reference/17-supported-platforms/",
+        "/docs/opensip-cli/70-reference/18-error-code-index/"
       ]
     },
     {
@@ -975,6 +999,7 @@
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
         "/docs/opensip-cli/80-implementation/07-website-integration/",
         "/docs/opensip-cli/80-implementation/08-tool-live-view/",
+        "/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/",
         "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }
@@ -1146,6 +1171,7 @@
         "/docs/opensip-cli/70-reference/15-compatibility-policy/",
         "/docs/opensip-cli/70-reference/16-performance-profiling/",
         "/docs/opensip-cli/70-reference/17-supported-platforms/",
+        "/docs/opensip-cli/70-reference/18-error-code-index/",
         "/docs/opensip-cli/80-implementation/00-repository-layout/",
         "/docs/opensip-cli/80-implementation/01-cli-dispatch/",
         "/docs/opensip-cli/80-implementation/02-plugin-loader/",
@@ -1155,6 +1181,7 @@
         "/docs/opensip-cli/80-implementation/06-doc-conventions/",
         "/docs/opensip-cli/80-implementation/07-website-integration/",
         "/docs/opensip-cli/80-implementation/08-tool-live-view/",
+        "/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/",
         "/docs/opensip-cli/80-implementation/architecture-map/"
       ]
     }

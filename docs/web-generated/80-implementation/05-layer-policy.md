@@ -12,6 +12,7 @@ source-files:
 related-docs:
   - ../10-concepts/03-modular-monolith.md
   - ./04-coding-standards.md
+  - ./09-error-and-resiliency-model.md
   - ../70-reference/02-package-catalog.md
   - ../80-implementation/03-session-and-persistence.md
 ---
@@ -22,6 +23,21 @@ The six-layer package graph (core → substrates → shared libraries/adapters �
 For the conceptual layer narrative, see [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/).
 
 The literal rules are at [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs).
+
+---
+
+## Error and resiliency ownership
+
+Failure semantics follow the same layer cake (ADR-0181 / ADR-0182). Do not invert these arrows:
+
+| Layer | Owns | Must not own |
+|---|---|---|
+| **core** | `ErrorDefinition`, catalogs (`defineErrorCatalog`), `ToolError` / `createToolError`, total `normalizeFailure` + projections, `toSafeDiagnosticData`, `withRetry` / cancel+deadline constructors, worker failure-wire shapes | Terminal rendering, process exit, SIGINT listeners, contracts exit numbers |
+| **contracts** | `EXIT_CODES` (including `CANCELLED` = 130), `CommandOutcome` error slots, suggestion helpers | Definition catalogs, envelope construction, retry loops |
+| **cli** | Effectful `reportFailure` fan-out, last-resort process net, interrupt→`AbortSignal` coordinator, run-plane `runOutcome` stamping | Package-owned public codes (tools own those) |
+| **tools / substrates** | Package-owned error catalogs (`extensionPoints.errorCatalog`), throw/report sites | Process-global registries, host presentation encoding |
+
+Core still imports nothing from contracts or cli. Catalog aggregation is **per-invocation** (registry), never a module-singleton map. Details: [Error and resiliency model](/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/).
 
 ---
 

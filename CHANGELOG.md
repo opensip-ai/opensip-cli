@@ -2,6 +2,31 @@
 
 All notable changes to OpenSIP CLI are documented here.
 
+## [Unreleased]
+
+### Added
+
+- **Structured error definitions and failure envelope (Plan 00).** Immutable
+  `ErrorDefinition` catalogs (`defineErrorCatalog`), total `normalizeFailure`
+  projections (public/machine/operator), and host `reportFailure` fan-out that
+  preserves definition axes. See ADR-0181 / ADR-0182 and
+  `docs/public/80-implementation/09-error-and-resiliency-model.md`.
+- **Published error codes are public API.** Append-only lifecycle
+  (`active` / `deprecated` / `tombstoned` + `supersededBy`); semantic changes
+  require a new code. Generated reference: `docs/public/70-reference/18-error-code-index.md`
+  (`pnpm docs:error-index`).
+- **Abort-aware retry and cooperative OS cancel.** `withRetry` honors
+  `AbortSignal` / deadlines / definition retry posture; SIGINT/SIGTERM map to
+  `ToolScope.abortSignal` with POSIX 130/143 second-interrupt escalation.
+- **Representative tool catalogs** for fitness, simulation, external scanners
+  (`BINARY_MISSING`), and MCP stdio; workers emit machine-safe failure wire
+  projections without raw stacks.
+
+### Changed
+
+- `TOOL_CONTRACT_VERSION` is **1.1.0** (optional `extensionPoints.errorCatalog`).
+- `EXIT_CODES.CANCELLED` (**130**) for cooperative cancellation exit class.
+
 ## [0.8.4] - 2026-07-22
 
 The largest correctness-and-hardening cut since the production launch. It folds

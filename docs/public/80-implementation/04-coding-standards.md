@@ -9,6 +9,8 @@ source-files:
   - .config/eslint.config.mjs
   - tsconfig.json
   - packages/core/src/lib/errors.ts
+  - packages/core/src/lib/error-definition.ts
+  - packages/core/src/lib/failure-envelope.ts
   - packages/core/src/lib/logger.ts
   - packages/contracts/src/exit-codes.ts
   - .config/knip.json
@@ -16,7 +18,9 @@ related-docs:
   - ./00-repository-layout.md
   - ./05-layer-policy.md
   - ./06-doc-conventions.md
+  - ./09-error-and-resiliency-model.md
   - ../70-reference/02-package-catalog.md
+  - ../70-reference/18-error-code-index.md
 ---
 # Coding standards
 
@@ -24,7 +28,7 @@ The workspace's quality gates are: TypeScript strict mode, ESLint with type-awar
 
 > **What you'll understand after this:**
 > - The ESLint rule set and the few documented exceptions.
-> - How errors are constructed and propagated.
+> - How errors are constructed and propagated ([error and resiliency model](./09-error-and-resiliency-model.md)).
 > - The exit-code convention.
 > - Logger event naming.
 > - Comment policy: when to write one, when not to.
@@ -86,32 +90,27 @@ false-positive rate across releases.
 
 ## Errors
 
-[`packages/core/src/lib/errors.ts`](../../../packages/core/src/lib/errors.ts) defines the workspace's error hierarchy:
+Canonical model: [Error and resiliency model](./09-error-and-resiliency-model.md) (ADR-0181 / ADR-0182).  
+Registered codes: [Error code index](../70-reference/18-error-code-index.md).
+
+[`packages/core/src/lib/errors.ts`](../../../packages/core/src/lib/errors.ts) still exports the subclass hierarchy, but **machine semantics live on `ErrorDefinition`** (catalogs via `defineErrorCatalog`). Prefer:
 
 ```ts
-interface ToolErrorOptions extends ErrorOptions { code?: string; [key: string]: unknown }
+import { createToolError, defineErrorCatalog, normalizeFailure } from '@opensip-cli/core';
 
-class ToolError extends Error {
-  readonly code: string;
-  // `cause` is inherited from base `Error` via the options bag (ES2022).
-  constructor(message: string, code: string, options?: ToolErrorOptions);
-}
-
-class ValidationError    extends ToolError { /* default code: 'VALIDATION_ERROR' */ }
-class NotFoundError      extends ToolError { /* default code: 'NOT_FOUND' */ }
-class SystemError        extends ToolError { /* default code: 'SYSTEM_ERROR' */ }
-class TimeoutError       extends ToolError { /* default code: 'TIMEOUT'; second arg is `number | ToolErrorOptions` */ }
-class NetworkError       extends ToolError { /* default code: 'NETWORK_ERROR'; supports { statusCode } */ }
-class ConfigurationError extends ToolError { /* default code: 'CONFIGURATION_ERROR' */ }
+// createToolError(catalog.require('OWNER.DOMAIN.CONDITION'), message, { metadata, cause })
+// Host: normalizeFailure(error) → public / machine / operator projections
 ```
 
-Plus the `Result<T, E>` pattern with `ok(value)` / `err(error)` / `tryCatch(fn)` / `tryCatchAsync(fn)` exported from the same module.
+Legacy form remains: `new NotFoundError(msg, { code, definition, metadata })` — metadata and definition are retained (no longer discarded).
+
+Plus the `Result<T, E = ToolError>` pattern with `ok` / `err` / `tryCatch` / `tryCatchAsync` and logging-forcing `unwrapOrLog` / `matchLog`.
 
 ### When to throw vs. return Result
 
-- **Throw `ToolError` subclasses** at boundaries where the caller is the framework or the CLI. The action handler wraps the throw, maps the code to a suggestion, and renders an error result.
-- **Return `Result<T, E>`** in tight loops where allocating exception objects is hot, or where multiple error kinds are equally first-class.
-- **Throw plain `Error`** *never*. Always one of the typed subclasses, with a `code`.
+- **Throw `ToolError` / catalog-backed errors** at boundaries where the caller is the framework or the CLI. The host `reportFailure` path normalizes once.
+- **Return `Result<T, E>`** for expected/recoverable local failures.
+- **Throw plain `Error`** only for internal invariants when an enclosing public boundary will normalize; do not use bare `Error` as the public control plane.
 
 ### Handling a Result error observably
 
@@ -124,7 +123,7 @@ A `Result` failure must never be *silently* discarded. The `error-handling-quali
 
 ### Error codes
 
-Each error subclass ships with a sensible default: `VALIDATION_ERROR`, `NOT_FOUND`, `SYSTEM_ERROR`, `TIMEOUT`, `NETWORK_ERROR`, `CONFIGURATION_ERROR`. Call sites that want a more specific code pass `{ code: '...' }` as the second argument, e.g. `new ValidationError('bad', { code: 'SCHEMA_FAIL' })`. Most production throws today use the defaults; the shape is in place for future scoped codes.
+Subclass defaults (`VALIDATION_ERROR`, `NOT_FOUND`, …) remain for compatibility and map through the core system catalog. New public codes use `OWNER.DOMAIN.CONDITION` grammar, are **append-only**, and require a CHANGELOG note when first published or superseded. See the [error code index](../70-reference/18-error-code-index.md).
 
 Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](../../../packages/contracts/src/exit-codes.ts):
 

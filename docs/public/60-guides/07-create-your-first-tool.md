@@ -120,6 +120,12 @@ export const tool = defineTool({
 templates teach the explicit command-spec path directly. Neither path adds
 hidden lifecycle hooks.
 
+When the tool owns stable failure codes, attach an immutable catalog via
+`extensionPoints.errorCatalog` (`TOOL_CONTRACT_VERSION` ≥ `1.1.0`) and throw with
+`createToolError` — do not pre-stringify caught values before
+`cli.reportFailure`. See the [full tool plugin guide](../50-extend/06-full-tool-plugins.md)
+and the [error and resiliency model](../80-implementation/09-error-and-resiliency-model.md).
+
 ## 4. Validate
 
 ```bash

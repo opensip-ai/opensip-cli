@@ -204,11 +204,15 @@ add `--json` yourself — the host renders your result and wraps `--json` in a
 | `raw-stream` | `cli.emitRaw(...)` (requires a `rawStreamReason`) | Writes your bytes verbatim — for human status lines / file-export confirmations, not machine JSON |
 | `live-view` | `cli.renderLive(key, args)` | Renders an Ink/TTY live view. **Bundled/in-process tools only** — external manifest tools may not declare it (see [External tool trust boundary](#external-tool-trust-boundary-adr-0054-adr-0061)) |
 
-**Error path (any mode).** To fail a command, either `throw` a typed `ToolError`
-(the host maps it to an exit code) or call `cli.reportFailure({ error, … })` — the
-host accepts any caught value, derives the message/exit code, logs, renders the
-customer surface, and sets the exit code. Do not `process.exit` or format errors
-yourself. See [Command failures vs findings](#command-failures-vs-findings).
+**Error path (any mode).** To fail a command, either `throw` a catalog-backed
+`ToolError` via `createToolError` (the host maps definition axes to an exit code)
+or call `cli.reportFailure({ error, … })` — the host **normalizes once**
+(`normalizeFailure`), derives the message/exit code, logs, renders the customer
+surface, and sets the exit code. Do not `process.exit`, pre-stringify failures, or
+format error JSON yourself. Prefer a package-owned
+`extensionPoints.errorCatalog` (contract ≥ `1.1.0`) so codes stay stable across
+hosts. See [Command failures vs findings](#command-failures-vs-findings) and the
+[error and resiliency model](../80-implementation/09-error-and-resiliency-model.md).
 
 ## Logging and operational telemetry
 
@@ -242,21 +246,64 @@ customer-facing command output.
 | Durable artifact export | `await cli.writeArtifact(path, bytes)` (or a narrower host seam such as `cli.writeSarif`) |
 
 `reportFailure` fans out to structured log, human Ink / `--json` error `CommandOutcome`,
-exit code, and diagnostics — the host owns routing. Example:
+exit code, and diagnostics — the host owns routing. Example with an optional
+immutable error catalog:
 
 ```ts
+import {
+  createToolError,
+  defineErrorCatalog,
+  defineTool,
+  ERROR_CATALOG_SCHEMA_VERSION,
+} from '@opensip-cli/core';
+
+const errorCatalog = defineErrorCatalog(
+  { id: '11111111-1111-4111-8111-111111111111', displayName: 'audit-sec', packageName: '@my-co/audit-sec' },
+  {
+    'AUDIT.TARGET.MISSING': {
+      code: 'AUDIT.TARGET.MISSING',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'not-found',
+      operatorAction: 'Pass an existing path under the project root.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+  },
+);
+
+export const tool = defineTool({
+  // … identity, commandSpecs …
+  extensionPoints: {
+    errorCatalog: {
+      schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
+      catalog: errorCatalog,
+    },
+  },
+  // handlers throw createToolError(errorCatalog.require('AUDIT.TARGET.MISSING'), '…')
+});
+
 handler: async (opts, cli) => {
   try {
     cli.logger.info({ evt: 'audit-sec.run.start', module: 'audit-sec:cli' });
     return await runAudit(opts.cwd);
   } catch (error) {
+    // Pass the thrown value through — do not String(error) first.
     await cli.reportFailure({ error, jsonRequested: opts.json === true });
     return;
   }
 };
 ```
 
-See [ADR-0077](../../decisions/ADR-0077-unified-tool-logging-and-error-reporting.md).
+Malformed or colliding catalogs are rejected at load with a registered safe
+failure (never a silent half-mount). Older hosts may ignore the optional
+contribution; new hosts validate schema version and owner identity. See
+[ADR-0077](../../decisions/ADR-0077-unified-tool-logging-and-error-reporting.md),
+[ADR-0181](../../decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md).
 
 `defineTool` derives `commands[]` from `commandSpecs` (including `parent` for
 nested children). The manifest lists every command by **short name** — `list`,
