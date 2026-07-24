@@ -301,7 +301,7 @@ describe('graph:unexpected-coupling package cycles', () => {
       { callerPackage: 'pkg-a', calleePackage: 'pkg-b', count: 1 },
       { callerPackage: 'pkg-b', calleePackage: 'pkg-a', count: 1 },
     ];
-    const run = (occs: readonly typeof zEntry[]) =>
+    const run = (occs: readonly (typeof zEntry)[]) =>
       unexpectedCouplingRule.evaluate(
         makeCatalog(occs),
         buildIndexes(makeCatalog(occs)),

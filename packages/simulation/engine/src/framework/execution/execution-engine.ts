@@ -87,8 +87,7 @@ export function updateLatencyMetrics(metrics: SimulationMetrics, latency: number
     metrics.p95LatencyMs = latency;
     metrics.p99LatencyMs = latency;
   } else {
-    metrics.avgLatencyMs =
-      (metrics.avgLatencyMs * priorCount + latency) / (priorCount + 1);
+    metrics.avgLatencyMs = (metrics.avgLatencyMs * priorCount + latency) / (priorCount + 1);
     // Rough estimates — use LatencyTracker.getLatencySnapshot() for real percentiles
     metrics.p50LatencyMs = metrics.avgLatencyMs * 0.9;
     metrics.p95LatencyMs = metrics.avgLatencyMs * 1.5;

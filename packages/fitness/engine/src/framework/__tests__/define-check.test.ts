@@ -2,7 +2,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { enterScope, LanguageRegistry, logger, RunScope, runWithScopeSync } from '@opensip-cli/core';
+import {
+  enterScope,
+  LanguageRegistry,
+  logger,
+  RunScope,
+  runWithScopeSync,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
@@ -779,9 +785,7 @@ describe('defineCheck — analyze mode oversized-file skip (fail-loud posture)',
           (call[1] as { evt?: string } | undefined)?.evt === 'fitness.check.file.skip.too_large',
       );
       expect(warnCall).toBeDefined();
-      const warnFields = warnCall?.[1] as
-        | { filePath?: string; checkSlug?: string }
-        | undefined;
+      const warnFields = warnCall?.[1] as { filePath?: string; checkSlug?: string } | undefined;
       expect(warnFields?.filePath).toBe(hugePath);
       expect(warnFields?.checkSlug).toBe('oversized-rt');
 
