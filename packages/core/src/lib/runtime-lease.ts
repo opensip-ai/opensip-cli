@@ -819,12 +819,15 @@ function assertDirectory(
   const mode = Number(stat.mode & 0o777n);
   if (
     process.platform !== 'win32' &&
-    (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o022) !== 0)
+    // Owner-controlled hops are uid-verified above; group-write is the normal
+    // umask-002 customer layout, so only other-write is refused (scoped
+    // group-controlled posture). Private coordination dirs stay exactly 0700.
+    (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o002) !== 0)
   ) {
     throw unsafeCoordination(
       permissionPosture === 'private'
         ? 'Runtime coordination directory permissions must be 0700'
-        : 'Anchored directory must not be group/world writable',
+        : 'Anchored directory must not be world writable',
     );
   }
   let canonical: string;
@@ -892,12 +895,14 @@ function assertRecordStatMetadata(
   const mode = Number(stat.mode & 0o777n);
   if (
     process.platform !== 'win32' &&
-    (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)
+    // Same scoped posture as assertDirectory: uid-verified owner-controlled
+    // records accept group-write (umask 002); other-write is refused.
+    (permissionPosture === 'private' ? mode !== 0o600 : (mode & 0o002) !== 0)
   ) {
     throw unsafeCoordination(
       permissionPosture === 'private'
         ? 'Runtime coordination record permissions must be 0600'
-        : 'Anchored record must not be group/world writable',
+        : 'Anchored record must not be world writable',
     );
   }
   if (maxBytes !== undefined && stat.size > BigInt(maxBytes)) {
@@ -1279,7 +1284,7 @@ function openAnchoredParentIdentity(
       !sameIdentity(validated, opened) ||
       (uid !== undefined && stat.uid !== BigInt(uid)) ||
       (process.platform !== 'win32' &&
-        (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o022) !== 0))
+        (permissionPosture === 'private' ? mode !== 0o700 : (mode & 0o002) !== 0))
     ) {
       throw unsafeCoordination('Anchored parent changed before its handle was opened');
     }
@@ -2428,7 +2433,7 @@ function readAnchoredBoundedRecord(
       before.isSymbolicLink() ||
       (uid !== undefined && before.uid !== BigInt(uid)) ||
       (process.platform !== 'win32' &&
-        (recordPosture === 'private' ? mode !== 0o600 : (mode & 0o022) !== 0)) ||
+        (recordPosture === 'private' ? mode !== 0o600 : (mode & 0o002) !== 0)) ||
       before.size > BigInt(maxBytes)
     ) {
       throw unsafeCoordination('Runtime coordination linked create is unsafe');

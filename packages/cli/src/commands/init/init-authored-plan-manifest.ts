@@ -94,7 +94,10 @@ function parseState(value: unknown, field: string): InitAuthoredPathState {
   if (type === null || mode === null || hash === null) {
     authoredPlanFailure(`${field} existing state requires type, mode, and digest`);
   }
-  if ((mode & 0o022) !== 0) authoredPlanFailure(`${field}.mode is group/world writable`);
+  // Scoped group-controlled posture (matches isSafeAuthoredPathMode): recorded
+  // modes may carry the group-write bit (umask 002 layout, owner-verified at
+  // snapshot time); other-write remains a hard refusal.
+  if ((mode & 0o002) !== 0) authoredPlanFailure(`${field}.mode is world writable`);
   return { exists: true, type, mode, digest: hash };
 }
 
@@ -164,7 +167,7 @@ function parseMutation(value: unknown, index: number): InitAuthoredMutation {
   const path = normalizeProjectRelativePath(object.path);
   const targetType = choice(object.targetType, TARGET_TYPES, `${field}.targetType`);
   const targetMode = integer(object.targetMode, `${field}.targetMode`, 0o777);
-  if ((targetMode & 0o022) !== 0) authoredPlanFailure(`${field}.targetMode is unsafe`);
+  if ((targetMode & 0o002) !== 0) authoredPlanFailure(`${field}.targetMode is unsafe`);
   const preimage = parseState(object.preimage, `${field}.preimage`);
   const desired = parseState(object.desired, `${field}.desired`);
   const expectedTarget = desired.exists ? desired : preimage;

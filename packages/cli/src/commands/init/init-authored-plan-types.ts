@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
 import { posix } from 'node:path';
 
+import { ConfigurationError } from '@opensip-cli/core';
+
 import {
   RUNTIME_PROMOTION_AUTHORED_MODES,
   RUNTIME_PROMOTION_JOURNAL_CAPS,
@@ -108,6 +110,11 @@ export interface InitAuthoredSnapshot {
   readonly opaquePaths: readonly string[];
   /** Classification derived from these exact snapshot observations. */
   readonly workingDirState: InitAuthoredWorkingDirState;
+  /**
+   * Observed posture of the (owner-verified) project root: 'group-writable'
+   * on umask-002 layouts. Provenance only — acceptance already happened.
+   */
+  readonly projectRootPosture: 'strict' | 'group-writable';
 }
 
 export interface RenderedInitToolScaffold extends RenderedToolScaffold {
@@ -178,8 +185,15 @@ export interface CreateInitAuthoredPlanInput {
 }
 
 /** @throws {Error} Always; the authored plan violates a required invariant. */
+/**
+ * @throws {ConfigurationError} Always — authored-plan refusals are project
+ * configuration/state problems the user fixes (exit class 2), never runtime
+ * faults (the old bare Error degraded to exit 1).
+ */
 export function authoredPlanFailure(message: string): never {
-  throw new Error(`Invalid Init authored plan: ${message}`);
+  throw new ConfigurationError(`Invalid Init authored plan: ${message}`, {
+    code: 'CONFIG.INIT.AUTHORED_PLAN_INVALID',
+  });
 }
 
 export function sha256Bytes(value: string | Uint8Array): string {

@@ -9,11 +9,12 @@
 
 import { join } from 'node:path';
 
-import { resolveProjectPaths } from '@opensip-cli/core';
+import { currentScope, resolveProjectPaths } from '@opensip-cli/core';
 
 import { enumerateToolScaffolds } from '../shared.js';
 
 import { renderAgentGuidanceTargets } from './agent-guidance.js';
+import { classifyAuthoredPathPosture } from './authored-path-mode.js';
 import { classifySnapshotFilesFromRenderedScaffolds } from './file-classifier.js';
 import {
   buildInitAuthoredPlan,
@@ -89,6 +90,7 @@ export function createInitAuthoredPlan(input: CreateInitAuthoredPlanInput): Init
     targetPaths,
     ...(input.hooks === undefined ? {} : { hooks: input.hooks }),
   });
+  emitGroupWritablePostureDiagnostic(snapshot);
   const plan = buildInitAuthoredPlan({
     languages,
     mode: input.mode,
@@ -154,3 +156,33 @@ export {
   buildInitAuthoredPlan,
   collectInitAuthoredTargetPaths,
 } from './init-authored-plan-builder.js';
+
+/**
+ * One info-level provenance diagnostic when the accepted (owner-verified)
+ * snapshot contains group-writable paths — the umask-002 layout. Surfaced in
+ * `--json` diagnostics so trust decisions downstream can see the posture;
+ * never a warning, because acceptance is the designed behavior.
+ */
+function emitGroupWritablePostureDiagnostic(snapshot: {
+  readonly records: readonly { readonly path: string; readonly mode: number | null }[];
+  readonly projectRootPosture: 'strict' | 'group-writable';
+}): void {
+  const groupWritablePaths = snapshot.records
+    .filter(
+      (record) =>
+        record.mode !== null && classifyAuthoredPathPosture(record.mode) === 'group-writable',
+    )
+    .map((record) => record.path);
+  const rootGroupWritable = snapshot.projectRootPosture === 'group-writable';
+  if (!rootGroupWritable && groupWritablePaths.length === 0) return;
+  const total = groupWritablePaths.length + (rootGroupWritable ? 1 : 0);
+  currentScope()?.diagnostics.event(
+    'validate',
+    'info',
+    `Init accepted ${String(total)} owner-controlled group-writable path(s) (umask 002 layout)`,
+    {
+      projectRootPosture: snapshot.projectRootPosture,
+      samplePaths: groupWritablePaths.slice(0, 5),
+    },
+  );
+}

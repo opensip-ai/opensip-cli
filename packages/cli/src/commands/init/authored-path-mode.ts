@@ -21,13 +21,38 @@ export function normalizeAuthoredPathMode(
   return writable ? 0o644 : 0o444;
 }
 
+/**
+ * Scoped `group-controlled` posture: reject setuid/setgid/sticky and
+ * OTHER-writable bits, but ACCEPT group-writable. Every caller pairs this
+ * with a `safeOwner` uid check, so a group-writable path is only ever
+ * accepted when the current user owns it — which covers the stock
+ * Debian/Ubuntu user-private-group layout (umask 002 → 0775 clone dirs, a
+ * group effectively private to the owner) without admitting world-writable
+ * paths or paths owned by someone else. The group-write bit stays in the
+ * recorded snapshot mode, so provenance remains honest.
+ */
 export function isSafeAuthoredPathMode(
   mode: number | bigint,
   platform: NodeJS.Platform = process.platform,
 ): boolean {
   if (platform === 'win32') return true;
   const bits = typeof mode === 'bigint' ? Number(mode & 0o7777n) : mode & 0o7777;
-  return (bits & 0o7000) === 0 && (bits & 0o022) === 0;
+  return (bits & 0o7000) === 0 && (bits & 0o002) === 0;
+}
+
+/**
+ * Provenance label for an accepted authored-path mode: `'group-writable'`
+ * when the (owner-verified) path carries the group-write bit, `'strict'`
+ * otherwise. Used for the one-line init diagnostic and downstream trust
+ * decisions; never a rejection signal on its own.
+ */
+export function classifyAuthoredPathPosture(
+  mode: number | bigint,
+  platform: NodeJS.Platform = process.platform,
+): 'strict' | 'group-writable' {
+  if (platform === 'win32') return 'strict';
+  const bits = typeof mode === 'bigint' ? Number(mode & 0o7777n) : mode & 0o7777;
+  return (bits & 0o020) === 0 ? 'strict' : 'group-writable';
 }
 
 export function isCanonicalAuthoredPathMode(

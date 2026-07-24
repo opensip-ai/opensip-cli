@@ -61,7 +61,9 @@ export function validateSafeSnapshotStat(
   if (!correctType) authoredPlanFailure(`${path} is not a ${expected}`);
   if (!safeOwner(stat)) authoredPlanFailure(`${path} is not owned by the current user`);
   if (!isSafeAuthoredPathMode(stat.mode)) {
-    authoredPlanFailure(`${path} is group/world writable`);
+    authoredPlanFailure(
+      `${path} is world writable (or carries setuid/setgid/sticky bits) — run 'chmod o-w' on it`,
+    );
   }
   if (expected === 'file' && stat.nlink !== 1n) {
     authoredPlanFailure(`${path} is hard-linked`);

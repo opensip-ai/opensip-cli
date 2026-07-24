@@ -1,6 +1,7 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { classifyAuthoredPathPosture } from './authored-path-mode.js';
 import {
   inspectExistingSnapshotPath,
   isOpaqueGeneratedSnapshotEntry,
@@ -219,5 +220,6 @@ export function readInitAuthoredSnapshot(
     ),
     opaquePaths: Object.freeze([...opaquePaths].sort(compareUtf8)),
     workingDirState: snapshotWorkingDirState(records, opaquePaths),
+    projectRootPosture: classifyAuthoredPathPosture(requestedStat.mode),
   };
 }

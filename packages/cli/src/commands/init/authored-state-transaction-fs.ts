@@ -143,7 +143,10 @@ export function assertSafeAuthoredOwnerMode(stat: BigIntStats, field: string): v
   if (uid !== undefined && stat.uid !== uid) {
     authoredTransactionFailure(`${field} is not owned by the current user`);
   }
-  if (process.platform !== 'win32' && ((mode & 0o7000) !== 0 || (mode & 0o022) !== 0)) {
+  // Scoped group-controlled posture: the uid check above pins ownership, so
+  // group-write (umask 002 layout) is accepted; other-write and special bits
+  // remain hard refusals (matches isSafeAuthoredPathMode).
+  if (process.platform !== 'win32' && ((mode & 0o7000) !== 0 || (mode & 0o002) !== 0)) {
     authoredTransactionFailure(`${field} has an unsafe mode`);
   }
 }

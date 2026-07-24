@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  classifyAuthoredPathPosture,
   isCanonicalAuthoredPathMode,
   isSafeAuthoredPathMode,
   normalizeAuthoredPathMode,
@@ -25,6 +26,28 @@ describe('authored path platform posture', () => {
     expect(isSafeAuthoredPathMode(0o755, 'linux')).toBe(true);
     expect(isSafeAuthoredPathMode(0o777, 'linux')).toBe(false);
     expect(isCanonicalAuthoredPathMode(0o666, 'file', 'linux')).toBe(false);
+  });
+
+  it('accepts owner-verified group-writable modes (umask 002 / user-private-group layout)', () => {
+    // Stock Debian/Ubuntu git clones are 0775/0664; every caller pairs this
+    // predicate with a uid ownership check, so acceptance stays owner-scoped.
+    expect(isSafeAuthoredPathMode(0o775, 'linux')).toBe(true);
+    expect(isSafeAuthoredPathMode(0o664, 'linux')).toBe(true);
+    expect(isCanonicalAuthoredPathMode(0o775, 'directory', 'linux')).toBe(true);
+    expect(isCanonicalAuthoredPathMode(0o664, 'file', 'linux')).toBe(true);
+    // Other-writable and special bits remain hard refusals.
+    expect(isSafeAuthoredPathMode(0o776, 'linux')).toBe(false);
+    expect(isSafeAuthoredPathMode(0o2775, 'linux')).toBe(false);
+    expect(isSafeAuthoredPathMode(0o4755, 'linux')).toBe(false);
+    expect(isSafeAuthoredPathMode(0o1777, 'linux')).toBe(false);
+  });
+
+  it('classifies the accepted posture for provenance', () => {
+    expect(classifyAuthoredPathPosture(0o755, 'linux')).toBe('strict');
+    expect(classifyAuthoredPathPosture(0o775, 'linux')).toBe('group-writable');
+    expect(classifyAuthoredPathPosture(0o664, 'linux')).toBe('group-writable');
+    // Windows synthesized modes never carry a meaningful group bit.
+    expect(classifyAuthoredPathPosture(0o777, 'win32')).toBe('strict');
   });
 
   it.each(['EINVAL', 'ENOTSUP', 'EPERM'])(

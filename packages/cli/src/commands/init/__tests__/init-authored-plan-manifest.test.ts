@@ -346,9 +346,11 @@ const INVALID_CASES: readonly InvalidManifestCase[] = [
   {
     name: 'writable existing state',
     mutate: (manifest) => {
+      // 0o666 carries the OTHER-write bit — still refused under the scoped
+      // group-controlled posture (group-write alone is accepted).
       manifest.mutations[0].desired.mode = 0o666;
     },
-    message: /desired\.mode is group\/world writable/u,
+    message: /desired\.mode is world writable/u,
   },
   {
     name: 'target identity disagreement',

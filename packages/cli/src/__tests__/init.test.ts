@@ -329,6 +329,30 @@ describe('executeInit (single language)', () => {
     expect(config).toContain('typescript-source:');
   });
 
+  it('succeeds on a group-writable project root (umask 002 / Debian git clone)', async function umask002() {
+    if (process.platform === 'win32') return;
+    // Stock Debian/Ubuntu clones are 0775 — this used to abort every init mode.
+    chmodSync(testDir, 0o775);
+
+    const result = await executeInit(makeArgs({ language: ['typescript'] }));
+
+    expect(result.created).toBe(true);
+    expect(existsSync(join(testDir, 'opensip-cli.config.yml'))).toBe(true);
+  });
+
+  it('still refuses a world-writable project root with a configuration-class error', async () => {
+    if (process.platform === 'win32') return;
+    chmodSync(testDir, 0o777);
+    try {
+      await expect(executeInit(makeArgs({ language: ['typescript'] }))).rejects.toMatchObject({
+        name: 'ConfigurationError',
+        message: expect.stringContaining('world writable'),
+      });
+    } finally {
+      chmodSync(testDir, 0o755);
+    }
+  });
+
   it('reclassifies authored state after waiting for the exclusive lease', async () => {
     writeFileSync(join(testDir, 'tsconfig.json'), '{}');
     const existingConfig = 'schemaVersion: 1\n# initialized by the winning invocation\n';
