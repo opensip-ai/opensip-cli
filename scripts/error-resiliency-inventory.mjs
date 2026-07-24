@@ -16,10 +16,9 @@ import {
   readFileSync,
   renameSync,
   rmSync,
-  writeFileSync,
   writeSync,
 } from 'node:fs';
-import { dirname, join, posix, relative, sep } from 'node:path';
+import { dirname, join, posix, sep } from 'node:path';
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 
@@ -68,24 +67,32 @@ export async function main(argv = process.argv.slice(2), env = {}) {
     switch (command) {
       case 'help':
       case '--help':
-      case '-h':
+      case '-h': {
         stdout(`${usage()}\n`);
         return 0;
-      case 'schema-check':
+      }
+      case 'schema-check': {
         return runSchemaCheck(repoRoot, stdout);
-      case 'generate':
+      }
+      case 'generate': {
         return runGenerate(repoRoot, flags, stdout);
-      case 'check':
+      }
+      case 'check': {
         return runCheck(repoRoot, flags, stdout);
-      case 'status':
+      }
+      case 'status': {
         return runStatus(repoRoot, flags, stdout);
-      case 'reconcile':
+      }
+      case 'reconcile': {
         return runReconcile(repoRoot, flags, stdout);
-      case 'ratchet':
+      }
+      case 'ratchet': {
         return runRatchet(repoRoot, flags, stdout);
-      default:
+      }
+      default: {
         stderr(`Unknown command: ${command}\n${usage()}\n`);
         return 2;
+      }
     }
   } catch (error) {
     const diagnostic = formatInventoryDiagnostic(error);
@@ -323,9 +330,7 @@ function runCheck(repoRoot, flags, stdout) {
 
   if (flags.policy || flags.strict) {
     const policyPath = join(repoRoot, REVIEW_POLICY_REL);
-    if (!existsSync(policyPath)) {
-      problems.push(`missing ${REVIEW_POLICY_REL} (local campaign; gitignored)`);
-    } else {
+    if (existsSync(policyPath)) {
       const policy = parseJsonSafe(readFileSync(policyPath, 'utf8'), { label: 'review-policy' });
       const p = /** @type {any} */ (policy);
       if (!p || typeof p !== 'object' || p.schemaVersion !== 1) {
@@ -354,6 +359,8 @@ function runCheck(repoRoot, flags, stdout) {
           );
         }
       }
+    } else {
+      problems.push(`missing ${REVIEW_POLICY_REL} (local campaign; gitignored)`);
     }
   }
 
@@ -421,14 +428,13 @@ function runCheck(repoRoot, flags, stdout) {
             break;
           }
         }
+        // sizes differ without missing — extras
         if (
           primary.size !== production.size &&
-          problems.every((p) => !p.includes('missing from primary'))
+          problems.every((p) => !p.includes('missing from primary')) &&
+          primary.size > production.size
         ) {
-          // sizes differ without missing — extras
-          if (primary.size > production.size) {
-            problems.push('primary shards contain non-production or unknown paths');
-          }
+          problems.push('primary shards contain non-production or unknown paths');
         }
       }
       if (flags.strict) {
@@ -803,13 +809,13 @@ function classifyTrackedFile(pathValue) {
   if (/\.(wasm|node|bin)$/u.test(pathValue) || pathValue.includes('/grammars/')) {
     return { classification: 'runtime-asset' };
   }
-  if (pathValue.startsWith('packages/') || pathValue.startsWith('scripts/')) {
-    if (isStructurallySupportedPath(pathValue) || pathValue.endsWith('.json')) {
-      // production-ish for package/runtime sources
-      if (pathValue.includes('/src/') || pathValue.startsWith('scripts/')) {
-        return { classification: 'production' };
-      }
-    }
+  // production-ish for package/runtime sources
+  if (
+    (pathValue.startsWith('packages/') || pathValue.startsWith('scripts/')) &&
+    (isStructurallySupportedPath(pathValue) || pathValue.endsWith('.json')) &&
+    (pathValue.includes('/src/') || pathValue.startsWith('scripts/'))
+  ) {
+    return { classification: 'production' };
   }
   if (pathValue.startsWith('packages/') && /\.(ts|tsx|mts|cts|js|mjs|cjs)$/u.test(pathValue)) {
     return { classification: 'production' };
@@ -839,11 +845,9 @@ function packageNameForPath(pathValue, packageByRelDir) {
   let best = '(root)';
   let bestLen = -1;
   for (const [relDir, name] of packageByRelDir) {
-    if (pathValue === relDir || pathValue.startsWith(`${relDir}/`)) {
-      if (relDir.length > bestLen) {
-        best = name;
-        bestLen = relDir.length;
-      }
+    if ((pathValue === relDir || pathValue.startsWith(`${relDir}/`)) && relDir.length > bestLen) {
+      best = name;
+      bestLen = relDir.length;
     }
   }
   return best;
@@ -1050,7 +1054,9 @@ function compareByCodePointLocal(a, b) {
  * @param {Record<string, unknown>} manifest
  */
 function digestableManifest(manifest) {
-  const { digest: _digest, createdAt: _createdAt, ...rest } = manifest;
+  const rest = { ...manifest };
+  delete rest.digest;
+  delete rest.createdAt;
   return rest;
 }
 

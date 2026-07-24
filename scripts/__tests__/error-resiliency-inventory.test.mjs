@@ -217,7 +217,7 @@ test('makeStructuralSiteId is deterministic', () => {
 test('detector coverage manifest is honest about non-TS languages', () => {
   const coverage = getDetectorCoverageManifest();
   assert.deepEqual(coverage, defaultDetectorCoverage());
-  assert.ok(coverage.humanReviewOnly.length >= 1);
+  assert.ok(coverage.humanReviewOnly.length > 0);
   assert.ok(BOUNDS.maxSourceFileBytes > 0);
 });
 
@@ -245,12 +245,12 @@ test('structural fingerprints ignore line shifts for same structure', () => {
   const left = extractStructuralSites(
     'pkg/x.ts',
     'function f() {\n  throw new Error("x");\n}\n',
-  ).sites.filter((s) => s.kind === 'throw');
+  ).sites.find((s) => s.kind === 'throw');
   const right = extractStructuralSites(
     'pkg/x.ts',
     'function f() {\n\n\n  throw new Error("x");\n}\n',
-  ).sites.filter((s) => s.kind === 'throw');
-  assert.equal(left[0]?.siteId, right[0]?.siteId);
+  ).sites.find((s) => s.kind === 'throw');
+  assert.equal(left?.siteId, right?.siteId);
 });
 
 test('inventory CLI schema-check succeeds against fixture root via library', () => {

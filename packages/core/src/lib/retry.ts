@@ -6,9 +6,9 @@
  * Clock, random, and sleep are injectable for deterministic tests.
  */
 
-import { normalizeFailure } from './failure-envelope.js';
-import { ToolError, createToolError } from './errors.js';
 import { coreSystemErrorCatalog } from './error-definition.js';
+import { ToolError, createToolError } from './errors.js';
+import { normalizeFailure } from './failure-envelope.js';
 
 const ABSOLUTE_ATTEMPT_BACKSTOP = 100;
 
@@ -132,8 +132,7 @@ export function defaultShouldRetry(error: unknown): boolean {
   }
   // Native Error / primitives: allow retry (withRetry historical default).
   const envelope = normalizeFailure(error);
-  if (envelope.definition.kind === 'cancelled') return false;
-  return true;
+  return envelope.definition.kind !== 'cancelled';
 }
 
 function computeDelay(
@@ -155,18 +154,23 @@ function computeDelay(
   );
   const r = options.random();
   switch (options.jitter) {
-    case 'none':
+    case 'none': {
       return Math.min(base, options.maxDelayMs);
-    case 'equal':
+    }
+    case 'equal': {
       return Math.min(base * 0.5 + r * base * 0.5, options.maxDelayMs);
+    }
     case 'decorrelated': {
       const prev = options.prevDelay ?? options.initialDelayMs;
       const next = Math.min(options.maxDelayMs, r * (prev * 3));
       return Math.max(options.initialDelayMs, next);
     }
-    case 'full':
-    default:
+    case 'full': {
       return Math.min(r * base, options.maxDelayMs);
+    }
+    default: {
+      return Math.min(r * base, options.maxDelayMs);
+    }
   }
 }
 
@@ -188,6 +192,7 @@ function safeOnRetry(
  * Execute an async function with exponential backoff retry.
  * Throws the last error if all attempts fail, or a cancellation/deadline error.
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- attempt/deadline/signal branches are load-bearing and clearer inline
 export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {
   const {
     maxAttempts = 3,

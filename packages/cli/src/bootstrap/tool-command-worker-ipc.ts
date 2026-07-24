@@ -88,7 +88,7 @@ export function errorMessage(
   return {
     kind: 'error',
     message: wire.message || message,
-    failureClass: (wire.failureClass as ToolCommandFailureClass | undefined) ?? failureClass,
+    failureClass: wire.failureClass ?? failureClass,
     ...(code === undefined && wire.code === undefined ? {} : { code: code ?? wire.code }),
     ...(detailCode === undefined && wire.detailCode === undefined
       ? {}

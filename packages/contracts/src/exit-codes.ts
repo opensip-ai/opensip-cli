@@ -32,22 +32,33 @@ export const EXIT_CODES = {
  */
 export function mapExitClassToExitCode(exitClass: string | undefined): number {
   switch (exitClass) {
-    case 'success':
+    case 'success': {
       return EXIT_CODES.SUCCESS;
-    case 'configuration':
+    }
+    case 'configuration': {
       return EXIT_CODES.CONFIGURATION_ERROR;
-    case 'not-found':
+    }
+    case 'not-found': {
       return EXIT_CODES.CHECK_NOT_FOUND;
-    case 'report-failed':
+    }
+    case 'report-failed': {
       return EXIT_CODES.REPORT_FAILED;
-    case 'plugin-incompatible':
+    }
+    case 'plugin-incompatible': {
       return EXIT_CODES.PLUGIN_INCOMPATIBLE;
-    case 'cancelled':
+    }
+    case 'cancelled': {
       return EXIT_CODES.CANCELLED;
-    case 'fatal':
-    case 'runtime':
-    default:
+    }
+    case 'fatal': {
       return EXIT_CODES.RUNTIME_ERROR;
+    }
+    case 'runtime': {
+      return EXIT_CODES.RUNTIME_ERROR;
+    }
+    default: {
+      return EXIT_CODES.RUNTIME_ERROR;
+    }
   }
 }
 

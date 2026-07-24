@@ -4,7 +4,7 @@
  * Serialize only machine-safe failure axes — never raw Error/cause objects.
  */
 
-import { canonicalToolErrorCode, isToolErrorLike, type ToolError } from '../lib/errors.js';
+import { canonicalToolErrorCode, isToolErrorLike } from '../lib/errors.js';
 import { normalizeFailure, toMachineFailureProjection } from '../lib/failure-envelope.js';
 
 import { getWorkerErrorFailureClass } from './worker-error-failure-class.js';
@@ -33,8 +33,8 @@ export function toWorkerFailureWire(error: unknown): WorkerFailureWire {
   let code: string | undefined;
   let detailCode: string | undefined;
   if (isToolErrorLike(error)) {
-    code = canonicalToolErrorCode(error as ToolError);
-    detailCode = error.code !== code ? error.code : undefined;
+    code = canonicalToolErrorCode(error);
+    detailCode = error.code === code ? undefined : error.code;
   } else if (envelope.known === 'known') {
     code = envelope.code;
   }

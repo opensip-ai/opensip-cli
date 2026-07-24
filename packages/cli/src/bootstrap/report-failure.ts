@@ -122,7 +122,7 @@ export function resolveReportFailure(detail: ReportFailureDetail): ResolvedRepor
             ...detail.log,
             ...(detail.log.data === undefined
               ? {}
-              : { data: toSafeDiagnosticRecord(detail.log.data) as Record<string, unknown> }),
+              : { data: toSafeDiagnosticRecord(detail.log.data) }),
           },
         }),
     ...(derived.failure === undefined ? {} : { failure: derived.failure }),

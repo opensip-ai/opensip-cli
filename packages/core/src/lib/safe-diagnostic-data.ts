@@ -5,10 +5,13 @@
  * and HTML encoding stay at final sinks — not here.
  */
 
-import { toJsonRecord, toJsonValue, type JsonRecord, type JsonValue } from './json-value.js';
 import { sanitizeErrorMetadata } from './errors.js';
+import { toJsonRecord, toJsonValue, type JsonRecord, type JsonValue } from './json-value.js';
 
+// Control-character ranges are intentional for diagnostic scrubbing.
+// eslint-disable-next-line no-control-regex -- strip C0 controls from operator text
 const CONTROL_CHARS = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
+// eslint-disable-next-line no-control-regex -- strip CSI ANSI sequences (ESC is a control)
 const ANSI = /\u001B\[[0-9;]*[A-Za-z]/gu;
 const CREDENTIAL_IN_URL = /:\/\/([^/@\s]+):([^@/\s]+)@/gu;
 
@@ -16,6 +19,8 @@ const CREDENTIAL_IN_URL = /:\/\/([^/@\s]+):([^@/\s]+)@/gu;
  * Bound and scrub a value for structured logs / public diagnostics.
  * Deny-by-default for Error/cause objects — use failure envelope instead.
  */
+// JsonValue is a union of scalar/object/array arms — each branch is a valid arm.
+// eslint-disable-next-line sonarjs/function-return-type -- intentionally multi-arm JsonValue
 export function toSafeDiagnosticData(value: unknown): JsonValue {
   if (value instanceof Error) {
     return toJsonRecord({

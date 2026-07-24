@@ -18,8 +18,6 @@ import {
   defaultDetectorCoverage,
 } from './error-resiliency-inventory.mjs';
 
-export { DETECTOR_VERSION };
-
 const STRUCTURAL_EXTENSIONS = new Set([
   '.ts',
   '.tsx',
@@ -103,14 +101,13 @@ export function extractStructuralSites(relativePath, sourceText) {
       if (name && isErrorConstruction(name)) {
         pushSite(sites, pathValue, sourceFile, node, 'error-construction', `new ${name}`);
       }
-    } else if (
+    } else // Common fallback: expr || default
+    if (
       ts.isBinaryExpression(node) &&
-      node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+      node.operatorToken.kind === ts.SyntaxKind.BarBarToken &&
+      (ts.isPropertyAccessExpression(node.left) || ts.isIdentifier(node.left))
     ) {
-      // Common fallback: expr || default
-      if (ts.isPropertyAccessExpression(node.left) || ts.isIdentifier(node.left)) {
-        pushSite(sites, pathValue, sourceFile, node, 'fallback', '||');
-      }
+      pushSite(sites, pathValue, sourceFile, node, 'fallback', '||');
     }
 
     ts.forEachChild(node, visit);
@@ -198,18 +195,23 @@ function buildSite(args) {
 function scriptKindForPath(pathValue) {
   const ext = extname(pathValue).toLowerCase();
   switch (ext) {
-    case '.tsx':
+    case '.tsx': {
       return ts.ScriptKind.TSX;
-    case '.jsx':
+    }
+    case '.jsx': {
       return ts.ScriptKind.JSX;
+    }
     case '.js':
     case '.mjs':
-    case '.cjs':
+    case '.cjs': {
       return ts.ScriptKind.JS;
-    case '.cts':
+    }
+    case '.cts': {
       return ts.ScriptKind.TS;
-    default:
+    }
+    default: {
       return ts.ScriptKind.TS;
+    }
   }
 }
 
@@ -226,7 +228,7 @@ function callName(expression) {
     }
     return right;
   }
-  return undefined;
+  return '';
 }
 
 /**
@@ -260,7 +262,7 @@ function isSignalCall(name) {
  */
 function isErrorConstruction(name) {
   return (
-    /Error$/u.test(name) ||
+    name.endsWith('Error') ||
     /^(ToolError|ValidationError|SystemError|NotFoundError|NetworkError|TimeoutError|ConfigurationError|PluginIncompatibleError|BootstrapError)$/u.test(
       name,
     )
@@ -293,3 +295,5 @@ function structuralSnippet(node, sourceFile) {
 export function getDetectorCoverageManifest() {
   return defaultDetectorCoverage();
 }
+
+export { DETECTOR_VERSION } from './error-resiliency-inventory.mjs';

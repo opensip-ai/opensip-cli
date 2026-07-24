@@ -120,7 +120,7 @@ async function main() {
     });
     all.push(...defs);
   }
-  all.sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
+  all.sort((a, b) => a.code.localeCompare(b.code));
   const payload = {
     schemaVersion: 1,
     generatedAt: new Date().toISOString(),

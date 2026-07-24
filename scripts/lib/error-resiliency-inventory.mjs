@@ -28,7 +28,7 @@ export const BOUNDS = Object.freeze({
   maxPathLength: 512,
   maxStringLength: 4096,
   maxFilesPerSnapshot: 100_000,
-  maxSitesPerFile: 2_000,
+  maxSitesPerFile: 2000,
   maxRecordsPerPackage: 50_000,
   maxSourceFileBytes: 2 * 1024 * 1024,
   maxNestingDepth: 32,
@@ -613,17 +613,22 @@ export function formatInventoryDiagnostic(error) {
 function repairHint(code) {
   switch (code) {
     case 'INVENTORY.FILE.NEEDS_DECISION':
-    case 'INVENTORY.SITE.NEEDS_DECISION':
+    case 'INVENTORY.SITE.NEEDS_DECISION': {
       return 'Resolve needs-decision at C3 and re-submit before C4/C5 acceptance.';
+    }
     case 'INVENTORY.PATH.ESCAPE':
-    case 'INVENTORY.PATH.UNSAFE':
+    case 'INVENTORY.PATH.UNSAFE': {
       return 'Use repository-relative POSIX paths without .. segments.';
-    case 'INVENTORY.JSON.PARSE':
+    }
+    case 'INVENTORY.JSON.PARSE': {
       return 'Fix JSON syntax in the evidence file and re-run schema validation.';
-    case 'INVENTORY.SCHEMA.VERSION':
+    }
+    case 'INVENTORY.SCHEMA.VERSION': {
       return 'Regenerate inventory artifacts with the current schema version 1 tooling.';
-    default:
+    }
+    default: {
       return `See ${INVENTORY_COOP_DIR}/rubric.md (local campaign) and re-run pnpm error-inventory:check.`;
+    }
   }
 }
 

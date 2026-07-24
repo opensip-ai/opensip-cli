@@ -15,8 +15,6 @@ import {
 } from '../lib/error-definition.js';
 import { coreSystemErrorCatalog } from '../lib/error-definition.js';
 
-export { coreSystemErrorCatalog, ERROR_CATALOG_SCHEMA_VERSION };
-
 /** Wire shape for optional tool catalog contribution. */
 export interface ToolErrorCatalogContribution {
   readonly schemaVersion: typeof ERROR_CATALOG_SCHEMA_VERSION;
@@ -48,8 +46,8 @@ export function validateToolErrorCatalogContribution(
     value.catalog &&
     typeof value.catalog === 'object' &&
     value.catalog !== null &&
-    'definitions' in (value.catalog as object) &&
-    'list' in (value.catalog as object)
+    'definitions' in value.catalog &&
+    'list' in value.catalog
   ) {
     const catalog = value.catalog as ErrorCatalog;
     if (catalog.owner?.id !== owner.id) {
@@ -101,3 +99,5 @@ export function aggregateErrorCatalogs(
 
   return { byCode, collisions };
 }
+
+export { coreSystemErrorCatalog, ERROR_CATALOG_SCHEMA_VERSION } from '../lib/error-definition.js';

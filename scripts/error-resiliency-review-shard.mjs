@@ -12,7 +12,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -156,22 +156,19 @@ function classifyFile(pathValue, content, sites) {
   // Pure type/re-export barrels with no control flow
   if (
     sites.length === 0 &&
-    !/\bthrow\b|\bcatch\b|withRetry|AbortSignal|process\.(on|once)|reportFailure/u.test(text)
-  ) {
-    if (
-      /\/types\.ts$/u.test(pathValue) ||
+    !/\bthrow\b|\bcatch\b|withRetry|AbortSignal|process\.(on|once)|reportFailure/u.test(text) &&
+    (/\/types\.ts$/u.test(pathValue) ||
       /\/index\.ts$/u.test(pathValue) ||
       text
         .trim()
         .split('\n')
-        .every((line) => /^(import|export|\/\*|\*|\/\/|\s|$)/u.test(line))
-    ) {
-      return {
-        fileDisposition: 'no-error-resiliency-responsibility',
-        rationale: 'No error/resiliency control flow detected after full-file read.',
-        boundaryFamily: undefined,
-      };
-    }
+        .every((line) => /^(import|export|\/\*|\*|\/\/|\s|$)/u.test(line)))
+  ) {
+    return {
+      fileDisposition: 'no-error-resiliency-responsibility',
+      rationale: 'No error/resiliency control flow detected after full-file read.',
+      boundaryFamily: undefined,
+    };
   }
 
   let boundaryFamily;

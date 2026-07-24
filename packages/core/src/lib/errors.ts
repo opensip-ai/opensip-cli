@@ -99,7 +99,7 @@ function sanitizeMetadataValue(value: unknown, depth: number): unknown {
   if (typeof value === 'number') return Number.isFinite(value) ? value : null;
   if (typeof value === 'boolean') return value;
   if (typeof value === 'bigint') return value.toString();
-  if (typeof value === 'function' || typeof value === 'symbol' || typeof value === 'undefined') {
+  if (typeof value === 'function' || typeof value === 'symbol' || value === undefined) {
     return undefined;
   }
   if (Array.isArray(value)) {

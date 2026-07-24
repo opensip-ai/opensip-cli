@@ -62,14 +62,23 @@ function truncate(text: string, max: number): string {
   return `${text.slice(0, max - 3)}...`;
 }
 
+function safePrimitiveString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  if (value === null) return 'null';
+  if (value === undefined) return 'undefined';
+  if (typeof value === 'symbol') return value.description ?? 'Symbol';
+  return typeof value;
+}
+
 function safeMessage(value: unknown): string {
   try {
     if (typeof value === 'string') return truncate(value, MAX_MESSAGE);
     if (value instanceof Error)
       return truncate(value.message || value.name || 'Error', MAX_MESSAGE);
-    if (value === null) return 'null';
-    if (value === undefined) return 'undefined';
-    return truncate(String(value), MAX_MESSAGE);
+    return truncate(safePrimitiveString(value), MAX_MESSAGE);
   } catch {
     return '<unstringifiable>';
   }
@@ -89,7 +98,7 @@ function readField<T>(obj: object, key: string, read: () => T, fallback: T): T {
 export function normalizeFailure(
   value: unknown,
   context: NormalizeFailureContext = {},
-  seen: WeakSet<object> = new WeakSet(),
+  seen = new WeakSet<object>(),
   depth = 0,
 ): FailureEnvelope {
   try {
@@ -134,13 +143,19 @@ function normalizeFailureInner(
     const name = readField(
       value,
       'name',
-      () => String((value as { name?: unknown }).name ?? ''),
+      () => {
+        const n = (value as { name?: unknown }).name;
+        return typeof n === 'string' ? n : '';
+      },
       '',
     );
     const message = readField(
       value,
       'message',
-      () => String((value as { message?: unknown }).message ?? safeMessage(value)),
+      () => {
+        const m = (value as { message?: unknown }).message;
+        return typeof m === 'string' ? m : safeMessage(value);
+      },
       safeMessage(value),
     );
     if (name === 'AbortError' || message === 'This operation was aborted') {
@@ -317,7 +332,7 @@ function freezeEnvelope(envelope: FailureEnvelope): FailureEnvelope {
 
 /** Public projection — no operatorDetail, metadata allowlisted by definition. */
 export function toPublicFailureProjection(envelope: FailureEnvelope): JsonRecord {
-  const allow = new Set(envelope.definition.publicMetadataKeys ?? []);
+  const allow = new Set(envelope.definition.publicMetadataKeys);
   /** @type {Record<string, unknown>} */
   const meta: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(envelope.metadata)) {

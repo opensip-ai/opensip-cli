@@ -151,6 +151,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Coerce only string primitives (reject objects that stringify to [object Object]). */
+function asBoundedString(value: unknown, label: string): string {
+  if (typeof value === 'string') return value;
+  if (value === undefined || value === null) return '';
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  throw new ErrorDefinitionError(`${label} must be a string`);
+}
+
 const SOURCES: readonly FailureSource[] = ['application', 'infrastructure', 'external'];
 const RESPONSIBILITIES: readonly FailureResponsibility[] = [
   'user',
@@ -209,10 +219,10 @@ export function normalizeErrorDefinition(
     throw new ErrorDefinitionError('definition must be a plain object');
   }
   // Reject prototype pollution / accessors by reading only own enumerable data fields
-  const code = assertErrorCodeShape(String(raw.code ?? ''), {
+  const code = assertErrorCodeShape(asBoundedString(raw.code, 'code'), {
     allowLegacy: opts.allowLegacyCodes,
   });
-  const operatorAction = String(raw.operatorAction ?? '');
+  const operatorAction = asBoundedString(raw.operatorAction, 'operatorAction');
   if (operatorAction.length === 0 || operatorAction.length > 512) {
     throw new ErrorDefinitionError(`definition ${code}: operatorAction required`);
   }
@@ -293,13 +303,15 @@ export function defineErrorCatalog<
     definitions[key] = def;
   }
 
-  const list = Object.freeze(Object.values(definitions).sort((a, b) => (a.code < b.code ? -1 : 1)));
+  const list = Object.freeze(
+    [...Object.values(definitions)].sort((a, b) => a.code.localeCompare(b.code)),
+  );
   const frozenDefs = deepFreeze(definitions);
 
   const catalog: ErrorCatalog<Extract<keyof TDefs, string>> = {
     schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
     owner: deepFreeze({ ...owner }),
-    definitions: frozenDefs as ErrorCatalog<Extract<keyof TDefs, string>>['definitions'],
+    definitions: frozenDefs,
     list,
     get(code: string) {
       return list.find((d) => d.code === code);
@@ -459,23 +471,31 @@ function legacyFamilyCode(code: string): string | undefined {
   if (!code.includes('.')) return undefined;
   const head = code.slice(0, code.indexOf('.'));
   switch (head) {
-    case 'CONFIGURATION':
+    case 'CONFIGURATION': {
       return 'CONFIGURATION_ERROR';
-    case 'VALIDATION':
+    }
+    case 'VALIDATION': {
       return 'VALIDATION_ERROR';
-    case 'PLUGIN':
+    }
+    case 'PLUGIN': {
       return 'PLUGIN_INCOMPATIBLE';
-    case 'TIMEOUT':
+    }
+    case 'TIMEOUT': {
       return 'TIMEOUT';
-    case 'SYSTEM':
+    }
+    case 'SYSTEM': {
       return 'SYSTEM_ERROR';
-    case 'NETWORK':
+    }
+    case 'NETWORK': {
       return 'NETWORK_ERROR';
-    case 'CAPABILITY':
+    }
+    case 'CAPABILITY': {
       // Unknown domain → not-found; schema/contribution mismatch → validation.
       return code.includes('.DOMAIN.') ? 'NOT_FOUND' : 'VALIDATION_ERROR';
-    default:
+    }
+    default: {
       return undefined;
+    }
   }
 }
 
