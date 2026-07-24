@@ -82,7 +82,11 @@ export const DataStoreFactory = {
     if (supportedVersion !== undefined) {
       const dbVersion = handle.readUserVersion();
       if (isDbNewerThanCli(dbVersion, supportedVersion)) {
-        handle.close();
+        // Mirror the migrate-failure lifecycle close below: a secondary
+        // checkpoint failure must not shadow the version error, but a truly
+        // unclosed native handle is more urgent and takes priority.
+        const closeResult = handle.closeForLifecycle();
+        if (!closeResult.closed) handle.close();
         throw new DataStoreVersionError({ path, dbVersion, supportedVersion });
       }
     }
@@ -138,7 +142,11 @@ function openAndMigrate(
   try {
     migrate(datastore.db, { migrationsFolder });
   } catch (error) {
-    datastore.close();
+    // Mirror the sqlite migrate-failure lifecycle close above: a secondary
+    // checkpoint failure must not shadow the migration error, but a truly
+    // unclosed native handle is more urgent and takes priority.
+    const closeResult = datastore.closeForLifecycle?.();
+    if (!closeResult?.closed) datastore.close();
     throw new DataStoreMigrationError(migrateFailureMessage(opts), {
       cause: error,
     });
