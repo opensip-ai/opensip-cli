@@ -851,9 +851,12 @@ describe('graph handlers (async GraphToolResult)', () => {
       fromPackage: 'pkg-a',
       toPackage: 'pkg-b',
       groupBy: 'package',
-      evidenceLimit: 0,
       filter: expect.objectContaining({ visibilities: ['private'] }),
     });
+    // groupBy implies evidence: an omitted evidenceLimit must be FORWARDED
+    // omitted (library default), never the aggregates-only 0 — grouping over
+    // zero rows silently reported itself complete.
+    expect(captured.why).not.toHaveProperty('evidenceLimit');
     expect(captured.cycles).toMatchObject({
       edgeKind: 'combined',
       groupBy: 'package',
@@ -892,6 +895,40 @@ describe('graph handlers (async GraphToolResult)', () => {
     await handlers.get('why_depends')!(args);
 
     expect(captured).toMatchObject({ edgeKind: 'combined' });
+    // Without groupBy, the documented aggregates-only default holds.
+    expect(captured).toMatchObject({ evidenceLimit: 0 });
+  });
+
+  it('floors an explicit evidenceLimit 0 at 1 when why_depends grouping is requested', async () => {
+    let captured: unknown;
+    const graph = fakePort({
+      whyDepends: (query) => {
+        captured = query;
+        return Promise.resolve(
+          ok(
+            wrap({
+              edgeKind: 'combined',
+              calls: [],
+              imports: [],
+              totalMatchingEvidence: 0,
+            }),
+          ),
+        );
+      },
+    });
+    const { handlers, server } = captureServer();
+    registerWhyDepends(server, deps(graph));
+
+    await handlers.get('why_depends')!({
+      fromPackage: 'pkg-a',
+      toPackage: 'pkg-b',
+      groupBy: 'package',
+      evidenceLimit: 0,
+    });
+
+    // Explicit 0 + groupBy is contradictory — grouping needs at least one
+    // evidence row per group key to exist at all.
+    expect(captured).toMatchObject({ groupBy: 'package', evidenceLimit: 1 });
   });
 
   it('maps port errors through errorResult', async () => {
