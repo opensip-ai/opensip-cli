@@ -46,8 +46,17 @@ export function findNearDuplicates(
   const rows = NEAR_DUP_SIGNATURE_K / bands;
   // bands MUST divide k evenly — otherwise `rows` is fractional and band slicing is
   // misaligned. `rows * bands === k` alone does not catch this (128/7*7 round-trips to
-  // 128 in IEEE-754), so test integrality.
-  if (!Number.isInteger(rows) || rows < 1) return emptyResult();
+  // 128 in IEEE-754), so test integrality. This is a programming-error contract
+  // violation (the library's only caller, graph, validates `lshBands` upstream via
+  // Zod), so it throws rather than silently returning an empty `complete: true`
+  // result — the latter would be indistinguishable from "ran clean, no near-dups".
+  if (!Number.isInteger(rows) || rows < 1) {
+    throw new Error(
+      `findNearDuplicates: invalid lshBands (${String(bands)}) — it must evenly divide ` +
+        `NEAR_DUP_SIGNATURE_K (${String(NEAR_DUP_SIGNATURE_K)}); ` +
+        `${String(NEAR_DUP_SIGNATURE_K)} / ${String(bands)} = ${String(rows)} is not a positive integer.`,
+    );
+  }
 
   const eligible = collectEligible(candidates, minBodySize);
   if (eligible.length < 2) return emptyResult();

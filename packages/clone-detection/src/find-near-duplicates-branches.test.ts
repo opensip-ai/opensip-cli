@@ -68,16 +68,18 @@ describe('findNearDuplicates branch behavior', () => {
     expect(result.coverage).toEqual({ complete: true, reasons: [], cappedBuckets: 0 });
   });
 
-  it('returns no clusters when the LSH band count cannot evenly partition the signature', () => {
-    expect(
-      findNearDuplicates(
-        [
-          cand({ bodyHash: 'a', language: 'typescript' }),
-          cand({ bodyHash: 'b', language: 'typescript' }),
-        ],
-        { lshBands: 7 },
-      ).clusters,
-    ).toEqual([]);
+  it('throws when lshBands cannot evenly partition the signature, instead of silently returning complete:true empty', () => {
+    // A silent empty result with `coverage.complete: true` would be
+    // indistinguishable from "ran clean, no near-dups" — the caller (graph)
+    // validates `lshBands` upstream via Zod, so this is a programming-error
+    // contract violation the library must surface loudly, not swallow.
+    const candidates = [
+      cand({ bodyHash: 'a', language: 'typescript' }),
+      cand({ bodyHash: 'b', language: 'typescript' }),
+    ];
+    expect(() => findNearDuplicates(candidates, { lshBands: 7 })).toThrow(
+      /invalid lshBands \(7\).*evenly divide/,
+    );
   });
 
   it('filters candidates without an eligible near-duplicate signature', () => {
