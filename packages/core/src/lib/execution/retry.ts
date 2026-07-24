@@ -53,6 +53,7 @@ async function backoff(
  * re-throws, and short-circuits for `shouldNotRetry` errors. Mirrors fitness's
  * former `executeWithRetry` exactly (same default backoff, same return shape).
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- retry/outcome branches mirror the fitness contract
 export async function runWithRetry<T>(
   fn: () => Promise<T>,
   options: PipelineRetryOptions,

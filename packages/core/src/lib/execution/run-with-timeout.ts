@@ -47,14 +47,18 @@ export interface RunWithTimeoutOptions<R> {
  * Compose a child AbortController that aborts when either parent or timeout fires.
  * Returns cleanup to remove the parent listener.
  */
+const noopCleanup = (): void => {
+  /* no parent signal to detach */
+};
+
 export function composeAbortSignals(
   parent: AbortSignal | undefined,
   child: AbortController,
 ): () => void {
-  if (!parent) return () => undefined;
+  if (!parent) return noopCleanup;
   if (parent.aborted) {
     child.abort(parent.reason);
-    return () => undefined;
+    return noopCleanup;
   }
   const onAbort = () => {
     child.abort(parent.reason);

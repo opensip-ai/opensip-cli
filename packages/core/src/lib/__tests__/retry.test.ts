@@ -99,9 +99,10 @@ describe('withRetry', () => {
     const clock = {
       now: () => 0,
       random: () => 0,
-      sleep: async (_ms: number, signal?: AbortSignal) => {
+      sleep: (_ms: number, signal?: AbortSignal) => {
         controller.abort();
-        if (signal?.aborted) throw new Error('aborted-sleep');
+        if (signal?.aborted) return Promise.reject(new Error('aborted-sleep'));
+        return Promise.resolve();
       },
     };
 
@@ -158,8 +159,9 @@ describe('withRetry', () => {
     const clock = {
       now: () => now,
       random: () => 0,
-      sleep: async (ms: number) => {
+      sleep: (ms: number) => {
         now += ms;
+        return Promise.resolve();
       },
     };
     const fn = vi.fn().mockRejectedValue(new Error('transient'));

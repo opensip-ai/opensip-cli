@@ -7,6 +7,7 @@
 import { logger, ConfigurationError } from '@opensip-cli/core';
 
 import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import { resolveChecks, validateCheckReferences } from './check-resolution.js';
 
 import type { FitnessRecipe } from './types.js';

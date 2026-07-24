@@ -45,10 +45,11 @@ describe('safe-diagnostic-data', () => {
   });
 
   it('bounds long text and strips control characters', () => {
-    const long = `${'a'.repeat(3000)}\u0001\u0002`;
+    const ctrl = String.fromCharCode(1, 2);
+    const long = `${'a'.repeat(3000)}${ctrl}`;
     const scrubbed = scrubText(long, 100);
     expect(scrubbed.length).toBeLessThanOrEqual(100);
-    expect(scrubbed).not.toMatch(/[\u0001\u0002]/);
+    expect(scrubbed.includes(ctrl)).toBe(false);
   });
 
   it('neutralizes terminal ANSI before control scrubbing', () => {

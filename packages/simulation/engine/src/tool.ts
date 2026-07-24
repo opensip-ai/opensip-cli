@@ -24,13 +24,13 @@ import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/co
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { isolatedSimPackBridge } from './capability/isolated-sim-pack.js';
-import { simulationErrorCatalog } from './errors/simulation-error-catalog.js';
 import { collectSimulationReportData } from './cli/report-data.js';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { simRecipesCommandSpec } from './cli/sim-recipes.js';
 import { renderSimLive } from './cli/sim-runner.js';
 import { simRunWorkerCommandSpec } from './cli/sim-worker.js';
 import { executeSim } from './cli/sim.js';
+import { simulationErrorCatalog } from './errors/simulation-error-catalog.js';
 import {
   createScenarioRegistry,
   createSimulationLoadState,

@@ -52,7 +52,6 @@
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
-import { fitnessErrorCatalog } from './errors/fitness-error-catalog.js';
 import {
   fitExportCommandSpec,
   fitListGroupedCommandSpec,
@@ -63,6 +62,7 @@ import { renderFitLive } from './cli/fit-runner.js';
 import { fitRunWorkerCommandSpec } from './cli/fit-worker.js';
 import { collectFitnessReportData } from './cli/report-data.js';
 import { fitnessConfigDeclaration } from './config/fitness-config-schema.js';
+import { fitnessErrorCatalog } from './errors/fitness-error-catalog.js';
 import { FileCache } from './framework/file-cache.js';
 import {
   createCheckRegistry,

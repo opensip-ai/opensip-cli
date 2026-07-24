@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 
 import { EXIT_CODES, mapExitClassToExitCode } from '@opensip-cli/contracts';
 import { normalizeFailure } from '@opensip-cli/core';
+import { describe, expect, it } from 'vitest';
 
 import { ScenarioAbortedError } from '../scenario-aborted-error.js';
 

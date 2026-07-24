@@ -1,6 +1,6 @@
+import { normalizeFailure } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { normalizeFailure } from '@opensip-cli/core';
 
 import { spawnFailureError } from '../../process-exec.js';
 import { externalToolErrorCatalog } from '../external-tool-error-catalog.js';

@@ -1,6 +1,6 @@
+import { SystemError, normalizeFailure } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { SystemError, normalizeFailure } from '@opensip-cli/core';
 
 import { mcpErrorCatalog } from '../mcp-error-catalog.js';
 

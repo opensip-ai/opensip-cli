@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { ToolError, createToolError } from '../errors.js';
 import { coreSystemErrorCatalog } from '../error-definition.js';
+import { ToolError, createToolError } from '../errors.js';
 import {
   normalizeFailure,
   toPublicFailureProjection,

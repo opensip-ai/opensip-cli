@@ -16,12 +16,13 @@
  * before storing it. `list()` / `get()` unwrap.
  */
 
-import { Registry, type Registerable } from '../lib/registry.js';
-import type { ErrorCatalog, ErrorDefinition } from '../lib/error-definition.js';
 import { ErrorDefinitionError } from '../lib/error-definition.js';
+import { Registry, type Registerable } from '../lib/registry.js';
+
 import { aggregateErrorCatalogs } from './error-catalog.js';
 
 import type { Tool } from './types.js';
+import type { ErrorCatalog, ErrorDefinition } from '../lib/error-definition.js';
 
 interface RegisterableTool extends Registerable {
   readonly id: string;

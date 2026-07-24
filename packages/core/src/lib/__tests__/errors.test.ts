@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
+import { coreSystemErrorCatalog } from '../../lib/error-definition.js';
 import {
   ToolError,
   ValidationError,
@@ -21,7 +22,6 @@ import {
   tryCatch,
   tryCatchAsync,
 } from '../../lib/errors.js';
-import { coreSystemErrorCatalog } from '../../lib/error-definition.js';
 
 import type { Result } from '../../lib/errors.js';
 

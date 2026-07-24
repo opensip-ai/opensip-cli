@@ -40,11 +40,11 @@ import { buildDatastoreThunk } from '../cli-context.js';
 import { assembleCorrelation } from './assemble-correlation.js';
 import { buildTargets } from './build-targets.js';
 import { composeAndValidateToolConfig, wireCapabilityRegistry } from './config-and-capabilities.js';
+import { getActiveInterruptSignal } from './interrupt-abort.js';
 import { admitCapabilityPackage } from './load-tool-capabilities.js';
 import { flushPolicyAuditEvents } from './policy-audit-flush.js';
 import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
-import { getActiveInterruptSignal } from './interrupt-abort.js';
 import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 
 import type { BuildPerRunScopeInput } from './build-per-run-scope-contract.js';

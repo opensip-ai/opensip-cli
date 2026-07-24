@@ -46,6 +46,8 @@ import {
   buildCommandRegistrationInput,
   resolveStartupExecutionMode,
 } from './bootstrap/index.js';
+import { installInterruptAbortCoordinator } from './bootstrap/interrupt-abort.js';
+import { installLastResortFailureNet } from './bootstrap/last-resort-failure-net.js';
 import { runLightweightCommandProbe } from './bootstrap/lightweight-command-probe.js';
 import { PolicyAuditCollector } from './bootstrap/policy-audit.js';
 import { rejectHostCommandCollisions } from './bootstrap/reject-host-command-collisions.js';
@@ -69,8 +71,6 @@ import {
   buildToolPluginGroups,
 } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
-import { installInterruptAbortCoordinator } from './bootstrap/interrupt-abort.js';
-import { installLastResortFailureNet } from './bootstrap/last-resort-failure-net.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { resolvedCommandLabel } from './telemetry/command-label.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';

@@ -3,7 +3,7 @@
  * (Plan 06). Combines core error types with contracts exit-code policy.
  */
 
-import { EXIT_CODES, mapExitClassToExitCode, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { mapExitClassToExitCode, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   SystemError,
   ToolError,
@@ -27,14 +27,6 @@ const MAX_DERIVED_ERROR_MESSAGE_LENGTH = 1000;
 export function truncateDerivedMessage(message: string): string {
   if (message.length <= MAX_DERIVED_ERROR_MESSAGE_LENGTH) return message;
   return `${message.slice(0, MAX_DERIVED_ERROR_MESSAGE_LENGTH - 3)}...`;
-}
-
-function stringFromUnknown(error: unknown): string {
-  try {
-    return String(error);
-  } catch {
-    return '<unstringifiable thrown value>';
-  }
 }
 
 function deriveErrorDefaults(error: unknown): {
