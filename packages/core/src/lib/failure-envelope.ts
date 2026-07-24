@@ -12,17 +12,33 @@ import {
   FAILURE_PROJECTION_SCHEMA_VERSION,
 } from './error-definition.js';
 import { isToolErrorLike, sanitizeErrorMetadata, type ToolError } from './errors.js';
-import { toJsonRecord, type JsonRecord } from './json-value.js';
 
 export const FAILURE_ENVELOPE_VERSION = FAILURE_PROJECTION_SCHEMA_VERSION;
 
 const MAX_CAUSE_DEPTH = 4;
 const MAX_AGGREGATE = 16;
 const MAX_MESSAGE = 1000;
-const MAX_OPERATOR_DETAIL = 2000;
+/** Shared with the projection egress layer (`failure-projection.ts`). */
+export const MAX_OPERATOR_DETAIL = 2000;
+/**
+ * Total-work ceiling across one normalize call. Depth (`MAX_CAUSE_DEPTH`) and
+ * per-level width (`MAX_AGGREGATE`) bound a *tree*, but a shared-node
+ * `AggregateError` DAG (the same child referenced at many parents) would
+ * re-expand `width^depth` times from a tiny input. This shared, mutable node
+ * budget caps the total nodes any single normalize traverses so the "never
+ * crash on hostile input" contract holds structurally, not per-branch.
+ */
+const MAX_TOTAL_NODES = 1000;
 
+/** Shared mutable work counter threaded through the recursion (parallel to `seen`). */
+interface NodeBudget {
+  remaining: number;
+}
+
+/** Whether a normalized failure matched a known error definition or degraded to unknown. */
 export type FailureKnownStatus = 'known' | 'unknown';
 
+/** One entry in a failure's bounded cause chain (see {@link FailureEnvelope.causes}). */
 export interface FailureCauseSummary {
   readonly code?: string;
   readonly name?: string;
@@ -30,6 +46,11 @@ export interface FailureCauseSummary {
   readonly known: FailureKnownStatus;
 }
 
+/**
+ * Canonical, frozen representation of any thrown value produced by
+ * {@link normalizeFailure}. Projection helpers render it for a specific audience
+ * (public / machine / operator) without leaking operator-only detail.
+ */
 export interface FailureEnvelope {
   readonly schemaVersion: typeof FAILURE_ENVELOPE_VERSION;
   readonly known: FailureKnownStatus;
@@ -47,6 +68,7 @@ export interface FailureEnvelope {
   readonly operatorDetail?: string;
 }
 
+/** Optional context passed to {@link normalizeFailure} (project root, sibling failures). */
 export interface NormalizeFailureContext {
   readonly projectRoot?: string;
   /** Optional sibling failures for aggregate envelopes. */
@@ -55,7 +77,8 @@ export interface NormalizeFailureContext {
 
 const UNKNOWN = coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
 
-function truncate(text: string, max: number): string {
+/** Shared with the projection egress layer (`failure-projection.ts`). */
+export function truncate(text: string, max: number): string {
   if (text.length <= max) return text;
   // Match report-failure style: length exactly `max` with ASCII ellipsis suffix.
   if (max <= 3) return text.slice(0, max);
@@ -100,9 +123,13 @@ export function normalizeFailure(
   context: NormalizeFailureContext = {},
   seen = new WeakSet<object>(),
   depth = 0,
+  budget?: NodeBudget,
 ): FailureEnvelope {
+  // A fresh budget per top-level call; recursion threads the same object so the
+  // node ceiling is shared across the whole DAG (never per-branch).
+  const activeBudget = budget ?? { remaining: MAX_TOTAL_NODES };
   try {
-    return normalizeFailureInner(value, context, seen, depth);
+    return normalizeFailureInner(value, context, seen, depth, activeBudget);
   } catch {
     return unknownEnvelope('normalize-emergency', undefined);
   }
@@ -113,25 +140,40 @@ function normalizeFailureInner(
   context: NormalizeFailureContext,
   seen: WeakSet<object>,
   depth: number,
+  budget: NodeBudget,
 ): FailureEnvelope {
+  // Structural work ceiling: a shared-node aggregate DAG can reference the same
+  // child at every parent, so depth+width caps alone do not bound total work.
+  if (budget.remaining <= 0) {
+    return unknownEnvelope('node-budget-exhausted', undefined);
+  }
+  budget.remaining -= 1;
+
   if (depth > MAX_CAUSE_DEPTH + 2) {
     return unknownEnvelope('max-depth', undefined);
   }
 
   // AggregateError or explicit siblings
   if (typeof AggregateError !== 'undefined' && value instanceof AggregateError) {
-    return buildAggregate(value.errors, context, seen, depth, safeMessage(value));
+    return fromAggregateError(value, context, seen, depth, budget);
   }
   if (context.siblings && context.siblings.length > 0 && depth === 0) {
-    return buildAggregate([value, ...context.siblings], context, seen, depth, 'aggregate failure');
+    return buildAggregate(
+      [value, ...context.siblings],
+      context,
+      seen,
+      depth,
+      budget,
+      'aggregate failure',
+    );
   }
 
   if (isToolErrorLike(value)) {
-    return fromToolError(value, context, seen, depth);
+    return fromToolError(value, context, seen, depth, budget);
   }
 
   if (value instanceof Error) {
-    return fromNativeError(value, context, seen, depth);
+    return fromNativeError(value, context, seen, depth, budget);
   }
 
   if (typeof value === 'object' && value !== null) {
@@ -188,9 +230,10 @@ function fromToolError(
   context: NormalizeFailureContext,
   seen: WeakSet<object>,
   depth: number,
+  budget: NodeBudget,
 ): FailureEnvelope {
   const definition = error.definition ?? definitionFromLegacyCode(error.code);
-  const causes = collectCauses(error.cause, context, seen, depth + 1);
+  const causes = collectCauses(error.cause, context, seen, depth + 1, budget);
   const metadata = sanitizeErrorMetadata(error.metadata ?? {});
   return freezeEnvelope({
     schemaVersion: FAILURE_ENVELOPE_VERSION,
@@ -213,6 +256,7 @@ function fromNativeError(
   context: NormalizeFailureContext,
   seen: WeakSet<object>,
   depth: number,
+  budget: NodeBudget,
 ): FailureEnvelope {
   if (seen.has(error)) {
     return unknownEnvelope('circular-error', undefined);
@@ -244,7 +288,7 @@ function fromNativeError(
     }
   }
 
-  const causes = collectCauses(error.cause, context, seen, depth + 1);
+  const causes = collectCauses(error.cause, context, seen, depth + 1, budget);
   return freezeEnvelope({
     schemaVersion: FAILURE_ENVELOPE_VERSION,
     known: 'unknown',
@@ -268,9 +312,10 @@ function collectCauses(
   context: NormalizeFailureContext,
   seen: WeakSet<object>,
   depth: number,
+  budget: NodeBudget,
 ): FailureCauseSummary[] {
   if (cause === undefined || cause === null || depth > MAX_CAUSE_DEPTH) return [];
-  const nested = normalizeFailure(cause, context, seen, depth);
+  const nested = normalizeFailure(cause, context, seen, depth, budget);
   return [
     {
       ...(nested.code ? { code: nested.code } : {}),
@@ -281,16 +326,34 @@ function collectCauses(
   ].slice(0, MAX_CAUSE_DEPTH);
 }
 
+function fromAggregateError(
+  value: AggregateError,
+  context: NormalizeFailureContext,
+  seen: WeakSet<object>,
+  depth: number,
+  budget: NodeBudget,
+): FailureEnvelope {
+  // Dedup the aggregate node itself: a shared-node DAG re-references the same
+  // AggregateError under many parents; expanding it once collapses width^depth
+  // fan-out to O(distinct nodes) (the object/native-Error branches already do this).
+  if (seen.has(value)) {
+    return unknownEnvelope('circular-aggregate', undefined);
+  }
+  seen.add(value);
+  return buildAggregate(value.errors, context, seen, depth, budget, safeMessage(value));
+}
+
 function buildAggregate(
   members: readonly unknown[],
   context: NormalizeFailureContext,
   seen: WeakSet<object>,
   depth: number,
+  budget: NodeBudget,
   headline: string,
 ): FailureEnvelope {
   const sliced = members.slice(0, MAX_AGGREGATE);
   const aggregate = sliced.map((m) =>
-    normalizeFailure(m, { ...context, siblings: undefined }, seen, depth + 1),
+    normalizeFailure(m, { ...context, siblings: undefined }, seen, depth + 1, budget),
   );
   const truncated = members.length > MAX_AGGREGATE;
   const first = aggregate[0] ?? unknownEnvelope(headline, undefined);
@@ -328,71 +391,4 @@ function unknownEnvelope(message: string, original: unknown): FailureEnvelope {
 
 function freezeEnvelope(envelope: FailureEnvelope): FailureEnvelope {
   return Object.freeze(envelope);
-}
-
-/** Public projection — no operatorDetail, metadata allowlisted by definition. */
-export function toPublicFailureProjection(envelope: FailureEnvelope): JsonRecord {
-  const allow = new Set(envelope.definition.publicMetadataKeys);
-  /** @type {Record<string, unknown>} */
-  const meta: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(envelope.metadata)) {
-    if (allow.has(k)) meta[k] = v;
-  }
-  return toJsonRecord({
-    schemaVersion: envelope.schemaVersion,
-    code: envelope.code,
-    message: envelope.message,
-    action: envelope.operatorAction,
-    source: envelope.definition.source,
-    responsibility: envelope.definition.defaultResponsibility,
-    kind: envelope.definition.kind,
-    retry: envelope.definition.retry,
-    severity: envelope.definition.severity,
-    known: envelope.known,
-    ...(Object.keys(meta).length > 0 ? { metadata: meta } : {}),
-    ...(envelope.aggregate
-      ? { aggregate: envelope.aggregate.map((a) => toPublicFailureProjection(a)) }
-      : {}),
-  });
-}
-
-/** Machine / worker-safe projection (redacted metadata, no operatorDetail/stack). */
-export function toMachineFailureProjection(envelope: FailureEnvelope): JsonRecord {
-  return toJsonRecord({
-    schemaVersion: envelope.schemaVersion,
-    code: envelope.code,
-    message: envelope.message,
-    action: envelope.operatorAction,
-    source: envelope.definition.source,
-    responsibility: envelope.definition.defaultResponsibility,
-    kind: envelope.definition.kind,
-    retry: envelope.definition.retry,
-    severity: envelope.definition.severity,
-    exposure: envelope.definition.exposure,
-    exitClass: envelope.definition.exitClass,
-    known: envelope.known,
-    ...(envelope.failureClass === undefined ? {} : { failureClass: envelope.failureClass }),
-    metadata: sanitizeErrorMetadata(envelope.metadata),
-    causes: envelope.causes.map((c) => ({
-      message: c.message,
-      known: c.known,
-      ...(c.code ? { code: c.code } : {}),
-    })),
-    ...(envelope.aggregate
-      ? {
-          aggregate: envelope.aggregate.map((a) => toMachineFailureProjection(a)),
-          ...(envelope.aggregateTruncated ? { aggregateTruncated: true } : {}),
-        }
-      : {}),
-  });
-}
-
-/** Local operator projection — may include operatorDetail; still no raw Error objects. */
-export function toOperatorFailureProjection(envelope: FailureEnvelope): JsonRecord {
-  return toJsonRecord({
-    ...toMachineFailureProjection(envelope),
-    ...(envelope.operatorDetail === undefined
-      ? {}
-      : { operatorDetail: truncate(envelope.operatorDetail, MAX_OPERATOR_DETAIL) }),
-  });
 }

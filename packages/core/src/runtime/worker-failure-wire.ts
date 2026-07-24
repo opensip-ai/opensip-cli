@@ -5,7 +5,8 @@
  */
 
 import { canonicalToolErrorCode, isToolErrorLike } from '../lib/errors.js';
-import { normalizeFailure, toMachineFailureProjection } from '../lib/failure-envelope.js';
+import { normalizeFailure } from '../lib/failure-envelope.js';
+import { toMachineFailureProjection } from '../lib/failure-projection.js';
 
 import { getWorkerErrorFailureClass } from './worker-error-failure-class.js';
 

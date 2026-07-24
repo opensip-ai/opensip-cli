@@ -52,13 +52,12 @@ export type {
 } from './lib/error-definition.js';
 
 // Lib — failure envelope + safe diagnostics (Plan 00 Phase 3)
+export { normalizeFailure, FAILURE_ENVELOPE_VERSION } from './lib/failure-envelope.js';
 export {
-  normalizeFailure,
   toPublicFailureProjection,
   toMachineFailureProjection,
   toOperatorFailureProjection,
-  FAILURE_ENVELOPE_VERSION,
-} from './lib/failure-envelope.js';
+} from './lib/failure-projection.js';
 export type {
   FailureEnvelope,
   FailureCauseSummary,

@@ -169,7 +169,17 @@ export async function runWithTimeout<R>(
   });
 
   // Race so a non-settling domain cannot hang the scheduler/recipe.
-  const outcome = await Promise.race([workPromise, hardTimeout]);
+  let outcome: UnitRunOutcome<R>;
+  try {
+    outcome = await Promise.race([workPromise, hardTimeout]);
+  } finally {
+    // Release the parent-signal listener + timer even when the hard timeout wins
+    // and the (non-cooperative) domain promise never settles. Otherwise `finish()`
+    // only runs inside the workPromise branches, leaking one listener per such unit
+    // on the long-lived shared parent signal (violating the parentSignal contract).
+    // `finish()` is idempotent, so the workPromise branch that also calls it is safe.
+    finish();
+  }
 
   // If the hard timeout won, the domain promise may still settle (or reject) later.
   // Attach a no-op handler so a late rejection does not become an unhandled promise rejection.

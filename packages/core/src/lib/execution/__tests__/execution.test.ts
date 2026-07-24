@@ -65,6 +65,25 @@ describe('runWithTimeout', () => {
     expect(out.status === 'error' && (out.error as Error).message).toBe('boom');
   });
 
+  it('detaches the parent-signal listener when the hard timeout wins a non-settling run', async () => {
+    // Regression: detachParent() ran only inside the workPromise branches, so a
+    // hard timeout winning the race against a callee that never settles (and
+    // never fires the parent) left the parent 'abort' listener attached for the
+    // parent signal's whole lifetime — one leaked listener per such unit on the
+    // shared root signal, violating the parentSignal "no leaked listeners" contract.
+    const parent = new AbortController();
+    const removeSpy = vi.spyOn(parent.signal, 'removeEventListener');
+    const out = await runWithTimeout({
+      // Never settles and ignores abort → only the hard timeout ends the race.
+      run: () => new Promise<number>(() => {}),
+      timeoutMs: 10,
+      parentSignal: parent.signal,
+    });
+    expect(out.status).toBe('timeout');
+    expect(removeSpy).toHaveBeenCalledWith('abort', expect.any(Function));
+    removeSpy.mockRestore();
+  });
+
   describe('with a retry policy (the retry branch)', () => {
     const retry = { enabled: true, maxRetries: 2, backoffMs: [0, 0] } as const;
 

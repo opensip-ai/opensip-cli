@@ -2,12 +2,12 @@ import { describe, it, expect } from 'vitest';
 
 import { coreSystemErrorCatalog } from '../error-definition.js';
 import { ToolError, createToolError } from '../errors.js';
+import { normalizeFailure } from '../failure-envelope.js';
 import {
-  normalizeFailure,
   toPublicFailureProjection,
   toMachineFailureProjection,
   toOperatorFailureProjection,
-} from '../failure-envelope.js';
+} from '../failure-projection.js';
 
 describe('normalizeFailure', () => {
   it('normalizes ToolError with definition', () => {
@@ -110,6 +110,27 @@ describe('normalizeFailure', () => {
     expect(env.message.length).toBeGreaterThan(0);
     expect(typeof env.code).toBe('string');
     expect(typeof env.operatorAction).toBe('string');
+  });
+
+  it('bounds shared-node AggregateError DAGs without exponential amplification', () => {
+    // Regression: a shared-node DAG references the SAME AggregateError child
+    // MAX_AGGREGATE times at every level. Depth + per-level width cap a *tree*,
+    // but this tiny structure (a few dozen objects) would re-expand width^depth
+    // (~16^8) times without a shared visited-set + total-node budget — hanging or
+    // OOMing the last-resort failure net. The normalizer must dedup the shared
+    // node and cap total work: termination itself is the proof (a regression does
+    // not return), and the envelope stays bounded + serializable.
+    let node = new AggregateError([new Error('leaf')], 'leaf');
+    for (let level = 0; level < 8; level += 1) {
+      node = new AggregateError(
+        Array.from({ length: 16 }, () => node),
+        `level-${level}`,
+      );
+    }
+    const env = normalizeFailure(node);
+    expect(env.schemaVersion).toBe(1);
+    expect(env.aggregate?.length).toBeLessThanOrEqual(16);
+    expect(() => JSON.stringify(toMachineFailureProjection(env))).not.toThrow();
   });
 
   it('handles cyclic cause graphs without hanging', () => {
