@@ -749,6 +749,7 @@ const EXPORT_ALLOWLIST = {
   mutateAnchoredRecord: 'run-kernel',
   mutateRuntimePromotionJournal: 'run-kernel',
   mutateUserUninstallReceipt: 'run-kernel',
+  readUserUninstallReceipt: 'run-kernel',
   readAnchoredRecord: 'run-kernel',
   readRuntimePromotionJournal: 'run-kernel',
   resolveCoordinationPaths: 'run-kernel',
