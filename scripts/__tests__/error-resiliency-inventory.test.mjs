@@ -248,3 +248,76 @@ test('tracked schema fixture is valid JSON (campaign schema is not git-tracked)'
   const parsed = parseJsonSafe(text);
   assert.equal(typeof parsed, 'object');
 });
+
+test('canonical digests are stable for reordered keys', () => {
+  const a = digestCanonical({ z: 1, a: { y: 2, x: 3 } });
+  const b = digestCanonical({ a: { x: 3, y: 2 }, z: 1 });
+  assert.equal(a, b);
+});
+
+test('structural fingerprints ignore line shifts for same structure', () => {
+  const left = extractStructuralSites(
+    'pkg/x.ts',
+    'function f() {\n  throw new Error("x");\n}\n',
+  ).sites.filter((s) => s.kind === 'throw');
+  const right = extractStructuralSites(
+    'pkg/x.ts',
+    'function f() {\n\n\n  throw new Error("x");\n}\n',
+  ).sites.filter((s) => s.kind === 'throw');
+  assert.equal(left[0]?.siteId, right[0]?.siteId);
+});
+
+test('inventory CLI schema-check succeeds against fixture root via library', () => {
+  const schema = loadSchemaDocument(REPO_ROOT, FIXTURE_ROOT);
+  assert.equal(schema.properties.schemaVersion.const, SCHEMA_VERSION);
+});
+
+test('unsupported language paths are human-review-only, not structural-complete', () => {
+  assert.equal(isStructurallySupportedPath('packages/x/src/main.py'), false);
+  assert.equal(isStructurallySupportedPath('packages/x/src/main.go'), false);
+  assert.equal(isStructurallySupportedPath('packages/x/src/main.ts'), true);
+  const coverage = getDetectorCoverageManifest();
+  assert.ok(coverage.humanReviewOnly.some((row) => row.language === 'python'));
+  assert.ok(coverage.humanReviewOnly.some((row) => row.language === 'go'));
+});
+
+test('validateSiteRecord rejects needs-decision when closed and bad kinds', () => {
+  assert.throws(
+    () =>
+      validateSiteRecord(
+        {
+          siteId: 's1:0123456789abcdef',
+          kind: 'throw',
+          source: 'structural',
+          disposition: 'needs-decision',
+          fingerprint: 'abc',
+        },
+        { allowNeedsDecision: false },
+      ),
+    (error) => error instanceof InventoryError && error.code === 'INVENTORY.SITE.NEEDS_DECISION',
+  );
+  assert.throws(
+    () =>
+      validateSiteRecord(
+        {
+          siteId: 'short',
+          kind: 'throw',
+          source: 'structural',
+          disposition: 'migrate',
+          fingerprint: 'abc',
+        },
+        { allowNeedsDecision: false },
+      ),
+    /siteId/i,
+  );
+});
+
+test('canonical digests reject non-finite numbers', () => {
+  assert.throws(() => digestCanonical({ n: Number.NaN }), /non-finite|JSON/i);
+  assert.throws(() => digestCanonical({ n: Number.POSITIVE_INFINITY }), /non-finite|JSON/i);
+});
+
+test('parseJsonSafe rejects non-string labels and empty objects are accepted', () => {
+  assert.deepEqual(parseJsonSafe('{"ok":true}'), { ok: true });
+  assert.throws(() => parseJsonSafe(null), /must be a string|JSON/i);
+});

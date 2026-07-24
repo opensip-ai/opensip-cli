@@ -90,3 +90,87 @@ describe('deepFreeze', () => {
     expect(Object.isFrozen(value.a)).toBe(true);
   });
 });
+
+describe('error definition axes coverage', () => {
+  const owner = { id: 'test.owner', displayName: 'Test' };
+  const base = {
+    source: 'application' as const,
+    defaultResponsibility: 'user' as const,
+    kind: 'validation' as const,
+    retry: 'never' as const,
+    severity: 'error' as const,
+    exposure: 'public' as const,
+    exitClass: 'configuration' as const,
+    operatorAction: 'act',
+    stability: 'public' as const,
+    lifecycle: 'active' as const,
+  };
+
+  it('accepts lifecycle tombstoned with supersededBy', () => {
+    const catalog = defineErrorCatalog(owner, {
+      'TEST.LIFE.OLD': {
+        ...base,
+        code: 'TEST.LIFE.OLD',
+        lifecycle: 'tombstoned',
+        supersededBy: 'TEST.LIFE.NEW',
+      },
+    });
+    expect(catalog.require('TEST.LIFE.OLD').lifecycle).toBe('tombstoned');
+    expect(catalog.require('TEST.LIFE.OLD').supersededBy).toBe('TEST.LIFE.NEW');
+  });
+
+  it('covers retry postures and exit classes used by core system catalog', () => {
+    const retries = new Set(coreSystemErrorCatalog.list.map((d) => d.retry));
+    const exits = new Set(coreSystemErrorCatalog.list.map((d) => d.exitClass));
+    expect(retries.has('never')).toBe(true);
+    expect(retries.has('transient')).toBe(true);
+    expect(exits.has('configuration')).toBe(true);
+    expect(exits.has('not-found')).toBe(true);
+    expect(exits.has('runtime')).toBe(true);
+  });
+
+  it('rejects hostile non-plain catalog definitions', () => {
+    expect(() =>
+      defineErrorCatalog(owner, {
+        bad: Object.create({ code: 'TEST.HOST.X', ...base }),
+      } as never),
+    ).toThrow();
+  });
+
+  it('accepts source × responsibility combinations used by core catalog', () => {
+    const sources = new Set(coreSystemErrorCatalog.list.map((d) => d.source));
+    const responsibilities = new Set(
+      coreSystemErrorCatalog.list.map((d) => d.defaultResponsibility),
+    );
+    expect(sources.has('application')).toBe(true);
+    expect(responsibilities.size).toBeGreaterThan(0);
+    for (const d of coreSystemErrorCatalog.list) {
+      expect(d.stability === 'public' || d.stability === 'internal').toBe(true);
+      expect(['active', 'deprecated', 'tombstoned']).toContain(d.lifecycle);
+    }
+  });
+
+  it('rejects empty operatorAction and invalid code shapes', () => {
+    expect(() =>
+      defineErrorCatalog(owner, {
+        'TEST.BAD.EMPTY': {
+          ...base,
+          code: 'TEST.BAD.EMPTY',
+          operatorAction: '',
+        },
+      }),
+    ).toThrow(ErrorDefinitionError);
+    expect(() => assertErrorCodeShape('lowercase.bad')).toThrow(ErrorDefinitionError);
+    expect(() => assertErrorCodeShape('OK.CODE.SHAPE')).not.toThrow();
+  });
+
+  it('lists are stable ordered views of definitions map', () => {
+    const catalog = defineErrorCatalog(owner, {
+      'TEST.Z.LAST': { ...base, code: 'TEST.Z.LAST' },
+      'TEST.A.FIRST': { ...base, code: 'TEST.A.FIRST' },
+    });
+    expect(catalog.list.map((d) => d.code).sort()).toEqual(['TEST.A.FIRST', 'TEST.Z.LAST']);
+    expect(catalog.get('TEST.A.FIRST')?.code).toBe('TEST.A.FIRST');
+    expect(catalog.get('MISSING')).toBeUndefined();
+  });
+});

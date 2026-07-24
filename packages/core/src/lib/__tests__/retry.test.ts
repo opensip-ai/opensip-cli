@@ -133,4 +133,46 @@ describe('withRetry', () => {
       withRetry(fn, { maxAttempts: 3, initialDelayMs: 1, onRetry, useDefinitionRetry: false }),
     ).resolves.toBe('ok');
   });
+
+  it('fails before first attempt when signal already aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const fn = vi.fn().mockResolvedValue('ok');
+    await expect(
+      withRetry(fn, { signal: controller.signal, maxAttempts: 3, initialDelayMs: 1 }),
+    ).rejects.toThrow();
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('does not retry cancelled errors', async () => {
+    const { createCancelledError } = await import('../../lib/retry.js');
+    const fn = vi.fn().mockRejectedValue(createCancelledError('stop'));
+    await expect(withRetry(fn, { maxAttempts: 5, initialDelayMs: 1 })).rejects.toThrow(/stop|cancel/i);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('respects deadline via injectable clock', async () => {
+    let now = 0;
+    const clock = {
+      now: () => now,
+      random: () => 0,
+      sleep: async (ms: number) => {
+        now += ms;
+      },
+    };
+    const fn = vi.fn().mockRejectedValue(new Error('transient'));
+    await expect(
+      withRetry(fn, {
+        maxAttempts: 10,
+        initialDelayMs: 50,
+        // Absolute clock deadline (not a relative duration).
+        deadlineMs: 30,
+        // full jitter with random=0 yields 0 delay and would never advance time.
+        jitter: 'none',
+        clock,
+        useDefinitionRetry: false,
+      }),
+    ).rejects.toThrow();
+    expect(fn.mock.calls.length).toBeLessThan(10);
+  });
 });
