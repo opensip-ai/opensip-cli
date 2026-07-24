@@ -15,7 +15,12 @@
 
 import { createInterface } from 'node:readline';
 
-import { GLOBAL_CONFIG_PATH, readGlobalConfig, writeGlobalConfig } from '@opensip-cli/config';
+import {
+  GLOBAL_CONFIG_PATH,
+  readGlobalConfig,
+  withGlobalConfigLock,
+  writeGlobalConfig,
+} from '@opensip-cli/config';
 import { resolveUserPaths } from '@opensip-cli/core';
 import { checkEntitlement, DEFAULT_CLOUD_ENDPOINT } from '@opensip-cli/output';
 
@@ -100,8 +105,14 @@ export async function executeConfigure(): Promise<ConfigureDoneResult> {
     };
   }
 
-  existing.apiKey = key;
-  writeGlobalConfig(existing);
+  // Re-read INSIDE the lock: `existing` was read before the interactive
+  // prompt, and a concurrent writer (e.g. `policy trust`) may have changed the
+  // file since — the whole-file overwrite must not discard its change.
+  withGlobalConfigLock(() => {
+    const current = readGlobalConfig();
+    current.apiKey = key;
+    writeGlobalConfig(current);
+  });
 
   // Test the key against the cloud entitlement endpoint (documented step 4).
   await verifyConfiguredKey(key);

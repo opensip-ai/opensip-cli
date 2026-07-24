@@ -98,6 +98,7 @@ export {
   readGlobalConfig,
   readGlobalTrustPolicy,
   revokeCapabilityTrust,
+  withGlobalConfigLock,
   writeGlobalConfig,
   resolveApiKey,
   resolveEffectiveCloudConfig,

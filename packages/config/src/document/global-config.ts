@@ -29,7 +29,7 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { EnvRegistry, isPlainRecord, type EnvVarSpec } from '@opensip-cli/core';
+import { EnvRegistry, isPlainRecord, withFileLock, type EnvVarSpec } from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
 import {
@@ -55,6 +55,37 @@ const CONFIG_ENV = new EnvRegistry(CONFIG_ENV_SPECS);
 const OPENSIP_DIR = join(homedir(), '.opensip-cli');
 /** User-level config file path. */
 export const GLOBAL_CONFIG_PATH = join(OPENSIP_DIR, 'config.yml');
+
+/** Same-directory lockfile serializing global-config read-modify-write cycles. */
+const GLOBAL_CONFIG_LOCK_PATH = join(OPENSIP_DIR, '.config.yml.lock');
+const GLOBAL_CONFIG_LOCK_POLICY = Object.freeze({
+  waitMs: 2000,
+  staleMs: 30_000,
+  heartbeatMs: 5000,
+});
+
+/**
+ * Serialize a global-config read-modify-write cycle. `writeGlobalConfig`'s
+ * temp+rename is atomic against torn READS, but two concurrent RMW cycles
+ * (e.g. `policy trust` in one terminal, `configure` in another) still lose
+ * the first writer's change to the second's whole-file overwrite. Every
+ * mutation that reads the config before writing it back must run inside this
+ * lock, with the read INSIDE `fn`.
+ */
+export function withGlobalConfigLock<T>(fn: () => T): T {
+  if (!existsSync(OPENSIP_DIR)) {
+    mkdirSync(OPENSIP_DIR, { recursive: true });
+  }
+  return withFileLock(
+    GLOBAL_CONFIG_LOCK_PATH,
+    {
+      policy: GLOBAL_CONFIG_LOCK_POLICY,
+      resource: 'runtime',
+      operation: 'global-config-rmw',
+    },
+    fn,
+  );
+}
 
 /**
  * Shape of `~/.opensip-cli/config.yml`. Open-ended on purpose — future
@@ -129,26 +160,28 @@ export function grantCapabilityTrust(grant: {
   readonly manifestHash: string;
   readonly grantedAt?: string;
 }): void {
-  const config = readGlobalConfig();
-  const existing = readGlobalTrustPolicy();
-  if (existing.error !== undefined) {
-    throw new Error(
-      `user-level policy block is invalid (${existing.error}); fix ${GLOBAL_CONFIG_PATH} before granting trust`,
-    );
-  }
-  const policy: UserTrustPolicyDocument = existing.policy ?? {};
-  const grants = (policy.trustedCapabilityPacks ?? []).filter((entry) => entry.id !== grant.id);
-  const nextPolicy = userTrustPolicySchema.safeParse({
-    ...policy,
-    trustedCapabilityPacks: [...grants, { ...grant }],
-  });
-  if (!nextPolicy.success) {
-    const summary = nextPolicy.error.issues.map((issue) => issue.message).join('; ');
-    throw new Error(`capability trust grant would make the user policy invalid: ${summary}`);
-  }
-  writeGlobalConfig({
-    ...config,
-    policy: nextPolicy.data,
+  withGlobalConfigLock(() => {
+    const config = readGlobalConfig();
+    const existing = readGlobalTrustPolicy();
+    if (existing.error !== undefined) {
+      throw new Error(
+        `user-level policy block is invalid (${existing.error}); fix ${GLOBAL_CONFIG_PATH} before granting trust`,
+      );
+    }
+    const policy: UserTrustPolicyDocument = existing.policy ?? {};
+    const grants = (policy.trustedCapabilityPacks ?? []).filter((entry) => entry.id !== grant.id);
+    const nextPolicy = userTrustPolicySchema.safeParse({
+      ...policy,
+      trustedCapabilityPacks: [...grants, { ...grant }],
+    });
+    if (!nextPolicy.success) {
+      const summary = nextPolicy.error.issues.map((issue) => issue.message).join('; ');
+      throw new Error(`capability trust grant would make the user policy invalid: ${summary}`);
+    }
+    writeGlobalConfig({
+      ...config,
+      policy: nextPolicy.data,
+    });
   });
 }
 
@@ -159,17 +192,19 @@ export function grantCapabilityTrust(grant: {
  * broken document already grants nothing).
  */
 export function revokeCapabilityTrust(id: string): boolean {
-  const config = readGlobalConfig();
-  const existing = readGlobalTrustPolicy();
-  if (existing.error !== undefined || existing.policy === undefined) return false;
-  const grants = existing.policy.trustedCapabilityPacks ?? [];
-  const kept = grants.filter((entry) => entry.id !== id);
-  if (kept.length === grants.length) return false;
-  writeGlobalConfig({
-    ...config,
-    policy: { ...existing.policy, trustedCapabilityPacks: kept },
+  return withGlobalConfigLock(() => {
+    const config = readGlobalConfig();
+    const existing = readGlobalTrustPolicy();
+    if (existing.error !== undefined || existing.policy === undefined) return false;
+    const grants = existing.policy.trustedCapabilityPacks ?? [];
+    const kept = grants.filter((entry) => entry.id !== id);
+    if (kept.length === grants.length) return false;
+    writeGlobalConfig({
+      ...config,
+      policy: { ...existing.policy, trustedCapabilityPacks: kept },
+    });
+    return true;
   });
-  return true;
 }
 
 /**
