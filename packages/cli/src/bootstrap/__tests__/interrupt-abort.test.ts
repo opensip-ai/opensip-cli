@@ -1,3 +1,4 @@
+import { logger } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { installInterruptAbortCoordinator } from '../interrupt-abort.js';
@@ -5,6 +6,36 @@ import { installInterruptAbortCoordinator } from '../interrupt-abort.js';
 describe('installInterruptAbortCoordinator', () => {
   afterEach(() => {
     // Ensure listeners cleaned between tests
+  });
+
+  it('logs a structured record on the first interrupt (troubleshooting trace)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const coord = installInterruptAbortCoordinator();
+    process.emit('SIGINT');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ evt: 'cli.interrupt.received', signal: 'SIGINT' }),
+    );
+    coord.dispose();
+    warnSpy.mockRestore();
+  });
+
+  it('logs a force-exit record (with cause) before exiting', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const coord = installInterruptAbortCoordinator({ secondInterruptWindowMs: 60_000 });
+    process.emit('SIGINT'); // first: cancel
+    process.emit('SIGINT'); // second: force-exit
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'cli.interrupt.force_exit',
+        signal: 'SIGINT',
+        exitCode: 130,
+        cause: 'second-interrupt',
+      }),
+    );
+    coord.dispose();
+    exitSpy.mockRestore();
+    warnSpy.mockRestore();
   });
 
   it('aborts the root signal on first SIGINT', () => {

@@ -7,11 +7,20 @@
  * POSIX 130/143. Registering a SIGTERM/SIGINT listener removes Node's default
  * terminate action, so the grace timer is required for single-signal
  * supervisors (CI, pack smoke) to still converge.
+ *
+ * Both edges are logged (`cli.interrupt.received` on the first interrupt,
+ * `cli.interrupt.force_exit` before a forced exit) so a run's log shows it was
+ * interrupted rather than crashed or exited cleanly. The logger's file sink is a
+ * synchronous append, so the force-exit record survives the immediate exit.
  */
 
-import { createCancelledError } from '@opensip-cli/core';
+import { createCancelledError, currentLogger } from '@opensip-cli/core';
 
 const SECOND_INTERRUPT_WINDOW_MS = 2000;
+const INTERRUPT_MODULE = 'interrupt-abort';
+
+/** Why the process is being force-terminated (for the interrupt log record). */
+type ForceExitCause = 'second-interrupt' | 'grace-timeout';
 
 export type InterruptSignal = 'SIGINT' | 'SIGTERM';
 
@@ -39,8 +48,22 @@ function forceExitCode(name: InterruptSignal): number {
   return name === 'SIGTERM' ? 143 : 130;
 }
 
-function forceExit(name: InterruptSignal): void {
+function forceExit(name: InterruptSignal, cause: ForceExitCause): void {
   const code = forceExitCode(name);
+  try {
+    // Record the forced termination BEFORE exiting — the logger's file sink is a
+    // synchronous appendFileSync, so this survives the immediate process.exit and
+    // leaves a durable trace for troubleshooting (interrupted vs crashed vs clean).
+    currentLogger().warn({
+      evt: 'cli.interrupt.force_exit',
+      module: INTERRUPT_MODULE,
+      signal: name,
+      exitCode: code,
+      cause,
+    });
+  } catch {
+    // Logging must never block the forced exit.
+  }
   try {
     process.exitCode = code;
     // @fitness-ignore-next-line no-local-exit-or-stdout -- Process edge (Plan 00 §4.7): a SECOND SIGINT/SIGTERM within the grace window force-terminates a cooperative cancellation that did not complete; it must exit now (130/143), bypassing the possibly-stuck top-level boundary.
@@ -80,11 +103,23 @@ export function installInterruptAbortCoordinator(
       // Second interrupt always escalates (even after the grace window), so a
       // hung process cannot ignore repeated Ctrl-C / SIGTERM once cancel started.
       clearGrace();
-      forceExit(name);
+      forceExit(name, 'second-interrupt');
       return;
     }
     firstAt = Date.now();
     firstSignal = name;
+    // Leave a durable, structured trace that the run was interrupted (vs crashed
+    // or exited cleanly) — valuable when troubleshooting after the fact.
+    try {
+      currentLogger().warn({
+        evt: 'cli.interrupt.received',
+        module: INTERRUPT_MODULE,
+        signal: name,
+        action: 'aborting run; interrupt again or wait for the grace window to force-exit',
+      });
+    } catch {
+      // Never let logging throw into the signal handler.
+    }
     if (!controller.signal.aborted) {
       controller.abort(createCancelledError(`Received ${name}`));
     }
@@ -97,7 +132,7 @@ export function installInterruptAbortCoordinator(
     // does not exit the process first (Node no longer auto-exits once we listen).
     graceTimer = setTimeout(() => {
       if (disposed) return;
-      forceExit(firstSignal ?? name);
+      forceExit(firstSignal ?? name, 'grace-timeout');
     }, windowMs);
     // Do not keep the event loop alive solely for the grace timer.
     graceTimer.unref?.();
