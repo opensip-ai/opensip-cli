@@ -73,8 +73,8 @@ export {
 } from './lib/safe-diagnostic-data.js';
 export { unwrapOrLog, matchLog } from './lib/result-logging.js';
 export type { ResultLogContext } from './lib/result-logging.js';
-export { appendBoundedUtf8Text } from './lib/bounded-text.js';
-export type { BoundedTextAppendResult } from './lib/bounded-text.js';
+export { createBoundedUtf8Capture } from './lib/bounded-text.js';
+export type { BoundedUtf8Capture } from './lib/bounded-text.js';
 export { compareByCodePoint } from './lib/compare-by-code-point.js';
 
 // Lib — embedded-render mode (suite steps run headless; host owns the visible output).

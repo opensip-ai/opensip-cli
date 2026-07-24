@@ -1,44 +1,85 @@
 import { describe, expect, it } from 'vitest';
 
-import { appendBoundedUtf8Text } from '../bounded-text.js';
+import { createBoundedUtf8Capture } from '../bounded-text.js';
 
-describe('appendBoundedUtf8Text', () => {
+describe('createBoundedUtf8Capture', () => {
+  it('decodes a multi-byte character split across chunk boundaries', () => {
+    // 'é' is two UTF-8 bytes; split them across two appends.
+    const full = Buffer.from('héllo', 'utf8');
+    const capture = createBoundedUtf8Capture(100);
+    capture.append(full.subarray(0, 2));
+    capture.append(full.subarray(2));
+    expect(capture.value).toBe('héllo');
+    expect(capture.truncated).toBe(false);
+  });
+
+  it('decodes a 4-byte emoji split one byte per chunk', () => {
+    const full = Buffer.from('😀', 'utf8');
+    const capture = createBoundedUtf8Capture(100);
+    for (let index = 0; index < full.length; index++) {
+      capture.append(full.subarray(index, index + 1));
+    }
+    expect(capture.value).toBe('😀');
+    expect(capture.truncated).toBe(false);
+  });
+
   it('M18: does not leave a lone high surrogate when truncating mid-pair', () => {
     // U+1F600 😀 is a surrogate pair in JS strings (length 2).
-    const emoji = '😀';
-    const out = appendBoundedUtf8Text('', Buffer.from(emoji, 'utf8'), 1);
-    expect(out.truncated).toBe(true);
+    const capture = createBoundedUtf8Capture(1);
+    capture.append(Buffer.from('😀', 'utf8'));
+    expect(capture.truncated).toBe(true);
     // Cap of 1 code unit would cut after the high surrogate; drop it instead.
-    expect(out.value).toBe('');
-    expect(out.value).not.toMatch(/[\uD800-\uDBFF]$/);
+    expect(capture.value).toBe('');
+    expect(capture.value).not.toMatch(/[\uD800-\uDBFF]$/);
   });
 
   it('appends chunks until the limit is reached', () => {
-    expect(appendBoundedUtf8Text('abc', Buffer.from('def'), 6)).toEqual({
-      value: 'abcdef',
-      truncated: false,
-    });
+    const capture = createBoundedUtf8Capture(6);
+    capture.append(Buffer.from('abc'));
+    capture.append(Buffer.from('def'));
+    expect(capture.value).toBe('abcdef');
+    expect(capture.truncated).toBe(false);
   });
 
   it('truncates at the configured limit', () => {
-    expect(appendBoundedUtf8Text('abc', Buffer.from('def'), 5)).toEqual({
-      value: 'abcde',
-      truncated: true,
-    });
+    const capture = createBoundedUtf8Capture(5);
+    capture.append(Buffer.from('abc'));
+    capture.append(Buffer.from('def'));
+    expect(capture.value).toBe('abcde');
+    expect(capture.truncated).toBe(true);
   });
 
-  it('keeps the existing buffer when it is already at or past the limit', () => {
-    expect(appendBoundedUtf8Text('abcdef', Buffer.from('xyz'), 6)).toEqual({
-      value: 'abcdef',
-      truncated: true,
-    });
-    expect(appendBoundedUtf8Text('abcdefg', Buffer.from('xyz'), 6)).toEqual({
-      value: 'abcdef',
-      truncated: true,
-    });
-    expect(appendBoundedUtf8Text('abc', Buffer.from('xyz'), 0)).toEqual({
-      value: '',
-      truncated: true,
-    });
+  it('drops whole chunks once at the limit and reports truncation', () => {
+    const capture = createBoundedUtf8Capture(3);
+    capture.append(Buffer.from('abc'));
+    expect(capture.truncated).toBe(false);
+    capture.append(Buffer.from('xyz'));
+    expect(capture.value).toBe('abc');
+    expect(capture.truncated).toBe(true);
+  });
+
+  it('treats a zero cap as capture-nothing', () => {
+    const capture = createBoundedUtf8Capture(0);
+    capture.append(Buffer.from('abc'));
+    expect(capture.value).toBe('');
+    expect(capture.truncated).toBe(true);
+  });
+
+  it('does not report truncation for an empty or partial-only chunk at the limit', () => {
+    const capture = createBoundedUtf8Capture(3);
+    capture.append(Buffer.from('abc'));
+    capture.append(Buffer.alloc(0));
+    // First byte of a 2-byte sequence: decoder buffers it, emits nothing.
+    capture.append(Buffer.from([0xc3]));
+    expect(capture.value).toBe('abc');
+    expect(capture.truncated).toBe(false);
+  });
+
+  it('drops a trailing incomplete sequence instead of emitting U+FFFD', () => {
+    const capture = createBoundedUtf8Capture(100);
+    capture.append(Buffer.from('ab', 'utf8'));
+    capture.append(Buffer.from([0xc3])); // child killed mid-'é'
+    expect(capture.value).toBe('ab');
+    expect(capture.value).not.toContain('�');
   });
 });

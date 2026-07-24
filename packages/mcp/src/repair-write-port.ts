@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 
 import {
-  appendBoundedUtf8Text,
+  createBoundedUtf8Capture,
   err,
   ok,
   snapshotEnv,
@@ -150,10 +150,9 @@ export class CliRepairWritePort implements RepairWritePort {
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
-      let stdout = '';
-      let stderr = '';
+      const stdout = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
+      const stderr = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
       let timedOut = false;
-      let truncated = false;
       let settled = false;
       let killEscalationTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -188,16 +187,12 @@ export class CliRepairWritePort implements RepairWritePort {
       }, this.timeoutMs);
 
       child.stdout.on('data', (chunk: Buffer) => {
-        const next = appendBoundedUtf8Text(stdout, chunk, MAX_CAPTURE_BYTES);
-        stdout = next.value;
-        truncated ||= next.truncated;
-        if (truncated) requestStop();
+        stdout.append(chunk);
+        if (stdout.truncated) requestStop();
       });
       child.stderr.on('data', (chunk: Buffer) => {
-        const next = appendBoundedUtf8Text(stderr, chunk, MAX_CAPTURE_BYTES);
-        stderr = next.value;
-        truncated ||= next.truncated;
-        if (truncated) requestStop();
+        stderr.append(chunk);
+        if (stderr.truncated) requestStop();
       });
       child.on('error', (error) => {
         settle(
@@ -215,17 +210,17 @@ export class CliRepairWritePort implements RepairWritePort {
           settle(err(readError('repair-timeout', 'repair apply verify timed out')));
           return;
         }
-        if (truncated) {
+        if (stdout.truncated || stderr.truncated) {
           settle(err(readError('repair-output-too-large', 'repair output exceeded capture limit')));
           return;
         }
-        const parsed = parseApplyVerifyResult(stdout);
-        if (!parsed.ok && stderr.trim() !== '') {
+        const parsed = parseApplyVerifyResult(stdout.value);
+        if (!parsed.ok && stderr.value.trim() !== '') {
           settle(
             err(
               readError(
                 parsed.error.code,
-                sanitizeMcpErrorMessage(`${parsed.error.message}; stderr: ${stderr}`, {
+                sanitizeMcpErrorMessage(`${parsed.error.message}; stderr: ${stderr.value}`, {
                   projectRoot: this.projectRoot,
                 }),
               ),

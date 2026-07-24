@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 
-import { appendBoundedUtf8Text, snapshotEnv, type EnvVarSpec } from '@opensip-cli/core';
+import { createBoundedUtf8Capture, snapshotEnv, type EnvVarSpec } from '@opensip-cli/core';
 
 import { changedFilesForRepair } from './changes.js';
 import {
@@ -83,47 +83,42 @@ export const defaultProcessRunner: ProcessRunner = (request) =>
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
+    const stdout = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
+    const stderr = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
     let timedOut = false;
-    let truncated = false;
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
     }, request.timeoutMs);
 
     child.stdout.on('data', (chunk: Buffer) => {
-      const next = appendBoundedUtf8Text(stdout, chunk, MAX_CAPTURE_BYTES);
-      stdout = next.value;
-      truncated ||= next.truncated;
-      if (truncated) child.kill('SIGTERM');
+      stdout.append(chunk);
+      if (stdout.truncated) child.kill('SIGTERM');
     });
     child.stderr.on('data', (chunk: Buffer) => {
-      const next = appendBoundedUtf8Text(stderr, chunk, MAX_CAPTURE_BYTES);
-      stderr = next.value;
-      truncated ||= next.truncated;
-      if (truncated) child.kill('SIGTERM');
+      stderr.append(chunk);
+      if (stderr.truncated) child.kill('SIGTERM');
     });
     child.on('error', (error) => {
       clearTimeout(timer);
       resolve({
         exitCode: null,
-        stdout,
+        stdout: stdout.value,
         stderr: error.message,
         durationMs: Date.now() - startedAt,
         timedOut: false,
-        truncated,
+        truncated: stdout.truncated || stderr.truncated,
       });
     });
     child.on('close', (exitCode) => {
       clearTimeout(timer);
       resolve({
         exitCode,
-        stdout,
-        stderr,
+        stdout: stdout.value,
+        stderr: stderr.value,
         durationMs: Date.now() - startedAt,
         timedOut,
-        truncated,
+        truncated: stdout.truncated || stderr.truncated,
       });
     });
   });

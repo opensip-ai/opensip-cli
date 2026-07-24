@@ -1,26 +1,52 @@
-/** Result of appending a text chunk under a bounded capture limit. */
-export interface BoundedTextAppendResult {
+import { StringDecoder } from 'node:string_decoder';
+
+/**
+ * Stateful bounded UTF-8 stream capture.
+ *
+ * Stream chunks split multi-byte UTF-8 sequences at arbitrary byte boundaries;
+ * decoding each chunk independently mangles the split character into U+FFFD
+ * pairs. The capture owns a `StringDecoder` so partial sequences carry across
+ * `append` calls. A trailing incomplete sequence (child killed mid-write) is
+ * dropped rather than emitted as a replacement character.
+ */
+export interface BoundedUtf8Capture {
+  /** Decode `chunk` and append under the cap. Excess text is dropped. */
+  append(chunk: Buffer): void;
+  /** Captured text so far (never exceeds the cap). */
   readonly value: string;
+  /** True once any decoded text was dropped by the cap. */
   readonly truncated: boolean;
 }
 
-/** Append a UTF-8 chunk to a string without exceeding a caller-owned character cap. */
-export function appendBoundedUtf8Text(
-  buffer: string,
-  chunk: Buffer,
-  maxLength: number,
-): BoundedTextAppendResult {
-  const limit = Math.max(0, maxLength);
-  if (buffer.length >= limit) {
-    return { value: sliceAvoidingSurrogateSplit(buffer, limit), truncated: true };
-  }
-  const remaining = limit - buffer.length;
-  const text = chunk.toString('utf8');
-  if (text.length <= remaining) return { value: buffer + text, truncated: false };
-  // M18: do not leave a lone high surrogate at the cut boundary.
+/** Create a capture that keeps at most `maxChars` UTF-16 code units. */
+export function createBoundedUtf8Capture(maxChars: number): BoundedUtf8Capture {
+  const limit = Math.max(0, maxChars);
+  const decoder = new StringDecoder('utf8');
+  let value = '';
+  let truncated = false;
   return {
-    value: buffer + sliceAvoidingSurrogateSplit(text, remaining),
-    truncated: true,
+    append(chunk: Buffer): void {
+      const text = decoder.write(chunk);
+      if (text.length === 0) return;
+      if (value.length >= limit) {
+        truncated = true;
+        return;
+      }
+      const remaining = limit - value.length;
+      if (text.length <= remaining) {
+        value += text;
+        return;
+      }
+      // M18: do not leave a lone high surrogate at the cut boundary.
+      value += sliceAvoidingSurrogateSplit(text, remaining);
+      truncated = true;
+    },
+    get value(): string {
+      return value;
+    },
+    get truncated(): boolean {
+      return truncated;
+    },
   };
 }
 

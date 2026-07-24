@@ -123,7 +123,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'assertCommandSpec',
   'assertCompatibilityPoliciesComplete',
   'assertManifestMatchesTool',
-  'appendBoundedUtf8Text',
+  'createBoundedUtf8Capture',
   'assessHostSupport',
   'buildLineStarts',
   'buildMinimalTextTree',
