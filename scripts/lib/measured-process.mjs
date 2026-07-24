@@ -840,6 +840,15 @@ export async function runMeasuredCommand(input) {
   let rssSamplerFault = false;
   let deliveredSignal;
   let rootCloseObserved = false;
+  // Optional readiness gate for a native signal (see nativeSignal.afterReady):
+  // arm the signal only once the child announces readiness on stdout.
+  const nativeReadyMarker =
+    typeof input.nativeSignal?.afterReady === 'string' ? input.nativeSignal.afterReady : undefined;
+  const NATIVE_READY_BUFFER_CAP = 8192;
+  let nativeReadyBuffer = '';
+  let nativeReadySeen = false;
+  /** Set inside the exit-Promise executor; invoked when the ready marker lands. */
+  let armNativeSignalOnReady;
 
   const spawnChild = input.spawnChild ?? spawn;
   const useProcessGroup = input.useProcessGroup ?? process.platform !== 'win32';
@@ -886,6 +895,17 @@ export async function runMeasuredCommand(input) {
   const onStdout = (chunk) => {
     stdout.push(chunk);
     stdoutCapture?.push(chunk);
+    if (nativeReadyMarker !== undefined && !nativeReadySeen) {
+      nativeReadyBuffer += chunk.toString('utf8');
+      if (nativeReadyBuffer.length > NATIVE_READY_BUFFER_CAP) {
+        nativeReadyBuffer = nativeReadyBuffer.slice(-NATIVE_READY_BUFFER_CAP);
+      }
+      if (nativeReadyBuffer.includes(nativeReadyMarker)) {
+        nativeReadySeen = true;
+        nativeReadyBuffer = '';
+        armNativeSignalOnReady?.();
+      }
+    }
   };
   const onStderr = (chunk) => stderr.push(chunk);
   child.stdout?.on('data', onStdout);
@@ -1061,10 +1081,23 @@ export async function runMeasuredCommand(input) {
       timeoutHandle = setTimeout(() => beginTermination('timeout'), input.timeoutMs);
     }
     if (input.nativeSignal !== undefined) {
-      nativeSignalHandle = setTimeout(
-        () => beginTermination('native-signal', input.nativeSignal.signal),
-        input.nativeSignal.afterMs,
-      );
+      const armNativeSignal = () => {
+        if (nativeSignalHandle !== undefined) return; // idempotent
+        nativeSignalHandle = setTimeout(
+          () => beginTermination('native-signal', input.nativeSignal.signal),
+          input.nativeSignal.afterMs,
+        );
+      };
+      if (nativeReadyMarker === undefined) {
+        // No readiness gate: fixed post-spawn delay (unchanged behavior).
+        armNativeSignal();
+      } else {
+        // Readiness-gated: arm when the marker lands on stdout. If it already
+        // landed before this executor ran, arm now; otherwise onStdout arms it.
+        // If the marker never appears, the timeout path terminates the run.
+        armNativeSignalOnReady = armNativeSignal;
+        if (nativeReadySeen) armNativeSignal();
+      }
     }
   });
 
@@ -1399,15 +1432,27 @@ export async function runMeasuredProcess(spec, ctx = {}) {
       (spec.nativeSignal.signal !== 'SIGINT' && spec.nativeSignal.signal !== 'SIGTERM') ||
       !Number.isSafeInteger(spec.nativeSignal.afterMs) ||
       spec.nativeSignal.afterMs <= 0 ||
-      spec.nativeSignal.afterMs >= timeoutMs
+      spec.nativeSignal.afterMs >= timeoutMs ||
+      (spec.nativeSignal.afterReady !== undefined &&
+        (typeof spec.nativeSignal.afterReady !== 'string' ||
+          spec.nativeSignal.afterReady.length === 0))
     ) {
       throw new TypeError(
-        'runMeasuredProcess nativeSignal requires SIGINT/SIGTERM and 0 < afterMs < timeoutMs',
+        'runMeasuredProcess nativeSignal requires SIGINT/SIGTERM, 0 < afterMs < timeoutMs, and a non-empty afterReady marker when provided',
       );
     }
     nativeSignal = {
       signal: spec.nativeSignal.signal,
       afterMs: spec.nativeSignal.afterMs,
+      // Optional readiness gate: when set, the signal is armed only after this
+      // marker appears on the child's stdout (proof the child is fully spawned,
+      // process-group joined, and its handler registered), with afterMs as a
+      // post-ready settle — instead of a fixed post-spawn delay that races child
+      // startup under load (a PTY process-group-membership race that force-kills
+      // a not-yet-ready child).
+      ...(spec.nativeSignal.afterReady === undefined
+        ? {}
+        : { afterReady: spec.nativeSignal.afterReady }),
       // The PTY wrapper is not the CLI. Forward the exact native signal to the
       // hosted CLI descendant once, then retain the whole group for bounded
       // escalation/cleanup if the child does not terminate.

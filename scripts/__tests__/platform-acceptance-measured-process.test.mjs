@@ -335,7 +335,11 @@ test('the production port delivers exact SIGINT/SIGTERM with bounded tree cleanu
         argv: [process.execPath, '-e', SIGNAL_CHILD_SOURCE, signal, marker],
         cwd: process.cwd(),
         timeoutMs,
-        nativeSignal: { signal, afterMs: 150 },
+        // Gate the signal on the child's readiness announcement (it prints
+        // `ready:<signal>` once its handler is registered) rather than a fixed
+        // post-spawn delay, which races child startup under load on a PTY (the
+        // child would be force-killed before it could receive the signal).
+        nativeSignal: { signal, afterMs: 150, afterReady: `ready:${signal}` },
         pty,
         rssSampleIntervalMs: 25,
       });
