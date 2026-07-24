@@ -76,6 +76,20 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
     expect(html).toContain('const EDITOR_PROTOCOL = "vscode";');
   });
 
+  it('embeds PROJECT_ROOT = null when no projectRoot is supplied', () => {
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: null });
+    expect(html).toContain('const PROJECT_ROOT = null;');
+  });
+
+  it('embeds PROJECT_ROOT as a JS string constant when supplied', () => {
+    const html = generateDashboardHtml({
+      sessions: [],
+      graphCatalog: minimalCatalog,
+      projectRoot: '/repo/root',
+    });
+    expect(html).toContain('const PROJECT_ROOT = "/repo/root";');
+  });
+
   it('embeds the restructured view ids via the views[] registry', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
     // The views register from the typed client bundle (L4); esbuild emits

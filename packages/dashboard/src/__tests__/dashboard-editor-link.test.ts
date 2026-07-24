@@ -8,8 +8,13 @@
  * (L4) — NOT a page global. Its sole consumer is the Function Card's action row
  * (an "Open in editor" anchor when the URL resolves, a "Copy path" button
  * otherwise), so the test drives it through that public surface: define the
- * `EDITOR_PROTOCOL` page global, boot the bundle (which exposes `openFunctionCard`
- * / `buildIndexes`), open a card, and read the resulting anchor href.
+ * `EDITOR_PROTOCOL` / `PROJECT_ROOT` page globals, boot the bundle (which exposes
+ * `openFunctionCard` / `buildIndexes`), open a card, and read the resulting
+ * anchor href.
+ *
+ * `vscode://file/` / `cursor://file/` requires an ABSOLUTE path — the catalog
+ * only carries repo-relative paths, so `editorLinkUrl` posix-joins the embedded
+ * `PROJECT_ROOT` with the relative path before building the URL.
  */
 
 import { describe, expect, it, beforeEach } from 'vitest';
@@ -51,17 +56,19 @@ const CATALOG: GraphCatalog = {
   },
 };
 
-/** Boot the bundle with the given EDITOR_PROTOCOL, open the card for h1, return its action anchor href (or null). */
+/** Boot the bundle with the given EDITOR_PROTOCOL/PROJECT_ROOT, open the card for h1, return its action anchor href (or null). */
 function editorHref(
   protocol: string | null,
   line = 42,
   filePath = 'packages/x/src/x.ts',
+  projectRoot: string | null = '/repo/root',
 ): string | null {
   document.body.innerHTML = '';
   const protoSrc =
     protocol === null
       ? 'var EDITOR_PROTOCOL = null;'
       : 'var EDITOR_PROTOCOL = ' + JSON.stringify(protocol) + ';';
+  const rootSrc = 'var PROJECT_ROOT = ' + JSON.stringify(projectRoot) + ';';
   const cat: GraphCatalog = {
     ...CATALOG,
     functions: {
@@ -69,7 +76,11 @@ function editorHref(
     },
   };
   const head =
-    'var sessions = [];\n' + protoSrc + '\nvar graphCatalog = null;\nvar graphIndexes = null;\n';
+    'var sessions = [];\n' +
+    protoSrc +
+    '\n' +
+    rootSrc +
+    '\nvar graphCatalog = null;\nvar graphIndexes = null;\n';
   const tail = `
 graphCatalog = ${JSON.stringify(cat)};
 graphIndexes = buildIndexes(graphCatalog);
@@ -87,17 +98,29 @@ beforeEach(() => {
 });
 
 describe('editorLinkUrl (via the Function Card action row)', () => {
-  it('produces vscode://file/<path>:<line> for vscode', () => {
-    expect(editorHref('vscode', 42)).toBe('vscode://file/packages/x/src/x.ts:42');
+  it('produces an absolute vscode://file/<projectRoot>/<path>:<line> URL for vscode', () => {
+    expect(editorHref('vscode', 42)).toBe('vscode://file//repo/root/packages/x/src/x.ts:42');
   });
 
-  it('produces cursor://file/<path>:<line> for cursor', () => {
-    expect(editorHref('cursor', 7)).toBe('cursor://file/packages/x/src/x.ts:7');
+  it('produces an absolute cursor://file/<projectRoot>/<path>:<line> URL for cursor', () => {
+    expect(editorHref('cursor', 7)).toBe('cursor://file//repo/root/packages/x/src/x.ts:7');
   });
 
   it('encodes URI-reserved filename characters instead of changing the target path', () => {
     expect(editorHref('vscode', 9, 'src/risk#part?100%.ts')).toBe(
-      'vscode://file/src/risk%23part%3F100%25.ts:9',
+      'vscode://file//repo/root/src/risk%23part%3F100%25.ts:9',
+    );
+  });
+
+  it('strips a trailing slash on PROJECT_ROOT so the joined path has no double separator', () => {
+    expect(editorHref('vscode', 42, 'packages/x/src/x.ts', '/repo/root/')).toBe(
+      'vscode://file//repo/root/packages/x/src/x.ts:42',
+    );
+  });
+
+  it('normalizes a Windows-style PROJECT_ROOT to a posix path and preserves the drive letter', () => {
+    expect(editorHref('vscode', 42, 'packages/x/src/x.ts', 'C:\\Users\\dev\\repo')).toBe(
+      'vscode://file/C:/Users/dev/repo/packages/x/src/x.ts:42',
     );
   });
 
@@ -109,5 +132,14 @@ describe('editorLinkUrl (via the Function Card action row)', () => {
 
   it('renders no editor anchor for an unrecognized protocol', () => {
     expect(editorHref('mystery')).toBeNull();
+  });
+
+  it('renders no editor anchor (Copy path fallback) when PROJECT_ROOT is absent (legacy payload)', () => {
+    expect(editorHref('vscode', 42, 'packages/x/src/x.ts', null)).toBeNull();
+    expect(document.querySelector('.fc-actions button.fc-action')?.textContent).toBe('Copy path');
+  });
+
+  it('renders no editor anchor when PROJECT_ROOT is not an absolute path', () => {
+    expect(editorHref('vscode', 42, 'packages/x/src/x.ts', 'relative/root')).toBeNull();
   });
 });

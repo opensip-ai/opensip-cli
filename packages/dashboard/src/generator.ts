@@ -137,6 +137,15 @@ export interface DashboardInput {
   yagniCatalog?: readonly unknown[];
   editorProtocol?: string | null;
   /**
+   * Absolute filesystem path the report is being generated from. Threaded to
+   * the client as `PROJECT_ROOT` (see `client/globals.ts`) so `editor-link`
+   * can turn a catalog/risk-relative path into an absolute `vscode://file/`
+   * URL — that scheme cannot resolve a repo-relative path on its own.
+   * Omitted/null ⇒ the client hides "Open in editor" links instead of
+   * emitting ones the editor can't resolve.
+   */
+  projectRoot?: string | null;
+  /**
    * Byte budget for the inlined graph catalog (see `code-paths/bound-catalog.ts`).
    *
    * Omitted ⇒ {@link MAX_GRAPH_CATALOG_BYTES}, which keeps the report a size you
@@ -218,6 +227,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     yagniSummary = null,
     yagniCatalog = [],
     editorProtocol = null,
+    projectRoot = null,
     selection,
     declaredInputs,
   } = input;
@@ -254,6 +264,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
   const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
+  const projectRootJs = serializeOptionalBlob('PROJECT_ROOT', projectRoot, 'literal');
   const reportSelectionJs = serializeOptionalBlob(
     'REPORT_SELECTION',
     normalizeReportViewSelection(selection),
@@ -365,6 +376,7 @@ const simRecipeCatalog = ${safeSimRecipeCatalogJson};
 const yagniSummary = ${safeYagniSummaryJson};
 const yagniCatalog = ${safeYagniCatalogJson};
 ${editorProtocolJs}
+${projectRootJs}
 ${reportSelectionJs}
 const fitSessions = sessions.filter(s => s.tool === 'fit');
 const simSessions = sessions.filter(s => s.tool === 'sim');

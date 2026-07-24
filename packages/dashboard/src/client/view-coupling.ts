@@ -118,7 +118,7 @@ views.push({
     const scroll = el('div', { class: 'coupling-scroll' });
     scroll.append(
       buildCouplingTable(pkgs, counts, max, (caller, callee) =>
-        openCouplingDrilldown(caller, callee, indexes, filterState),
+        openCouplingDrilldown(caller, callee, indexes),
       ),
     );
     card.append(scroll);
@@ -276,19 +276,16 @@ function callSitesFromOcc(occ: OccLike, calleePkg: string, indexes: IndexesLike)
   return sites;
 }
 
-// Walk the indexed occurrences for call sites from `callerPkg` into `calleePkg`,
-// honoring the active filter. Capped at 200 hits (the overlay is a sample, not a
-// full report).
-function collectCallSites(
-  callerPkg: string,
-  calleePkg: string,
-  indexes: IndexesLike,
-  filterState: FilterStateLike,
-): CallSite[] {
+// Walk the indexed occurrences for call sites from `callerPkg` into `calleePkg`.
+// Deliberately unfiltered: the matrix cell this drilldown expands counts the
+// WHOLE-GRAPH population (see the module doc comment and the `render` note
+// above), so applying the Explore filterState here would let a non-empty cell
+// resolve to zero call sites. Capped at 200 hits (the overlay is a sample, not
+// a full report).
+function collectCallSites(callerPkg: string, calleePkg: string, indexes: IndexesLike): CallSite[] {
   const sites: CallSite[] = [];
   for (const occurrences of indexes.occurrencesByHash.values()) {
     for (const occ of occurrences) {
-      if (!passesFilter(occ, filterState)) continue;
       if (packageIdentityOf(occ) !== callerPkg) continue;
       sites.push(...callSitesFromOcc(occ, calleePkg, indexes));
       if (sites.length > 200) return sites;
@@ -297,12 +294,7 @@ function collectCallSites(
   return sites;
 }
 
-function openCouplingDrilldown(
-  callerPkg: string,
-  calleePkg: string,
-  indexes: IndexesLike,
-  filterState: FilterStateLike,
-): void {
+function openCouplingDrilldown(callerPkg: string, calleePkg: string, indexes: IndexesLike): void {
   // Render an inline Function Card overlay listing the call sites for the
   // (callerPkg, calleePkg) pair. We piggyback on the overlay used by the
   // universal Function Card to keep the singleton invariant.
@@ -314,8 +306,12 @@ function openCouplingDrilldown(
   card.append(el('h3', { text: callerPkg + ' → ' + calleePkg }));
   card.append(el('div', { class: 'fc-loc', text: 'Call sites between these packages' }));
   const list = el('ul', { class: 'fc-list' });
-  const sites = collectCallSites(callerPkg, calleePkg, indexes, filterState);
+  const sites = collectCallSites(callerPkg, calleePkg, indexes);
   for (const { occ, callee, line } of sites) {
+    // `line` is undefined when the call edge carries no line (e.g. a
+    // synthesized edge). Rendering 'file.ts:undefined' would be worse than
+    // just omitting the location — so drop the ':<line>' suffix entirely.
+    const location = line === undefined ? occ.filePath : occ.filePath + ':' + line;
     const item = el('li', {
       'data-body-hash': occ.bodyHash,
       text:
@@ -323,9 +319,7 @@ function openCouplingDrilldown(
         '  →  ' +
         displayName(callee.simpleName) +
         '   (' +
-        occ.filePath +
-        ':' +
-        line +
+        location +
         ')',
     });
     list.append(item);

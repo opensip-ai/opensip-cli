@@ -319,6 +319,17 @@ declare global {
   const EDITOR_PROTOCOL: string | null;
 
   /**
+   * Absolute filesystem path the report was generated from, emitted by
+   * generator.ts as a `const PROJECT_ROOT = …;` literal. `editor-link` joins
+   * it with a catalog/risk-relative path to build a resolvable
+   * `vscode://file/`-style URL — that scheme requires an absolute path.
+   * `null` for reports generated before this was threaded through (or when
+   * the project root could not be determined); editor-link hides the "Open
+   * in editor" action in that case rather than emit a broken link.
+   */
+  const PROJECT_ROOT: string | null;
+
+  /**
    * The loaded graph catalog (the latest `graph` build), assigned by the panel
    * orchestrator (`code-paths.ts`, still string-emitted) at panel-init. `null`
    * until the inline `<script id="graph-catalog">` blob is parsed. The bundle

@@ -218,6 +218,112 @@ describe('View 4 — Coupling matrix', () => {
     expect(overlay!.textContent).toContain('target');
   });
 
+  it('drilldown enumerates the same unfiltered population the matrix counted — a test-file-only call site still resolves', () => {
+    // The matrix is documented as the WHOLE-GRAPH unfiltered coupling count.
+    // The drilldown must show the same population: a call site whose caller
+    // occurrence is a test file must still appear, even though the shared
+    // Explore filterState defaults to production-only (includeTests: false).
+    // Regression for the bug where the drilldown applied `passesFilter` and a
+    // non-empty cell could resolve to "No call sites found".
+    const catalog: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        caller: [
+          makeOcc({
+            bodyHash: 'c1',
+            simpleName: 'caller',
+            filePath: 'packages/cli/src/c.test.ts',
+            inTestFile: true,
+            calls: [
+              {
+                to: ['t1'],
+                line: 7,
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              },
+            ],
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 't1',
+            simpleName: 'target',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
+      },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    const cell = c.querySelector('td.coupling-cell[data-caller="cli"][data-callee="contracts"]')!;
+    cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const overlay = document.querySelector('.function-card-overlay');
+    expect(overlay).not.toBeNull();
+    expect(overlay!.textContent).not.toContain('No call sites found');
+    expect(overlay!.textContent).toContain('caller');
+    expect(overlay!.textContent).toContain('target');
+  });
+
+  it('omits the ":<line>" suffix when a call site has no line', () => {
+    // CallSite.line is number | undefined; a location with no line must not
+    // render as "file.ts:undefined".
+    const catalog: GraphCatalog = {
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {
+        caller: [
+          makeOcc({
+            bodyHash: 'c1',
+            simpleName: 'caller',
+            filePath: 'packages/cli/src/c.ts',
+            calls: [
+              // No `line` on the call edge — the real GraphCallEdge contract
+              // requires it, but the client's structural mirror (CallEdgeLike)
+              // treats it as optional; cast past the contract to exercise that.
+              {
+                to: ['t1'],
+                column: 0,
+                resolution: 'static',
+                confidence: 'high',
+                text: 'target()',
+              } as unknown as GraphCatalog['functions'][string][number]['calls'][number],
+            ],
+          }),
+        ],
+        target: [
+          makeOcc({
+            bodyHash: 't1',
+            simpleName: 'target',
+            filePath: 'packages/contracts/src/t.ts',
+          }),
+        ],
+      },
+      features: { edge: [{ callerPackage: 'cli', calleePackage: 'contracts', count: 1 }] },
+    };
+    const env = loadEnv(catalog);
+    const c = document.createElement('div');
+    env.views
+      .find((v) => v.id === 'coupling')!
+      .render(c, env.graphCatalog, env.graphIndexes, env.filterState);
+    const cell = c.querySelector('td.coupling-cell[data-caller="cli"][data-callee="contracts"]')!;
+    cell.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const overlay = document.querySelector('.function-card-overlay');
+    expect(overlay!.textContent).not.toContain('undefined');
+    expect(overlay!.textContent).toContain('packages/cli/src/c.ts)');
+    expect(overlay!.textContent).not.toContain('packages/cli/src/c.ts:');
+  });
+
   it('uses the engine package identity consistently for feature cells and drilldowns', () => {
     const catalog: GraphCatalog = {
       version: '2.0',

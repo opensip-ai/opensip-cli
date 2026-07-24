@@ -168,6 +168,11 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
       ? {}
       : { selectionEvidence: history.selectionEvidence }),
     declaredInputs: collectDeclaredInputsForTool('report'),
+    // Editor deep links (vscode://file/…) need an absolute path; the client
+    // hides the link when this is absent.
+    ...(scope.projectContext?.projectRoot === undefined
+      ? {}
+      : { projectRoot: scope.projectContext.projectRoot }),
   };
   const claimedKeys = new Map<string, string>();
 
