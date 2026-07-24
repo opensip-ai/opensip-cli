@@ -388,6 +388,14 @@ export type RpcReply =
       readonly rpcId: number;
       readonly ok: true;
       readonly value: unknown;
+      /**
+       * The host's exit code AFTER performing the effect, when one is set.
+       * Host-RPC seams can mutate the host exit code (`deliverSignals` derives
+       * the findings/gate code); the worker mirrors this into its local
+       * accumulator so its sync `getExitCode()` — which cannot await an RPC —
+       * observes the same value an in-process handler would.
+       */
+      readonly hostExitCode?: number;
     }
   | {
       readonly kind: 'rpc-reply';

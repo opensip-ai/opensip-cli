@@ -11,10 +11,14 @@
  *     resolves; the host replays them through the real seams.
  *   - host-RPC (RPC): `deliverSignals` / `writeSarif` / the four baseline seams
  *     / `writeArtifact` / `ensureArtifactDir` / `toolState.*` / `hostPlanes.*` /
- *     `maybeOpenReport` / `getExitCode` issue a typed {@link HostRpcRequest} via
- *     the {@link WorkerRpcClient} and await the host's reply — the HOST performs
+ *     `maybeOpenReport` issue a typed {@link HostRpcRequest} via the
+ *     {@link WorkerRpcClient} and await the host's reply — the HOST performs
  *     the privileged effect (datastore / egress / FS / process exit) and returns
- *     the result.
+ *     the result. `getExitCode` stays sync-local by contract: it reads the
+ *     accumulator's exit-code mirror, which every ok RPC reply refreshes with
+ *     the host's post-effect code (`RpcReply.hostExitCode`) — so a handler that
+ *     calls `deliverSignals` then reads `getExitCode()` sees what an in-process
+ *     run would.
  *   - host-only (fail loud): the live-view seams (`registerLiveView` /
  *     `renderLive`) throw {@link UnsupportedSeamError} — Ink/TTY rendering
  *     cannot leave the host (documented as a later increment).
@@ -222,6 +226,8 @@ export function buildWorkerContext(input: BuildWorkerContextInput): ToolCliConte
       acc.exitCode = code;
     },
     // ── Host-RPC seams (M4-C upcalls — host performs the effect) ──────────
+    // Sync-local by contract; the accumulator mirror is refreshed with the
+    // host's post-effect exit code on every ok RPC reply (see module header).
     getExitCode: () => acc.exitCode,
     deliverSignals: (envelope, opts) =>
       rpc<SignalDeliveryResult>(rpcClient, {

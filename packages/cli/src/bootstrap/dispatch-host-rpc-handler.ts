@@ -255,7 +255,16 @@ export async function handleHostRpc(request: unknown, ctx: ToolCliContext): Prom
     // a malformed or version-skewed upcall rather than silently no-op'ing).
     validateHostRpcRequest(request);
     const value = await performHostRpc(request, ctx);
-    return { kind: 'rpc-reply', rpcId, ok: true, value };
+    // Mirror the post-effect host exit code so the worker's sync getExitCode()
+    // stays coherent with host-side mutations (e.g. deliverSignals).
+    const hostExitCode = ctx.getExitCode?.();
+    return {
+      kind: 'rpc-reply',
+      rpcId,
+      ok: true,
+      value,
+      ...(hostExitCode === undefined ? {} : { hostExitCode }),
+    };
   } catch (error) {
     // Bounded failure reply — never echo host stacks, paths, or arbitrary
     // exception text across the worker IPC boundary (ADR-0146). Known stable

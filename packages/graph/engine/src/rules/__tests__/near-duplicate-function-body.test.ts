@@ -189,9 +189,10 @@ describe('near-duplicate-function-body', () => {
     expect(NEAR_DUP_SIGNATURE_K).toBe(128);
   });
 
-  it('emits nothing when nearDuplicateLshBands does not divide k (fractional rows)', () => {
-    // 128 / 7 is fractional → band slicing would be misaligned. The integer guard
-    // must reject it (the schema also refuses this value at config load).
+  it('rejects a nearDuplicateLshBands that does not divide k (fractional rows)', () => {
+    // 128 / 7 is fractional → band slicing would be misaligned. clone-detection
+    // now throws on this contract violation instead of silently returning an
+    // empty complete result (the schema also refuses this value at config load).
     const a = withSignature(
       { bodyHash: 'hash-a', simpleName: 'pA', filePath: 'src/a.ts' },
       BASE_BODY,
@@ -205,7 +206,9 @@ describe('near-duplicate-function-body', () => {
       },
       NEAR_BODY,
     );
-    expect(evaluateNear(makeCatalog([a, b]), { nearDuplicateLshBands: 7 })).toHaveLength(0);
+    expect(() => evaluateNear(makeCatalog([a, b]), { nearDuplicateLshBands: 7 })).toThrow(
+      /invalid lshBands \(7\).*evenly divide/,
+    );
     // ...but the same pair IS flagged with a valid divisor.
     expect(evaluateNear(makeCatalog([a, b]), { nearDuplicateLshBands: 16 })).toHaveLength(1);
   });

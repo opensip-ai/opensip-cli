@@ -85,6 +85,47 @@ describe('createWorkerRpcClient — happy path', () => {
     await expect(pending).resolves.toEqual({ exitCode: 7 });
   });
 
+  it('invokes onHostExitCode with the mirrored host code before the seam resolves', async () => {
+    const channel = makeChannel();
+    const observed: number[] = [];
+    let mirrorAtResolve: number | undefined;
+    const client = createWorkerRpcClient(channel, {
+      onHostExitCode: (code) => observed.push(code),
+    });
+
+    const pending = client.call({ seam: 'deliverSignals', envelope: {}, opts: { cwd: '/w' } });
+    const { rpcId } = channel.sent[0];
+    channel.deliver({
+      kind: 'rpc-reply',
+      rpcId,
+      ok: true,
+      value: { cloudAccepted: 0 },
+      hostExitCode: 1,
+    } satisfies RpcReply);
+    await pending.then(() => {
+      mirrorAtResolve = observed.at(-1);
+    });
+
+    // The mirror was already refreshed when the awaiting handler continued.
+    expect(mirrorAtResolve).toBe(1);
+    expect(observed).toEqual([1]);
+  });
+
+  it('does not invoke onHostExitCode when the reply carries no host code', async () => {
+    const channel = makeChannel();
+    const observed: number[] = [];
+    const client = createWorkerRpcClient(channel, {
+      onHostExitCode: (code) => observed.push(code),
+    });
+
+    const pending = client.call(CALL);
+    const { rpcId } = channel.sent[0];
+    channel.deliver({ kind: 'rpc-reply', rpcId, ok: true, value: undefined } satisfies RpcReply);
+    await pending;
+
+    expect(observed).toEqual([]);
+  });
+
   it('assigns monotonically increasing rpcIds across calls', async () => {
     const channel = makeChannel();
     const client = createWorkerRpcClient(channel);

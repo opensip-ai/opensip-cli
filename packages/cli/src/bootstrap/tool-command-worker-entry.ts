@@ -160,7 +160,15 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
   // The host-RPC upcall client over the live IPC channel (M4-C). `process` is the
   // duplex: requests post via `process.send`; replies arrive on
   // `process.on('message')`. Disposed in the finally so the listener is removed.
-  const rpcClient = createWorkerRpcClient(process);
+  // Host-RPC seams can mutate the host exit code (deliverSignals); each ok
+  // reply mirrors it into the accumulator so the shim's sync getExitCode()
+  // observes what an in-process handler would.
+  const acc: ResultAccumulator = {};
+  const rpcClient = createWorkerRpcClient(process, {
+    onHostExitCode: (code) => {
+      acc.exitCode = code;
+    },
+  });
   // The handler runs against the bootstrapped scope (worker-local reads) but with
   // the WORKER context shim (FRR records + RPC upcalls for privileged effects).
   const scope = currentScope();
@@ -171,7 +179,6 @@ async function runLoadedCommand(spec: ToolCommandWorkerSpec): Promise<DispatchWo
     );
   }
   try {
-    const acc: ResultAccumulator = {};
     const maxCapturedOutputBytes = getWorkerLimits().maxCapturedOutputBytes;
     // The completion envelope only crosses IPC (and is size-checked) for the live
     // view; --json / non-TTY runs never read it, so they must not pay for it.

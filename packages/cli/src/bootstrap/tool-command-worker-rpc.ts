@@ -103,11 +103,21 @@ function isRpcReply(msg: unknown): msg is RpcReply {
  * reply listener; `send` posts requests on the `progress` arm. The caller passes
  * `process` so unit tests can supply a fake duplex.
  */
-export function createWorkerRpcClient(channel: {
-  send?: (msg: WorkerOutbound) => unknown;
-  on: (event: 'message', listener: (msg: unknown) => void) => unknown;
-  off?: (event: 'message', listener: (msg: unknown) => void) => unknown;
-}): WorkerRpcClient {
+export function createWorkerRpcClient(
+  channel: {
+    send?: (msg: WorkerOutbound) => unknown;
+    on: (event: 'message', listener: (msg: unknown) => void) => unknown;
+    off?: (event: 'message', listener: (msg: unknown) => void) => unknown;
+  },
+  hooks?: {
+    /**
+     * Invoked with the host's post-effect exit code carried on an ok reply,
+     * BEFORE the awaiting seam resolves — so the worker's local exit-code
+     * mirror is already coherent when the handler's next line runs.
+     */
+    readonly onHostExitCode?: (code: number) => void;
+  },
+): WorkerRpcClient {
   const pending = new Map<number, PendingCall>();
   let nextId = 1;
 
@@ -116,8 +126,12 @@ export function createWorkerRpcClient(channel: {
     const waiter = pending.get(msg.rpcId);
     if (waiter === undefined) return; // unknown/duplicate rpcId — defensively ignore
     pending.delete(msg.rpcId);
-    if (msg.ok) waiter.resolve(msg.value);
-    else waiter.reject(rpcError(msg.error));
+    if (msg.ok) {
+      if (typeof msg.hostExitCode === 'number') hooks?.onHostExitCode?.(msg.hostExitCode);
+      waiter.resolve(msg.value);
+    } else {
+      waiter.reject(rpcError(msg.error));
+    }
   };
   channel.on('message', onMessage);
 
