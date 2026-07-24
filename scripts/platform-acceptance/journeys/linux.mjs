@@ -44,7 +44,9 @@ import {
   assertUniqueJourneyIds,
   defineJourney,
   fail,
+  loadAssessHostSupport,
   pass,
+  probeValue,
   readJson,
   runCli,
   unavailable,
@@ -63,8 +65,6 @@ export const UBUNTU_PREVIEW_ROW_ID = 'ubuntu-2404-x64-node24-npm11-v1';
 const HERE = fileURLToPath(import.meta.url);
 // journeys → platform-acceptance → scripts → repo root.
 const REPO_ROOT = dirname(dirname(dirname(dirname(HERE))));
-/** The built core lib is loaded lazily so module load stays build-free. */
-const CORE_LIB_URL = new URL('../../../packages/core/dist/index-lib.js', import.meta.url);
 
 const UNAME = '/usr/bin/uname';
 const OS_RELEASE = '/etc/os-release';
@@ -229,30 +229,6 @@ function requireLinux(context) {
   return unavailable('non-linux-host', [
     context.assert.diagnostic(`Linux journey is not applicable on ${process.platform}`),
   ]);
-}
-
-let assessHostSupportPromise;
-/** Lazily load the built core `assessHostSupport`; null (never throw) if unbuilt. */
-function loadAssessHostSupport() {
-  assessHostSupportPromise ??= import(CORE_LIB_URL.href)
-    .then((module) =>
-      typeof module.assessHostSupport === 'function' ? module.assessHostSupport : null,
-    )
-    .catch(() => null);
-  return assessHostSupportPromise;
-}
-
-/** Run one fixed argv through the port; return trimmed stdout, or null on any failure. */
-async function probeValue(context, argv) {
-  let result;
-  try {
-    result = await context.process.run({ argv, cwd: context.paths.workRoot });
-  } catch {
-    return null;
-  }
-  if (result.timedOut || (result.status ?? 1) !== 0) return null;
-  const out = (result.stdoutCapture ?? '').trim();
-  return out.length > 0 ? out : null;
 }
 
 /** Run one fixed argv through the port with optional cwd override. */
