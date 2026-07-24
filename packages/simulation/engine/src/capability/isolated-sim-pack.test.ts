@@ -4,8 +4,9 @@ import { join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isolatedSimPackBridge } from './isolated-sim-pack.js';
 import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
+
+import { isolatedSimPackBridge } from './isolated-sim-pack.js';
 
 import type { CapabilityHostBridgeContext, CapabilityWorkerBridgeContext } from '@opensip-cli/core';
 
@@ -146,11 +147,10 @@ describe('isolatedSimPackBridge', () => {
   });
 
   it('rejects the proxy run immediately when the signal is already aborted', async () => {
-    const invoke = async (): Promise<unknown> => {
-      // Should never be called — an already-aborted signal must short-circuit
-      // before the RPC is even issued.
-      throw new Error('invoke should not run when pre-aborted');
-    };
+    // Should never be called — an already-aborted signal must short-circuit
+    // before the RPC is even issued.
+    const invoke = (): Promise<unknown> =>
+      Promise.reject(new Error('invoke should not run when pre-aborted'));
     const contributions = await isolatedSimPackBridge.createHostContributions(
       hostContext(async (request) => {
         if ((request as { kind?: unknown }).kind === 'simulation.discover') {
@@ -180,7 +180,7 @@ describe('isolatedSimPackBridge', () => {
           return await isolatedSimPackBridge.runInWorker(workerContext(request));
         }
         // Never resolves/rejects — simulates a worker RPC hanging forever.
-        return new Promise(() => {});
+        return new Promise(() => undefined);
       }),
     );
     expect(rpcRejectFromDiscover).toBe(true);
