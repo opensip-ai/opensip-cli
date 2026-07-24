@@ -30,9 +30,7 @@ export const EXIT_CODES = {
  * Map definition exitClass → numeric host exit (Plan 00). Preferred path when
  * a normalized failure / ToolError.definition is available.
  */
-export function mapExitClassToExitCode(
-  exitClass: string | undefined,
-): number {
+export function mapExitClassToExitCode(exitClass: string | undefined): number {
   switch (exitClass) {
     case 'success':
       return EXIT_CODES.SUCCESS;

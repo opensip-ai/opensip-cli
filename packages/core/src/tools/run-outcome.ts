@@ -12,12 +12,7 @@
 export type ToolRunOutcome = 'passed' | 'failed' | 'degraded' | 'error';
 
 /** Lifecycle phase for contextual runOutcome projection (Plan 00). */
-export type RunLifecyclePhase =
-  | 'setup'
-  | 'execution'
-  | 'persistence'
-  | 'delivery'
-  | 'shutdown';
+export type RunLifecyclePhase = 'setup' | 'execution' | 'persistence' | 'delivery' | 'shutdown';
 
 /** Inputs for stamping a new session row from a completed run. */
 export interface DeriveRunOutcomeInput {

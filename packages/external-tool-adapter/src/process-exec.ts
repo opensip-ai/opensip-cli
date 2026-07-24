@@ -25,11 +25,7 @@ import type { BinaryResolveDeps } from './binary-resolver.js';
 /**
  * Plan 00: coded spawn failure (binary missing vs other errno) with safe metadata.
  */
-export function spawnFailureError(
-  command: string,
-  errno: string,
-  cause?: unknown,
-): SystemError {
+export function spawnFailureError(command: string, errno: string, cause?: unknown): SystemError {
   if (errno === 'ENOENT') {
     return new SystemError(`scanner '${command}' binary not found (ENOENT)`, {
       code: 'EXTERNAL.SCANNER.BINARY_MISSING',

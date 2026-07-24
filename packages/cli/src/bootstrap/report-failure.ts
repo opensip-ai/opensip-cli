@@ -3,11 +3,7 @@
  * (Plan 06). Combines core error types with contracts exit-code policy.
  */
 
-import {
-  EXIT_CODES,
-  mapExitClassToExitCode,
-  mapToolErrorToExitCode,
-} from '@opensip-cli/contracts';
+import { EXIT_CODES, mapExitClassToExitCode, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   SystemError,
   ToolError,

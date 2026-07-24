@@ -141,7 +141,9 @@ describe('normalizeFailure', () => {
   });
 
   it('rejects prototype-pollution keys from leaking into projections', () => {
-    const polluted = JSON.parse('{"__proto__":{"polluted":true},"message":"x","code":"SYSTEM_ERROR"}');
+    const polluted = JSON.parse(
+      '{"__proto__":{"polluted":true},"message":"x","code":"SYSTEM_ERROR"}',
+    );
     const env = normalizeFailure(polluted);
     const machine = toMachineFailureProjection(env);
     expect(JSON.stringify(machine)).not.toMatch(/"polluted"\s*:\s*true/);

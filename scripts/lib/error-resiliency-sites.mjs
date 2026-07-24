@@ -20,7 +20,16 @@ import {
 
 export { DETECTOR_VERSION };
 
-const STRUCTURAL_EXTENSIONS = new Set(['.ts', '.tsx', '.mts', '.cts', '.js', '.jsx', '.mjs', '.cjs']);
+const STRUCTURAL_EXTENSIONS = new Set([
+  '.ts',
+  '.tsx',
+  '.mts',
+  '.cts',
+  '.js',
+  '.jsx',
+  '.mjs',
+  '.cjs',
+]);
 
 /**
  * @param {string} relativePath
@@ -94,7 +103,10 @@ export function extractStructuralSites(relativePath, sourceText) {
       if (name && isErrorConstruction(name)) {
         pushSite(sites, pathValue, sourceFile, node, 'error-construction', `new ${name}`);
       }
-    } else if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
+    } else if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.BarBarToken
+    ) {
       // Common fallback: expr || default
       if (ts.isPropertyAccessExpression(node.left) || ts.isIdentifier(node.left)) {
         pushSite(sites, pathValue, sourceFile, node, 'fallback', '||');

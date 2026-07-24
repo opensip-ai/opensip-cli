@@ -65,7 +65,8 @@ function truncate(text: string, max: number): string {
 function safeMessage(value: unknown): string {
   try {
     if (typeof value === 'string') return truncate(value, MAX_MESSAGE);
-    if (value instanceof Error) return truncate(value.message || value.name || 'Error', MAX_MESSAGE);
+    if (value instanceof Error)
+      return truncate(value.message || value.name || 'Error', MAX_MESSAGE);
     if (value === null) return 'null';
     if (value === undefined) return 'undefined';
     return truncate(String(value), MAX_MESSAGE);
@@ -130,7 +131,12 @@ function normalizeFailureInner(
     }
     seen.add(value);
     // AbortSignal reason / DOMException-like
-    const name = readField(value, 'name', () => String((value as { name?: unknown }).name ?? ''), '');
+    const name = readField(
+      value,
+      'name',
+      () => String((value as { name?: unknown }).name ?? ''),
+      '',
+    );
     const message = readField(
       value,
       'message',
@@ -280,7 +286,10 @@ function buildAggregate(
     operatorAction: first.operatorAction,
     code: first.code,
     definition: first.definition,
-    metadata: { aggregateCount: members.length, ...(truncated ? { aggregateTruncated: true } : {}) },
+    metadata: {
+      aggregateCount: members.length,
+      ...(truncated ? { aggregateTruncated: true } : {}),
+    },
     causes: [],
     aggregate,
     ...(truncated ? { aggregateTruncated: true } : {}),
@@ -298,9 +307,7 @@ function unknownEnvelope(message: string, original: unknown): FailureEnvelope {
     metadata: {},
     causes: [],
     operatorDetail:
-      original === undefined
-        ? undefined
-        : truncate(safeMessage(original), MAX_OPERATOR_DETAIL),
+      original === undefined ? undefined : truncate(safeMessage(original), MAX_OPERATOR_DETAIL),
   });
 }
 

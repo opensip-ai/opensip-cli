@@ -16,7 +16,10 @@ const INDEX_DOC = join(REPO_ROOT, 'docs/public/70-reference/18-error-code-index.
 
 function escapeMd(s) {
   if (!s) return '';
-  return s.replaceAll('|', String.raw`\|`).replaceAll('\n', ' ').trim();
+  return s
+    .replaceAll('|', String.raw`\|`)
+    .replaceAll('\n', ' ')
+    .trim();
 }
 
 function buildMarkdown(payload) {
@@ -104,7 +107,9 @@ async function main() {
     // Normalize generated timestamp line for check
     const norm = (s) => s.replace(/^last_verified:.*$/mu, 'last_verified: <date>');
     if (norm(existing) !== norm(markdown)) {
-      console.error('docs/public/70-reference/18-error-code-index.md is stale; run pnpm docs:error-index');
+      console.error(
+        'docs/public/70-reference/18-error-code-index.md is stale; run pnpm docs:error-index',
+      );
       process.exitCode = 1;
       return;
     }

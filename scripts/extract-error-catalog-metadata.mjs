@@ -66,8 +66,7 @@ const AXES = [
  */
 function extractDefinitions(sourceText, packageName, ownerId, file) {
   const definitions = [];
-  const blockRe =
-    /['"]?([A-Z][A-Z0-9_.]+)['"]?\s*:\s*\{([\s\S]*?)\n\s*\},?/gu;
+  const blockRe = /['"]?([A-Z][A-Z0-9_.]+)['"]?\s*:\s*\{([\s\S]*?)\n\s*\},?/gu;
   let match;
   while ((match = blockRe.exec(sourceText)) !== null) {
     const code = match[1];

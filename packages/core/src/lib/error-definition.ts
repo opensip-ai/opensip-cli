@@ -10,12 +10,7 @@
 export type FailureSource = 'application' | 'infrastructure' | 'external';
 
 /** Who can act (may be refined per occurrence without changing the code). */
-export type FailureResponsibility =
-  | 'user'
-  | 'tool-author'
-  | 'operator'
-  | 'environment'
-  | 'unknown';
+export type FailureResponsibility = 'user' | 'tool-author' | 'operator' | 'environment' | 'unknown';
 
 /** Closed failure kind vocabulary. */
 export type FailureKind =
@@ -230,7 +225,11 @@ export function normalizeErrorDefinition(
       ...(owner.packageName === undefined ? {} : { packageName: owner.packageName }),
     }),
     source: requireEnum(raw.source, SOURCES, 'source'),
-    defaultResponsibility: requireEnum(raw.defaultResponsibility, RESPONSIBILITIES, 'defaultResponsibility'),
+    defaultResponsibility: requireEnum(
+      raw.defaultResponsibility,
+      RESPONSIBILITIES,
+      'defaultResponsibility',
+    ),
     kind: requireEnum(raw.kind, KINDS, 'kind'),
     retry: requireEnum(raw.retry, RETRIES, 'retry'),
     severity: requireEnum(raw.severity, SEVERITIES, 'severity'),
@@ -264,7 +263,9 @@ export function normalizeErrorDefinition(
 /**
  * Build an immutable package/tool error catalog.
  */
-export function defineErrorCatalog<const TDefs extends Record<string, Omit<ErrorDefinition, 'owner'> & { code?: string }>>(
+export function defineErrorCatalog<
+  const TDefs extends Record<string, Omit<ErrorDefinition, 'owner'> & { code?: string }>,
+>(
   owner: ErrorCatalogOwner,
   definitionsInput: TDefs,
   opts: { allowLegacyCodes?: boolean } = {},

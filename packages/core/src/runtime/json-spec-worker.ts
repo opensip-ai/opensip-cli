@@ -2,10 +2,7 @@ import { readFileSync } from 'node:fs';
 
 import { startWorkerHeartbeat } from './worker-heartbeat.js';
 import { sendWorkerIpcMessage, sendWorkerIpcMessageAndDrain } from './worker-ipc-send.js';
-import {
-  toWorkerFailureWire,
-  WORKER_FAILURE_WIRE_VERSION,
-} from './worker-failure-wire.js';
+import { toWorkerFailureWire, WORKER_FAILURE_WIRE_VERSION } from './worker-failure-wire.js';
 
 import type { WorkerMessage } from './progress-transport.js';
 

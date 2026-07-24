@@ -23,9 +23,7 @@ function writeMinimal(line: string): void {
 function projectFatal(reason: unknown, kind: 'uncaughtException' | 'unhandledRejection'): void {
   try {
     const envelope = normalizeFailure(reason);
-    writeMinimal(
-      `opensip: fatal ${kind} [${envelope.code}] ${envelope.message.slice(0, 200)}`,
-    );
+    writeMinimal(`opensip: fatal ${kind} [${envelope.code}] ${envelope.message.slice(0, 200)}`);
   } catch {
     writeMinimal(`opensip: fatal ${kind} [CORE.SYSTEM.UNKNOWN_FAILURE]`);
   }

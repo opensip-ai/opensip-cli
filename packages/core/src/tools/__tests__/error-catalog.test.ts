@@ -60,10 +60,7 @@ describe('validateToolErrorCatalogContribution', () => {
     ).toThrow(ErrorDefinitionError);
     expect(() => validateToolErrorCatalogContribution(null, ownerA)).toThrow(ErrorDefinitionError);
     expect(() =>
-      validateToolErrorCatalogContribution(
-        { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION },
-        ownerA,
-      ),
+      validateToolErrorCatalogContribution({ schemaVersion: ERROR_CATALOG_SCHEMA_VERSION }, ownerA),
     ).toThrow(ErrorDefinitionError);
   });
 });
@@ -88,9 +85,7 @@ describe('aggregateErrorCatalogs', () => {
       { toolName: 'b', toolId: ownerB.id, catalog: catalogB },
     ]);
     expect(collisions).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ code: 'SHARED.CODE.X' }),
-      ]),
+      expect.arrayContaining([expect.objectContaining({ code: 'SHARED.CODE.X' })]),
     );
     expect(byCode.get('SHARED.CODE.X')?.owner.id).toBe(ownerA.id);
   });

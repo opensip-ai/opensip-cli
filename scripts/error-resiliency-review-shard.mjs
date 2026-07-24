@@ -39,8 +39,12 @@ export function main(argv = process.argv.slice(2)) {
   }
 
   const coop = join(repoRoot, INVENTORY_COOP_DIR);
-  const scope = JSON.parse(readFileSync(join(coop, 'snapshots/pre-infra/scope-manifest.json'), 'utf8'));
-  const shards = JSON.parse(readFileSync(join(coop, 'snapshots/pre-infra/shard-manifest.json'), 'utf8'));
+  const scope = JSON.parse(
+    readFileSync(join(coop, 'snapshots/pre-infra/scope-manifest.json'), 'utf8'),
+  );
+  const shards = JSON.parse(
+    readFileSync(join(coop, 'snapshots/pre-infra/shard-manifest.json'), 'utf8'),
+  );
   const shard = shards.shards.find((s) => s.id === shardId);
   if (!shard) {
     console.error(`Unknown shard ${shardId}`);
@@ -65,9 +69,7 @@ export function main(argv = process.argv.slice(2)) {
     const blobOid = meta?.blobOid ?? gitBlobOid(repoRoot, scope.commit, pathValue);
     const content = gitShow(repoRoot, scope.commit, pathValue);
     const structural =
-      content === null
-        ? { sites: [] }
-        : extractStructuralSites(pathValue, content);
+      content === null ? { sites: [] } : extractStructuralSites(pathValue, content);
 
     const classified = classifyFile(pathValue, content ?? '', structural.sites);
     const sites = structural.sites.map((site) => ({
@@ -159,7 +161,10 @@ function classifyFile(pathValue, content, sites) {
     if (
       /\/types\.ts$/u.test(pathValue) ||
       /\/index\.ts$/u.test(pathValue) ||
-      text.trim().split('\n').every((line) => /^(import|export|\/\*|\*|\/\/|\s|$)/u.test(line))
+      text
+        .trim()
+        .split('\n')
+        .every((line) => /^(import|export|\/\*|\*|\/\/|\s|$)/u.test(line))
     ) {
       return {
         fileDisposition: 'no-error-resiliency-responsibility',
@@ -263,7 +268,11 @@ function siteRisk(pathValue, kind) {
  * @param {string} pathValue
  */
 function packageFromPath(pathValue) {
-  if (pathValue.startsWith('scripts/') || pathValue.startsWith('.github/') || pathValue === 'action.yml') {
+  if (
+    pathValue.startsWith('scripts/') ||
+    pathValue.startsWith('.github/') ||
+    pathValue === 'action.yml'
+  ) {
     return '(operational)';
   }
   const m = /^packages\/(?:[^/]+\/)?([^/]+)/u.exec(pathValue);

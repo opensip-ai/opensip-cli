@@ -186,7 +186,10 @@ function stableSerialize(value) {
   if (value === null) return 'null';
   if (typeof value === 'boolean' || typeof value === 'number') {
     if (typeof value === 'number' && !Number.isFinite(value)) {
-      throw new InventoryError('INVENTORY.JSON.NON_FINITE', 'canonical JSON rejects non-finite numbers');
+      throw new InventoryError(
+        'INVENTORY.JSON.NON_FINITE',
+        'canonical JSON rejects non-finite numbers',
+      );
     }
     return JSON.stringify(value);
   }
@@ -196,10 +199,15 @@ function stableSerialize(value) {
   }
   if (isPlainObject(value)) {
     const keys = Object.keys(value).sort(compareByCodePoint);
-    const body = keys.map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(',');
+    const body = keys
+      .map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`)
+      .join(',');
     return `{${body}}`;
   }
-  throw new InventoryError('INVENTORY.JSON.TYPE', `unsupported canonical value type: ${typeof value}`);
+  throw new InventoryError(
+    'INVENTORY.JSON.TYPE',
+    `unsupported canonical value type: ${typeof value}`,
+  );
 }
 
 /**
@@ -235,8 +243,15 @@ export function sortByKey(items, keyOf) {
  * @param {string} label
  */
 export function assertSafeRepoRelativePath(pathValue, label = 'path') {
-  if (typeof pathValue !== 'string' || pathValue.length === 0 || pathValue.length > BOUNDS.maxPathLength) {
-    throw new InventoryError('INVENTORY.PATH.INVALID', `${label} must be a bounded non-empty string`);
+  if (
+    typeof pathValue !== 'string' ||
+    pathValue.length === 0 ||
+    pathValue.length > BOUNDS.maxPathLength
+  ) {
+    throw new InventoryError(
+      'INVENTORY.PATH.INVALID',
+      `${label} must be a bounded non-empty string`,
+    );
   }
   if (isAbsolute(pathValue) || pathValue.includes('\0')) {
     throw new InventoryError('INVENTORY.PATH.UNSAFE', `${label} must be repository-relative`);
@@ -248,7 +263,10 @@ export function assertSafeRepoRelativePath(pathValue, label = 'path') {
     normalized.includes(`${sep}..${sep}`) ||
     normalized.endsWith(`${sep}..`)
   ) {
-    throw new InventoryError('INVENTORY.PATH.ESCAPE', `${label} escapes repository root: ${pathValue}`);
+    throw new InventoryError(
+      'INVENTORY.PATH.ESCAPE',
+      `${label} escapes repository root: ${pathValue}`,
+    );
   }
   if (pathValue.includes('\\')) {
     throw new InventoryError('INVENTORY.PATH.SEPARATOR', `${label} must use POSIX separators`);
@@ -311,7 +329,10 @@ export function validateFileRecord(raw, opts = {}) {
   ]);
   for (const key of Object.keys(raw)) {
     if (!allowedKeys.has(key)) {
-      throw new InventoryError('INVENTORY.FILE.UNKNOWN_FIELD', `file record has unknown field '${key}'`);
+      throw new InventoryError(
+        'INVENTORY.FILE.UNKNOWN_FIELD',
+        `file record has unknown field '${key}'`,
+      );
     }
   }
   const pathValue = assertSafeRepoRelativePath(/** @type {string} */ (raw.path), 'path');
@@ -327,7 +348,11 @@ export function validateFileRecord(raw, opts = {}) {
   if (classification === 'excluded') {
     assertBoundedString(/** @type {string} */ (raw.exclusionReason), 'exclusionReason', 512);
   }
-  const disposition = assertEnum(/** @type {string} */ (raw.disposition), DISPOSITIONS, 'disposition');
+  const disposition = assertEnum(
+    /** @type {string} */ (raw.disposition),
+    DISPOSITIONS,
+    'disposition',
+  );
   if (!opts.allowNeedsDecision && disposition === 'needs-decision') {
     throw new InventoryError(
       'INVENTORY.FILE.NEEDS_DECISION',
@@ -345,7 +370,11 @@ export function validateFileRecord(raw, opts = {}) {
     throw new InventoryError('INVENTORY.FILE.SITES', `too many sites on ${pathValue}`);
   }
   const validatedSites = sites.map((site, index) =>
-    validateSiteRecord(site, { allowNeedsDecision: opts.allowNeedsDecision, index, path: pathValue }),
+    validateSiteRecord(site, {
+      allowNeedsDecision: opts.allowNeedsDecision,
+      index,
+      path: pathValue,
+    }),
   );
 
   /** @type {unknown[]} */
@@ -396,7 +425,11 @@ function validateReviewer(raw) {
   return {
     role,
     identity: assertBoundedString(/** @type {string} */ (raw.identity), 'reviewer.identity', 128),
-    reviewedAt: assertBoundedString(/** @type {string} */ (raw.reviewedAt), 'reviewer.reviewedAt', 64),
+    reviewedAt: assertBoundedString(
+      /** @type {string} */ (raw.reviewedAt),
+      'reviewer.reviewedAt',
+      64,
+    ),
   };
 }
 
@@ -414,7 +447,11 @@ export function validateSiteRecord(raw, opts = {}) {
   }
   const kind = assertEnum(/** @type {string} */ (raw.kind), SITE_KINDS, 'kind');
   const source = assertEnum(/** @type {string} */ (raw.source), ['structural', 'human'], 'source');
-  const disposition = assertEnum(/** @type {string} */ (raw.disposition), DISPOSITIONS, 'disposition');
+  const disposition = assertEnum(
+    /** @type {string} */ (raw.disposition),
+    DISPOSITIONS,
+    'disposition',
+  );
   if (!opts.allowNeedsDecision && disposition === 'needs-decision') {
     throw new InventoryError(
       'INVENTORY.SITE.NEEDS_DECISION',
@@ -430,7 +467,9 @@ export function validateSiteRecord(raw, opts = {}) {
           boundaryFamily: assertEnum(raw.boundaryFamily, BOUNDARY_FAMILIES, 'boundaryFamily'),
         }
       : {}),
-    ...(typeof raw.owner === 'string' ? { owner: assertBoundedString(raw.owner, 'owner', 256) } : {}),
+    ...(typeof raw.owner === 'string'
+      ? { owner: assertBoundedString(raw.owner, 'owner', 256) }
+      : {}),
     ...(typeof raw.currentCode === 'string'
       ? { currentCode: assertBoundedString(raw.currentCode, 'currentCode', 256) }
       : {}),
@@ -467,7 +506,10 @@ export function findDuplicates(files) {
     }
   }
   return {
-    duplicatePaths: [...pathCounts.entries()].filter(([, n]) => n > 1).map(([p]) => p).sort(compareByCodePoint),
+    duplicatePaths: [...pathCounts.entries()]
+      .filter(([, n]) => n > 1)
+      .map(([p]) => p)
+      .sort(compareByCodePoint),
     duplicateSiteIds: [...siteCounts.entries()]
       .filter(([, n]) => n > 1)
       .map(([id]) => id)

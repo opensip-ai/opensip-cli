@@ -147,7 +147,9 @@ describe('withRetry', () => {
   it('does not retry cancelled errors', async () => {
     const { createCancelledError } = await import('../../lib/retry.js');
     const fn = vi.fn().mockRejectedValue(createCancelledError('stop'));
-    await expect(withRetry(fn, { maxAttempts: 5, initialDelayMs: 1 })).rejects.toThrow(/stop|cancel/i);
+    await expect(withRetry(fn, { maxAttempts: 5, initialDelayMs: 1 })).rejects.toThrow(
+      /stop|cancel/i,
+    );
     expect(fn).toHaveBeenCalledTimes(1);
   });
 

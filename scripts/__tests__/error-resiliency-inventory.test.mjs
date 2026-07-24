@@ -59,10 +59,7 @@ test('campaign root constant is under gitignored docs/internal coop', () => {
 
 test('parseJsonSafe rejects oversized and deep payloads', () => {
   assert.throws(() => parseJsonSafe('{', { label: 'bad' }), /not valid JSON/);
-  assert.throws(
-    () => parseJsonSafe('{"a":1}', { maxBytes: 2, label: 'tiny' }),
-    /exceeds/,
-  );
+  assert.throws(() => parseJsonSafe('{"a":1}', { maxBytes: 2, label: 'tiny' }), /exceeds/);
   let deep = '0';
   for (let i = 0; i < 40; i++) deep = `[${deep}]`;
   assert.throws(() => parseJsonSafe(deep, { maxDepth: 8, label: 'deep' }), /nesting depth/);
@@ -75,19 +72,16 @@ test('canonicalStringify sorts keys and digest is stable', () => {
   assert.equal(digestCanonical(left), digestCanonical(right));
   assert.equal(compareByCodePoint('a', 'b'), -1);
   assert.deepEqual(
-    sortByKey(
-      [
-        { path: 'b' },
-        { path: 'a' },
-      ],
-      (x) => x.path,
-    ).map((x) => x.path),
+    sortByKey([{ path: 'b' }, { path: 'a' }], (x) => x.path).map((x) => x.path),
     ['a', 'b'],
   );
 });
 
 test('assertSafeRepoRelativePath rejects escapes and absolutes', () => {
-  assert.equal(assertSafeRepoRelativePath('packages/core/src/lib/errors.ts'), 'packages/core/src/lib/errors.ts');
+  assert.equal(
+    assertSafeRepoRelativePath('packages/core/src/lib/errors.ts'),
+    'packages/core/src/lib/errors.ts',
+  );
   assert.throws(() => assertSafeRepoRelativePath('../secret'), /escape/i);
   assert.throws(() => assertSafeRepoRelativePath('/etc/passwd'), /relative/i);
   assert.throws(() => assertSafeRepoRelativePath('a\\b'), /POSIX/);
@@ -108,7 +102,8 @@ test('validateFileRecord enforces closed enums and needs-decision policy', () =>
   assert.equal(ok.path, base.path);
 
   assert.throws(
-    () => validateFileRecord({ ...base, disposition: 'needs-decision' }, { allowNeedsDecision: false }),
+    () =>
+      validateFileRecord({ ...base, disposition: 'needs-decision' }, { allowNeedsDecision: false }),
     (error) => error instanceof InventoryError && error.code === 'INVENTORY.FILE.NEEDS_DECISION',
   );
 
@@ -118,14 +113,8 @@ test('validateFileRecord enforces closed enums and needs-decision policy', () =>
   );
   assert.equal(pending.disposition, 'needs-decision');
 
-  assert.throws(
-    () => validateFileRecord({ ...base, extra: true }),
-    /unknown field/,
-  );
-  assert.throws(
-    () => validateFileRecord({ ...base, classification: 'nope' }),
-    /unknown value/,
-  );
+  assert.throws(() => validateFileRecord({ ...base, extra: true }), /unknown field/);
+  assert.throws(() => validateFileRecord({ ...base, classification: 'nope' }), /unknown value/);
 });
 
 test('validateSiteRecord and findDuplicates catch collisions', () => {
@@ -144,10 +133,7 @@ test('validateSiteRecord and findDuplicates catch collisions', () => {
   const dups = findDuplicates([
     {
       path: 'a.ts',
-      sites: [
-        { siteId: 'same-id-xx' },
-        { siteId: 'same-id-xx' },
-      ],
+      sites: [{ siteId: 'same-id-xx' }, { siteId: 'same-id-xx' }],
     },
     { path: 'a.ts', sites: [] },
   ]);
@@ -175,7 +161,10 @@ export function demo(signal) {
   }
 }
 `;
-  const { sites, coverage, truncated } = extractStructuralSites('packages/demo/src/demo.ts', source);
+  const { sites, coverage, truncated } = extractStructuralSites(
+    'packages/demo/src/demo.ts',
+    source,
+  );
   assert.equal(truncated, false);
   const kinds = new Set(sites.map((s) => s.kind));
   assert.ok(kinds.has('throw'));
@@ -190,10 +179,7 @@ export function demo(signal) {
   }
   // Same source => stable site ids
   const again = extractStructuralSites('packages/demo/src/demo.ts', source);
-  assert.deepEqual(
-    sites.map((s) => s.siteId).sort(),
-    again.sites.map((s) => s.siteId).sort(),
-  );
+  assert.deepEqual(sites.map((s) => s.siteId).sort(), again.sites.map((s) => s.siteId).sort());
   assert.equal(coverage.detectorVersion, DETECTOR_VERSION);
   assert.ok(coverage.humanReviewOnly.some((row) => row.language === 'python'));
 });

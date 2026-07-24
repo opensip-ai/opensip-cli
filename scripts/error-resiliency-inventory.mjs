@@ -196,9 +196,7 @@ function runGenerate(repoRoot, flags, stdout) {
   const dryRun = Boolean(flags['dry-run']);
 
   const packages = readWorkspacePackageManifests(repoRoot);
-  const packageByRelDir = new Map(
-    packages.map((pkg) => [toPosix(pkg.relativeDir), pkg.name]),
-  );
+  const packageByRelDir = new Map(packages.map((pkg) => [toPosix(pkg.relativeDir), pkg.name]));
 
   const tracked = listTrackedFiles(repoRoot, commit);
   /** @type {ReturnType<typeof classifyTrackedFile>[]} */
@@ -302,7 +300,9 @@ function runGenerate(repoRoot, flags, stdout) {
         detectorCoverage: {
           detectorVersion: DETECTOR_VERSION,
           structuralLanguages: ['typescript', 'javascript'],
-          humanReviewOnlyLanguages: defaultDetectorCoverage().humanReviewOnly.map((r) => r.language),
+          humanReviewOnlyLanguages: defaultDetectorCoverage().humanReviewOnly.map(
+            (r) => r.language,
+          ),
         },
       },
       null,
@@ -349,7 +349,9 @@ function runCheck(repoRoot, flags, stdout) {
           }
         }
         if (!p.rules?.blindSecondary || !p.rules?.needsDecisionForbiddenAtAcceptance) {
-          problems.push('review-policy rules must require blind secondary and forbid needs-decision at acceptance');
+          problems.push(
+            'review-policy rules must require blind secondary and forbid needs-decision at acceptance',
+          );
         }
       }
     }
@@ -419,7 +421,10 @@ function runCheck(repoRoot, flags, stdout) {
             break;
           }
         }
-        if (primary.size !== production.size && problems.every((p) => !p.includes('missing from primary'))) {
+        if (
+          primary.size !== production.size &&
+          problems.every((p) => !p.includes('missing from primary'))
+        ) {
           // sizes differ without missing — extras
           if (primary.size > production.size) {
             problems.push('primary shards contain non-production or unknown paths');
@@ -601,7 +606,9 @@ function runStatus(repoRoot, flags, stdout) {
     parseJsonSafe(readFileSync(scopePath, 'utf8'), { label: 'scope-manifest' })
   );
   const shards = existsSync(shardPath)
-    ? /** @type {any} */ (parseJsonSafe(readFileSync(shardPath, 'utf8'), { label: 'shard-manifest' }))
+    ? /** @type {any} */ (
+        parseJsonSafe(readFileSync(shardPath, 'utf8'), { label: 'shard-manifest' })
+      )
     : null;
   stdout(
     JSON.stringify(
@@ -695,11 +702,11 @@ function resolveCommit(repoRoot, rev) {
  */
 function listTrackedFiles(repoRoot, commit) {
   // name-only with object names: git ls-tree -r -l --format
-  const result = spawnSync(
-    'git',
-    ['ls-tree', '-r', '-l', commit],
-    { cwd: repoRoot, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
-  );
+  const result = spawnSync('git', ['ls-tree', '-r', '-l', commit], {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  });
   if (result.status !== 0) {
     throw new InventoryError('INVENTORY.GIT.LS_TREE', 'git ls-tree failed', {
       stderr: result.stderr,
@@ -821,7 +828,11 @@ function classifyTrackedFile(pathValue) {
  * @param {Map<string, string>} packageByRelDir
  */
 function packageNameForPath(pathValue, packageByRelDir) {
-  if (pathValue.startsWith('scripts/') || pathValue === 'action.yml' || pathValue.startsWith('.github/')) {
+  if (
+    pathValue.startsWith('scripts/') ||
+    pathValue === 'action.yml' ||
+    pathValue.startsWith('.github/')
+  ) {
     return '(operational)';
   }
   // longest prefix match on packages/...
@@ -1016,11 +1027,13 @@ function buildShards(productionFiles) {
  * @param {string} packageName
  */
 function packageSlug(packageName) {
-  return packageName
-    .replace(/^@opensip-cli\//u, '')
-    .replace(/[^A-Za-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '')
-    .toLowerCase() || 'pkg';
+  return (
+    packageName
+      .replace(/^@opensip-cli\//u, '')
+      .replace(/[^A-Za-z0-9]+/gu, '-')
+      .replace(/^-+|-+$/gu, '')
+      .toLowerCase() || 'pkg'
+  );
 }
 
 /**
@@ -1091,8 +1104,7 @@ function atomicWriteJson(targetPath, value) {
   }
 }
 
-const isDirect =
-  process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+const isDirect = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isDirect) {
   main().then((code) => {
