@@ -49,6 +49,28 @@ export type {
   ErrorCodeStability,
   ErrorCodeLifecycle,
 } from './lib/error-definition.js';
+
+// Lib — failure envelope + safe diagnostics (Plan 00 Phase 3)
+export {
+  normalizeFailure,
+  toPublicFailureProjection,
+  toMachineFailureProjection,
+  toOperatorFailureProjection,
+  FAILURE_ENVELOPE_VERSION,
+} from './lib/failure-envelope.js';
+export type {
+  FailureEnvelope,
+  FailureCauseSummary,
+  FailureKnownStatus,
+  NormalizeFailureContext,
+} from './lib/failure-envelope.js';
+export {
+  toSafeDiagnosticData,
+  toSafeDiagnosticRecord,
+  scrubText,
+  neutralizeTerminalText,
+  projectRelativePath,
+} from './lib/safe-diagnostic-data.js';
 export { unwrapOrLog, matchLog } from './lib/result-logging.js';
 export type { ResultLogContext } from './lib/result-logging.js';
 export { appendBoundedUtf8Text } from './lib/bounded-text.js';
