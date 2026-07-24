@@ -99,6 +99,28 @@ function patchFilesystem(cwd: string, packageDir: string): void {
           return (fn as (...args: unknown[]) => unknown)(pathLike, ...rest);
         }
       : fn;
+  // Two-path APIs write to their SECOND argument — validating only the source
+  // would let an in-root rename/copy land outside the allowed roots.
+  const wrapTwoPaths = (fn: unknown): unknown =>
+    typeof fn === 'function'
+      ? (source: unknown, destination: unknown, ...rest: unknown[]) => {
+          if (
+            !isCapabilityFilesystemPathAllowed(source, roots) ||
+            !isCapabilityFilesystemPathAllowed(destination, roots)
+          ) {
+            denied('filesystem');
+          }
+          return (fn as (...args: unknown[]) => unknown)(source, destination, ...rest);
+        }
+      : fn;
+  const TWO_PATH_KEYS = new Set([
+    'rename',
+    'renameSync',
+    'copyFile',
+    'copyFileSync',
+    'cp',
+    'cpSync',
+  ]);
   // The destructive APIs the old list omitted (rm/unlink/rename/mkdir/chmod/
   // createWriteStream) are exactly the ones an accidental overreach hurts
   // with most — they are patched alongside the read/write set. Keys missing
@@ -140,8 +162,9 @@ function patchFilesystem(cwd: string, packageDir: string): void {
     'truncate',
     'truncateSync',
   ]) {
-    fs[key] = wrap(fs[key]);
-    fsPromises[key] = wrap(fsPromises[key]);
+    const wrapper = TWO_PATH_KEYS.has(key) ? wrapTwoPaths : wrap;
+    fs[key] = wrapper(fs[key]);
+    fsPromises[key] = wrapper(fsPromises[key]);
   }
 }
 

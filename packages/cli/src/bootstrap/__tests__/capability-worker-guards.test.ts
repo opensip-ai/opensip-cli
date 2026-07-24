@@ -174,4 +174,48 @@ try {
       rmSync(dir, { recursive: true, force: true });
     }
   }, 60_000);
+
+  it('validates the DESTINATION of two-path APIs (rename out of root denied)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'opensip-guard-rename-'));
+    const outDir = mkdtempSync(join(tmpdir(), 'opensip-guard-rename-out-'));
+    try {
+      writeFileSync(join(dir, 'inside.txt'), 'x');
+      const script = join(dir, 'probe-rename.mjs');
+      writeFileSync(
+        script,
+        `
+import { installCapabilityWorkerGuards } from ${JSON.stringify(pathToFileURL(GUARDS_DIST).href)};
+import { renameSync, copyFileSync } from 'node:fs';
+const results = {};
+installCapabilityWorkerGuards({
+  cwd: process.argv[2],
+  packageDir: process.argv[2],
+  resourceDecision: { isolation: 'worker', allowedResources: [], denyUndeclared: true },
+});
+const attempt = (name, fn) => {
+  try { fn(); results[name] = 'ALLOWED'; }
+  catch (error) { results[name] = String(error && error.message); }
+};
+attempt('renameOut', () => renameSync(process.argv[2] + '/inside.txt', process.argv[3] + '/escaped.txt'));
+attempt('copyOut', () => copyFileSync(process.argv[2] + '/inside.txt', process.argv[3] + '/escaped-copy.txt'));
+attempt('renameIn', () => renameSync(process.argv[2] + '/inside.txt', process.argv[2] + '/renamed.txt'));
+process.stdout.write(JSON.stringify(results));
+`,
+      );
+      const child = spawnSync(process.execPath, [script, dir, outDir], {
+        encoding: 'utf8',
+        timeout: 30_000,
+      });
+      expect(child.status, child.stderr).toBe(0);
+      const results = JSON.parse(child.stdout) as Record<string, string>;
+      // Destination outside the roots: denied even though the source is inside.
+      expect(results.renameOut).toContain('advisory guard');
+      expect(results.copyOut).toContain('advisory guard');
+      // In-root to in-root stays allowed (the pack owns its root).
+      expect(results.renameIn).toBe('ALLOWED');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(outDir, { recursive: true, force: true });
+    }
+  }, 60_000);
 });
