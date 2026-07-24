@@ -141,7 +141,8 @@
     "error-inventory:status": "node scripts/error-resiliency-inventory.mjs status",
     "error-inventory:check": "node scripts/error-resiliency-inventory.mjs check",
     "error-inventory:reconcile": "node scripts/error-resiliency-inventory.mjs reconcile",
-    "error-inventory:schema-check": "node scripts/error-resiliency-inventory.mjs schema-check"
+    "error-inventory:schema-check": "node scripts/error-resiliency-inventory.mjs schema-check",
+    "error-inventory:ratchet": "node scripts/error-resiliency-inventory.mjs ratchet"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

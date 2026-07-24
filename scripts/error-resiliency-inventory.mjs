@@ -42,7 +42,11 @@ import {
   resolveInventoryRoot,
   sortByKey,
 } from './lib/error-resiliency-inventory.mjs';
-import { extractStructuralSites, isStructurallySupportedPath } from './lib/error-resiliency-sites.mjs';
+import {
+  extractStructuralSites,
+  getDetectorCoverageManifest,
+  isStructurallySupportedPath,
+} from './lib/error-resiliency-sites.mjs';
 
 const require = createRequire(import.meta.url);
 const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
@@ -77,6 +81,8 @@ export async function main(argv = process.argv.slice(2), env = {}) {
         return runStatus(repoRoot, flags, stdout);
       case 'reconcile':
         return runReconcile(repoRoot, flags, stdout);
+      case 'ratchet':
+        return runRatchet(repoRoot, flags, stdout);
       default:
         stderr(`Unknown command: ${command}\n${usage()}\n`);
         return 2;
@@ -108,9 +114,10 @@ Campaign root (gitignored): ${INVENTORY_COOP_DIR}/
 Commands:
   schema-check              Validate campaign schema.json + rubric version
   generate [--commit SHA] [--dry-run] [--snapshot pre-infra]
-  check [--scope-only] [--policy] [--strict] [--changed]
+  check [--scope-only] [--policy] [--strict] [--changed] [--ratchet] [--plan 01]
   status                    Coverage/progress summary for a snapshot
   reconcile --from pre-infra --to post-infra
+  ratchet                   Temporary no-new-debt check vs C5 baseline (Plan 01)
 
 Options:
   --commit <sha>   Freeze inventory to this git commit (default HEAD)
@@ -433,6 +440,10 @@ function runCheck(repoRoot, flags, stdout) {
     }
   }
 
+  if (flags.ratchet || flags.plan === '01' || flags.plan === 1) {
+    return runRatchet(repoRoot, flags, stdout);
+  }
+
   if (flags.changed) {
     // Local mode: ensure tooling can enumerate changed tracked files without full rewrite
     const changed = listChangedTrackedFiles(repoRoot);
@@ -458,6 +469,106 @@ function runCheck(repoRoot, flags, stdout) {
         problems,
         detectorCoverageNote:
           'Structural detector covers TS/JS only; other languages are human-review-only and are not claimed rediscovered by --strict.',
+      },
+      null,
+      2,
+    ) + '\n',
+  );
+  return problems.length === 0 ? 0 : 1;
+}
+
+/**
+ * Temporary Plan 00/01 no-new-debt ratchet (Task 6.3).
+ * Compares structural fingerprints in changed production files against
+ * ratchet-baseline.json. Unrelated blob churn without new sites is OK.
+ */
+function runRatchet(repoRoot, flags, stdout) {
+  const inventoryRoot = resolveInventoryRoot(repoRoot);
+  const baselinePath = join(inventoryRoot, 'ratchet-baseline.json');
+  const coverage = getDetectorCoverageManifest();
+  /** @type {string[]} */
+  const problems = [];
+
+  if (!existsSync(baselinePath)) {
+    problems.push(
+      `missing ${INVENTORY_COOP_DIR}/ratchet-baseline.json — run Phase 6 C5 generation first`,
+    );
+    stdout(
+      JSON.stringify(
+        {
+          ok: false,
+          mode: 'ratchet',
+          detectorCoverage: coverage,
+          problems,
+          repair: 'Generate post-infra ledger and ratchet baseline under the campaign coop tree.',
+        },
+        null,
+        2,
+      ) + '\n',
+    );
+    return 1;
+  }
+
+  const baseline = /** @type {any} */ (
+    parseJsonSafe(readFileSync(baselinePath, 'utf8'), { label: 'ratchet-baseline' })
+  );
+  /** @type {Set<string>} */
+  const known = new Set(
+    (baseline.sites ?? []).map((s) => `${s.path}\0${s.kind}\0${s.fingerprint}`),
+  );
+
+  const changed = listChangedTrackedFiles(repoRoot);
+  const newSites = [];
+  for (const rel of changed) {
+    if (!isStructurallySupportedPath(rel)) continue;
+    if (!rel.startsWith('packages/') && !rel.startsWith('scripts/')) continue;
+    // Skip tests/fixtures
+    if (/\.test\.|\/__tests__\/|\/fixtures\//u.test(rel)) continue;
+    const abs = join(repoRoot, rel);
+    if (!existsSync(abs)) continue;
+    let text;
+    try {
+      text = readFileSync(abs, 'utf8');
+    } catch {
+      continue;
+    }
+    if (Buffer.byteLength(text, 'utf8') > BOUNDS.maxSourceFileBytes) continue;
+    const { sites } = extractStructuralSites(rel, text);
+    for (const site of sites) {
+      const key = `${rel}\0${site.kind}\0${site.fingerprint}`;
+      if (!known.has(key)) {
+        newSites.push({
+          path: rel,
+          kind: site.kind,
+          siteId: site.siteId,
+          fingerprint: site.fingerprint,
+          line: site.line,
+        });
+      }
+    }
+  }
+
+  for (const site of newSites) {
+    problems.push(
+      `new structural site not in C5 ratchet baseline: ${site.path}:${site.line} kind=${site.kind} id=${site.siteId} — add catalog definition + inventory evidence, or update ratchet via Plan 01 process (not silent expansion)`,
+    );
+  }
+
+  stdout(
+    JSON.stringify(
+      {
+        ok: problems.length === 0,
+        mode: 'ratchet',
+        temporary: true,
+        baselineDigest: baseline.digest,
+        baselineSiteCount: baseline.siteCount,
+        changedFilesScanned: changed.length,
+        newStructuralSites: newSites.length,
+        detectorCoverage: coverage,
+        problems: problems.slice(0, 50),
+        problemTruncated: problems.length > 50,
+        note: 'Ratchet keys structural fingerprints, not file blobs. Unsupported languages remain human-review-only.',
+        deletionCriterion: baseline.deletionCriterion,
       },
       null,
       2,
