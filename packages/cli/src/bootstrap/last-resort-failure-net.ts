@@ -40,6 +40,7 @@ function projectFatal(reason: unknown, kind: 'uncaughtException' | 'unhandledRej
 function forceFatalExit(): void {
   try {
     process.exitCode = FATAL_EXIT;
+    // @fitness-ignore-next-line no-local-exit-or-stdout -- Process edge (Plan 00 §4.7): a truly-escaped uncaughtException/unhandledRejection cannot unwind to the top-level boundary, so the last-resort net must synchronously terminate rather than set process.exitCode and resume.
     process.exit(FATAL_EXIT);
   } catch {
     // ignore

@@ -12,14 +12,17 @@ import { normalizeFailure } from './failure-envelope.js';
 
 const ABSOLUTE_ATTEMPT_BACKSTOP = 100;
 
+/** Backoff jitter strategy applied to each computed delay. */
 export type JitterMode = 'full' | 'equal' | 'decorrelated' | 'none';
 
+/** Injectable time source for deterministic retry tests (clock, random, sleep). */
 export interface RetryClock {
   readonly now: () => number;
   readonly random: () => number;
   readonly sleep: (ms: number, signal?: AbortSignal) => Promise<void>;
 }
 
+/** Caller-owned retry policy: attempts, backoff, deadline, and classification. */
 export interface RetryOptions {
   /** Maximum number of attempts (including the first). Default: 3 */
   maxAttempts?: number;
@@ -175,6 +178,8 @@ function safeOnRetry(
 /**
  * Execute an async function with exponential backoff retry.
  * Throws the last error if all attempts fail, or a cancellation/deadline error.
+ * @throws {ToolError} CORE.SYSTEM.CANCELLED when the signal aborts, or TIMEOUT when the deadline is exceeded.
+ * @throws The last thrown error when all attempts are exhausted or retry is declined.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- attempt/deadline/signal branches are load-bearing and clearer inline
 export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions = {}): Promise<T> {

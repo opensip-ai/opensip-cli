@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Package barrel: length tracks the re-exported public API surface, not logic complexity (what the soft limit targets).
 // Lib — errors + Result pattern
 export {
   ToolError,

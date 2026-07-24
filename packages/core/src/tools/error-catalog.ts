@@ -23,6 +23,7 @@ export interface ToolErrorCatalogContribution {
 
 /**
  * Validate an optional tool catalog contribution (hostile plugin input).
+ * @throws {ErrorDefinitionError} When the value is missing/not a plain object, the schemaVersion is unsupported, the owner id mismatches, or neither a catalog nor definitions are present.
  */
 export function validateToolErrorCatalogContribution(
   raw: unknown,

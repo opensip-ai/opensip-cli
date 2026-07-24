@@ -51,6 +51,7 @@ export class ToolRegistry {
    *
    * When `extensionPoints.errorCatalog` is present, cross-tool code collisions
    * fail registration with {@link ErrorDefinitionError}.
+   * @throws {ErrorDefinitionError} When the tool's error catalog collides with an already-registered code owned by a different tool.
    */
   register(tool: Tool, opts: { sourcePackage?: string } = {}): void {
     const key = tool.metadata.name ?? tool.metadata.id;
@@ -100,6 +101,7 @@ export class ToolRegistry {
   /**
    * Aggregate core + loaded tool error catalogs for this invocation.
    * Throws if two tools claim the same code with different owners.
+   * @throws {ErrorDefinitionError} When two tools claim the same code with different owners.
    */
   getErrorCatalogIndex(): {
     readonly byCode: ReadonlyMap<string, ErrorDefinition & { readonly toolName?: string }>;

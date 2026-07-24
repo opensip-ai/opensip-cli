@@ -12,6 +12,7 @@ import { getWorkerErrorFailureClass } from './worker-error-failure-class.js';
 /** Schema version for worker failure payloads. */
 export const WORKER_FAILURE_WIRE_VERSION = 1;
 
+/** Structured-clone-safe failure payload sent across the worker IPC boundary. */
 export interface WorkerFailureWire {
   readonly wireVersion: typeof WORKER_FAILURE_WIRE_VERSION;
   readonly message: string;

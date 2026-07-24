@@ -43,6 +43,7 @@ function forceExit(name: InterruptSignal): void {
   const code = forceExitCode(name);
   try {
     process.exitCode = code;
+    // @fitness-ignore-next-line no-local-exit-or-stdout -- Process edge (Plan 00 §4.7): a SECOND SIGINT/SIGTERM within the grace window force-terminates a cooperative cancellation that did not complete; it must exit now (130/143), bypassing the possibly-stuck top-level boundary.
     process.exit(code);
   } catch {
     // ignore

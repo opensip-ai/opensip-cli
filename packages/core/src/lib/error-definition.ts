@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Cohesive single-source contract: the immutable error-definition type surface (axes, owner identity, catalog) and the validators that enforce it. Splitting types from their validators is a possible follow-up; kept together as one authority for now.
 /**
  * Immutable error definitions and catalogs (Plan 00 Phase 2).
  *
@@ -51,7 +52,9 @@ export type FailureExitClass =
   | 'cancelled'
   | 'fatal';
 
+/** Whether a code is part of the public surface or internal-only. */
 export type ErrorCodeStability = 'public' | 'internal';
+/** Lifecycle state of an error code. */
 export type ErrorCodeLifecycle = 'active' | 'deprecated' | 'tombstoned';
 
 /** Schema version for machine consumers of catalog / failure projections. */
@@ -64,6 +67,7 @@ export const MAX_DEFINITIONS_PER_CATALOG = 500;
 const CODE_GRAMMAR = /^[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9_]*){2,}$/u;
 const LEGACY_CODE = /^[A-Z][A-Z0-9_.-]*$/u;
 
+/** Identity of the owner (tool or substrate package) that defines an error. */
 export interface ErrorOwnerIdentity {
   /** Stable owner key (tool UUID or package name for substrate). */
   readonly id: string;
@@ -73,6 +77,7 @@ export interface ErrorOwnerIdentity {
   readonly packageName?: string;
 }
 
+/** Immutable, frozen error definition carrying orthogonal machine-failure semantics. */
 export interface ErrorDefinition {
   readonly code: string;
   readonly owner: ErrorOwnerIdentity;
@@ -92,12 +97,14 @@ export interface ErrorDefinition {
   readonly publicMetadataKeys?: readonly string[];
 }
 
+/** Owner metadata for an error catalog. */
 export interface ErrorCatalogOwner {
   readonly id: string;
   readonly displayName: string;
   readonly packageName?: string;
 }
 
+/** Immutable per-owner catalog of error definitions, indexed by code. */
 export interface ErrorCatalog<TCodes extends string = string> {
   readonly schemaVersion: typeof ERROR_CATALOG_SCHEMA_VERSION;
   readonly owner: ErrorCatalogOwner;
@@ -107,6 +114,7 @@ export interface ErrorCatalog<TCodes extends string = string> {
   require(code: TCodes): ErrorDefinition;
 }
 
+/** Thrown when an error definition or catalog fails validation. */
 export class ErrorDefinitionError extends Error {
   readonly code = 'CORE.ERROR_DEFINITION.INVALID';
   constructor(message: string) {
@@ -135,6 +143,7 @@ export function deepFreeze<T>(value: T): Readonly<T> {
 /**
  * Validate a published/new code grammar. Legacy short codes are accepted only
  * when `allowLegacy` is true (core system adapter).
+ * @throws {ErrorDefinitionError} When the code is not a bounded non-empty string or fails the grammar.
  */
 export function assertErrorCodeShape(code: string, opts: { allowLegacy?: boolean } = {}): string {
   if (typeof code !== 'string' || code.length === 0 || code.length > 128) {
@@ -151,7 +160,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-/** Coerce only string primitives (reject objects that stringify to [object Object]). */
+/**
+ * Coerce only string primitives (reject objects that stringify to [object Object]).
+ * @throws {ErrorDefinitionError} When value is a non-primitive (object, array, symbol, function).
+ */
 function asBoundedString(value: unknown, label: string): string {
   if (typeof value === 'string') return value;
   if (value === undefined || value === null) return '';
@@ -200,6 +212,10 @@ const EXIT_CLASSES: readonly FailureExitClass[] = [
 const STABILITIES: readonly ErrorCodeStability[] = ['public', 'internal'];
 const LIFECYCLES: readonly ErrorCodeLifecycle[] = ['active', 'deprecated', 'tombstoned'];
 
+/**
+ * Return value when it is one of the allowed enum members.
+ * @throws {ErrorDefinitionError} When value is not one of the allowed members.
+ */
 function requireEnum<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
   if (typeof value !== 'string' || !allowed.includes(value as T)) {
     throw new ErrorDefinitionError(`${label} has invalid value`);
@@ -209,6 +225,7 @@ function requireEnum<T extends string>(value: unknown, allowed: readonly T[], la
 
 /**
  * Copy and validate a hostile external definition object into a plain frozen definition.
+ * @throws {ErrorDefinitionError} When raw is not a plain object, the code/operatorAction are invalid, or any axis fails enum validation.
  */
 export function normalizeErrorDefinition(
   raw: unknown,
@@ -272,6 +289,7 @@ export function normalizeErrorDefinition(
 
 /**
  * Build an immutable package/tool error catalog.
+ * @throws {ErrorDefinitionError} When the owner lacks id/displayName, the definition count exceeds the cap, or two entries share a code.
  */
 export function defineErrorCatalog<
   const TDefs extends Record<string, Omit<ErrorDefinition, 'owner'> & { code?: string }>,
@@ -316,6 +334,7 @@ export function defineErrorCatalog<
     get(code: string) {
       return list.find((d) => d.code === code);
     },
+    /** @throws {ErrorDefinitionError} When no definition exists for the given catalog key. */
     require(code: Extract<keyof TDefs, string>) {
       const def = frozenDefs[code as string];
       if (!def) {
