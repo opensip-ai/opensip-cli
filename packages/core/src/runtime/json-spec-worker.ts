@@ -30,7 +30,10 @@ function toWorkerErrorMessage<TEvent, TResult>(error: unknown): WorkerMessage<TE
   return {
     kind: 'error',
     message: wire.message,
-    // Stack is operator-only: omit from wire (Plan 00). Parent uses failure projection.
+    // Stack is operator-only: omit from wire (Plan 00). The parent reconstructs the
+    // typed error from the structured axes below (code/detailCode/failureClass) via
+    // subprocess-transport's reconstructWorkerError; `failure` carries the machine
+    // projection for diagnostics.
     ...(wire.failureClass === undefined ? {} : { failureClass: wire.failureClass }),
     ...(wire.code === undefined ? {} : { code: wire.code }),
     ...(wire.detailCode === undefined ? {} : { detailCode: wire.detailCode }),

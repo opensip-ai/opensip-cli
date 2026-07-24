@@ -16,6 +16,7 @@
  */
 
 import { EnvRegistry } from '../lib/env-registry.js';
+import { toolErrorFromCanonicalCode } from '../lib/errors.js';
 import { correlationToEnv } from '../lib/run-correlation.js';
 import { currentLogger, currentScope } from '../lib/run-scope.js';
 import { currentTraceparent } from '../lib/telemetry.js';
@@ -49,12 +50,41 @@ const WORKER_ENV = new EnvRegistry([
   },
 ]);
 
-/** Reconstruct an Error from a worker's `error` message (preserving stack). */
-function workerError(message: string, stack?: string, stderrTail?: string): Error {
+/** Bare Error for worker failures that carry no typed code (limit/premature-exit). */
+function workerError(message: string, stderrTail?: string): Error {
   const err = new Error(message) as Error & { stderrTail?: string };
-  if (stack !== undefined) err.stack = stack;
   if (stderrTail !== undefined) err.stderrTail = stderrTail;
   return err;
+}
+
+/**
+ * Reconstruct the richest possible error from a worker `error` IPC message.
+ *
+ * Plan 00 makes the worker omit `stack` from the wire (operator-only) and send
+ * the structured failure axes instead (`code`/`detailCode`/`failureClass`). The
+ * parent must consume them: rebuild the canonical {@link ToolError} subclass so
+ * the worker's exit class + code survive the process boundary (matching the
+ * dispatch transport's `workerErrorToToolError`). Falls back to a bare Error when
+ * no recognized canonical code crossed.
+ */
+function reconstructWorkerError(
+  typed: {
+    readonly message: string;
+    readonly code?: string;
+    readonly detailCode?: string;
+    readonly failureClass?: string;
+  },
+  stderrTail?: string,
+): Error {
+  if (typed.code !== undefined) {
+    const rebuilt = toolErrorFromCanonicalCode(typed.code, typed.message, {
+      code: typed.detailCode ?? typed.code,
+      ...(typed.failureClass === undefined ? {} : { failureClass: typed.failureClass }),
+      ...(stderrTail === undefined ? {} : { stderrTail }),
+    });
+    if (rebuilt !== undefined) return rebuilt;
+  }
+  return workerError(typed.message, stderrTail);
 }
 
 /**
@@ -182,7 +212,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
         } else if (typed.kind === 'error') {
           handle.done(() => {
             logFailed('ipc_error', typed);
-            settle.reject(workerError(typed.message, typed.stack, handle.getStderrTail()));
+            settle.reject(reconstructWorkerError(typed, handle.getStderrTail()));
           });
         }
       },
@@ -192,7 +222,7 @@ export function createSubprocessProgressRun<TEvent, TResult>(
           detail === undefined
             ? `worker failed: ${failureClass}`
             : `worker failed: ${failureClass} (${detail})`;
-        settle.reject(workerError(msg, undefined, handle.getStderrTail()));
+        settle.reject(workerError(msg, handle.getStderrTail()));
       },
     },
     { runId },
@@ -205,7 +235,6 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       settle.reject(
         workerError(
           `worker exited (code ${code ?? 'null'}) before producing a result`,
-          undefined,
           handle.getStderrTail(),
         ),
       );

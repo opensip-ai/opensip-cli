@@ -303,6 +303,10 @@ export async function runToolCommandWorker(specPath: string): Promise<DispatchWo
         // ADR-0145's direct-datastore denial must remain machine-identifiable after
         // the worker boundary.
         error instanceof ToolError ? error.code : undefined,
+        // Normalize the REAL thrown error (B#5): the machine `failure` projection
+        // then reflects the true definition/metadata/cause chain/stderrTail instead
+        // of a synthetic `new Error(message)`.
+        error,
       ),
     );
   }

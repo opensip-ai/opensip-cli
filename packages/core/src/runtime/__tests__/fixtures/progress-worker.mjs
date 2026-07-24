@@ -43,6 +43,18 @@ switch (mode) {
     send({ kind: 'error', message: 'worker blew up', stack: 'worker blew up\n  at fixture' });
     break;
   }
+  case 'error-typed': {
+    // Plan 00 wire: no stack; structured axes only. The parent must reconstruct a
+    // typed ToolError (NotFoundError) so the worker's exit class + subcode survive.
+    send({
+      kind: 'error',
+      message: 'thing not found',
+      code: 'NOT_FOUND',
+      detailCode: 'DEMO.NOT.FOUND',
+      failureClass: 'not-found',
+    });
+    break;
+  }
   case 'throw': {
     throw new Error('uncaught in worker');
   }

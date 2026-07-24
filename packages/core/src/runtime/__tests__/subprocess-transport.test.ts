@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { NotFoundError } from '../../lib/errors.js';
 import { createSubprocessProgressRun, runOffThreadOrInProcess } from '../subprocess-transport.js';
 
 const FIXTURE = fileURLToPath(new URL('fixtures/progress-worker.mjs', import.meta.url));
@@ -47,6 +48,22 @@ describe('createSubprocessProgressRun', () => {
   it('rejects the result with the reconstructed message on an error message', async () => {
     const run = createSubprocessProgressRun<number, string>(descriptorFor('error-message'));
     await expect(run.result).rejects.toThrow('worker blew up');
+  });
+
+  it('reconstructs a typed ToolError from the error message code (Plan 00 B#2)', async () => {
+    // The worker omits `stack` and sends structured axes (code/detailCode/failureClass);
+    // the parent must rebuild the canonical ToolError subclass so the worker's exit
+    // class + subcode survive the process boundary instead of a bare Error.
+    const run = createSubprocessProgressRun<number, string>(descriptorFor('error-typed'));
+    const rejection = await run.result.then(
+      () => {
+        throw new Error('expected rejection');
+      },
+      (error: unknown) => error,
+    );
+    expect(rejection).toBeInstanceOf(NotFoundError);
+    expect((rejection as { code?: string }).code).toBe('DEMO.NOT.FOUND');
+    expect((rejection as Error).message).toBe('thing not found');
   });
 
   it('rejects when the worker throws and exits non-zero without a result', async () => {
