@@ -99,11 +99,13 @@ throw createToolError(catalog.require('MYTOOL.RESOURCE.MISSING'), 'Resource not 
 - **machine / worker** — redacted axes for IPC and JSON  
 - **operator** — may include bounded operatorDetail (stderr tails); still no raw `Error` objects  
 
+Exit codes for any throw use `mapFailureToExitCode` (`@opensip-cli/contracts`): typed subclass ladder first (ADR-0066), then structural `isToolErrorLike` brands (duplicate physical `@opensip-cli/core`), then normalized definition `exitClass`.
+
 ## Host reporting
 
 Tools call `cli.reportFailure({ error, message?, suggestion?, … })`. The host normalizes **once** and fans out to log, human/JSON, exit code, and diagnostics. Do not pre-stringify and lose structure.
 
-Escaped process failures use a **minimal last-resort net** (synchronous coded line) — not the full async fan-out.
+Escaped process failures use a **minimal last-resort net** (synchronous coded line) — not the full async fan-out. Both `uncaughtException` and `unhandledRejection` force-exit after that write so the process cannot resume with undefined state.
 
 ## Retry and cancellation
 

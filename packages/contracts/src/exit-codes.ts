@@ -4,8 +4,10 @@ import {
   NotFoundError,
   PluginIncompatibleError,
   TimeoutError,
+  ToolError,
   ValidationError,
-  type ToolError,
+  isToolErrorLike,
+  normalizeFailure,
 } from '@opensip-cli/core';
 
 export const EXIT_CODES = {
@@ -67,8 +69,11 @@ export function mapExitClassToExitCode(exitClass: string | undefined): number {
  *
  * Typed subclasses own exit codes via the instanceof ladder (ADR-0066) so a
  * detail subcode on `error.code` cannot demote a ConfigurationError or
- * PluginIncompatibleError to runtime/fatal. Base `ToolError` and cross-copy
- * branded shapes use {@link ToolError.definition}.exitClass when present.
+ * PluginIncompatibleError to runtime/fatal. Base `ToolError` uses
+ * {@link ToolError.definition}.exitClass (e.g. cooperative cancel → 130).
+ *
+ * For cross-copy branded failures without a shared prototype chain, prefer
+ * {@link mapFailureToExitCode} which recognizes `isToolErrorLike` brands.
  */
 export function mapToolErrorToExitCode(error: ToolError): number {
   // Subclass ladder first — stable for subcodes (CONFIGURATION.GATE.*, PLUGIN.WORKER.*, …).
@@ -84,6 +89,24 @@ export function mapToolErrorToExitCode(error: ToolError): number {
     return mapExitClassToExitCode(fromDefinition);
   }
   return EXIT_CODES.RUNTIME_ERROR;
+}
+
+/**
+ * Total exit-code mapper for any thrown value (Plan 00).
+ *
+ * Precedence:
+ * 1. Same-realm `ToolError` subclasses via {@link mapToolErrorToExitCode}
+ * 2. Structural `isToolErrorLike` brands (duplicate physical `@opensip-cli/core`) → definition.exitClass
+ * 3. {@link normalizeFailure} definition axes for natives/primitives/hostile input
+ */
+export function mapFailureToExitCode(error: unknown): number {
+  if (error instanceof ToolError) {
+    return mapToolErrorToExitCode(error);
+  }
+  if (isToolErrorLike(error)) {
+    return mapExitClassToExitCode(error.definition.exitClass);
+  }
+  return mapExitClassToExitCode(normalizeFailure(error).definition.exitClass);
 }
 
 /**

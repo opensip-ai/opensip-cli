@@ -195,6 +195,7 @@ export {
   EXIT_CODES,
   getErrorSuggestion,
   mapToolErrorToExitCode,
+  mapFailureToExitCode,
   mapExitClassToExitCode,
 } from './exit-codes.js';
 export type { ErrorSuggestion } from './exit-codes.js';

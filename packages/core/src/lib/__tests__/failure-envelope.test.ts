@@ -163,3 +163,72 @@ describe('normalizeFailure', () => {
     expect(typeof env.message).toBe('string');
   });
 });
+
+describe('failure projection golden fixtures (Plan 00 versioned wire)', () => {
+  it('public projection keeps stable keys and strips secrets', () => {
+    const def = coreSystemErrorCatalog.require('NOT_FOUND');
+    const err = createToolError(def, 'missing resource', {
+      metadata: { identifier: 'r1', token: 'sekrit' },
+    });
+    const pub = toPublicFailureProjection(normalizeFailure(err));
+    expect(pub).toMatchObject({
+      schemaVersion: 1,
+      code: 'NOT_FOUND',
+      message: 'missing resource',
+      kind: 'not-found',
+      retry: 'never',
+      known: 'known',
+    });
+    expect(pub).not.toHaveProperty('operatorDetail');
+    expect(JSON.stringify(pub)).not.toContain('sekrit');
+    // Additive-only contract: required keys present for machine consumers.
+    for (const key of [
+      'schemaVersion',
+      'code',
+      'message',
+      'action',
+      'source',
+      'responsibility',
+      'kind',
+      'retry',
+      'severity',
+      'known',
+    ]) {
+      expect(pub).toHaveProperty(key);
+    }
+  });
+
+  it('machine projection includes exitClass and causes without operatorDetail', () => {
+    const err = new ToolError('outer', 'SYSTEM_ERROR', {
+      cause: new Error('inner-cause'),
+      stderrTail: 'secret-stderr-tail',
+    });
+    const machine = toMachineFailureProjection(normalizeFailure(err));
+    expect(machine).toMatchObject({
+      schemaVersion: 1,
+      exitClass: 'runtime',
+      known: 'known',
+    });
+    expect(machine).not.toHaveProperty('operatorDetail');
+    expect(Array.isArray(machine.causes)).toBe(true);
+    expect(JSON.stringify(machine)).not.toContain('secret-stderr-tail');
+  });
+
+  it('operator projection may include operatorDetail; re-normalize is safe', () => {
+    const err = new ToolError('outer', 'SYSTEM_ERROR', { stderrTail: 'tail-for-ops' });
+    const op = toOperatorFailureProjection(normalizeFailure(err));
+    expect(op.operatorDetail).toContain('tail-for-ops');
+    expect(normalizeFailure(op).schemaVersion).toBe(1);
+  });
+
+  it('cancelled definition projects cancelled exitClass', () => {
+    const err = createToolError(coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED'), 'aborted');
+    const machine = toMachineFailureProjection(normalizeFailure(err));
+    expect(machine).toMatchObject({
+      code: 'CORE.SYSTEM.CANCELLED',
+      kind: 'cancelled',
+      exitClass: 'cancelled',
+      retry: 'never',
+    });
+  });
+});

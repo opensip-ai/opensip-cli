@@ -10,7 +10,12 @@ import {
 } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { EXIT_CODES, getErrorSuggestion, mapToolErrorToExitCode } from '../exit-codes.js';
+import {
+  EXIT_CODES,
+  getErrorSuggestion,
+  mapFailureToExitCode,
+  mapToolErrorToExitCode,
+} from '../exit-codes.js';
 
 describe('EXIT_CODES', () => {
   it('exposes the documented set', () => {
@@ -259,5 +264,46 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
     expect(mapToolErrorToExitCode(new GatePolicyError('policy violated'))).toBe(
       EXIT_CODES.CONFIGURATION_ERROR,
     );
+  });
+});
+
+describe('mapFailureToExitCode (Plan 00 total mapper)', () => {
+  it('matches mapToolErrorToExitCode for same-realm subclasses', () => {
+    const err = new ConfigurationError('bad');
+    expect(mapFailureToExitCode(err)).toBe(mapToolErrorToExitCode(err));
+    expect(mapFailureToExitCode(err)).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+  });
+
+  it('maps cooperative cancel definitions to CANCELLED (130)', async () => {
+    const { createCancelledError } = await import('@opensip-cli/core');
+    expect(mapFailureToExitCode(createCancelledError('stop'))).toBe(EXIT_CODES.CANCELLED);
+  });
+
+  it('maps structural isToolErrorLike brands without shared instanceof', async () => {
+    const { createToolError, coreSystemErrorCatalog, TOOL_ERROR_BRAND_VERSION } =
+      await import('@opensip-cli/core');
+    const def = coreSystemErrorCatalog.require('NOT_FOUND');
+    // Forge a brand-only shape (as if from a duplicate physical core copy).
+    const branded = {
+      message: 'missing across copy',
+      code: 'NOT_FOUND',
+      name: 'ToolError',
+      definition: def,
+      metadata: {},
+      [Symbol.for('@opensip-cli/core/tool-error-brand')]: TOOL_ERROR_BRAND_VERSION,
+    };
+    expect(mapFailureToExitCode(branded)).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+    // Sanity: true ToolError still works
+    expect(mapFailureToExitCode(createToolError(def, 'x'))).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+  });
+
+  it('maps native errno failures through normalizeFailure', () => {
+    const enoent = Object.assign(new Error('no such file'), { code: 'ENOENT' });
+    expect(mapFailureToExitCode(enoent)).toBe(EXIT_CODES.CHECK_NOT_FOUND);
+  });
+
+  it('maps opaque throws to RUNTIME_ERROR', () => {
+    expect(mapFailureToExitCode('string boom')).toBe(EXIT_CODES.RUNTIME_ERROR);
+    expect(mapFailureToExitCode(null)).toBe(EXIT_CODES.RUNTIME_ERROR);
   });
 });

@@ -3,12 +3,10 @@
  * (Plan 06). Combines core error types with contracts exit-code policy.
  */
 
-import { mapExitClassToExitCode, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import { mapFailureToExitCode } from '@opensip-cli/contracts';
 import {
   SystemError,
-  ToolError,
   formatCliDiagnosticHuman,
-  isToolErrorLike,
   normalizeFailure,
   toMachineFailureProjection,
   toSafeDiagnosticRecord,
@@ -37,19 +35,11 @@ function deriveErrorDefaults(error: unknown): {
   readonly suggestion?: string;
   readonly failure?: Readonly<Record<string, unknown>>;
 } {
-  // Single normalize path (Plan 00) — definition axes drive exit/code/action.
+  // Single normalize path (Plan 00) — definition axes + typed subclass ladder.
   const envelope = normalizeFailure(error);
-  // Prefer subclass ladder for true ToolError instances; branded cross-copy
-  // shapes and untyped throws use the normalized definition exitClass.
-  const exitCode =
-    error instanceof ToolError
-      ? mapToolErrorToExitCode(error)
-      : isToolErrorLike(error)
-        ? mapExitClassToExitCode(error.definition.exitClass)
-        : mapExitClassToExitCode(envelope.definition.exitClass);
   return {
     message: truncateDerivedMessage(envelope.message),
-    exitCode,
+    exitCode: mapFailureToExitCode(error),
     code: envelope.code,
     suggestion: envelope.operatorAction,
     failure: toMachineFailureProjection(envelope),

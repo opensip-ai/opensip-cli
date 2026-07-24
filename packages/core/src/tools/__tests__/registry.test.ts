@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { defineErrorCatalog, ErrorDefinitionError } from '../../lib/error-definition.js';
 import { logger } from '../../lib/logger.js';
 import { ToolRegistry } from '../registry.js';
 
@@ -15,6 +16,37 @@ const stub = (id: string, version = '0.0.0'): Tool => ({
   },
   commands: [{ name: id, description: `${id} command` }],
 });
+
+const catalogDef = {
+  source: 'application' as const,
+  defaultResponsibility: 'user' as const,
+  kind: 'validation' as const,
+  retry: 'never' as const,
+  severity: 'error' as const,
+  exposure: 'public' as const,
+  exitClass: 'configuration' as const,
+  operatorAction: 'fix',
+  stability: 'public' as const,
+  lifecycle: 'active' as const,
+};
+
+function stubWithCatalog(name: string, toolId: string, code: string): Tool {
+  const catalog = defineErrorCatalog(
+    { id: toolId, displayName: name, packageName: `@scope/${name}` },
+    { [code]: { ...catalogDef, code } },
+  );
+  return {
+    identity: { name },
+    metadata: {
+      id: toolId,
+      name,
+      version: '0.0.0',
+      description: `${name} stub`,
+    },
+    commands: [{ name, description: `${name} command` }],
+    extensionPoints: { errorCatalog: catalog },
+  };
+}
 
 describe('ToolRegistry', () => {
   let reg: ToolRegistry;
@@ -132,6 +164,36 @@ describe('ToolRegistry', () => {
           sourcePackage: '@vendor/a',
         }),
       );
+    });
+  });
+
+  describe('error catalog registration (Plan 00)', () => {
+    it('indexes a tool catalog after register', () => {
+      const tool = stubWithCatalog(
+        'fit-like',
+        '11111111-1111-4111-8111-111111111111',
+        'FITLIKE.DEMO.CODE',
+      );
+      reg.register(tool);
+      expect(reg.getErrorCatalogIndex().byCode.get('FITLIKE.DEMO.CODE')?.toolName).toBe('fit-like');
+    });
+
+    it('refuses register when a colliding code would leave a half-mounted tool', () => {
+      const a = stubWithCatalog(
+        'tool-a',
+        'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        'SHARED.COLLISION.X',
+      );
+      const b = stubWithCatalog(
+        'tool-b',
+        'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+        'SHARED.COLLISION.X',
+      );
+      reg.register(a);
+      expect(() => reg.register(b)).toThrow(ErrorDefinitionError);
+      // Colliding tool must not remain registered.
+      expect(reg.get('tool-b')).toBeUndefined();
+      expect(reg.list().map((t) => t.metadata.name)).toEqual(['tool-a']);
     });
   });
 });
