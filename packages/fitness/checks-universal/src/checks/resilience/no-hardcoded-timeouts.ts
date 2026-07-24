@@ -3,15 +3,14 @@
  */
 
 import { logger } from '@opensip-cli/core';
-import { defineCheck, isTestFile, type CheckViolation } from '@opensip-cli/fitness';
-import { stripStringLiterals, stripStringsAndComments } from '@opensip-cli/fitness';
-
+import { defineCheck, isTestFile, type CheckViolation, getLineNumber } from '@opensip-cli/fitness';
 import {
-  isDigit,
-  isAlphanumericChar,
-  skipWhitespace,
-  parseDigits,
-} from './_helpers/config-validation.js';
+  stripStringLiterals,
+  stripStringsAndComments,
+  stripStringsAndCommentsPreservingPositions,
+} from '@opensip-cli/fitness';
+
+import { isDigit, isAlphanumericChar } from './_helpers/config-validation.js';
 
 // =============================================================================
 // CONSTANTS
@@ -28,73 +27,83 @@ const MIN_FLAGGABLE_TIMEOUT = 5000;
 // =============================================================================
 
 /**
- * Find the comma separator after the callback in setTimeout
+ * Walk forward from an opening `(` at `openIndex` and return the index of
+ * its balanced closing `)`, or -1 if the parens never balance.
  */
-function findSetTimeoutComma(str: string, startPos: number): number {
-  logger.debug({
-    evt: 'fitness.checks.no_hardcoded_timeouts.find_set_timeout_comma',
-    msg: 'Finding comma separator after setTimeout callback',
-  });
-  let i = startPos;
-  let parenDepth = 1;
-
-  while (i < str.length && parenDepth > 0) {
-    if (str[i] === '(') {
-      parenDepth++;
-    } else if (str[i] === ')') {
-      parenDepth--;
-    } else if (str[i] === ',' && parenDepth === 1) {
-      break;
-    } else {
-      // Other characters - continue scanning
+function findMatchingParen(str: string, openIndex: number): number {
+  let depth = 0;
+  for (let i = openIndex; i < str.length; i++) {
+    if (str[i] === '(') depth++;
+    else if (str[i] === ')') {
+      depth--;
+      if (depth === 0) return i;
     }
-    i++;
   }
+  return -1;
+}
 
-  return i;
+/**
+ * Parse the trailing numeric literal immediately before `argsText`'s end
+ * (after skipping trailing whitespace/newlines) — e.g. the `10000` in
+ * `"() => {\n  doWork();\n}, 10000"`. Returns null when the final token
+ * isn't a bare digit run (a variable reference, another call, etc.),
+ * matching the "hardcoded literal only" scope of the other extractors.
+ */
+function parseTrailingTimeoutArg(argsText: string): { timeout: number; digitCount: number } | null {
+  let end = argsText.length;
+  while (end > 0 && /\s/.test(argsText[end - 1] ?? '')) end--;
+  let start = end;
+  while (start > 0 && isDigit(argsText[start - 1])) start--;
+  const digitCount = end - start;
+  if (digitCount === 0) return null;
+  // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
+  return { timeout: Number.parseInt(argsText.slice(start, end), 10), digitCount };
 }
 
 /* v8 ignore start -- timeout extraction state machines; many parser-state branches covered indirectly */
 /**
- * Extract setTimeout value using string parsing.
+ * Find every `setTimeout(...)` call in `content` and extract its trailing
+ * numeric delay argument via a balanced-parenthesis walk from the call's
+ * opening paren to its matching close. This spans newlines — unlike the
+ * previous line-by-line extraction (which scanned one `line` at a time
+ * and so returned null the instant a callback body continued onto a
+ * following line, making the idiomatic block-body form
+ * (`setTimeout(() => {\n  ...\n}, 10000)`) invisible — this walk finds
+ * the delay regardless of how many lines the callback spans, then reads
+ * the final numeric argument before the balanced close.
+ *
+ * Runs against `stripStringsAndCommentsPreservingPositions(content)`, a
+ * same-length/same-line-structure view with strings and comments blanked,
+ * so a commented-out or string-embedded `setTimeout(` never matches and
+ * `getLineNumber(content, index)` still maps back to the true line.
  */
-function extractSetTimeoutValue(line: string): { timeout: number; matchText: string } | null {
+function findSetTimeoutOccurrences(
+  content: string,
+): { index: number; timeout: number; matchText: string }[] {
   logger.debug({
-    evt: 'fitness.checks.no_hardcoded_timeouts.extract_set_timeout_value',
-    msg: 'Extracting setTimeout value from line',
+    evt: 'fitness.checks.no_hardcoded_timeouts.find_set_timeout_occurrences',
+    msg: 'Scanning file for setTimeout(...) calls',
   });
-  const idx = line.indexOf('setTimeout');
-  if (idx === -1) return null;
+  const stripped = stripStringsAndCommentsPreservingPositions(content);
+  const results: { index: number; timeout: number; matchText: string }[] = [];
+  const headerPattern = /setTimeout\s*\(/g;
+  let headerMatch: RegExpExecArray | null;
+  while ((headerMatch = headerPattern.exec(stripped)) !== null) {
+    const openParenIndex = headerMatch.index + headerMatch[0].length - 1;
+    const closeParenIndex = findMatchingParen(stripped, openParenIndex);
+    if (closeParenIndex === -1) continue;
 
-  const afterSetTimeout = line.slice(Math.max(0, idx + 10));
-  let i = skipWhitespace(afterSetTimeout, 0);
+    const argsText = stripped.slice(openParenIndex + 1, closeParenIndex);
+    const parsed = parseTrailingTimeoutArg(argsText);
+    if (!parsed || parsed.digitCount < 4) continue;
 
-  // Expect (
-  if (afterSetTimeout[i] !== '(') return null;
-  i++;
-
-  // Find the comma (skip over the callback argument)
-  i = findSetTimeoutComma(afterSetTimeout, i);
-  if (afterSetTimeout[i] !== ',') return null;
-  i++;
-
-  // Skip whitespace
-  i = skipWhitespace(afterSetTimeout, i);
-
-  // Parse the timeout number (4+ digits)
-  const { endPos, value: timeout, digitCount } = parseDigits(afterSetTimeout, i);
-  i = endPos;
-  if (digitCount < 4) return null;
-
-  // Skip whitespace and expect )
-  i = skipWhitespace(afterSetTimeout, i);
-  if (afterSetTimeout[i] !== ')') return null;
-  i++;
-
-  return {
-    timeout,
-    matchText: `setTimeout${afterSetTimeout.slice(0, Math.max(0, i))}`,
-  };
+    results.push({
+      index: headerMatch.index,
+      timeout: parsed.timeout,
+      matchText: `setTimeout(..., ${parsed.timeout})`,
+    });
+  }
+  return results;
 }
 
 /**
@@ -218,16 +227,17 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
 
 /**
  * Extract timeout value from a line using string parsing.
+ *
+ * `setTimeout(...)` is intentionally NOT handled here — it is scanned once
+ * across the whole file by {@link findSetTimeoutOccurrences} so a callback
+ * body spanning multiple lines is still found. Handling it per-line here
+ * too would double-report the single-line case.
  */
 function extractTimeoutFromLine(line: string): { timeout: number; matchText: string } | null {
   logger.debug({
     evt: 'fitness.checks.no_hardcoded_timeouts.extract_timeout_from_line',
     msg: 'Extracting timeout value from line',
   });
-  // Check for setTimeout(fn, NUMBER)
-  const setTimeoutMatch = extractSetTimeoutValue(line);
-  if (setTimeoutMatch) return setTimeoutMatch;
-
   // Check for timeout = NUMBER or timeout: NUMBER
   const timeoutAssignMatch = extractTimeoutAssignment(line);
   if (timeoutAssignMatch) return timeoutAssignMatch;
@@ -302,6 +312,23 @@ export const noHardcodedTimeouts = defineCheck({
     const strippedContent = stripStringsAndComments(content);
     if (!strippedContent.includes('timeout') && !strippedContent.includes('setTimeout')) {
       return violations;
+    }
+
+    // setTimeout(...) is scanned across the whole file (not line-by-line)
+    // so a block-body callback spanning multiple lines is still found.
+    for (const occurrence of findSetTimeoutOccurrences(content)) {
+      if (occurrence.timeout < MIN_FLAGGABLE_TIMEOUT) continue;
+      violations.push({
+        line: getLineNumber(content, occurrence.index),
+        column: 0,
+        message: `Hardcoded timeout value: ${occurrence.timeout}ms`,
+        severity: 'warning',
+        suggestion:
+          'Use configurable timeout from configuration or constants. Example: const timeout = config.get("httpTimeout") or import { HTTP_TIMEOUT } from "./constants"',
+        match: occurrence.matchText,
+        type: 'hardcoded-timeout',
+        filePath,
+      });
     }
 
     const lines = content.split('\n');

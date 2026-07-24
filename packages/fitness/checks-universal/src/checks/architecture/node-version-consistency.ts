@@ -275,8 +275,10 @@ export const nodeVersionConsistency = defineCheck({
         checkTypesNode(content, filePath, expectedMajor, violations);
       } else if (
         filePath.replaceAll('\\', '/').includes('.github/workflows/') &&
-        basename.endsWith('.yml')
+        (basename.endsWith('.yml') || basename.endsWith('.yaml'))
       ) {
+        // GitHub Actions accepts both extensions for workflow files —
+        // gating on '.yml' alone silently skipped every '.yaml' workflow.
         checkCiWorkflow(content, filePath, expectedMajor, violations);
       }
     }

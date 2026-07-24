@@ -11,10 +11,64 @@ import {
 } from '@opensip-cli/fitness';
 
 /**
- * Pattern for catch blocks that log errors but don't propagate failure.
- * Detects: catch blocks containing logger.error/console.error but no throw/process.exit(1)/return err
+ * Header of a `catch (...) {` block, up to and including its opening brace.
+ * The body is NOT captured here — a fixed-depth regex like the previous
+ * `CATCH_BLOCK_PATTERN` (`[^{}]*(?:\{[^{}]*\}[^{}]*)*`) only balances ONE
+ * level of nested braces, so it produces zero matches for any catch body
+ * containing a doubly nested block — e.g. `if (...) { for (...) { ... } }`,
+ * the common shape of real-world retry/cleanup logic. `findCatchBlocks`
+ * below walks forward from this header's opening brace with a simple
+ * depth counter instead, which balances to arbitrary nesting depth.
  */
-const CATCH_BLOCK_PATTERN = /\bcatch\s*\([^)]+\)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)}/g;
+const CATCH_HEADER_PATTERN = /\bcatch\s*\([^)]*\)\s*\{/g;
+
+/** One `catch (...) { ... }` block discovered by {@link findCatchBlocks}. */
+interface CatchBlock {
+  /** Index of the `catch` keyword — used for line-number reporting. */
+  readonly index: number;
+  /** Body text between the balanced braces (exclusive of both braces). */
+  readonly body: string;
+}
+
+/**
+ * Walk forward from an opening `{` at `openIndex` and return the index of
+ * its balanced closing `}`, or -1 if the braces never balance (malformed
+ * or truncated input — the caller skips rather than mis-reports).
+ */
+function findMatchingBrace(content: string, openIndex: number): number {
+  let depth = 0;
+  for (let i = openIndex; i < content.length; i++) {
+    if (content[i] === '{') depth++;
+    else if (content[i] === '}') {
+      depth--;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Find every `catch (...) { ... }` block in `content`, resolving each
+ * body via balanced brace counting (not a fixed-depth regex) so bodies
+ * with 2+ levels of nested braces are found. `content` has already been
+ * through the check's `contentFilter: 'strip-strings'`, so braces inside
+ * string literals cannot perturb the depth count.
+ */
+function findCatchBlocks(content: string): CatchBlock[] {
+  const blocks: CatchBlock[] = [];
+  CATCH_HEADER_PATTERN.lastIndex = 0;
+  let headerMatch: RegExpExecArray | null;
+  while ((headerMatch = CATCH_HEADER_PATTERN.exec(content)) !== null) {
+    const openBraceIndex = headerMatch.index + headerMatch[0].length - 1;
+    const closeBraceIndex = findMatchingBrace(content, openBraceIndex);
+    if (closeBraceIndex === -1) continue;
+    blocks.push({
+      index: headerMatch.index,
+      body: content.slice(openBraceIndex + 1, closeBraceIndex),
+    });
+  }
+  return blocks;
+}
 
 /** Patterns indicating error is logged */
 const ERROR_LOG_PATTERNS = [/logger\.error/, /logger\.fatal/, /console\.error/];
@@ -97,10 +151,8 @@ export const exitCodeCorrectness = defineCheck({
       return violations;
     }
 
-    CATCH_BLOCK_PATTERN.lastIndex = 0;
-    let match;
-    while ((match = CATCH_BLOCK_PATTERN.exec(content)) !== null) {
-      const catchBody = match[1] ?? '';
+    for (const block of findCatchBlocks(content)) {
+      const catchBody = block.body;
 
       // Only flag if it logs an error
       const logsError = ERROR_LOG_PATTERNS.some((p) => p.test(catchBody));
@@ -110,7 +162,7 @@ export const exitCodeCorrectness = defineCheck({
       const propagatesError = ERROR_PROPAGATION_PATTERNS.some((p) => p.test(catchBody));
       if (propagatesError) continue;
 
-      const lineNumber = getLineNumber(content, match.index);
+      const lineNumber = getLineNumber(content, block.index);
       const line = content.split('\n')[lineNumber - 1] ?? '';
       if (isCommentLine(line)) continue;
 
@@ -121,7 +173,7 @@ export const exitCodeCorrectness = defineCheck({
         severity: 'warning',
         suggestion:
           'Re-throw the error, call process.exit(1), or return a Result.err() to ensure the failure is visible to callers and CI pipelines.',
-        match: match[0].slice(0, 60),
+        match: content.slice(block.index, block.index + 60),
         type: 'silent-failure-exit',
         filePath,
       });
