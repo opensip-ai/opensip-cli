@@ -39,6 +39,7 @@ export class FileCache {
   private _prewarmed = false;
   private _cleared = false;
   private _autoClearTimer: ReturnType<typeof setTimeout> | null = null;
+  private _prewarmSnapshot: readonly string[] | undefined;
 
   /**
    * Prewarm the cache by loading all files matching patterns.
@@ -98,6 +99,11 @@ export class FileCache {
     }
 
     this._prewarmed = true;
+    // Freeze the post-prewarm universe: scope-empty (universal) checks read
+    // THIS snapshot, never the live cache — on-demand reads by concurrently
+    // running scoped checks would otherwise widen their file set
+    // scheduling-dependently (nondeterministic findings run-to-run).
+    this._prewarmSnapshot = Object.freeze([...this.cache.keys()].sort());
     this._cleared = false;
     this.scheduleAutoClear();
     const durationMs = Date.now() - start;
@@ -174,6 +180,7 @@ export class FileCache {
   clear(): void {
     this.cache.clear();
     this._prewarmed = false;
+    this._prewarmSnapshot = undefined;
     this._cleared = true;
     if (this._autoClearTimer) {
       clearTimeout(this._autoClearTimer);
@@ -187,6 +194,15 @@ export class FileCache {
    */
   paths(): readonly string[] {
     return [...this.cache.keys()].sort();
+  }
+
+  /**
+   * The immutable file universe captured when prewarm completed, or
+   * `undefined` when this cache was never prewarmed (tests, ad-hoc use).
+   * Later on-demand reads grow {@link paths} but never this snapshot.
+   */
+  prewarmedPaths(): readonly string[] | undefined {
+    return this._prewarmSnapshot;
   }
 
   /**

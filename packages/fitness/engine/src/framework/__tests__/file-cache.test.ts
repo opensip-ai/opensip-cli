@@ -46,6 +46,35 @@ describe('fileCache.prewarm', () => {
   });
 });
 
+describe('fileCache.prewarmedPaths (frozen scope-empty universe)', () => {
+  it('freezes the universe at prewarm completion; on-demand reads never widen it', async () => {
+    writeFileSync(join(testDir, 'a.ts'), 'a');
+    writeFileSync(join(testDir, 'b.ts'), 'b');
+    writeFileSync(join(testDir, 'late.py'), 'print()');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+
+    const snapshot = fileCache.prewarmedPaths();
+    expect(snapshot).toBeDefined();
+    expect(snapshot).toHaveLength(2);
+
+    // A concurrently-running scoped check reads a non-prewarmed file on
+    // demand: the live cache grows, the frozen universe must not.
+    await fileCache.get(join(testDir, 'late.py'));
+    expect(fileCache.paths()).toHaveLength(3);
+    expect(fileCache.prewarmedPaths()).toBe(snapshot);
+    expect(fileCache.prewarmedPaths()).toHaveLength(2);
+  });
+
+  it('is undefined before prewarm and after clear', async () => {
+    expect(fileCache.prewarmedPaths()).toBeUndefined();
+    writeFileSync(join(testDir, 'a.ts'), 'a');
+    await fileCache.prewarm(testDir, ['**/*.ts']);
+    expect(fileCache.prewarmedPaths()).toBeDefined();
+    fileCache.clear();
+    expect(fileCache.prewarmedPaths()).toBeUndefined();
+  });
+});
+
 describe('fileCache.get', () => {
   it('returns content from disk on cache miss and caches it', async () => {
     const path = join(testDir, 'fresh.ts');

@@ -175,12 +175,14 @@ function createMatchFilesFunction(
     }
 
     // When the matcher has no include patterns (checks without targets),
-    // fall back to the prewarmed file cache paths. The cache itself
-    // honors no exclusion config — that's the layer where globalExcludes
-    // must be applied, otherwise scope-empty checks scan every prewarmed
-    // file regardless of project intent.
+    // fall back to the file universe FROZEN at prewarm completion — reading
+    // the live cache here would make the set scheduling-dependent (other
+    // checks' on-demand reads grow it mid-run). Only a never-prewarmed cache
+    // (tests, ad-hoc use) falls back to the live paths. The cache honors no
+    // exclusion config — globalExcludes must be applied at this layer.
     if (matcher.includePatterns.length === 0) {
-      return applyGlobalExcludes(fc.paths(), cwd, globalExcludes ?? []);
+      const universe = fc.prewarmedPaths() ?? fc.paths();
+      return applyGlobalExcludes(universe, cwd, globalExcludes ?? []);
     }
 
     return matcher.files();

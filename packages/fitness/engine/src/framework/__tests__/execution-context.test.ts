@@ -99,6 +99,29 @@ describe('createExecutionContext > matchFiles fileCache fallback', () => {
     const files = await runMatchFiles([]);
     expect(files.length).toBe(3);
   });
+
+  it('scope-empty universe is FROZEN at prewarm — later on-demand reads never widen it', async () => {
+    setupCachedFiles();
+    writeFileSync(join(testDir, 'src', 'late.py'), 'print()');
+    await fileCache.prewarm(testDir, ['**/*.ts', '**/*.md', '**/*.json']);
+
+    // A concurrently-running scoped check reads a non-prewarmed file mid-run.
+    await fileCache.get(join(testDir, 'src', 'late.py'));
+
+    const matcher = PathMatcher.create({ cwd: testDir, include: [], exclude: [] });
+    const ctx = createExecutionContext(
+      { id: 'test-id', slug: 'test-slug', itemType: 'files' },
+      testDir,
+      matcher,
+      { fileCache },
+    );
+    const files = await ctx.matchFiles();
+    // Deterministic: the scope-empty set is the prewarm snapshot, independent
+    // of what other checks happened to read first (scheduling order).
+    expect(files.length).toBe(3);
+    expect(files.some((f) => f.endsWith('late.py'))).toBe(false);
+    expect(fileCache.paths().some((f) => f.endsWith('late.py'))).toBe(true);
+  });
 });
 
 describe('createExecutionContext > extractSnippet, log, checkAborted', () => {
