@@ -8,18 +8,18 @@
 
 import { isEligibleKind } from './find-duplicate-bodies.js';
 import {
-  NEAR_DUP_LSH_BANDS,
-  NEAR_DUP_SIGNATURE_K,
-  estimateJaccard,
-  lshBandHashes,
-} from './near-duplicate-signature.js';
-import {
   capComponentIndices,
   capComponentIndicesByDegree,
   nearIndicesInComponent,
   residualConnectedComponents,
   type NearEdge,
 } from './near-duplicate-capping.js';
+import {
+  NEAR_DUP_LSH_BANDS,
+  NEAR_DUP_SIGNATURE_K,
+  estimateJaccard,
+  lshBandHashes,
+} from './near-duplicate-signature.js';
 import { UnionFind } from './near-duplicate-union-find.js';
 
 import type {

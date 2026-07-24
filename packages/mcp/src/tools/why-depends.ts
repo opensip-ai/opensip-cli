@@ -41,12 +41,12 @@ export function registerWhyDepends(server: McpStdioServer, deps: McpToolDeps): v
       // floor an explicit limit at 1 (mirrors package_dependencies' sampleLimit
       // handling for file grouping).
       const groupBy = args.groupBy ?? 'none';
-      const evidenceLimit =
-        groupBy === 'none'
-          ? (args.evidenceLimit ?? 0)
-          : args.evidenceLimit === undefined
-            ? undefined
-            : Math.max(args.evidenceLimit, 1);
+      let evidenceLimit: number | undefined;
+      if (groupBy === 'none') {
+        evidenceLimit = args.evidenceLimit ?? 0;
+      } else if (args.evidenceLimit !== undefined) {
+        evidenceLimit = Math.max(args.evidenceLimit, 1);
+      }
       return packageToolResult(
         deps.graph.whyDepends({
           fromPackage: args.fromPackage,

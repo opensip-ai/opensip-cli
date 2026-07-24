@@ -257,7 +257,7 @@ describe('FitnessRecipeService — parallel execution', () => {
       }),
     );
 
-    expect(completes.sort()).toEqual(['first', 'second']);
+    expect([...completes].toSorted()).toEqual(['first', 'second']);
     expect(result.summary.totalChecks).toBe(2);
     expect(result.checkResults.every((cr) => cr.error === undefined)).toBe(true);
   });

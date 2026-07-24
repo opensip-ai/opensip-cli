@@ -18,10 +18,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DataStoreFactory, DataStoreMigrationError, DataStoreVersionError } from '../index.js';
 
+import type * as MemoryBackendModule from '../backends/memory.js';
 import type { DatastoreCloseResult, DrizzleDataStore } from '../data-store.js';
+import type * as SchemaVersionModule from '../schema-version.js';
 
 vi.mock('../schema-version.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../schema-version.js')>();
+  const actual = await importOriginal<typeof SchemaVersionModule>();
   return {
     ...actual,
     // The first call is the early read-only probe (before the writable handle
@@ -33,7 +35,7 @@ vi.mock('../schema-version.js', async (importOriginal) => {
 });
 
 vi.mock('../backends/memory.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../backends/memory.js')>();
+  const actual = await importOriginal<typeof MemoryBackendModule>();
   return {
     ...actual,
     openMemoryBackend: vi.fn(actual.openMemoryBackend),

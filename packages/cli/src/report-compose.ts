@@ -116,6 +116,14 @@ function requireReportScope(): NonNullable<ReturnType<typeof currentScope>> {
  *   a CLI action body), since session history and tool contributions both
  *   require the scope.
  */
+/**
+ * Editor deep links (vscode://file/…) need an absolute path; the dashboard
+ * client hides the link when this is absent.
+ */
+function optionalProjectRoot(projectRoot: string | undefined): { projectRoot?: string } {
+  return projectRoot === undefined ? {} : { projectRoot };
+}
+
 async function composeReportInput(selection?: ReportViewSelection): Promise<HtmlReportInput> {
   const scope = requireReportScope();
   const log = scope.logger ?? defaultLogger;
@@ -168,11 +176,7 @@ async function composeReportInput(selection?: ReportViewSelection): Promise<Html
       ? {}
       : { selectionEvidence: history.selectionEvidence }),
     declaredInputs: collectDeclaredInputsForTool('report'),
-    // Editor deep links (vscode://file/…) need an absolute path; the client
-    // hides the link when this is absent.
-    ...(scope.projectContext?.projectRoot === undefined
-      ? {}
-      : { projectRoot: scope.projectContext.projectRoot }),
+    ...optionalProjectRoot(scope.projectContext?.projectRoot),
   };
   const claimedKeys = new Map<string, string>();
 

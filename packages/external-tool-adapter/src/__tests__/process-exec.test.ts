@@ -9,11 +9,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 const execFileMock = vi.hoisted(() => vi.fn());
 vi.mock('node:child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('node:child_process')>()),
+  ...(await importOriginal<typeof ChildProcessModule>()),
   execFile: execFileMock,
 }));
 
 import { runScannerProcess } from '../process-exec.js';
+
+import type * as ChildProcessModule from 'node:child_process';
 
 type ExecCallback = (error: Error | null, stdout: string, stderr: string) => void;
 

@@ -11,7 +11,12 @@ import { openSqliteBackend } from './backends/sqlite.js';
 import { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
 import { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 
-import type { DataStore, DataStoreOpenOptions, DrizzleDataStore } from './data-store.js';
+import type {
+  DataStore,
+  DataStoreOpenOptions,
+  DatastoreCloseResult,
+  DrizzleDataStore,
+} from './data-store.js';
 
 function defaultMigrationsFolder(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', 'migrations');
@@ -82,11 +87,7 @@ export const DataStoreFactory = {
     if (supportedVersion !== undefined) {
       const dbVersion = handle.readUserVersion();
       if (isDbNewerThanCli(dbVersion, supportedVersion)) {
-        // Mirror the migrate-failure lifecycle close below: a secondary
-        // checkpoint failure must not shadow the version error, but a truly
-        // unclosed native handle is more urgent and takes priority.
-        const closeResult = handle.closeForLifecycle();
-        if (!closeResult.closed) handle.close();
+        closeWithoutShadowing(handle);
         throw new DataStoreVersionError({ path, dbVersion, supportedVersion });
       }
     }
@@ -104,12 +105,7 @@ export const DataStoreFactory = {
         if (supportedVersion !== undefined) handle.writeUserVersion(supportedVersion);
       });
     } catch (error) {
-      const closeResult = handle.closeForLifecycle();
-      // A failed checkpoint is secondary once native closure is proven: keep
-      // the migration failure and its actionable recovery message. An unclosed
-      // native handle remains authority-bearing, so close() rethrows that
-      // bounded lifecycle failure instead.
-      if (!closeResult.closed) handle.close();
+      closeWithoutShadowing(handle);
       throw new DataStoreMigrationError(migrateFailureMessage(opts), {
         cause: error,
       });
@@ -126,6 +122,20 @@ export const DataStoreFactory = {
  * @throws {DataStoreMigrationError} When the backend cannot be opened or the
  *   migrations folder fails to apply; the original cause is preserved.
  */
+/**
+ * Close before throwing WITHOUT letting the close shadow the real error: a
+ * secondary checkpoint failure is swallowed by `closeForLifecycle()` once
+ * native closure is proven, while a truly unclosed native handle remains
+ * authority-bearing — `close()` rethrows that bounded lifecycle failure.
+ */
+function closeWithoutShadowing(handle: {
+  closeForLifecycle?: () => DatastoreCloseResult;
+  close: () => void;
+}): void {
+  const closeResult = handle.closeForLifecycle?.();
+  if (!closeResult?.closed) handle.close();
+}
+
 function openAndMigrate(
   opts: DataStoreOpenOptions,
   migrationsFolder: string,
@@ -142,11 +152,7 @@ function openAndMigrate(
   try {
     migrate(datastore.db, { migrationsFolder });
   } catch (error) {
-    // Mirror the sqlite migrate-failure lifecycle close above: a secondary
-    // checkpoint failure must not shadow the migration error, but a truly
-    // unclosed native handle is more urgent and takes priority.
-    const closeResult = datastore.closeForLifecycle?.();
-    if (!closeResult?.closed) datastore.close();
+    closeWithoutShadowing(datastore);
     throw new DataStoreMigrationError(migrateFailureMessage(opts), {
       cause: error,
     });

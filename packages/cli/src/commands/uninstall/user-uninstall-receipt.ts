@@ -7,7 +7,7 @@
 
 import { createHash, randomBytes } from 'node:crypto';
 
-import { RUNTIME_RECOVERY_HEADER_VERSION } from '@opensip-cli/core';
+import { isRecord, RUNTIME_RECOVERY_HEADER_VERSION } from '@opensip-cli/core';
 
 export const USER_UNINSTALL_MARKER_BASENAME = '.opensip-user-uninstall-marker';
 export const USER_UNINSTALL_TOMBSTONE_PREFIX = '.opensip-user-uninstall-tombstone-';
@@ -107,10 +107,6 @@ export function closeReceipt(receipt: UserUninstallReceiptBody): UserUninstallRe
 
 export function serializeReceipt(receipt: UserUninstallReceiptBody): string {
   return `${JSON.stringify(receipt)}\n`;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isPhase(value: unknown): value is UserUninstallPhase {
