@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.8.4
+release: v0.8.5
 title: "Package catalog"
 audience: [contributors, plugin-authors]
 purpose: "Flat reference of every package in the monorepo: name, path, layer, one-line role, key exports. Lookup-only; the conceptual layer narrative lives in 10-concepts/03-modular-monolith.md."
@@ -174,7 +174,7 @@ Imports every layer below. The published binary.
 ## Adding a new package
 
 1. **Decide the layer.** Apply the rules in [`../10-concepts/03-modular-monolith.md`](/docs/opensip-cli/10-concepts/03-modular-monolith/): kernel = zero tool knowledge; contracts = used by every tool; tools = own a Tool contract; language adapters = implement `LanguageAdapter`; check packs = ship `Check[]`; cli = composition root only.
-2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
+2. **Add the dep-cruiser carve-out** if needed. The default layer rules forbid most cross-layer edges; if your package needs an exception, add it to [`.config/dependency-cruiser.cjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/.config/dependency-cruiser.cjs) and document it in [`../80-implementation/05-layer-policy.md`](/docs/opensip-cli/80-implementation/05-layer-policy/).
 3. **Add a row** in the right table above with the canonical npm name, path, one-line role (concrete, not "fitness concerns"), and 1–3 key exports a reader would grep for.
 4. **Update the layer narrative** in `10-concepts/03-modular-monolith.md` if the new package changes what the layer *means*. Pure additions to an existing pattern don't need a narrative edit — just the row here.
 
@@ -182,10 +182,10 @@ Imports every layer below. The published binary.
 
 ## Verification trail
 
-Last verified at v0.8.4 against `scripts/release-package-order.mjs` (the publishable
+Last verified at v0.8.5 against `scripts/release-package-order.mjs` (the publishable
 package source of truth) and the layer tables above:
 
-- **61 workspace packages** total: **58 publishable** (all at `0.8.4`) and three
+- **61 workspace packages** total: **58 publishable** (all at `0.8.5`) and three
   private packages: `@opensip-cli/agent-eval`, `@opensip-cli/test-support`, and
   `@opensip-cli/checks-dogfood`. The root manifest is tooling metadata, not a
   workspace package. The six runtime-layer counts below cover the 58

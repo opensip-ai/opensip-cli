@@ -308,11 +308,14 @@ test('separate-prefix npm 11 is bound into every acceptance npm invocation', () 
     'the scheduled lane exports the seam only when it installs separate npm',
   );
 
+  // build-release + qualify-macos + qualify-linux each bootstrap npm@11 (Plan 12
+  // added the third, Linux, acceptance job to the release topology). The Linux
+  // job's own seam/ordering invariants live in linux-qualification-workflow.test.mjs.
   assert.equal(
     (release.match(/npm install --prefix "\$HOME\/\.npm-cli" npm@11/gu) ?? []).length,
-    2,
+    3,
   );
-  assert.equal(release.split(seam).length - 1, 2);
+  assert.equal(release.split(seam).length - 1, 3);
   for (const workflow of [scheduled, release]) {
     for (const line of workflow
       .split('\n')

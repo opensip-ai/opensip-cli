@@ -385,3 +385,36 @@ export function makeCommandExecutor(commandStepsFn) {
     return pass();
   };
 }
+
+// ---------------------------------------------------------------------------
+// Shared host-probe helpers — consumed by the tuple journeys (macos + linux).
+// They live here, not copied per-domain module, so there is exactly one body
+// (clone detection flagged the per-domain copies; consolidate, do not duplicate).
+// ---------------------------------------------------------------------------
+
+/** The built core lib, loaded lazily so module load stays build-free. */
+const CORE_LIB_URL = new URL('../../packages/core/dist/index-lib.js', import.meta.url);
+
+let assessHostSupportPromise;
+/** Lazily load the built core `assessHostSupport`; null (never throw) if unbuilt. */
+export function loadAssessHostSupport() {
+  assessHostSupportPromise ??= import(CORE_LIB_URL.href)
+    .then((module) =>
+      typeof module.assessHostSupport === 'function' ? module.assessHostSupport : null,
+    )
+    .catch(() => null);
+  return assessHostSupportPromise;
+}
+
+/** Run one fixed argv through the port; return trimmed stdout, or null on any failure. */
+export async function probeValue(context, argv) {
+  let result;
+  try {
+    result = await context.process.run({ argv, cwd: context.paths.workRoot });
+  } catch {
+    return null;
+  }
+  if (result.timedOut || (result.status ?? 1) !== 0) return null;
+  const out = (result.stdoutCapture ?? '').trim();
+  return out.length > 0 ? out : null;
+}

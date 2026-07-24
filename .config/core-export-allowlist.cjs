@@ -538,7 +538,7 @@ const EXPORT_ALLOWLIST = {
   ToolError: 'run-kernel',
   ToolErrorCode: 'run-kernel',
   ToolErrorOptions: 'run-kernel',
-  // Plan 00 structured errors / failure envelope / retry (ADR-0181 / ADR-0182)
+  // Plan 00 structured errors / failure envelope / retry (ADR-0181 / ADR-0183)
   CORE_SYSTEM_ERROR_OWNER: 'run-kernel',
   ERROR_CATALOG_SCHEMA_VERSION: 'run-kernel',
   ErrorCatalog: 'run-kernel',

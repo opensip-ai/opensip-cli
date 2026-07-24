@@ -290,6 +290,42 @@ test('valid artifact passes matching expected version + host constraints', () =>
   });
 });
 
+test('kernel-major extraction tolerates a build/vendor suffix (6.11.0-1015-azure → 6)', () => {
+  withTempDir((dir) => {
+    const valid = writeValid(dir);
+    // A realistic GitHub-runner / distro kernel release carries a build+vendor
+    // suffix after the first hyphen. The verifier must extract the leading major
+    // (6) rather than rejecting the whole string as malformed.
+    const suffixed = reseal(valid, join(dir, 'suffixed-kernel.json'), (body) => {
+      body.host.kernelRelease = '6.11.0-1015-azure';
+    });
+    const pass = runVerifier([
+      '--evidence',
+      suffixed,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-kernel-major',
+      '6',
+    ]);
+    assert.equal(pass.code, 0, pass.stdout);
+    // The suffix strip must NOT mask a genuine major mismatch.
+    const bad = runVerifier([
+      '--evidence',
+      suffixed,
+      '--profile',
+      PROFILE_PATH,
+      '--expected-kernel-major',
+      '7',
+      '--json',
+    ]);
+    assert.notEqual(bad.code, 0);
+    assert.ok(
+      JSON.parse(bad.stdout).failures.some((f) => f.code === 'host-kernel-major-mismatch'),
+      'a wrong expected kernel major must still fail',
+    );
+  });
+});
+
 test('candidate-kind, registry, and registry-integrity expectations are independently enforced', () => {
   withTempDir((dir) => {
     const evidence = writeValid(dir);

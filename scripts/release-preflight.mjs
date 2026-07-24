@@ -100,6 +100,12 @@ function main() {
     rmSync(policyHome, { recursive: true, force: true });
   }
   pnpm('graph dogfood gate', ['graph:ci']);
+  // NOTE: the release lane's build-release job ALSO runs yagni:ci (ADR-0017), but
+  // it is intentionally NOT mirrored here yet: yagni's clone-detection audits
+  // `.claude/worktrees/**` despite globalExcludes, so a local preflight run would
+  // false-fail whenever a dev worktree exists. Add yagni:ci here once that yagni
+  // scoping bug is fixed (a duplicate-body finding once slipped a release because
+  // the preflight ran only fit/graph — v0.8.5 build-release).
   pnpm('release consistency', ['verify-release', '--expected-version', args.expectedVersion]);
 
   // The tarball directory built below — freshly-packed npm tarballs plus the release

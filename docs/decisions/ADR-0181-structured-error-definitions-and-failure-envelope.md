@@ -36,4 +36,4 @@ enforced-by: ['type-structural', 'script:error-resiliency-inventory.test.mjs', '
 - CLI `reportFailure` / last-resort net / worker wire consume envelope projections; raw stacks are not the primary public surface.
 - Published codes are append-only public API; replacements use `supersededBy`.
 
-**Related ADRs:** ADR-0060 (diagnostics/run outcomes), ADR-0077 (`reportFailure`), ADR-0175 (JSON-safe diagnostics), ADR-0176 (bootstrap diagnostics fold), ADR-0180 (finite numbers), ADR-0182 (retry/cancel/sinks).
+**Related ADRs:** ADR-0060 (diagnostics/run outcomes), ADR-0077 (`reportFailure`), ADR-0175 (JSON-safe diagnostics), ADR-0176 (bootstrap diagnostics fold), ADR-0180 (finite numbers), ADR-0183 (retry/cancel/sinks).

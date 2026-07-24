@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-14
-release: v0.8.4
+release: v0.8.5
 title: "Supported platforms"
 audience: [getting-started, ci-integrators, contributors]
 purpose: "The generated, authoritative host-support matrix: the exact qualified tuple, its status, explicitly unsupported hosts, and what unqualified means."
@@ -9,6 +9,7 @@ source-files:
   - packages/core/src/lib/platform-support.ts
   - scripts/build-supported-platforms-doc.mjs
   - .config/platform-acceptance/macos-26-arm64-node24-npm11-v2.json
+  - .config/platform-acceptance/ubuntu-2404-x64-node24-npm11-v2.json
 related-docs:
   - ./15-compatibility-policy.md
   - ./13-verifiable-releases.md
@@ -24,7 +25,7 @@ The npm package declares `engines.node: ">=24"`, which is an install/runtime
 floor — not a support claim. Qualified support is narrower than "any host that
 can run Node 24": it names an exact host tuple with measured evidence. This
 page is generated from the platform-support policy registry
-([`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/core/src/lib/platform-support.ts)) and is the authoritative
+([`packages/core/src/lib/platform-support.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/core/src/lib/platform-support.ts)) and is the authoritative
 matrix. The same registry drives the CLI/MCP agent catalogs and the release
 acceptance harness, so human and machine claims cannot drift.
 
@@ -50,6 +51,7 @@ Every host resolves to exactly one of four statuses. `unqualified` never means
 |---|---|---|---|---|---|---|
 | `macos-26-arm64-node24-npm11-v1` | `preview` | macOS 26.x | `arm64` | 24.x (ABI 137) | 11.x | apfs (case-insensitive) |
 | `macos-26-intel-unsupported` | `unsupported` | macOS 26.x | `x64` | 24.x (ABI 137) | 11.x | apfs (case-insensitive) |
+| `ubuntu-2404-x64-node24-npm11-v1` | `preview` | Ubuntu 24.x | `x64` | 24.x (ABI 137) | 11.x | ext4 (case-sensitive) |
 
 ## Host details
 
@@ -88,6 +90,24 @@ Row id: `macos-26-intel-unsupported`
 This exact Intel/x64 macOS 26 / Node 24 tuple is intentionally excluded: no Intel GA evidence. Other Intel tuples remain unqualified until measured.
 
 No qualification evidence is collected for this tuple; it is intentionally excluded.
+
+### Ubuntu 24.x on x64 — `preview`
+
+Row id: `ubuntu-2404-x64-node24-npm11-v1`
+
+| Dimension | Requirement |
+|---|---|
+| Operating system | Ubuntu 24.x (`process.platform` = `linux`) |
+| Kernel | Linux 6.x |
+| Architecture | `x64` (`process.arch`) |
+| Node.js | 24.x (module ABI `137`) |
+| npm | 11.x |
+| Filesystem | ext4 (case-sensitive) |
+| Install channels | `npm-exact-version` |
+
+Ubuntu 24.04 LTS on x86_64 with Node 24 (ABI 137) / npm 11 over ext4 (case-sensitive). Qualified via the linux-qualification acceptance lane against published bytes. Preview until a 14-day scheduled-lane burn-in and a staged release pass promote it to supported.
+
+Acceptance profile `ubuntu-2404-x64-node24-npm11-v2` (version 2), stored at `.config/platform-acceptance/ubuntu-2404-x64-node24-npm11-v2.json`. Release evidence artifact: `opensip-cli-linux-qualification.v2.json`. Published evidence link: not yet available — the row is in burn-in and the link is attached on promotion to `supported`.
 
 ## Unqualified hosts and unqualified dimensions
 
@@ -138,14 +158,17 @@ contradiction. Agents must distinguish the registry row's published `status`
 }
 ```
 
-A non-macOS host projects `status: "unqualified"`, `match: "none"`, and
-`reasonCodes: ["non-macos-host"]`. Process-only facts cannot establish every
-dimension of the exact Intel exclusion row, so Intel/x64 projects
-`status: "unqualified"` with `reasonCodes: ["insufficient-host-facts"]` unless
-a fuller assessment observes the complete published tuple. Only that exact tuple
-is `unsupported`, with `reasonCodes: ["macos-intel-unsupported"]`. The CLI and
-MCP surfaces map the same core projection through one shared helper, so they emit
-a byte-identical `hostSupport` for identical process facts.
+A host whose `(platform, arch)` has no registry row projects
+`status: "unqualified"`, `match: "none"`, and `reasonCodes: ["unqualified-host"]`.
+A host that matches a row's `(platform, arch)` projects that row's published
+status at `match: "partial"` (process-only facts leave the other dimensions
+unobserved) — e.g. a Linux x64 host projects the `preview` ubuntu row. The exact
+Intel/x64 tuple projects `status: "unqualified"` with
+`reasonCodes: ["insufficient-host-facts"]` until a fuller assessment observes
+every dimension; only that complete tuple is `unsupported`, with
+`reasonCodes: ["unsupported-tuple"]`. The CLI and MCP surfaces map the same core
+projection through one shared helper, so they emit a byte-identical `hostSupport`
+for identical process facts.
 
 ## `engines` is not a support claim
 

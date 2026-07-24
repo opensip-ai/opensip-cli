@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-11
-release: v0.8.4
+release: v0.8.5
 title: "Layer policy"
 audience: [contributors]
 purpose: "The dependency-cruiser rules that enforce the six-layer package graph and the tool-internal partitioning rules (graph stages, dashboard panels), rule by rule, with rationale."
@@ -28,7 +28,7 @@ The literal rules are at [`.config/dependency-cruiser.cjs`](../../../.config/dep
 
 ## Error and resiliency ownership
 
-Failure semantics follow the same layer cake (ADR-0181 / ADR-0182). Do not invert these arrows:
+Failure semantics follow the same layer cake (ADR-0181 / ADR-0183). Do not invert these arrows:
 
 | Layer | Owns | Must not own |
 |---|---|---|

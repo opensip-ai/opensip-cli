@@ -9,7 +9,7 @@ All notable changes to OpenSIP CLI are documented here.
 - **Structured error definitions and failure envelope (Plan 00).** Immutable
   `ErrorDefinition` catalogs (`defineErrorCatalog`), total `normalizeFailure`
   projections (public/machine/operator), and host `reportFailure` fan-out that
-  preserves definition axes. See ADR-0181 / ADR-0182 and
+  preserves definition axes. See ADR-0181 / ADR-0183 and
   `docs/public/80-implementation/09-error-and-resiliency-model.md`.
 - **Published error codes are public API.** Append-only lifecycle
   (`active` / `deprecated` / `tombstoned` + `supersededBy`); semantic changes
@@ -18,6 +18,9 @@ All notable changes to OpenSIP CLI are documented here.
 - **Abort-aware retry and cooperative OS cancel.** `withRetry` honors
   `AbortSignal` / deadlines / definition retry posture; SIGINT/SIGTERM map to
   `ToolScope.abortSignal` with POSIX 130/143 second-interrupt escalation.
+  Cooperative cancellation is a host-owned substrate plane: `runWithTimeout` /
+  `scheduleUnits` default to the per-invocation root cancel signal, so every
+  substrate-based tool inherits Ctrl-C cancellation without per-tool wiring.
 - **Representative tool catalogs** for fitness, simulation, external scanners
   (`BINARY_MISSING`), and MCP stdio; workers emit machine-safe failure wire
   projections without raw stacks.
@@ -26,6 +29,58 @@ All notable changes to OpenSIP CLI are documented here.
 
 - `TOOL_CONTRACT_VERSION` is **1.1.0** (optional `extensionPoints.errorCatalog`).
 - `EXIT_CODES.CANCELLED` (**130**) for cooperative cancellation exit class.
+- **Two error exit codes are now more specific** (frozen-contract change,
+  ADR-0066): a scenario aborted via its `AbortSignal` (e.g. Ctrl-C) now exits
+  **130** (cancelled) instead of `1`, and a missing or unresolved external
+  scanner binary now exits **2** (configuration) instead of `1`.
+
+## [0.8.5] - 2026-07-23
+
+Qualifies a **preview** Linux support tuple and generalizes the host-support
+machinery from macOS-only to a multi-platform registry, alongside two
+error-handling ergonomics improvements carried over from the observability work.
+
+### Added
+
+- **Linux is now a `preview` supported host** — the exact tuple Ubuntu 24.04 ·
+  x86_64 · Node 24 (ABI 137) · npm 11 · ext4, published as
+  `ubuntu-2404-x64-node24-npm11-v1` in the single support registry (additive; it
+  does not bump the platform-support contract version). The generated
+  supported-platforms matrix and the CLI/MCP agent catalogs pick it up from that
+  one registry, so a Linux host's `agent-catalog` reports `preview` for its local
+  match. Qualification is measured exactly as macOS is: a schema-v2 acceptance
+  profile, three Linux-native journeys (glibc-linked `better-sqlite3` x64 prebuild
+  load, case-sensitive filesystem behavior, and an os-release/uname/Node/npm tuple
+  cross-check), a scheduled `linux-qualification.yml` lane on a pinned
+  `ubuntu-24.04` runner, and a `qualify-linux` job in the release topology. During
+  burn-in that release job is **report-only** — it seals independently-verified
+  evidence and fails itself on a bad run, but never blocks promotion; it becomes a
+  hard promotion prerequisite atomically with a future promotion to `supported`
+  (ADR-0182).
+- **`unwrapOrLog` and `matchLog`** — logging-forcing consumers of the internal
+  `Result` type that normalize a failure and emit it through the RunScope-aware
+  logger before returning, so an expected/recoverable error cannot be silently
+  discarded at a call site.
+
+### Changed
+
+- **The `error-handling-quality` fitness check now flags silently-discarded
+  native `Result` errors** — `!r.ok` / `r.ok === false` branches that neither
+  log, return, nor throw — not just swallowed thrown errors, extending the
+  no-silent-swallow invariant to whichever error style a site uses.
+- **The host-support classifier is registry-driven and multi-platform.** It was
+  hardcoded to macOS; a Linux host now classifies against the Linux row at
+  runtime, and the mismatch reason codes generalized (`non-macos-host` →
+  `unqualified-host`, `macos-intel-unsupported` → `unsupported-tuple`).
+
+### Fixed
+
+- **Calendar-versioned OS minors no longer read as a version mismatch.** The
+  host-support major parser was semver-strict and rejected any version with a
+  leading-zero component, so Ubuntu's `24.04` (April) failed its os-version
+  dimension — which would have failed the Linux tuple cross-check on the exact
+  qualified runner. The major stays strict (a leading-zero major is still
+  rejected); only trailing numeric components are relaxed.
 
 ## [0.8.4] - 2026-07-22
 

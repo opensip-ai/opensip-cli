@@ -14,6 +14,7 @@ import {
   COMMON_V1_JOURNEY_IDS,
   COMMON_V2_JOURNEY_IDS,
   JOURNEY_REGISTRY,
+  LINUX_JOURNEY_IDS,
   MACOS_JOURNEY_IDS,
   RELEASE_SMOKE_JOURNEY_IDS,
   getJourney,
@@ -41,10 +42,19 @@ const MACOS_V2_PATH = join(
   'platform-acceptance',
   'macos-26-arm64-node24-npm11-v2.json',
 );
+const UBUNTU_V2_PATH = join(
+  HERE,
+  '..',
+  '..',
+  '.config',
+  'platform-acceptance',
+  'ubuntu-2404-x64-node24-npm11-v2.json',
+);
 const commonV1 = JSON.parse(readFileSync(COMMON_V1_PATH, 'utf8'));
 const commonV2 = JSON.parse(readFileSync(COMMON_V2_PATH, 'utf8'));
 const macosV1 = JSON.parse(readFileSync(MACOS_V1_PATH, 'utf8'));
 const macosV2 = JSON.parse(readFileSync(MACOS_V2_PATH, 'utf8'));
+const ubuntuV2 = JSON.parse(readFileSync(UBUNTU_V2_PATH, 'utf8'));
 
 // Placeholder absolute paths only — this test projects scenarios (no filesystem
 // writes), so the exact location is irrelevant and never touched.
@@ -55,9 +65,9 @@ const SMOKE_PARAMS = Object.freeze({
   fitPackTarball: '/acceptance-run/fit.tgz',
 });
 
-test('registry holds exactly COMMON_V2 ∪ MACOS ids, once each', () => {
+test('registry holds exactly COMMON_V2 ∪ MACOS ∪ LINUX ids, once each', () => {
   // The registry is the closed union of common-v2 (every v1 id + cache→Init) and
-  // the macOS additive journeys. Immutable COMMON_V1 remains a strict subset.
+  // the macOS + Linux additive journeys. Immutable COMMON_V1 remains a strict subset.
   assert.equal(COMMON_V1_JOURNEY_IDS.length, 46);
   assert.equal(COMMON_V2_JOURNEY_IDS.length, 47);
   assert.equal(new Set(COMMON_V1_JOURNEY_IDS).size, 46, 'COMMON_V1_JOURNEY_IDS has a duplicate');
@@ -67,15 +77,20 @@ test('registry holds exactly COMMON_V2 ∪ MACOS ids, once each', () => {
     MACOS_JOURNEY_IDS.length,
     'MACOS_JOURNEY_IDS has a duplicate',
   );
+  assert.equal(
+    new Set(LINUX_JOURNEY_IDS).size,
+    LINUX_JOURNEY_IDS.length,
+    'LINUX_JOURNEY_IDS has a duplicate',
+  );
   for (const id of COMMON_V1_JOURNEY_IDS) {
     assert.ok(COMMON_V2_JOURNEY_IDS.includes(id), `common-v2 drops ${id}`);
   }
   assert.ok(COMMON_V2_JOURNEY_IDS.includes('persistence.cache-init-promotion'));
-  const union = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
+  const union = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS, ...LINUX_JOURNEY_IDS]);
   assert.equal(
     union.size,
-    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length,
-    'COMMON_V2_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap',
+    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length + LINUX_JOURNEY_IDS.length,
+    'COMMON_V2 / MACOS / LINUX journey id sets overlap',
   );
   assert.equal(JOURNEY_REGISTRY.size, union.size);
   for (const id of union) {
@@ -115,6 +130,59 @@ test('the committed common-v2.json selects exactly the catalog ids with required
   assert.deepEqual(continuity?.requiredPorts, ['mcp']);
   assert.equal(macosV2.schemaVersion, 2);
   assert.equal(macosV2.base?.id, 'common-v2');
+});
+
+test('the committed ubuntu-v2 profile runs the linux journeys against a live candidate (before lifecycle removal)', () => {
+  assert.equal(ubuntuV2.schemaVersion, 2);
+  assert.equal(ubuntuV2.version, 2);
+  assert.equal(ubuntuV2.base?.id, 'common-v2');
+  assert.equal(ubuntuV2.supportRow?.rowId, 'ubuntu-2404-x64-node24-npm11-v1');
+  assert.equal(ubuntuV2.supportRow?.contractVersion, 1);
+  const ids = ubuntuV2.journeys.map((entry) => entry.id);
+
+  // Selection is exactly common-v2 ∪ linux — no fork, no dropped common journey
+  // (a SET check; run order is asserted separately below).
+  assert.deepEqual(
+    [...ids].sort(),
+    [...COMMON_V2_JOURNEY_IDS, ...LINUX_JOURNEY_IDS].sort(),
+    'ubuntu-v2 drifted from common-v2 ∪ linux',
+  );
+
+  // CRITICAL run-order invariant (mirrors the macOS ordering rule): the native
+  // linux journeys exercise the INSTALLED candidate, so they MUST run BEFORE the
+  // lifecycle removal journeys. Appending them after `lifecycle.package-uninstall`
+  // made the real runner report every one `candidate-lost` — the candidate was
+  // already uninstalled. This assertion fails closed if the order regresses.
+  const upgrade = ids.indexOf('lifecycle.upgrade');
+  const firstRemoval = ids.indexOf('lifecycle.cli-state-uninstall');
+  assert.ok(firstRemoval > 0, 'ubuntu-v2 must include the lifecycle removal journeys');
+  for (const id of LINUX_JOURNEY_IDS) {
+    const at = ids.indexOf(id);
+    assert.ok(
+      at > upgrade && at < firstRemoval,
+      `${id} must run against the candidate, before lifecycle removal`,
+    );
+  }
+  assert.equal(
+    ids.indexOf('lifecycle.package-uninstall'),
+    ids.length - 1,
+    'package removal must remain the terminal journey',
+  );
+
+  // Profile closure: every selected journey resolves in the registry.
+  for (const entry of ubuntuV2.journeys) {
+    assert.ok(
+      JOURNEY_REGISTRY.has(entry.id),
+      `ubuntu-v2 references unregistered journey ${entry.id}`,
+    );
+    assert.ok(Array.isArray(entry.requiredPorts), `${entry.id} missing requiredPorts`);
+  }
+  // The three linux journeys are required and native (no injected ports).
+  for (const id of LINUX_JOURNEY_IDS) {
+    const entry = ubuntuV2.journeys.find((j) => j.id === id);
+    assert.equal(entry.required, true, `${id} must be required`);
+    assert.deepEqual(entry.requiredPorts, [], `${id} must need no injected port`);
+  }
 });
 
 test('lifecycle order qualifies the installed target before uninstalling state or package', () => {

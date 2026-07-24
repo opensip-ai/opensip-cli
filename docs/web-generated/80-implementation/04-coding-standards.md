@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.8.4
+release: v0.8.5
 title: "Coding standards"
 audience: [contributors]
 purpose: "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."
@@ -37,7 +37,7 @@ The workspace's quality gates are: TypeScript strict mode, ESLint with type-awar
 
 ## TypeScript
 
-The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
+The workspace root [`tsconfig.json`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/tsconfig.json) sets `target: ES2022`, `module: Node16`, `moduleResolution: Node16`, and `strict: true`. Each package has its own `tsconfig.json` that extends those settings.
 
 Notable settings:
 
@@ -52,7 +52,7 @@ Notable settings:
 
 ## ESLint
 
-Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/.config/eslint.config.mjs). The base layers:
+Flat config at [`.config/eslint.config.mjs`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/.config/eslint.config.mjs). The base layers:
 
 - `@eslint/js` recommended.
 - `typescript-eslint` `recommendedTypeChecked` + `stylisticTypeChecked`.
@@ -90,10 +90,10 @@ false-positive rate across releases.
 
 ## Errors
 
-Canonical model: [Error and resiliency model](/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/) (ADR-0181 / ADR-0182).  
+Canonical model: [Error and resiliency model](/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/) (ADR-0181 / ADR-0183).  
 Registered codes: [Error code index](/docs/opensip-cli/70-reference/18-error-code-index/).
 
-[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/core/src/lib/errors.ts) still exports the subclass hierarchy, but **machine semantics live on `ErrorDefinition`** (catalogs via `defineErrorCatalog`). Prefer:
+[`packages/core/src/lib/errors.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/core/src/lib/errors.ts) still exports the subclass hierarchy, but **machine semantics live on `ErrorDefinition`** (catalogs via `defineErrorCatalog`). Prefer:
 
 ```ts
 import { createToolError, defineErrorCatalog, normalizeFailure } from '@opensip-cli/core';
@@ -125,7 +125,7 @@ A `Result` failure must never be *silently* discarded. The `error-handling-quali
 
 Subclass defaults (`VALIDATION_ERROR`, `NOT_FOUND`, …) remain for compatibility and map through the core system catalog. New public codes use `OWNER.DOMAIN.CONDITION` grammar, are **append-only**, and require a CHANGELOG note when first published or superseded. See the [error code index](/docs/opensip-cli/70-reference/18-error-code-index/).
 
-Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/contracts/src/exit-codes.ts):
+Errors are mapped to user-facing suggestions by [`getErrorSuggestion`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export interface ErrorSuggestion {
@@ -146,7 +146,7 @@ The CLI calls `getErrorSuggestion(error)` and threads the returned `{ message, a
 
 ## Exit codes
 
-Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/contracts/src/exit-codes.ts):
+Defined exactly once in [`packages/contracts/src/exit-codes.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/contracts/src/exit-codes.ts):
 
 ```ts
 export const EXIT_CODES = {
@@ -161,7 +161,7 @@ export const EXIT_CODES = {
 
 Tools call `cli.setExitCode(code)` instead of mutating `process.exitCode` directly. The CLI mediates the final exit so it can run dashboard launching / cleanup after the Tool is done.
 
-Exit-code classification is owned by typed errors: only `ToolError` subclasses (and Commander/bootstrap errors) choose a non-runtime exit code; an untyped error defaults to `RUNTIME_ERROR` even when a suggestion is attached. See [ADR-0066](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0066-typed-errors-own-exit-codes.md).
+Exit-code classification is owned by typed errors: only `ToolError` subclasses (and Commander/bootstrap errors) choose a non-runtime exit code; an untyped error defaults to `RUNTIME_ERROR` even when a suggestion is attached. See [ADR-0066](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0066-typed-errors-own-exit-codes.md).
 
 Adding a new exit code is a major-version change — see [`10-concepts/04-contract-surfaces.md`](/docs/opensip-cli/10-concepts/04-contract-surfaces/).
 
@@ -169,7 +169,7 @@ Adding a new exit code is a major-version change — see [`10-concepts/04-contra
 
 ## Logging
 
-The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/packages/core/src/lib/logger.ts). Every log entry carries:
+The structured logger is in [`packages/core/src/lib/logger.ts`](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/packages/core/src/lib/logger.ts). Every log entry carries:
 
 - `evt` — dot-separated event name (`cli.fit.run.start`, `plugin.loader.discover`, `gate.compare.complete`).
 - `module` — the module that emitted it (`cli:fit`, `core:plugins`, `cli:gate`).
@@ -194,7 +194,7 @@ Examples:
 - `cli.fit.run.complete` — the fit run finished.
 - `plugin.loader.discover` — discovery completed.
 - `gate.compare.complete` — gate finished comparing.
-- `state.lock.acquire.complete` / `state.lock.acquire.timeout` — datastore or artifact write lock outcome ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
+- `state.lock.acquire.complete` / `state.lock.acquire.timeout` — datastore or artifact write lock outcome ([ADR-0075](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0075-state-locking-and-baseline-identity-versioning.md)).
 - `state.baseline.identity.mismatch` — gate compare/export blocked by incompatible baseline strategy metadata.
 - `state.artifact.write.complete` — SARIF or baseline fingerprint JSON written atomically.
 - `cli.report.chunk.start` / `cli.report.chunk.done` — cloud report chunk lifecycle.

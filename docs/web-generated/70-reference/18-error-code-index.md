@@ -51,4 +51,4 @@ generated: true
 ## See also
 
 - [Error and resiliency model](/docs/opensip-cli/80-implementation/09-error-and-resiliency-model/)
-- [ADR-0181 structured error definitions](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md)
+- [ADR-0181 structured error definitions](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md)

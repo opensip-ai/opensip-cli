@@ -19,6 +19,7 @@
 
 import { analysisJourneys } from './journeys/analysis.mjs';
 import { extensionsJourneys } from './journeys/extensions.mjs';
+import { linuxJourneys } from './journeys/linux.mjs';
 import { macosJourneys } from './journeys/macos.mjs';
 import { agentJourneys, mcpJourneys } from './journeys/mcp.mjs';
 import { outputJourneys } from './journeys/output.mjs';
@@ -171,6 +172,7 @@ const ALL_JOURNEYS = [
   ...extensionsJourneys,
   ...resilienceJourneys,
   ...macosJourneys,
+  ...linuxJourneys,
 ];
 
 /**
@@ -302,6 +304,17 @@ export const MACOS_JOURNEY_IDS = Object.freeze([
 ]);
 
 /**
+ * The Linux-only journey ids (Plan 12). The registry holds
+ * `COMMON_V2_JOURNEY_IDS ∪ MACOS_JOURNEY_IDS ∪ LINUX_JOURNEY_IDS`; the load-time
+ * assertion binds this union so drift fails fast.
+ */
+export const LINUX_JOURNEY_IDS = Object.freeze([
+  'linux.tuple-crosscheck',
+  'linux.native-sqlite',
+  'linux.case-sensitivity',
+]);
+
+/**
  * The explicit `release-smoke` selection — the command-only subset the packed
  * smoke projects, in projection order. Heavier MCP / contention / TTY /
  * resilience journeys are intentionally excluded.
@@ -338,6 +351,9 @@ function buildRegistry(journeys) {
   if (new Set(MACOS_JOURNEY_IDS).size !== MACOS_JOURNEY_IDS.length) {
     throw new Error('journey-catalog: MACOS_JOURNEY_IDS contains a duplicate id');
   }
+  if (new Set(LINUX_JOURNEY_IDS).size !== LINUX_JOURNEY_IDS.length) {
+    throw new Error('journey-catalog: LINUX_JOURNEY_IDS contains a duplicate id');
+  }
   for (const id of COMMON_V1_JOURNEY_IDS) {
     if (!COMMON_V2_JOURNEY_IDS.includes(id)) {
       throw new Error(`journey-catalog: common-v2 drops common-v1 journey ${JSON.stringify(id)}`);
@@ -349,9 +365,12 @@ function buildRegistry(journeys) {
       `journey-catalog: common-v2 may only add persistence.cache-init-promotion; got ${JSON.stringify(v2Only)}`,
     );
   }
-  const selected = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS]);
-  if (selected.size !== COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length) {
-    throw new Error('journey-catalog: COMMON_V2_JOURNEY_IDS and MACOS_JOURNEY_IDS overlap');
+  const selected = new Set([...COMMON_V2_JOURNEY_IDS, ...MACOS_JOURNEY_IDS, ...LINUX_JOURNEY_IDS]);
+  if (
+    selected.size !==
+    COMMON_V2_JOURNEY_IDS.length + MACOS_JOURNEY_IDS.length + LINUX_JOURNEY_IDS.length
+  ) {
+    throw new Error('journey-catalog: COMMON_V2 / MACOS / LINUX journey id sets overlap');
   }
   for (const id of COMMON_V2_JOURNEY_IDS) {
     if (!registry.has(id))
@@ -363,6 +382,12 @@ function buildRegistry(journeys) {
     if (!registry.has(id))
       throw new Error(
         `journey-catalog: macos profile selects unregistered journey ${JSON.stringify(id)}`,
+      );
+  }
+  for (const id of LINUX_JOURNEY_IDS) {
+    if (!registry.has(id))
+      throw new Error(
+        `journey-catalog: linux profile selects unregistered journey ${JSON.stringify(id)}`,
       );
   }
   for (const id of registry.keys()) {

@@ -4,10 +4,10 @@ last_verified: 2026-07-23
 owner: opensip-cli
 ---
 
-# ADR-0182: Explicit retry, cancellation, and safe failure sinks
+# ADR-0183: Explicit retry, cancellation, and safe failure sinks
 
 ```yaml
-id: ADR-0182
+id: ADR-0183
 title: Explicit retry, cancellation, and safe failure sinks
 date: 2026-07-23
 status: active

@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-06-15
-release: v0.8.4
+release: v0.8.5
 title: "Coding standards"
 audience: [contributors]
 purpose: "How code in this workspace is written. ESLint posture, error handling, exit codes, log style."
@@ -90,7 +90,7 @@ false-positive rate across releases.
 
 ## Errors
 
-Canonical model: [Error and resiliency model](./09-error-and-resiliency-model.md) (ADR-0181 / ADR-0182).  
+Canonical model: [Error and resiliency model](./09-error-and-resiliency-model.md) (ADR-0181 / ADR-0183).  
 Registered codes: [Error code index](../70-reference/18-error-code-index.md).
 
 [`packages/core/src/lib/errors.ts`](../../../packages/core/src/lib/errors.ts) still exports the subclass hierarchy, but **machine semantics live on `ErrorDefinition`** (catalogs via `defineErrorCatalog`). Prefer:

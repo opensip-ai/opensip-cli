@@ -151,9 +151,9 @@ export type PlatformDimension =
 
 /** Stable, kebab-case reason codes emitted when a host is not the exact tuple. */
 export type PlatformMismatchReason =
-  | 'non-macos-host'
+  | 'unqualified-host'
   | 'insufficient-host-facts'
-  | 'macos-intel-unsupported'
+  | 'unsupported-tuple'
   | 'os-platform-mismatch'
   | 'os-version-mismatch'
   | 'kernel-name-mismatch'

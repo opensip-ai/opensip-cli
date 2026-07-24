@@ -18,11 +18,7 @@
  * runtime dependency is the value import of the frozen rows — no import cycle.
  */
 
-import {
-  MACOS_INTEL_ROW,
-  MACOS_PREVIEW_ROW,
-  PLATFORM_SUPPORT_ROWS,
-} from './platform-support-rows.js';
+import { PLATFORM_SUPPORT_ROWS } from './platform-support-rows.js';
 import { assertPlatformSupportRowsValid } from './platform-support-validate.js';
 
 import type {
@@ -58,11 +54,17 @@ function majorOf(version: string | undefined): number | undefined {
     prereleaseAt === -1 ? versionAndPrerelease : versionAndPrerelease.slice(0, prereleaseAt);
   const prerelease = prereleaseAt === -1 ? undefined : versionAndPrerelease.slice(prereleaseAt + 1);
   if (prerelease !== undefined && !validVersionIdentifiers(prerelease, true)) return undefined;
-  const coreParts = core.split('.');
-  if (coreParts.length === 0 || coreParts.some((part) => !NUMERIC_VERSION_PART.test(part))) {
+  // The major must be strict (no leading zero); later numeric components may be
+  // plain digits, including a leading-zero calendar minor like Ubuntu's "24.04".
+  const [major, ...rest] = core.split('.');
+  if (
+    major === undefined ||
+    !NUMERIC_VERSION_PART.test(major) ||
+    rest.some((part) => !DECIMAL_IDENTIFIER.test(part))
+  ) {
     return undefined;
   }
-  const value = Number.parseInt(coreParts[0] ?? '', 10);
+  const value = Number.parseInt(major, 10);
   return Number.isSafeInteger(value) ? value : undefined;
 }
 
@@ -169,6 +171,29 @@ const DIMENSION_SPECS: readonly DimensionSpec[] = [
   },
 ];
 
+/**
+ * A sentinel tuple used only to detect which OBSERVATION fields are present: a
+ * dimension spec returns `unobserved` iff its source observation field is absent,
+ * regardless of the tuple value it is compared against. The concrete values here
+ * are never asserted — only presence/absence of the observed field is read.
+ */
+const PRESENCE_PROBE_TUPLE: PlatformSupportTuple = {
+  osPlatform: '',
+  osName: '',
+  osVersionMajor: 0,
+  osVersionRange: '',
+  kernelName: '',
+  kernelVersionMajor: 0,
+  kernelVersionRange: '',
+  arch: '',
+  nodeVersionMajor: 0,
+  nodeAbi: '',
+  npmVersionMajor: 0,
+  filesystemType: '',
+  caseSensitive: false,
+  installChannels: [],
+};
+
 interface DimensionEvaluation {
   readonly observed: PlatformDimension[];
   readonly unobserved: PlatformDimension[];
@@ -217,95 +242,110 @@ function freezeAssessment(
 
 /**
  * Classify an observed host against the platform-support registry — pure, with
- * no filesystem/process/global reads. It returns the applicable row (when one
- * applies), a match level, and the observed/unobserved dimensions plus stable
- * reason codes. An unlisted host is `unqualified` (may work, no promise), never
- * "cannot run"; only the complete published Intel/x64 tuple is `unsupported`.
+ * no filesystem/process/global reads. Registry-driven and multi-platform: the
+ * host's (platform, arch) selects a candidate row, then every normative dimension
+ * is classified against that row's tuple. A host whose (platform, arch) has no
+ * row is `unqualified` (may work, no promise), never "cannot run"; only an exact
+ * match to an `unsupported` row is `unsupported`.
  */
 export function assessHostSupport(
   observed: ObservedHost,
   rows: readonly PlatformSupportRow[] = PLATFORM_SUPPORT_ROWS,
 ): HostSupportAssessment {
   assertPlatformSupportRowsValid(rows);
-  const { macosRow, intelRow } = resolveRegistryRows(rows);
-  const macosTuple = macosRow.tuple;
-  const macosEval = classifyAgainst(observed, macosTuple);
 
-  // Non-macOS host: not classified by this OS contract (belongs to a later OS
-  // profile). Report unqualified, never a "cannot run" claim.
-  if (observed.osPlatform !== undefined && observed.osPlatform !== macosTuple.osPlatform) {
-    return freezeAssessment('unqualified', undefined, 'none', macosEval, ['non-macos-host']);
-  }
-
-  // Selecting an OS-specific support row requires enough identity to establish
-  // both the operating-system family and architecture. Missing dimensions remain
-  // unobserved, but an entirely/partially unidentified host must not inherit the
-  // macOS row merely because it has not contradicted that row yet.
+  // Selecting a support row requires both the operating-system family and the
+  // architecture. A partially/entirely unidentified host is unqualified — it
+  // must not inherit a row it has merely not contradicted yet.
   if (observed.osPlatform === undefined || observed.arch === undefined) {
-    return freezeAssessment('unqualified', undefined, 'none', macosEval, [
+    return freezeAssessment('unqualified', undefined, 'none', presenceEvaluation(observed), [
       'insufficient-host-facts',
     ]);
   }
 
-  // The exact Intel/x64 row is intentionally excluded (no Intel GA evidence).
-  if (observed.osPlatform === macosTuple.osPlatform && observed.arch === intelRow.tuple.arch) {
-    const intelEval = classifyAgainst(observed, intelRow.tuple);
-    // The unsupported row is one exact published tuple, not a blanket claim
-    // that every Intel Mac/runtime is unsupported. Any observed contradiction
-    // or unobserved normative dimension belongs to the broader unqualified set.
-    if (intelEval.reasonCodes.length > 0) {
-      return freezeAssessment('unqualified', undefined, 'none', intelEval, intelEval.reasonCodes);
-    }
-    if (intelEval.unobserved.length > 0) {
-      return freezeAssessment('unqualified', undefined, 'none', intelEval, [
-        'insufficient-host-facts',
-      ]);
-    }
-    return freezeAssessment(intelRow.status, intelRow, 'exact', intelEval, [
-      'macos-intel-unsupported',
+  // Candidate rows for this host's (platform, arch). The registry forbids two
+  // rows overlapping on (platform, osVersionMajor, arch), so multiple candidates
+  // only ever differ by OS-version major; pick the one the host best matches.
+  const candidates = rows.filter(
+    (row) => row.tuple.osPlatform === observed.osPlatform && row.tuple.arch === observed.arch,
+  );
+  if (candidates.length === 0) {
+    return freezeAssessment('unqualified', undefined, 'none', presenceEvaluation(observed), [
+      'unqualified-host',
     ]);
   }
 
-  // A contradicted dimension (wrong macOS/kernel/Node/ABI/npm/filesystem/case)
-  // means this is not the supported tuple: unqualified with the reason codes.
-  if (macosEval.reasonCodes.length > 0) {
-    return freezeAssessment('unqualified', undefined, 'none', macosEval, macosEval.reasonCodes);
+  const { row, evaluation } = selectBestCandidate(observed, candidates);
+
+  // A contradicted normative dimension means this is not that exact tuple:
+  // unqualified with the specific reason codes.
+  if (evaluation.reasonCodes.length > 0) {
+    return freezeAssessment('unqualified', undefined, 'none', evaluation, evaluation.reasonCodes);
   }
 
-  // No contradiction: advertise the preview row. Exact only when every normative
-  // dimension was observed; otherwise partial.
-  return freezeAssessment(macosRow.status, macosRow, matchLevel(macosEval), macosEval, []);
+  // An `unsupported` row is one exact published exclusion — only an EXACT match
+  // (every normative dimension observed) resolves to `unsupported`; a partial
+  // match belongs to the broader unqualified set.
+  if (row.status === 'unsupported') {
+    if (evaluation.unobserved.length > 0) {
+      return freezeAssessment('unqualified', undefined, 'none', evaluation, [
+        'insufficient-host-facts',
+      ]);
+    }
+    return freezeAssessment('unsupported', row, 'exact', evaluation, ['unsupported-tuple']);
+  }
+
+  // A `preview`/`supported` row: exact only when every normative dimension was
+  // observed, otherwise partial.
+  return freezeAssessment(row.status, row, matchLevel(evaluation), evaluation, []);
 }
 
 /**
- * @throws {Error} When the registry is missing the required macOS preview or
- *   Intel exclusion row, or either row's canonical tuple/status is invalid.
+ * Among rows sharing the host's (platform, arch), pick the one the host best
+ * matches: a contradiction-free candidate always beats a contradicted one; ties
+ * break toward the most observed dimensions, then registry order.
+ *
+ * @throws {Error} When `candidates` is empty (unreachable — every caller passes a
+ *   non-empty candidate list already filtered by platform + arch).
  */
-function resolveRegistryRows(rows: readonly PlatformSupportRow[]): {
-  readonly macosRow: PlatformSupportRow;
-  readonly intelRow: PlatformSupportRow;
-} {
-  const macosRow = rows.find((candidate) => candidate.id === MACOS_PREVIEW_ROW.id);
-  const intelRow = rows.find((candidate) => candidate.id === MACOS_INTEL_ROW.id);
-  if (macosRow === undefined || intelRow === undefined) {
-    const missingId = macosRow === undefined ? MACOS_PREVIEW_ROW.id : MACOS_INTEL_ROW.id;
-    throw new Error(`Platform-support registry is missing required row: ${missingId}`);
+function selectBestCandidate(
+  observed: ObservedHost,
+  candidates: readonly PlatformSupportRow[],
+): { readonly row: PlatformSupportRow; readonly evaluation: DimensionEvaluation } {
+  let best: {
+    row: PlatformSupportRow;
+    evaluation: DimensionEvaluation;
+    clean: boolean;
+    score: number;
+  } | null = null;
+  for (const row of candidates) {
+    const evaluation = classifyAgainst(observed, row.tuple);
+    const clean = evaluation.reasonCodes.length === 0;
+    const score = evaluation.observed.length;
+    if (best === null || (clean && !best.clean) || (clean === best.clean && score > best.score)) {
+      best = { row, evaluation, clean, score };
+    }
   }
-  if (
-    macosRow.tuple.osPlatform !== 'darwin' ||
-    macosRow.tuple.arch !== 'arm64' ||
-    macosRow.status === 'unsupported'
-  ) {
-    throw new Error(`Platform-support registry has an invalid macOS qualification row`);
+  if (best === null) {
+    // Unreachable: callers only pass a non-empty candidate list.
+    throw new Error('selectBestCandidate requires at least one candidate');
   }
-  if (
-    intelRow.tuple.osPlatform !== 'darwin' ||
-    intelRow.tuple.arch !== 'x64' ||
-    intelRow.status !== 'unsupported'
-  ) {
-    throw new Error(`Platform-support registry has an invalid macOS Intel exclusion row`);
+  return { row: best.row, evaluation: best.evaluation };
+}
+
+/**
+ * Report which normative dimensions were present in the observation, independent
+ * of any row — used when no row is selected (insufficient facts, or no row for
+ * the host's (platform, arch)). A dimension is "observed" when its source field
+ * is present, regardless of value.
+ */
+function presenceEvaluation(observed: ObservedHost): DimensionEvaluation {
+  const evaluation: DimensionEvaluation = { observed: [], unobserved: [], reasonCodes: [] };
+  for (const spec of DIMENSION_SPECS) {
+    const present = spec.evaluate(observed, PRESENCE_PROBE_TUPLE) !== 'unobserved';
+    (present ? evaluation.observed : evaluation.unobserved).push(spec.dimension);
   }
-  return { macosRow, intelRow };
+  return evaluation;
 }
 
 /**

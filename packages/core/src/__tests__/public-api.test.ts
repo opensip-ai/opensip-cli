@@ -337,7 +337,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'workerLimitsEnv',
   'WORKER_LIMITS_ENV_SPECS',
   'yieldToEventLoop',
-  // Plan 00 error/resiliency surface (ADR-0181 / ADR-0182).
+  // Plan 00 error/resiliency surface (ADR-0181 / ADR-0183).
   'CORE_SYSTEM_ERROR_OWNER',
   'ERROR_CATALOG_SCHEMA_VERSION',
   'ErrorDefinitionError',

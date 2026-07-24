@@ -250,7 +250,7 @@ New failure codes and retry/cancel paths follow the structured model:
 
 - [Error and resiliency model](docs/public/80-implementation/09-error-and-resiliency-model.md)
 - [Error code index](docs/public/70-reference/18-error-code-index.md) (generated; `pnpm docs:error-index`)
-- ADR-0181 (definitions + envelope) and ADR-0182 (retry, cancel, sinks)
+- ADR-0181 (definitions + envelope) and ADR-0183 (retry, cancel, sinks)
 
 Prefer `createToolError` / package catalogs over bare `Error` at public boundaries.
 Published codes are **append-only** public API — semantic change needs a new code +

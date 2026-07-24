@@ -34,6 +34,7 @@ import {
   writeSync,
   symlinkSync,
   existsSync,
+  readFileSync,
   rmSync,
 } from 'node:fs';
 import { cpus, totalmem, release, version as osVersionString } from 'node:os';
@@ -137,32 +138,57 @@ function collectShell(platform) {
 }
 
 /**
- * macOS product version from Apple's own `/usr/bin/sw_vers` — the sw_vers-family
- * source the macOS support tuple cross-checks against Node/kernel facts. A
- * darwin-only probe: every other host reports it as a tagged `unavailable` fact.
+ * OS product version: macOS via Apple's `/usr/bin/sw_vers -productVersion`
+ * (e.g. `26.0.1`), Linux via `/etc/os-release` `VERSION_ID` (e.g. `24.04`). The
+ * verifier's `--expected-sw-vers-major` cross-checks the major (26 / 24) against
+ * the tuple. Other platforms report a tagged `unavailable` fact.
  */
 function collectSwVers(platform) {
-  if (platform !== 'darwin') return unavailable('darwin-only-probe');
-  const out = runProbe('/usr/bin/sw_vers', ['-productVersion']);
-  return out && /^\d+(?:\.\d+)*$/.test(out) ? out : unavailable('sw-vers-unavailable');
+  if (platform === 'darwin') {
+    const out = runProbe('/usr/bin/sw_vers', ['-productVersion']);
+    return out && /^\d+(?:\.\d+)*$/.test(out) ? out : unavailable('sw-vers-unavailable');
+  }
+  if (platform === 'linux') return collectOsReleaseVersionId();
+  return unavailable('os-product-version-unsupported-probe');
+}
+
+/** Read `VERSION_ID` from `/etc/os-release` (bounded, secret-free). */
+function collectOsReleaseVersionId() {
+  try {
+    const raw = readFileSync('/etc/os-release', { encoding: 'utf8' });
+    if (raw.length > 8192) return unavailable('os-release-too-large');
+    for (const line of raw.split('\n')) {
+      const match = line.match(/^VERSION_ID="?(\d+(?:\.\d+)*)"?$/);
+      if (match) return match[1];
+    }
+    return unavailable('os-release-version-id-absent');
+  } catch {
+    return unavailable('os-release-unreadable');
+  }
 }
 
 /**
- * Darwin kernel release from `/usr/bin/uname -r` — the sw_vers-independent kernel
- * source (macOS 26.x must pair with Darwin 25.x). Darwin-only.
+ * Kernel release from `uname -r` — macOS Darwin (26.x pairs with Darwin 25.x) and
+ * Linux (the runner's 6.x kernel line, e.g. `6.8.0-1017-azure`). The verifier's
+ * `--expected-kernel-major` cross-checks the leading major against the tuple; a
+ * trailing vendor suffix (`-azure`, `-orbstack`) is ignored.
  */
 function collectKernelRelease(platform) {
-  if (platform !== 'darwin') return unavailable('darwin-only-probe');
+  if (platform !== 'darwin' && platform !== 'linux') {
+    return unavailable('kernel-release-unsupported-probe');
+  }
   const out = runProbe('/usr/bin/uname', ['-r']);
-  return out && /^\d+(?:\.\d+)+$/.test(out) ? out : unavailable('uname-release-unavailable');
+  return out && /^\d+(?:\.\d+)+/.test(out) ? out : unavailable('uname-release-unavailable');
 }
 
 /**
- * Machine architecture from `/usr/bin/uname -m` (e.g. `arm64`, `x86_64`) — the
- * hardware source cross-checked against `process.arch`. Darwin-only.
+ * Machine hardware architecture from `uname -m` (macOS `arm64`, Linux `x86_64`) —
+ * cross-checked against `process.arch` and the verifier's `--expect-uname-arch`.
  */
 function collectUnameArch(platform) {
-  if (platform !== 'darwin') return unavailable('darwin-only-probe');
+  if (platform !== 'darwin' && platform !== 'linux') {
+    return unavailable('uname-arch-unsupported-probe');
+  }
   const out = runProbe('/usr/bin/uname', ['-m']);
   return out && /^\w+$/.test(out) ? out : unavailable('uname-arch-unavailable');
 }
@@ -370,9 +396,10 @@ export function collectHostProfile(root, requiredCapabilities = []) {
       caseSensitive: detectCaseSensitivity(root),
     },
     shell: collectShell(platform),
-    // macOS-independent tuple sources (darwin-only; tagged `unavailable`
-    // elsewhere). Cross-checked against Node facts by the macOS journeys and
-    // bound to the verifier's host constraints.
+    // OS-product / kernel / hardware-arch tuple sources: macOS via sw_vers/uname,
+    // Linux via /etc/os-release + uname (tagged `unavailable` on other platforms).
+    // Cross-checked against Node facts by the journeys and bound to the verifier's
+    // host constraints.
     swVers: collectSwVers(platform),
     kernelRelease: collectKernelRelease(platform),
     unameArch: collectUnameArch(platform),

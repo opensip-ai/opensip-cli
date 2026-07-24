@@ -24,7 +24,7 @@ related-docs:
   - ../70-reference/04-json-output-schema.md
   - ../70-reference/18-error-code-index.md
   - ../../decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md
-  - ../../decisions/ADR-0182-explicit-retry-cancellation-and-safe-failure-sinks.md
+  - ../../decisions/ADR-0183-explicit-retry-cancellation-and-safe-failure-sinks.md
 ---
 
 # Error and resiliency model
@@ -144,4 +144,4 @@ Published error codes and versioned machine failure projections are public contr
 - Breaking projection shape requires a new schema version + deprecation window.  
 - Semantic change to a public code ⇒ new code + `supersededBy`, with a CHANGELOG note on release.
 
-See [ADR-0181](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md) and [ADR-0182](https://github.com/opensip-ai/opensip-cli/blob/v0.8.4/docs/decisions/ADR-0182-explicit-retry-cancellation-and-safe-failure-sinks.md).
+See [ADR-0181](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0181-structured-error-definitions-and-failure-envelope.md) and [ADR-0183](https://github.com/opensip-ai/opensip-cli/blob/v0.8.5/docs/decisions/ADR-0183-explicit-retry-cancellation-and-safe-failure-sinks.md).

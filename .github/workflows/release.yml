@@ -1145,6 +1145,403 @@ jobs:
           echo "macOS release qualification passed"
 
   # ===========================================================================
+  # qualify-linux — Linux burn-in qualification of the EXACT published bytes.
+  #
+  # BURN-IN POSTURE (Plan 12 Phase 3): this job is NOT in promote-release.needs
+  # while the ubuntu-2404-x64-node24-npm11-v1 support row is `preview`. It runs
+  # against the same staged/published bytes as qualify-macos and fails honestly
+  # on a non-pass (continue-on-error stays false — its red is a tracked burn-in
+  # signal), but a red Linux run NEVER blocks promotion during burn-in because
+  # promotion does not depend on it. When the row is promoted to `supported`
+  # (Phase 4, after the burn-in bar), the SAME change MUST add `qualify-linux` to
+  # `promote-release.needs` and extend the promote job's evidence recheck with the
+  # Linux tuple flags — status and gate move together or not at all. The
+  # `linux-qualification-workflow.test.mjs` structure test enforces that lockstep
+  # against the registry row status, so a `supported` flip cannot land with an
+  # advisory gate.
+  #
+  # It is a SIBLING job, not a `strategy.matrix` leg of qualify-macos, precisely
+  # because the gate posture is asymmetric: qualify-macos is a hard promote
+  # dependency and qualify-linux is (during burn-in) advisory. A matrix job is one
+  # job id; `promote.needs` cannot depend on a single leg. Trust posture is
+  # identical: `contents: read`, no publish/promotion credential.
+  #
+  # The burn-in/lockstep decision + rejected alternatives are recorded in
+  # docs/decisions/ADR-0182-linux-qualification-burn-in-lockstep.md.
+  # ===========================================================================
+  qualify-linux:
+    needs: stage-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      # Exposed now (forward-looking) so the Phase 4 supported-flip only adds the
+      # needs edge + promote recheck, not the plumbing. Unconsumed during burn-in.
+      evidence-digest: ${{ steps.evidence.outputs.evidence-digest }}
+      evidence-artifact: ${{ steps.evidence.outputs.evidence-artifact }}
+      evidence-run-attempt: ${{ steps.evidence.outputs.evidence-run-attempt }}
+      registry-integrity-digest: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+      candidate-digest: ${{ steps.registry-integrity.outputs.candidate-digest }}
+    env:
+      LINUX_PROFILE: .config/platform-acceptance/ubuntu-2404-x64-node24-npm11-v2.json
+      SUPPORT_ROW: ubuntu-2404-x64-node24-npm11-v1
+      SUPPORT_CONTRACT_VERSION: '1'
+    steps:
+      # Exact SHA the staging job packed/published — never a branch or `latest`.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ needs.stage-release.outputs.git-sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+
+      # No registry-url here: this job reads PUBLIC package metadata/tarballs and
+      # must hold no npm auth expectation. npmjs.org is npm's default registry.
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install npm 11 to a separate prefix if the image differs
+        run: |
+          set -eu
+          major="$(npm -v | cut -d. -f1)"
+          if [ "$major" != "11" ]; then
+            npm install --prefix "$HOME/.npm-cli" npm@11 --registry https://registry.npmjs.org/
+            echo "$HOME/.npm-cli/node_modules/.bin" >> "$GITHUB_PATH"
+            echo "OPENSIP_ACCEPTANCE_NPM_CLI=$HOME/.npm-cli/node_modules/npm/bin/npm-cli.js" >> "$GITHUB_ENV"
+          fi
+
+      - name: Print runtime versions (diagnostic only)
+        run: |
+          node --version
+          npm --version
+          (. /etc/os-release && echo "$NAME $VERSION_ID") || true
+
+      # Fail-closed tuple preflight + run-owned evidence dir (mirrors qualify-macos).
+      - name: Host tuple preflight (fail-closed)
+        id: preflight
+        run: |
+          set -uo pipefail
+          evidence_dir="$RUNNER_TEMP/qualification-evidence"
+          mkdir -p "$evidence_dir"
+          echo "EVIDENCE_DIR=$evidence_dir" >> "$GITHUB_ENV"
+          preflight_json="$evidence_dir/host-preflight.json"
+
+          os_ver="$( (. /etc/os-release 2>/dev/null && printf '%s' "$VERSION_ID") || echo unknown)"
+          kernel="$(/usr/bin/uname -r 2>/dev/null || echo unknown)"
+          uname_arch="$(/usr/bin/uname -m 2>/dev/null || echo unknown)"
+          node_platform="$(node -p 'process.platform')"
+          node_arch="$(node -p 'process.arch')"
+          node_ver="$(node -p 'process.versions.node')"
+          node_abi="$(node -p 'process.versions.modules')"
+          npm_ver="$(npm -v 2>/dev/null || echo unknown)"
+          fs_type="$(findmnt -n -o FSTYPE --target "$RUNNER_TEMP" 2>/dev/null || true)"
+          [ -n "$fs_type" ] || fs_type="$(stat -f -c %T "$RUNNER_TEMP" 2>/dev/null || echo unknown)"
+
+          fail=0
+          note() { echo "::error title=host-preflight::$1"; fail=1; }
+          case "$os_ver" in 24.*|24) ;; *) note "Ubuntu VERSION_ID $os_ver != 24.x" ;; esac
+          case "$kernel" in 6.*|6) ;; *) note "Linux kernel $kernel != 6.x" ;; esac
+          [ "$uname_arch" = x86_64 ] || note "uname -m $uname_arch != x86_64"
+          [ "$node_platform" = linux ] || note "process.platform $node_platform != linux"
+          [ "$node_arch" = x64 ] || note "process.arch $node_arch != x64"
+          case "$node_ver" in 24.*) ;; *) note "Node $node_ver != 24.x" ;; esac
+          [ "$node_abi" = 137 ] || note "Node module ABI $node_abi != 137"
+          case "$npm_ver" in 11.*) ;; *) note "npm $npm_ver != 11.x" ;; esac
+          [ "$fs_type" = ext4 ] || note "run-root filesystem $fs_type != ext4"
+
+          HOST_OS="$os_ver" HOST_KERNEL="$kernel" HOST_ARCH="$uname_arch" \
+          HOST_PLATFORM="$node_platform" HOST_NODE_ARCH="$node_arch" \
+          HOST_NODE="$node_ver" HOST_ABI="$node_abi" HOST_NPM="$npm_ver" HOST_FS="$fs_type" \
+          node -e 'const e=process.env;require("fs").writeFileSync(process.argv[1],JSON.stringify({schema:"ubuntu-tuple-preflight.v1",runId:process.env.GITHUB_RUN_ID,runAttempt:process.env.GITHUB_RUN_ATTEMPT,event:process.env.GITHUB_EVENT_NAME,runnerLabel:"ubuntu-24.04",productVersion:e.HOST_OS,kernel:e.HOST_KERNEL,unameArch:e.HOST_ARCH,platform:e.HOST_PLATFORM,nodeArch:e.HOST_NODE_ARCH,nodeVersion:e.HOST_NODE,nodeModuleAbi:e.HOST_ABI,npmVersion:e.HOST_NPM,fsType:e.HOST_FS},null,2)+"\n")' "$preflight_json"
+
+          if [ "$fail" -ne 0 ]; then
+            echo "host_ok=false" >> "$GITHUB_OUTPUT"
+            echo "::error::host tuple preflight failed — this runner does not match the supported tuple"
+            exit 1
+          fi
+          echo "host_ok=true" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Build every checkout-owned runtime the qualification harness imports (the
+      # tuple journey loads core's support policy from dist/index-lib.js;
+      # installed-smoke loads the private agent-eval CLI + report validator).
+      - name: Build Linux qualification harness prerequisites
+        run: |
+          pnpm --filter @opensip-cli/core build
+          pnpm --filter @opensip-cli/agent-eval build
+
+      - name: Download staged release metadata
+        uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
+        with:
+          name: ${{ needs.stage-release.outputs.release-metadata-artifact }}
+          path: ${{ runner.temp }}/release-metadata
+
+      # Poll for the EXACT staged version + the COMPLETE package set with bounded
+      # exponential backoff. Never falls back to `latest`, a range, or a
+      # different registry — a version mismatch can never become a pass.
+      - name: Poll npm for the exact staged version + complete package set
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+        run: |
+          set -eu
+          attempts=8
+          delay=5
+          check_all() {
+            while IFS= read -r pkg; do
+              if [ "$pkg" = "opensip-cli" ]; then name="opensip-cli"; else name="@opensip-cli/$pkg"; fi
+              npm view "${name}@${VERSION}" version --registry https://registry.npmjs.org/ >/dev/null 2>&1 || return 1
+            done < <(node scripts/release-package-order.mjs --print names)
+            return 0
+          }
+          i=1
+          while [ "$i" -le "$attempts" ]; do
+            if check_all; then echo "all packages visible at exact version $VERSION"; exit 0; fi
+            echo "attempt $i/$attempts: staged package set not fully visible yet; sleeping ${delay}s"
+            sleep "$delay"
+            delay=$((delay * 2))
+            [ "$delay" -le 60 ] || delay=60
+            i=$((i + 1))
+          done
+          echo "::error::exact staged version $VERSION not fully visible on npm after $attempts attempts"
+          exit 1
+
+      # Fetch each EXACT registry tarball into a run-owned dir and compare its
+      # SHA-256 + name/version against the downloaded release manifest. The
+      # manifest itself is first re-checked against the staging job's digest.
+      - name: Fetch registry tarballs and verify against the staged manifest
+        id: registry-integrity
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+        run: |
+          set -eu
+          stage="$RUNNER_TEMP/registry-tarballs"
+          rm -rf "$stage"; mkdir -p "$stage"
+          manifest="$RUNNER_TEMP/release-metadata/opensip-cli-release-manifest.v1.json"
+
+          got="$(shasum -a 256 "$manifest" | awk '{print $1}')"
+          if [ "$got" != "$MANIFEST_DIGEST" ]; then
+            echo "::error::downloaded manifest digest $got != staged $MANIFEST_DIGEST"; exit 1
+          fi
+
+          while IFS= read -r pkg; do
+            if [ "$pkg" = "opensip-cli" ]; then
+              name="opensip-cli"; file="opensip-cli-${VERSION}.tgz"
+            else
+              name="@opensip-cli/$pkg"; file="opensip-cli-${pkg}-${VERSION}.tgz"
+            fi
+            ( cd "$stage" && npm pack "${name}@${VERSION}" --registry https://registry.npmjs.org/ >/dev/null )
+            if [ ! -f "$stage/$file" ]; then
+              echo "::error::npm pack did not produce expected tarball $file for $name@$VERSION"; exit 1
+            fi
+            got="$(shasum -a 256 "$stage/$file" | awk '{print $1}')"
+            want="$(node -e 'const m=require(process.argv[1]);const f=process.argv[2];const a=(m.artifacts||[]).find(x=>x.path===f);process.stdout.write(a&&a.sha256?String(a.sha256):"")' "$manifest" "$file")"
+            if [ -z "$want" ]; then echo "::error::$file absent from staged manifest"; exit 1; fi
+            if [ "$got" != "$want" ]; then echo "::error::$file registry sha256 $got != manifest $want"; exit 1; fi
+            echo "  ok $name@$VERSION ($file)"
+          done < <(node scripts/release-package-order.mjs --print names)
+          echo "all registry tarballs match the staged manifest by sha256/name/version"
+
+          # Query exact npm metadata for every package, verify each tarball's
+          # sha512 SRI, and retain one canonical complete inventory. Its digest
+          # is candidate identity; the Phase 4 supported-flip has promotion
+          # independently reparse the closed schema and check it back.
+          inventory="$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json"
+          integrity_digest="$(node scripts/registry-integrity-inventory.mjs build \
+            --directory "$stage" \
+            --manifest "$manifest" \
+            --version "$VERSION" \
+            --registry https://registry.npmjs.org/ \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --out "$inventory")"
+          candidate_digest="$(node --input-type=module -e '
+            import { resolveCandidateSource } from "./scripts/platform-acceptance/candidate-source.mjs";
+            const resolved = await resolveCandidateSource({
+              kind: "published-version",
+              version: process.argv[1],
+              registry: "https://registry.npmjs.org/",
+              manifestDigest: process.argv[2],
+              registryIntegrityDigest: process.argv[3],
+            });
+            if (!resolved.ok) throw new Error(resolved.reasonCode);
+            process.stdout.write(resolved.identity.digest);
+          ' "$VERSION" "$MANIFEST_DIGEST" "$integrity_digest")"
+          echo "registry-integrity-digest=$integrity_digest" >> "$GITHUB_OUTPUT"
+          echo "candidate-digest=$candidate_digest" >> "$GITHUB_OUTPUT"
+          echo "retained complete npm integrity inventory ($integrity_digest)"
+
+      # Install the exact published version via the canonical installer and run
+      # the full Linux profile in PUBLISHED-VERSION mode, upgrading FROM the prior
+      # exact `latest` (empty only on a bootstrap release). The runner exit is
+      # captured but not trusted; the independent verifier is the authority.
+      - name: Run Linux platform acceptance (published version)
+        id: acceptance
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          PREVIOUS: ${{ needs.stage-release.outputs.previous-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+          REGISTRY_INTEGRITY_DIGEST: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+        run: |
+          set -u
+          out="$EVIDENCE_DIR/opensip-cli-linux-qualification.v2.json"
+          set +e
+          # The bare `--` is the pnpm script-arg separator. pnpm 11 forwards it as
+          # argv; run-platform-acceptance.mjs ignores end-of-options markers so this
+          # package-script form matches a direct `node scripts/…` invocation.
+          if [ -n "${PREVIOUS:-}" ]; then
+            pnpm platform:acceptance -- \
+              --profile "$LINUX_PROFILE" \
+              --published-version "$VERSION" \
+              --previous-version "$PREVIOUS" \
+              --registry https://registry.npmjs.org/ \
+              --expected-manifest-digest "$MANIFEST_DIGEST" \
+              --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+              --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+              --run-id "$GITHUB_RUN_ID" \
+              --run-attempt "$GITHUB_RUN_ATTEMPT" \
+              --runner-label ubuntu-24.04 \
+              --out "$out" \
+              --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
+          else
+            pnpm platform:acceptance -- \
+              --profile "$LINUX_PROFILE" \
+              --published-version "$VERSION" \
+              --registry https://registry.npmjs.org/ \
+              --expected-manifest-digest "$MANIFEST_DIGEST" \
+              --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+              --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+              --run-id "$GITHUB_RUN_ID" \
+              --run-attempt "$GITHUB_RUN_ATTEMPT" \
+              --runner-label ubuntu-24.04 \
+              --out "$out" \
+              --agent-report-out "$EVIDENCE_DIR/agent-eval-installed-smoke.json"
+          fi
+          rc=$?
+          set -e
+          echo "run_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "acceptance runner exit: $rc"
+
+      # NOTE on `--expect-shell`: deliberately omitted (documented in the
+      # scheduled lane). The Linux shell fact is only the recorded $SHELL basename
+      # and is not a tuple dimension; gating it would risk a mystery-red. It is
+      # still recorded in evidence.
+      - name: Verify acceptance evidence (independent)
+        id: verify
+        if: always() && steps.preflight.outputs.host_ok == 'true'
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+          PREVIOUS: ${{ needs.stage-release.outputs.previous-version }}
+          MANIFEST_DIGEST: ${{ needs.stage-release.outputs.manifest-digest }}
+          REGISTRY_INTEGRITY_DIGEST: ${{ steps.registry-integrity.outputs.registry-integrity-digest }}
+          CANDIDATE_DIGEST: ${{ steps.registry-integrity.outputs.candidate-digest }}
+          GIT_SHA: ${{ needs.stage-release.outputs.git-sha }}
+        run: |
+          set -u
+          previous_args=(--expect-no-previous-candidate)
+          if [ -n "${PREVIOUS:-}" ]; then
+            previous_args=(--expected-previous-version "$PREVIOUS")
+          fi
+          set +e
+          node scripts/verify-platform-acceptance.mjs \
+            --evidence "$EVIDENCE_DIR/opensip-cli-linux-qualification.v2.json" \
+            --profile "$LINUX_PROFILE" \
+            --expected-version "$VERSION" \
+            --expected-candidate-kind published-version \
+            --expected-registry https://registry.npmjs.org/ \
+            --expected-candidate-digest "$CANDIDATE_DIGEST" \
+            --expected-manifest-digest "$MANIFEST_DIGEST" \
+            --expected-registry-integrity-digest "$REGISTRY_INTEGRITY_DIGEST" \
+            --registry-integrity-inventory "$EVIDENCE_DIR/opensip-cli-registry-integrity.v1.json" \
+            "${previous_args[@]}" \
+            --expected-git-sha "$GIT_SHA" \
+            --expected-run-id "$GITHUB_RUN_ID" \
+            --expected-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --expected-runner-label ubuntu-24.04 \
+            --expect-platform linux \
+            --expect-arch x64 \
+            --expect-node-abi 137 \
+            --expect-fs-type ext4 \
+            --expected-node-major 24 \
+            --expected-npm-major 11 \
+            --expected-sw-vers-major 24 \
+            --expected-kernel-major 6 \
+            --expect-uname-arch x86_64 \
+            --expect-case-sensitive true \
+            --expected-support-row "$SUPPORT_ROW" \
+            --expected-support-contract-version "$SUPPORT_CONTRACT_VERSION" \
+            --json > "$EVIDENCE_DIR/verifier-result.json"
+          rc=$?
+          set -e
+          cat "$EVIDENCE_DIR/verifier-result.json" || true
+          echo "verify_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "verifier exit: $rc"
+
+      # Expose ONLY a verified evidence digest + artifact name (no runner-set
+      # boolean). The Phase 4 supported-flip has promote-release re-derive it.
+      - name: Expose verified evidence identity
+        id: evidence
+        if: always() && steps.verify.outputs.verify_rc == '0'
+        env:
+          VERSION: ${{ needs.stage-release.outputs.candidate-version }}
+        run: |
+          set -eu
+          short_sha="${GITHUB_SHA:0:7}"
+          digest="$(node -e 'const e=require(process.argv[1]);const d=e.completion?.evidenceDigest;if(typeof d!=="string"||!/^[a-f0-9]{64}$/.test(d))throw new Error("invalid evidence digest");process.stdout.write(d)' "$EVIDENCE_DIR/opensip-cli-linux-qualification.v2.json")"
+          evidence_attempt="$(node -e 'const e=require(process.argv[1]);const a=e.execution?.runAttempt;if(!Number.isSafeInteger(a)||a<=0)throw new Error("invalid evidence attempt");process.stdout.write(String(a))' "$EVIDENCE_DIR/opensip-cli-linux-qualification.v2.json")"
+          echo "evidence-digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "evidence-run-attempt=$evidence_attempt" >> "$GITHUB_OUTPUT"
+          echo "evidence-artifact=linux-release-qualification-c${SUPPORT_CONTRACT_VERSION}-v${VERSION}-${short_sha}-run${evidence_attempt}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Linux qualification evidence
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: ${{ steps.evidence.outputs.evidence-artifact || format('linux-release-qualification-run{0}', github.run_attempt) }}
+          path: |
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-linux-qualification.v2.json
+            ${{ env.EVIDENCE_DIR }}/opensip-cli-registry-integrity.v1.json
+            ${{ env.EVIDENCE_DIR }}/agent-eval-installed-smoke.json
+            ${{ env.EVIDENCE_DIR }}/host-preflight.json
+            ${{ env.EVIDENCE_DIR }}/verifier-result.json
+          if-no-files-found: warn
+          retention-days: 90
+
+      # Fail the JOB (not the release) LAST so evidence always uploads first. A
+      # host mismatch, required skip/unavailable (run_rc=1), or a verifier
+      # rejection makes this job red — a tracked burn-in signal. Promotion is
+      # unaffected because promote-release does not (yet) depend on this job.
+      - name: Enforce Linux burn-in qualification (advisory)
+        if: always()
+        env:
+          HOST_OK: ${{ steps.preflight.outputs.host_ok }}
+          RUN_RC: ${{ steps.acceptance.outputs.run_rc }}
+          VERIFY_RC: ${{ steps.verify.outputs.verify_rc }}
+          EVIDENCE_DIGEST: ${{ steps.evidence.outputs.evidence-digest }}
+          EVIDENCE_RUN_ATTEMPT: ${{ steps.evidence.outputs.evidence-run-attempt }}
+        run: |
+          set -eu
+          if [ "${HOST_OK:-false}" != "true" ] || [ "${RUN_RC:-1}" != "0" ] || [ "${VERIFY_RC:-1}" != "0" ]; then
+            echo "::error::Linux burn-in qualification failed (host_ok=${HOST_OK:-} run_rc=${RUN_RC:-} verify_rc=${VERIFY_RC:-})"
+            exit 1
+          fi
+          case "${EVIDENCE_DIGEST:-}" in
+            *[!a-f0-9]*) echo "::error::verified evidence digest is not lowercase SHA-256"; exit 1 ;;
+          esac
+          if [ "${#EVIDENCE_DIGEST}" -ne 64 ]; then
+            echo "::error::verified evidence digest is not lowercase SHA-256"
+            exit 1
+          fi
+          case "${EVIDENCE_RUN_ATTEMPT:-}" in
+            ''|*[!0-9]*|0) echo "::error::verified evidence attempt is not positive"; exit 1 ;;
+          esac
+          echo "Linux burn-in qualification passed"
+
+  # ===========================================================================
   # promote-release — the ONLY job with the promotion secret + release write. It
   # runs only after stage-release AND qualify-macos succeed (GitHub's default
   # success dependency). It independently rechecks identity + verified evidence

@@ -21,6 +21,10 @@
  *     other test via explicit `write` / `prompt` callbacks.
  */
 
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isValidTool } from '../bootstrap/validate-tool.js';
@@ -175,9 +179,32 @@ describe('update-notifier default write fallback', () => {
 // --- uninstall.ts default fallbacks ------------------------------------------
 
 describe('uninstall.ts — default I/O fallbacks', () => {
+  // executeUninstall inspects the GLOBAL runtime-lease coordination root
+  // (~/.opensip-cli-coordination, resolved from homedir()). Without HOME
+  // isolation these probes read the shared real root and can observe a record
+  // being concurrently mutated by another parallel worker, throwing
+  // SYSTEM.RUNTIME_COORDINATION.UNSAFE — a flake seen under the parallel
+  // coverage lane. Isolate HOME to a per-test temp dir so the coordination root
+  // is empty and private (ADR-0169: fix the race, do not retry it).
+  let priorHome: string | undefined;
+  let tempHome: string;
+
+  beforeEach(() => {
+    priorHome = process.env.HOME;
+    tempHome = mkdtempSync(join(tmpdir(), 'uninstall-fallback-home-'));
+    process.env.HOME = tempHome;
+  });
+
   afterEach(() => {
     vi.restoreAllMocks();
     vi.resetModules();
+    if (priorHome === undefined) delete process.env.HOME;
+    else process.env.HOME = priorHome;
+    try {
+      rmSync(tempHome, { recursive: true, force: true });
+    } catch {
+      /* the OS temp reaper handles any residue */
+    }
   });
 
   it('uses process.stdout.write when no `write` override is supplied', async () => {
