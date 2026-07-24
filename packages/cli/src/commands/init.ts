@@ -24,16 +24,12 @@
  * tool-generated state (sessions, logs, dashboards, baselines, plugin
  * installs) stays untracked.
  *
- * Promotion path: when a customer's pack outgrows a handful of .mjs
- * files (shared helpers, tests, more than a dozen checks/scenarios),
- * `opensip-cli/<domain>/` can graduate to a real workspace npm
- * package — fit packs declare the `fit-pack` marker plus target-domain epoch;
- * sim packs use the `scenarios-*` package-name pattern. Add `tsconfig.json` and
- * an `index.ts` re-exporting checks/recipes or scenarios/recipes. Marker-based
- * discovery picks up a fit workspace package automatically regardless of npm
- * scope. The init scaffold stays loose-`.mjs` to
- * preserve the fast first-touch experience; graduation is a manual
- * step the customer takes when their coverage becomes substantial.
+ * Promotion path: when a customer's pack outgrows loose .mjs files,
+ * `opensip-cli/<domain>/` graduates to a real workspace npm package (fit packs
+ * declare the `fit-pack` marker + target-domain epoch; sim packs use the
+ * `scenarios-*` name pattern; add `tsconfig.json` + a re-exporting `index.ts`).
+ * Marker-based discovery picks the package up regardless of npm scope; the
+ * scaffold stays loose-`.mjs` for the fast first touch.
  * See docs/public/50-extend/01-plugin-authoring.md.
  *
  * Language selection drives:
@@ -181,16 +177,14 @@ function invalidInitInput(
   baseResult: BaseInitResult,
 ): InitResult | undefined {
   if (args.keep === true && args.remove === true) {
-    // Report the OBSERVED state — this refusal used to fabricate
-    // 'fully-initialized' regardless of what was actually on disk.
-    const observedState = existsSync(args.cwd)
-      ? classifyWorkingDir(resolveProjectPaths(args.cwd))
-      : 'pristine';
+    // Report the OBSERVED state — this refusal used to fabricate 'fully-initialized'.
     return {
       ...baseResult,
       created: false,
       partialStateError: {
-        state: observedState,
+        state: existsSync(args.cwd)
+          ? classifyWorkingDir(resolveProjectPaths(args.cwd))
+          : 'pristine',
         preExistingFiles: [],
         message: '--keep and --remove are mutually exclusive. Pick one.',
       },

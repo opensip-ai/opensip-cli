@@ -195,9 +195,11 @@ export function revokeCapabilityTrust(id: string): boolean {
   return withGlobalConfigLock(() => {
     const config = readGlobalConfig();
     const existing = readGlobalTrustPolicy();
+    // @silent-ok — documented contract (see JSDoc): false = nothing to revoke.
     if (existing.error !== undefined || existing.policy === undefined) return false;
     const grants = existing.policy.trustedCapabilityPacks ?? [];
     const kept = grants.filter((entry) => entry.id !== id);
+    // @silent-ok — documented contract (see JSDoc): false = nothing to revoke.
     if (kept.length === grants.length) return false;
     writeGlobalConfig({
       ...config,

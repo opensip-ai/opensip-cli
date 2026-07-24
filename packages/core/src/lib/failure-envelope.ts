@@ -5,23 +5,22 @@
  * share definition axes without message-substring classification.
  */
 
+import { coreSystemErrorCatalog } from './error-definition.js';
+import { isToolErrorLike, type ToolError } from './errors.js';
 import {
-  definitionFromLegacyCode,
-  coreSystemErrorCatalog,
-  deepFreeze,
-  FAILURE_PROJECTION_SCHEMA_VERSION,
-} from './error-definition.js';
-import {
-  isToolErrorLike,
-  normalizeToolErrorDefinition,
-  sanitizeErrorMetadata,
-  type ToolError,
-} from './errors.js';
+  FAILURE_ENVELOPE_VERSION,
+  freezeEnvelope,
+  fromNativeError,
+  fromToolError,
+  MAX_MESSAGE,
+  MAX_OPERATOR_DETAIL,
+  readField,
+  truncate,
+} from './failure-envelope-builders.js';
 
 import type {
   FailureCauseSummary,
   FailureEnvelope,
-  FailureKnownStatus,
   NormalizeFailureContext,
 } from './failure-envelope-types.js';
 
@@ -32,13 +31,15 @@ export type {
   NormalizeFailureContext,
 } from './failure-envelope-types.js';
 
-export const FAILURE_ENVELOPE_VERSION = FAILURE_PROJECTION_SCHEMA_VERSION;
+// Re-exported from the builders split so existing importers keep one home.
+export {
+  FAILURE_ENVELOPE_VERSION,
+  MAX_OPERATOR_DETAIL,
+  truncate,
+} from './failure-envelope-builders.js';
 
 const MAX_CAUSE_DEPTH = 4;
 const MAX_AGGREGATE = 16;
-const MAX_MESSAGE = 1000;
-/** Shared with the projection egress layer (`failure-projection.ts`). */
-export const MAX_OPERATOR_DETAIL = 2000;
 /**
  * Total-work ceiling across one normalize call. Depth (`MAX_CAUSE_DEPTH`) and
  * per-level width (`MAX_AGGREGATE`) bound a *tree*, but a shared-node
@@ -55,14 +56,6 @@ interface NodeBudget {
 }
 
 const UNKNOWN = coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
-
-/** Shared with the projection egress layer (`failure-projection.ts`). */
-export function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  // Match report-failure style: length exactly `max` with ASCII ellipsis suffix.
-  if (max <= 3) return text.slice(0, max);
-  return `${text.slice(0, max - 3)}...`;
-}
 
 function safePrimitiveString(value: unknown): string {
   if (typeof value === 'string') return value;
@@ -83,14 +76,6 @@ function safeMessage(value: unknown): string {
     return truncate(safePrimitiveString(value), MAX_MESSAGE);
   } catch {
     return '<unstringifiable>';
-  }
-}
-
-function readField<T>(obj: object, key: string, read: () => T, fallback: T): T {
-  try {
-    return read();
-  } catch {
-    return fallback;
   }
 }
 
@@ -329,111 +314,6 @@ function fromUnknownObject(value: object, seen: WeakSet<object>): FailureEnvelop
   });
 }
 
-function fromToolError(error: ToolError, causes: readonly FailureCauseSummary[]): FailureEnvelope {
-  const code = readField(
-    error,
-    'code',
-    () => (typeof error.code === 'string' ? error.code : 'SYSTEM_ERROR'),
-    'SYSTEM_ERROR',
-  );
-  const definition =
-    readField(
-      error,
-      'definition',
-      () => normalizeToolErrorDefinition(error.definition),
-      undefined,
-    ) ?? definitionFromLegacyCode(code);
-  const metadataInput = readField(error, 'metadata', () => error.metadata, {});
-  const metadata = sanitizeErrorMetadata(metadataInput);
-  const message = readField(
-    error,
-    'message',
-    () => (typeof error.message === 'string' ? error.message : definition.code),
-    definition.code,
-  );
-  const failureClass = readField(
-    error,
-    'failureClass',
-    () => (typeof error.failureClass === 'string' ? error.failureClass : undefined),
-    undefined,
-  );
-  const stderrTail = readField(
-    error,
-    'stderrTail',
-    () => (typeof error.stderrTail === 'string' ? error.stderrTail : undefined),
-    undefined,
-  );
-  return freezeEnvelope({
-    schemaVersion: FAILURE_ENVELOPE_VERSION,
-    known: 'known',
-    message: truncate(message || definition.code, MAX_MESSAGE),
-    operatorAction: definition.operatorAction,
-    code: code || definition.code,
-    definition,
-    metadata,
-    ...(failureClass === undefined ? {} : { failureClass }),
-    causes,
-    ...(stderrTail === undefined
-      ? {}
-      : { operatorDetail: truncate(stderrTail, MAX_OPERATOR_DETAIL) }),
-  });
-}
-
-function fromNativeError(error: Error, causes: readonly FailureCauseSummary[]): FailureEnvelope {
-  const errno = readField(
-    error,
-    'code',
-    () => {
-      const code = (error as NodeJS.ErrnoException).code;
-      return typeof code === 'string' ? code : undefined;
-    },
-    undefined,
-  );
-  let definition = definitionFromLegacyCode('SYSTEM_ERROR');
-  let known: FailureKnownStatus = 'unknown';
-  if (typeof errno === 'string') {
-    if (errno === 'ENOENT' || errno === 'ENOTDIR') {
-      definition = definitionFromLegacyCode('NOT_FOUND');
-      known = 'known';
-    } else if (errno === 'EACCES' || errno === 'EPERM') {
-      definition = coreSystemErrorCatalog.require('CORE.SYSTEM.PERMISSION');
-      known = 'known';
-    } else if (errno === 'ENOSPC' || errno === 'EMFILE' || errno === 'ENOMEM') {
-      definition = coreSystemErrorCatalog.require('CORE.SYSTEM.RESOURCE');
-      known = 'known';
-    }
-  }
-
-  const name = readField(
-    error,
-    'name',
-    () => (typeof error.name === 'string' ? error.name : 'Error'),
-    'Error',
-  );
-  const message = readField(
-    error,
-    'message',
-    () => (typeof error.message === 'string' ? error.message : name),
-    name,
-  );
-  return freezeEnvelope({
-    schemaVersion: FAILURE_ENVELOPE_VERSION,
-    known,
-    message: truncate(message || name || 'Error', MAX_MESSAGE),
-    operatorAction: definition.operatorAction,
-    code: definition.code,
-    definition,
-    metadata: typeof errno === 'string' ? { errno } : {},
-    causes,
-    operatorDetail: truncate(
-      [name, message, typeof errno === 'string' ? `errno=${errno}` : '']
-        .filter(Boolean)
-        .join(' | '),
-      MAX_OPERATOR_DETAIL,
-    ),
-  });
-}
-
 function summarizeCause(nested: FailureEnvelope, depth: number): FailureCauseSummary[] {
   return [
     {
@@ -503,8 +383,4 @@ function unknownEnvelope(message: string, original: unknown): FailureEnvelope {
     operatorDetail:
       original === undefined ? undefined : truncate(safeMessage(original), MAX_OPERATOR_DETAIL),
   });
-}
-
-function freezeEnvelope(envelope: FailureEnvelope): FailureEnvelope {
-  return deepFreeze(envelope);
 }

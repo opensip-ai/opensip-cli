@@ -22,7 +22,7 @@
 import { logger } from '../lib/logger.js';
 import { forEachWithConcurrency } from '../lib/map-with-concurrency.js';
 
-import { COMMENT_OPENERS } from './comment-openers.js';
+import { findFirstRealCommentOpener } from './comment-openers.js';
 
 import type {
   SuppressionKeywords,
@@ -144,62 +144,6 @@ function isIdChar(char: string): boolean {
  * Extract the id token a directive names, or `null` when `line` is not a
  * `<comment> <directiveKeyword> <id>` directive.
  */
-/**
- * Find the first comment opener that is not inside a string literal.
- * This prevents matching `//` inside "http://..." or "foo//bar" or directives
- * hidden inside string literals (false positives) and ensures trailing
- * directives after code-with-embedded-// are found (false negatives).
- */
-/**
- * Advance past one character inside a quoted string, honouring backslash escapes
- * so `\"` / `\'` do not end the string early (M6).
- * Returns the next index and whether the string closed.
- */
-function advanceInQuotedString(
-  line: string,
-  i: number,
-  quote: string,
-): { next: number; closed: boolean } {
-  const ch = line[i];
-  // M6: honour backslash escapes so an escaped quote cannot end the string early
-  // (regression covered in suppress.test — escaped-quote mid-string cases).
-  if (ch === '\\' && i + 1 < line.length) {
-    return { next: i + 2, closed: false };
-  }
-  if (ch === quote) {
-    return { next: i + 1, closed: true };
-  }
-  return { next: i + 1, closed: false };
-}
-
-function findFirstRealCommentOpener(line: string): { index: number; length: number } | null {
-  let i = 0;
-  const len = line.length;
-  let inString: string | null = null; // ' or "
-  while (i < len) {
-    const ch = line[i];
-    if (inString) {
-      const stepped = advanceInQuotedString(line, i, inString);
-      if (stepped.closed) inString = null;
-      i = stepped.next;
-      continue;
-    }
-    if (ch === '"' || ch === "'") {
-      inString = ch;
-      i++;
-      continue;
-    }
-    // check for openers
-    for (const [opener, length] of COMMENT_OPENERS) {
-      if (line.startsWith(opener, i)) {
-        return { index: i, length };
-      }
-    }
-    i++;
-  }
-  return null;
-}
-
 function extractDirectiveId(line: string, directiveKeyword: string): string | null {
   const openerHit = findFirstRealCommentOpener(line);
   if (!openerHit) return null;
@@ -230,20 +174,6 @@ function extractDirectiveId(line: string, directiveKeyword: string): string | nu
  * module's own suppression scan, instead of re-deriving a divergent
  * approximation (only `//`-style stacked directives, no keyword check).
  */
-/**
- * Text after the first REAL comment opener on `line` (string-aware scan — the
- * same `findFirstRealCommentOpener` the suppression matcher uses), or `null`
- * when the line has no comment. Exported so directive-audit reconstructions
- * (fitness's `appliedDirectives` inventory) recognize exactly the set of
- * directives this module suppresses with — including trailing comments after
- * code, which a start-of-line-only parse misses.
- */
-export function commentTextAfterOpener(line: string): string | null {
-  const openerHit = findFirstRealCommentOpener(line);
-  if (!openerHit) return null;
-  return line.slice(openerHit.index + openerHit.length);
-}
-
 export function isKnownDirectiveLine(line: string): boolean {
   const trimmed = line.trimStart();
   // Support //, /*, #, and <!-- openers (stacked next-line directives).

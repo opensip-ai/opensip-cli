@@ -77,7 +77,6 @@ export type { SignalSink, EmitResult } from './signals/signal-sink.js';
 export { noopSignalSink } from './signals/signal-sink.js';
 // Inline suppression primitive (ADR-0014) — shared `@x-ignore-*` machinery
 export {
-  commentTextAfterOpener,
   filterSignalsBySuppressions,
   scanSuppressionDirectives,
   isKnownDirectiveLine,
@@ -91,4 +90,8 @@ export type {
   SuppressionResult,
   SuppressionScan,
 } from './signals/suppress.js';
-export { COMMENT_OPENERS, stripCommentOpener } from './signals/comment-openers.js';
+export {
+  COMMENT_OPENERS,
+  commentTextAfterOpener,
+  stripCommentOpener,
+} from './signals/comment-openers.js';
