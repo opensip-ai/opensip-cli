@@ -221,6 +221,23 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
     ).toBe(EXIT_CODES.PLUGIN_INCOMPATIBLE);
   });
 
+  it('detail subcodes keep subclass exit codes (Plan 00 definition family map)', () => {
+    expect(
+      mapToolErrorToExitCode(
+        new PluginIncompatibleError('ambient datastore denied', {
+          code: 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+        }),
+      ),
+    ).toBe(EXIT_CODES.PLUGIN_INCOMPATIBLE);
+    expect(
+      mapToolErrorToExitCode(
+        new ConfigurationError('recovery required', {
+          code: 'CONFIGURATION.RECOVERY_REQUIRED',
+        }),
+      ),
+    ).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+  });
+
   it('TimeoutError → RUNTIME_ERROR', () => {
     expect(mapToolErrorToExitCode(new TimeoutError('took too long'))).toBe(
       EXIT_CODES.RUNTIME_ERROR,

@@ -302,6 +302,26 @@ describe('Result pattern', () => {
   });
 });
 
+describe('definition-backed subcodes keep family exit classes', () => {
+  it('does not demote PluginIncompatibleError detail codes to UNKNOWN_FAILURE', () => {
+    const denied = new PluginIncompatibleError('denied', {
+      code: 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+    });
+    expect(denied.code).toBe('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS');
+    expect(denied.definition.exitClass).toBe('plugin-incompatible');
+    expect(denied.definition.code).toBe('PLUGIN_INCOMPATIBLE');
+  });
+
+  it('does not demote ConfigurationError recovery subcodes to UNKNOWN_FAILURE', () => {
+    const err = new ConfigurationError('recovery required', {
+      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+    });
+    expect(err.code).toBe('CONFIGURATION.RECOVERY_REQUIRED');
+    expect(err.definition.exitClass).toBe('configuration');
+    expect(err.definition.code).toBe('CONFIGURATION_ERROR');
+  });
+});
+
 describe('canonicalToolErrorCode', () => {
   it('maps each typed subclass to its canonical exit-class code', () => {
     expect(canonicalToolErrorCode(new NotFoundError('x'))).toBe('NOT_FOUND');

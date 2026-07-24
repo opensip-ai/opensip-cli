@@ -449,12 +449,50 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
   { allowLegacyCodes: true },
 );
 
-/** Resolve a legacy ToolError string code to a core definition when possible. */
+/**
+ * Map common subcode families (e.g. `PLUGIN.WORKER.*`, `CONFIGURATION.GATE.*`)
+ * onto the canonical legacy catalog entry so custom detail codes keep the
+ * parent exit class / axes instead of demoting to {@link UNKNOWN_FAILURE}.
+ */
+function legacyFamilyCode(code: string): string | undefined {
+  if (!code.includes('.')) return undefined;
+  const head = code.slice(0, code.indexOf('.'));
+  switch (head) {
+    case 'CONFIGURATION':
+      return 'CONFIGURATION_ERROR';
+    case 'VALIDATION':
+      return 'VALIDATION_ERROR';
+    case 'PLUGIN':
+      return 'PLUGIN_INCOMPATIBLE';
+    case 'TIMEOUT':
+      return 'TIMEOUT';
+    case 'SYSTEM':
+      return 'SYSTEM_ERROR';
+    case 'NETWORK':
+      return 'NETWORK_ERROR';
+    case 'CAPABILITY':
+      // Unknown domain → not-found; schema/contribution mismatch → validation.
+      return code.includes('.DOMAIN.') ? 'NOT_FOUND' : 'VALIDATION_ERROR';
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Resolve a legacy ToolError string code to a core definition when possible.
+ *
+ * Exact catalog hits win. Dotted subcodes fall back to their family bucket
+ * (exit class preserved). Only truly unknown codes map to UNKNOWN_FAILURE.
+ */
 export function definitionFromLegacyCode(code: string): ErrorDefinition {
-  return (
-    coreSystemErrorCatalog.get(code) ??
-    coreSystemErrorCatalog.require('UNKNOWN_FAILURE')
-  );
+  const direct = coreSystemErrorCatalog.get(code);
+  if (direct) return direct;
+  const family = legacyFamilyCode(code);
+  if (family) {
+    const familyDef = coreSystemErrorCatalog.get(family);
+    if (familyDef) return familyDef;
+  }
+  return coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
 }
 
 /**

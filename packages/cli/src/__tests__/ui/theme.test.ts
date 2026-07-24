@@ -31,10 +31,22 @@ describe('theme', () => {
     it('returns isTTY=false when stdout is not a TTY', () => {
       process.stdout.isTTY = false;
       delete process.env.NO_COLOR;
-      const caps = detectTerminalCapabilities();
-      expect(caps.isTTY).toBe(false);
-      // supportsColor requires isTTY
-      expect(caps.supportsColor).toBe(false);
+      // FORCE_COLOR bypasses the isTTY gate; clear it so this assertion is
+      // environment-stable under agent/CI shells that inject FORCE_COLOR.
+      const origForce = process.env.FORCE_COLOR;
+      delete process.env.FORCE_COLOR;
+      try {
+        const caps = detectTerminalCapabilities();
+        expect(caps.isTTY).toBe(false);
+        // supportsColor requires isTTY when FORCE_COLOR is unset
+        expect(caps.supportsColor).toBe(false);
+      } finally {
+        if (origForce === undefined) {
+          delete process.env.FORCE_COLOR;
+        } else {
+          process.env.FORCE_COLOR = origForce;
+        }
+      }
     });
 
     it('returns isTTY=true when stdout is a TTY', () => {

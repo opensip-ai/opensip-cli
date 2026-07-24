@@ -36,6 +36,20 @@ describe('installInterruptAbortCoordinator', () => {
     coord.dispose();
   });
 
+  it('grace expiry after a single SIGTERM force-exits with 143', async () => {
+    vi.useFakeTimers();
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never);
+    const coord = installInterruptAbortCoordinator({ secondInterruptWindowMs: 50 });
+    process.emit('SIGTERM');
+    expect(coord.signal.aborted).toBe(true);
+    expect(exitSpy).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(exitSpy).toHaveBeenCalledWith(143);
+    exitSpy.mockRestore();
+    coord.dispose();
+    vi.useRealTimers();
+  });
+
   it('cleanup callbacks that throw do not rethrow from the signal handler', () => {
     const coord = installInterruptAbortCoordinator({
       onFirstInterrupt: () => {

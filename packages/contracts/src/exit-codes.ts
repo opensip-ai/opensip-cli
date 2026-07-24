@@ -56,21 +56,24 @@ export function mapExitClassToExitCode(
 /**
  * Canonical mapping from typed `ToolError` to CLI exit codes.
  *
- * Prefers {@link ToolError.definition}.exitClass when present; falls back to
- * the legacy instanceof ladder (Plan 01 removal target).
+ * Typed subclasses own exit codes via the instanceof ladder (ADR-0066) so a
+ * detail subcode on `error.code` cannot demote a ConfigurationError or
+ * PluginIncompatibleError to runtime/fatal. Base `ToolError` and cross-copy
+ * branded shapes use {@link ToolError.definition}.exitClass when present.
  */
 export function mapToolErrorToExitCode(error: ToolError): number {
-  const fromDefinition = error.definition?.exitClass;
-  if (fromDefinition !== undefined) {
-    return mapExitClassToExitCode(fromDefinition);
-  }
-  // Legacy adapter — keep for subclasses that predate definitions
+  // Subclass ladder first — stable for subcodes (CONFIGURATION.GATE.*, PLUGIN.WORKER.*, …).
   if (error instanceof NotFoundError) return EXIT_CODES.CHECK_NOT_FOUND;
   if (error instanceof ConfigurationError) return EXIT_CODES.CONFIGURATION_ERROR;
   if (error instanceof ValidationError) return EXIT_CODES.CONFIGURATION_ERROR;
   if (error instanceof NetworkError) return EXIT_CODES.REPORT_FAILED;
   if (error instanceof PluginIncompatibleError) return EXIT_CODES.PLUGIN_INCOMPATIBLE;
   if (error instanceof TimeoutError) return EXIT_CODES.RUNTIME_ERROR;
+
+  const fromDefinition = error.definition?.exitClass;
+  if (fromDefinition !== undefined) {
+    return mapExitClassToExitCode(fromDefinition);
+  }
   return EXIT_CODES.RUNTIME_ERROR;
 }
 

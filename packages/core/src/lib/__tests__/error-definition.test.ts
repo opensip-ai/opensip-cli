@@ -81,6 +81,20 @@ describe('defineErrorCatalog', () => {
     expect(definitionFromLegacyCode('NOPE_UNKNOWN').code).toBe('CORE.SYSTEM.UNKNOWN_FAILURE');
     expect(MACHINE_CONSUMER_COMPATIBILITY.catalogSchemaVersion).toBe(ERROR_CATALOG_SCHEMA_VERSION);
   });
+
+  it('maps dotted subcodes to family exit classes instead of UNKNOWN_FAILURE', () => {
+    expect(definitionFromLegacyCode('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS').exitClass).toBe(
+      'plugin-incompatible',
+    );
+    expect(definitionFromLegacyCode('CONFIGURATION.RECOVERY_REQUIRED').exitClass).toBe(
+      'configuration',
+    );
+    expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_ACCESS_COMPOSITE').exitClass).toBe('runtime');
+    expect(definitionFromLegacyCode('CAPABILITY.DOMAIN.UNKNOWN').exitClass).toBe('not-found');
+    expect(definitionFromLegacyCode('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH').exitClass).toBe(
+      'configuration',
+    );
+  });
 });
 
 describe('deepFreeze', () => {

@@ -189,7 +189,10 @@ describe('runToolCommandWorker', () => {
     if (msg.kind !== 'error') throw new Error('expected error');
     expect(msg.failureClass).toBe('tool-handler-throw');
     expect(msg.message).toContain('external handler boom');
-    expect(msg.stack).toBeTypeOf('string');
+    // Plan 00: worker wire omits raw stacks; machine failure projection is the
+    // structured operator surface (see errorMessage / toWorkerFailureWire).
+    expect(msg.stack).toBeUndefined();
+    expect(msg.failure ?? msg.message).toBeDefined();
   });
 
   it('maps a thrown ConfigurationError to config-invalid + carries CONFIGURATION_ERROR (exit-2 contract survives the worker boundary)', async () => {
