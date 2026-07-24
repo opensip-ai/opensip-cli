@@ -319,6 +319,12 @@ export interface ToolScope extends ScopeContribution {
   /** Cloud signal sink for this run (ADR-0008); `noopSignalSink` unless cloud sync is on. */
   readonly signalSink: SignalSink;
   /**
+   * Host-owned per-invocation cooperative cancel signal (Plan 00). Distinct from
+   * `signalSink` (cloud findings). Aborted on OS interrupt / host cancel.
+   * Optional/additive — no SCOPE_ABI bump required under existing policy.
+   */
+  readonly abortSignal?: AbortSignal;
+  /**
    * The resolved, strict-validated tool configuration for this run (ADR-0023,
    * Phase 4). Seeded by the CLI's pre-action-hook after composing every
    * registered tool's contributed schema and validating the config document;

@@ -36,6 +36,31 @@ export interface RunWithTimeoutOptions<R> {
   readonly timeoutMs: number;
   /** Optional retry (fitness); omitted ⇒ the run executes exactly once. */
   readonly retry?: PipelineRetryOptions;
+  /**
+   * Parent cancel signal (Plan 00). Composed with the timeout controller so
+   * OS interrupt / outer deadline aborts unit work without leaking listeners.
+   */
+  readonly parentSignal?: AbortSignal;
+}
+
+/**
+ * Compose a child AbortController that aborts when either parent or timeout fires.
+ * Returns cleanup to remove the parent listener.
+ */
+export function composeAbortSignals(
+  parent: AbortSignal | undefined,
+  child: AbortController,
+): () => void {
+  if (!parent) return () => undefined;
+  if (parent.aborted) {
+    child.abort(parent.reason);
+    return () => undefined;
+  }
+  const onAbort = () => {
+    child.abort(parent.reason);
+  };
+  parent.addEventListener('abort', onAbort, { once: true });
+  return () => parent.removeEventListener('abort', onAbort);
 }
 
 /**
@@ -49,6 +74,7 @@ export async function runWithTimeout<R>(
   opts: RunWithTimeoutOptions<R>,
 ): Promise<UnitRunOutcome<R>> {
   const controller = new AbortController();
+  const detachParent = composeAbortSignals(opts.parentSignal, controller);
   const startTime = Date.now();
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
@@ -57,18 +83,39 @@ export async function runWithTimeout<R>(
       clearTimeout(timeoutId);
       timeoutId = undefined;
     }
+    detachParent();
     return Date.now() - startTime;
   };
+
+  // Parent already aborted → cancelled-as-error (distinct from unit timeout).
+  if (opts.parentSignal?.aborted) {
+    const durationMs = finish();
+    return {
+      status: 'error',
+      error: opts.parentSignal.reason ?? new Error('Parent signal aborted'),
+      durationMs,
+    };
+  }
 
   // Execute the domain work (retry or direct) and always classify to an outcome.
   // This promise may never settle if the callee ignores the abort signal.
   const workPromise = (async (): Promise<UnitRunOutcome<R>> => {
     try {
       if (opts.retry) {
-        const retry = await runWithRetry(() => opts.run(controller.signal), opts.retry);
+        const retry = await runWithRetry(() => opts.run(controller.signal), {
+          ...opts.retry,
+          signal: controller.signal,
+        });
         const durationMs = finish();
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted && !opts.parentSignal?.aborted) {
           return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
+        }
+        if (opts.parentSignal?.aborted) {
+          return {
+            status: 'error',
+            error: opts.parentSignal.reason ?? retry.lastError,
+            durationMs,
+          };
         }
         if (retry.result === undefined) {
           return { status: 'error', error: retry.lastError, durationMs };
@@ -80,13 +127,20 @@ export async function runWithTimeout<R>(
       const durationMs = finish();
       // A run that resolved AFTER the timeout fired is reported as a timeout
       // (single-source abort invariant), matching fitness's post-run check.
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted && !opts.parentSignal?.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
+      }
+      if (opts.parentSignal?.aborted) {
+        return {
+          status: 'error',
+          error: opts.parentSignal.reason ?? new Error('Parent signal aborted'),
+          durationMs,
+        };
       }
       return { status: 'ok', result, durationMs };
     } catch (error) {
       const durationMs = finish();
-      if (controller.signal.aborted) {
+      if (controller.signal.aborted && !opts.parentSignal?.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
       }
       return { status: 'error', error, durationMs };
@@ -107,6 +161,7 @@ export async function runWithTimeout<R>(
         timeoutMs: opts.timeoutMs,
       });
     }, opts.timeoutMs);
+    timeoutId.unref?.();
   });
 
   // Race so a non-settling domain cannot hang the scheduler/recipe.

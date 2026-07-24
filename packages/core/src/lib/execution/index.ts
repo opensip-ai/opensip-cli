@@ -7,7 +7,7 @@
 export { scheduleUnits, yieldToEventLoop } from './schedule.js';
 export type { ScheduleUnitsOptions } from './schedule.js';
 
-export { runWithTimeout } from './run-with-timeout.js';
+export { runWithTimeout, composeAbortSignals } from './run-with-timeout.js';
 export type { UnitRunOutcome, RunWithTimeoutOptions } from './run-with-timeout.js';
 
 export { runWithRetry } from './retry.js';

@@ -73,6 +73,11 @@ export interface RunScopeOptions {
    * Never holds live handlers or Commander objects.
    */
   readonly runtimeCommands?: RuntimeCommandInventory;
+  /**
+   * Host-owned per-invocation AbortSignal (Plan 00). Distinct from signalSink.
+   * Optional/additive under SCOPE_ABI non-breaking policy.
+   */
+  readonly abortSignal?: AbortSignal;
 }
 
 /**
@@ -94,6 +99,7 @@ export class RunScope {
   readonly ui: UiContext | undefined;
   readonly runId: string;
   readonly signalSink: SignalSink;
+  readonly abortSignal: AbortSignal | undefined;
   readonly diagnostics: DiagnosticsBus;
   readonly toolManifests: readonly ToolPluginManifest[];
   readonly toolProvenance: readonly ToolProvenance[];
@@ -120,6 +126,7 @@ export class RunScope {
     this.ui = opts.ui;
     this.runId = opts.runId ?? '';
     this.signalSink = opts.signalSink ?? noopSignalSink;
+    this.abortSignal = opts.abortSignal;
     this.diagnostics = new DiagnosticsBus(this.runId);
     this.toolManifests = opts.toolManifests ?? [];
     this.toolProvenance = opts.toolProvenance ?? [];
