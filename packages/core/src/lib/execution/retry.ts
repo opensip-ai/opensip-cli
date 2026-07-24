@@ -11,8 +11,10 @@
  *
  * Distinct from `withRetry` (`lib/retry.ts`), which is the network-oriented
  * throw-on-exhaustion retry for `--report-to`; this one returns an outcome and is
- * the per-unit execution retry.
+ * the per-unit execution retry. Backoff is abort-aware (Plan 00 Phase 4).
  */
+
+import { abortableSleep } from '../retry.js';
 
 /** Default per-attempt backoff delays (ms) — fitness's historical `[1000, 2000]`. */
 const DEFAULT_BACKOFF_MS = [1000, 2000] as const;
@@ -25,6 +27,8 @@ export interface PipelineRetryOptions {
   readonly shouldNotRetry?: (error: unknown) => boolean;
   /** Per-attempt backoff delays (ms). Default `[1000, 2000]` (last value repeats). */
   readonly backoffMs?: readonly number[];
+  /** Cancels backoff sleep and stops further attempts. */
+  readonly signal?: AbortSignal;
 }
 
 /** Outcome of a retry-wrapped run. `result === undefined` ⇔ every attempt threw. */
@@ -35,9 +39,13 @@ export interface PipelineRetryOutcome<T> {
   readonly wasRetried: boolean;
 }
 
-function backoff(attempt: number, delays: readonly number[]): Promise<void> {
+async function backoff(
+  attempt: number,
+  delays: readonly number[],
+  signal?: AbortSignal,
+): Promise<void> {
   const delay = delays[attempt] ?? delays.at(-1) ?? 2000;
-  return new Promise((resolve) => setTimeout(resolve, delay));
+  await abortableSleep(delay, signal);
 }
 
 /**
@@ -73,7 +81,24 @@ export async function runWithRetry<T>(
 
     let lastError: unknown = firstError;
     for (let attempt = 0; attempt < options.maxRetries; attempt++) {
-      await backoff(attempt, delays);
+      if (options.signal?.aborted) {
+        return {
+          result: undefined,
+          lastError: options.signal.reason ?? lastError,
+          retryCount: attempt,
+          wasRetried: attempt > 0,
+        };
+      }
+      try {
+        await backoff(attempt, delays, options.signal);
+      } catch (abortError) {
+        return {
+          result: undefined,
+          lastError: abortError,
+          retryCount: attempt,
+          wasRetried: attempt > 0,
+        };
+      }
       try {
         const result = await fn();
         return {

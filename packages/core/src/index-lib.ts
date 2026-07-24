@@ -210,9 +210,15 @@ export { extractPayloadVersion } from './lib/payload-version.js';
 // Lib — bounded-concurrency map/forEach helpers (shared across fit/graph/mcp).
 export { mapWithConcurrency, forEachWithConcurrency } from './lib/map-with-concurrency.js';
 
-// Lib — retry
-export { withRetry } from './lib/retry.js';
-export type { RetryOptions } from './lib/retry.js';
+// Lib — retry (Plan 00 abort-aware canonical primitive)
+export {
+  withRetry,
+  abortableSleep,
+  defaultShouldRetry,
+  createCancelledError,
+  createDeadlineError,
+} from './lib/retry.js';
+export type { RetryOptions, RetryClock, JitterMode } from './lib/retry.js';
 
 // Lib — file lock (state concurrency, ADR-0075). Generic lockfile primitive for
 // datastore-file and artifact-file write serialization.
@@ -294,6 +300,7 @@ export {
   scheduleUnits,
   yieldToEventLoop,
   runWithTimeout,
+  composeAbortSignals,
   runWithRetry,
   executePipeline,
 } from './lib/execution/index.js';

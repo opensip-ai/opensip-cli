@@ -92,4 +92,45 @@ describe('withRetry', () => {
 
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it('aborts during backoff when signal fires', async () => {
+    const controller = new AbortController();
+    const fn = vi.fn().mockRejectedValue(new Error('transient'));
+    const clock = {
+      now: () => 0,
+      random: () => 0,
+      sleep: async (_ms: number, signal?: AbortSignal) => {
+        controller.abort();
+        if (signal?.aborted) throw new Error('aborted-sleep');
+      },
+    };
+
+    await expect(
+      withRetry(fn, {
+        maxAttempts: 5,
+        initialDelayMs: 100,
+        signal: controller.signal,
+        clock,
+        useDefinitionRetry: false,
+      }),
+    ).rejects.toThrow();
+    expect(fn.mock.calls.length).toBeLessThan(5);
+  });
+
+  it('does not retry ToolError with retry:never', async () => {
+    const { ValidationError } = await import('../../lib/errors.js');
+    const fn = vi.fn().mockRejectedValue(new ValidationError('bad'));
+    await expect(withRetry(fn, { maxAttempts: 5, initialDelayMs: 1 })).rejects.toThrow('bad');
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('isolates onRetry throws from the operation', async () => {
+    const onRetry = vi.fn(() => {
+      throw new Error('observer boom');
+    });
+    const fn = vi.fn().mockRejectedValueOnce(new Error('fail')).mockResolvedValue('ok');
+    await expect(
+      withRetry(fn, { maxAttempts: 3, initialDelayMs: 1, onRetry, useDefinitionRetry: false }),
+    ).resolves.toBe('ok');
+  });
 });
