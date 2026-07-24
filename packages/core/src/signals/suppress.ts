@@ -230,6 +230,20 @@ function extractDirectiveId(line: string, directiveKeyword: string): string | nu
  * module's own suppression scan, instead of re-deriving a divergent
  * approximation (only `//`-style stacked directives, no keyword check).
  */
+/**
+ * Text after the first REAL comment opener on `line` (string-aware scan — the
+ * same `findFirstRealCommentOpener` the suppression matcher uses), or `null`
+ * when the line has no comment. Exported so directive-audit reconstructions
+ * (fitness's `appliedDirectives` inventory) recognize exactly the set of
+ * directives this module suppresses with — including trailing comments after
+ * code, which a start-of-line-only parse misses.
+ */
+export function commentTextAfterOpener(line: string): string | null {
+  const openerHit = findFirstRealCommentOpener(line);
+  if (!openerHit) return null;
+  return line.slice(openerHit.index + openerHit.length);
+}
+
 export function isKnownDirectiveLine(line: string): boolean {
   const trimmed = line.trimStart();
   // Support //, /*, #, and <!-- openers (stacked next-line directives).

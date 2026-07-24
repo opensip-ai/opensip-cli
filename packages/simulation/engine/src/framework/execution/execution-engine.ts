@@ -68,20 +68,27 @@ export function validateAssertions(
 /**
  * Update latency metrics with a new sample.
  *
+ * CONTRACT: `metrics.totalRequests` must reflect the count of samples
+ * already folded into `metrics.avgLatencyMs` — i.e. the count BEFORE this
+ * sample. Callers increment `totalRequests` themselves, either before
+ * calling (in which case pass the pre-increment count) or, more commonly,
+ * after this call returns.
+ *
  * WARNING: Percentile values (p50, p95, p99) are rough estimates derived from
  * the running average. For accurate percentiles, use LatencyTracker instead.
  * This function is intended for quick in-loop metric updates where
  * maintaining a full sample set is impractical.
  */
 export function updateLatencyMetrics(metrics: SimulationMetrics, latency: number): void {
-  const n = metrics.totalRequests;
-  if (n === 0) {
+  const priorCount = metrics.totalRequests;
+  if (priorCount === 0) {
     metrics.avgLatencyMs = latency;
     metrics.p50LatencyMs = latency;
     metrics.p95LatencyMs = latency;
     metrics.p99LatencyMs = latency;
   } else {
-    metrics.avgLatencyMs = (metrics.avgLatencyMs * (n - 1) + latency) / n;
+    metrics.avgLatencyMs =
+      (metrics.avgLatencyMs * priorCount + latency) / (priorCount + 1);
     // Rough estimates — use LatencyTracker.getLatencySnapshot() for real percentiles
     metrics.p50LatencyMs = metrics.avgLatencyMs * 0.9;
     metrics.p95LatencyMs = metrics.avgLatencyMs * 1.5;

@@ -77,6 +77,7 @@ export type { SignalSink, EmitResult } from './signals/signal-sink.js';
 export { noopSignalSink } from './signals/signal-sink.js';
 // Inline suppression primitive (ADR-0014) — shared `@x-ignore-*` machinery
 export {
+  commentTextAfterOpener,
   filterSignalsBySuppressions,
   scanSuppressionDirectives,
   isKnownDirectiveLine,

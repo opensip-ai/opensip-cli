@@ -141,6 +141,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'capabilityDiscoveryToCliDiagnostic',
   'clearCurrentRecipeUnitConfig',
   'clearParseCache',
+  'commentTextAfterOpener',
   'compareByCodePoint',
   'configureLogger',
   'createRunLogger',

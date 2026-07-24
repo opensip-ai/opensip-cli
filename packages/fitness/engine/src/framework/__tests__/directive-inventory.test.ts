@@ -31,6 +31,38 @@ describe('parseDirectiveLine', () => {
     });
   });
 
+  describe('suppression-parser parity — trailing and tab-separated directives', () => {
+    it('parses a trailing directive after code (the suppressor honours these)', () => {
+      const result = parseDirectiveLine(
+        'console.log(x); // @fitness-ignore-next-line no-console-log',
+      );
+      expect(result).toEqual({
+        type: 'next-line',
+        checkId: 'no-console-log',
+        reason: null,
+      });
+    });
+
+    it('does not treat an opener inside a string literal as a comment', () => {
+      expect(
+        parseDirectiveLine('const url = "http://x// @fitness-ignore-next-line no-console-log";'),
+      ).toBeNull();
+    });
+
+    it('parses a tab-separated keyword (the suppressor accepts space or tab)', () => {
+      const result = parseDirectiveLine('// @fitness-ignore-file\tno-console-log');
+      expect(result).toEqual({
+        type: 'file',
+        checkId: 'no-console-log',
+        reason: null,
+      });
+    });
+
+    it('rejects a checkId containing a tab', () => {
+      expect(parseDirectiveLine('// @fitness-ignore-file bad\tid')).toBeNull();
+    });
+  });
+
   describe('block comments (/* form) — parity with suppression parser', () => {
     it('parses single-line block directive with reason', () => {
       const result = parseDirectiveLine('/* @fitness-ignore-file no-console-log -- legacy file */');

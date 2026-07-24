@@ -104,6 +104,7 @@ const EXPORT_ALLOWLIST = {
   resolveFailOnDegraded: 'shared-data-contracts',
   resolveVerdictPolicy: 'shared-data-contracts',
   isKnownDirectiveLine: 'shared-data-contracts',
+  commentTextAfterOpener: 'shared-data-contracts',
   MAX_DIRECTIVE_SKIP: 'shared-data-contracts',
   scanSuppressionDirectives: 'shared-data-contracts',
   stampFingerprints: 'shared-data-contracts',

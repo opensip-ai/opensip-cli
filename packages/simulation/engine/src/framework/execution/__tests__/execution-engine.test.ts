@@ -114,13 +114,26 @@ describe('updateLatencyMetrics', () => {
   it('updates the running average on subsequent samples', () => {
     const m: SimulationMetrics = {
       ...createEmptyMetrics(),
+      // `totalRequests` is the count BEFORE this sample (one prior sample
+      // already folded into avgLatencyMs=100); the running average of two
+      // samples (100, 200) is 150.
       totalRequests: 1,
       avgLatencyMs: 100,
     };
-    // After: n=1, avg becomes (100*0 + sample)/1 — but the function expects
-    // `metrics.totalRequests` to be the count BEFORE incrementing.
     updateLatencyMetrics(m, 200);
-    expect(m.avgLatencyMs).toBe(200);
+    expect(m.avgLatencyMs).toBe(150);
+  });
+
+  it('folds a new sample into a multi-sample running average', () => {
+    const m: SimulationMetrics = {
+      ...createEmptyMetrics(),
+      // Three prior samples averaging 90; a fourth sample of 210 should
+      // bring the average to (90*3 + 210) / 4 = 120.
+      totalRequests: 3,
+      avgLatencyMs: 90,
+    };
+    updateLatencyMetrics(m, 210);
+    expect(m.avgLatencyMs).toBe(120);
   });
 
   it('approximates percentiles as multiples of the average for n>=1', () => {

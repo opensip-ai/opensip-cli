@@ -283,6 +283,48 @@ describe('defineSimulationRecipe', () => {
       }),
     ).toThrow(/missing required `execution`/);
   });
+
+  it('rejects execution.timeout: 0 rather than silently treating it as unlimited', () => {
+    // A timeout of 0 reaches `runWithTimeout` as `setTimeout(fn, 0)`, which
+    // aborts the scenario before it can run at all. "Omit the field" is the
+    // documented way to request no timeout, so 0 must be a validation error,
+    // not a reinterpretation.
+    expect(() =>
+      defineSimulationRecipe({
+        id: 'URCP_test',
+        name: 'test',
+        displayName: 'Test',
+        description: 'x',
+        scenarios: { type: 'all' },
+        execution: { mode: 'parallel', timeout: 0 },
+      }),
+    ).toThrow(/execution\.timeout must be a positive finite number/);
+  });
+
+  it('rejects a negative execution.timeout', () => {
+    expect(() =>
+      defineSimulationRecipe({
+        id: 'URCP_test',
+        name: 'test',
+        displayName: 'Test',
+        description: 'x',
+        scenarios: { type: 'all' },
+        execution: { mode: 'parallel', timeout: -1 },
+      }),
+    ).toThrow(/execution\.timeout must be a positive finite number/);
+  });
+
+  it('accepts a positive execution.timeout', () => {
+    const recipe = defineSimulationRecipe({
+      id: 'URCP_test',
+      name: 'test',
+      displayName: 'Test',
+      description: 'x',
+      scenarios: { type: 'all' },
+      execution: { mode: 'parallel', timeout: 1000 },
+    });
+    expect(recipe.execution.timeout).toBe(1000);
+  });
 });
 
 // =============================================================================

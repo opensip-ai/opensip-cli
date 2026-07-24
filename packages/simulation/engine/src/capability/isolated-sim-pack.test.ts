@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isolatedSimPackBridge } from './isolated-sim-pack.js';
+import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
 
 import type { CapabilityHostBridgeContext, CapabilityWorkerBridgeContext } from '@opensip-cli/core';
 
@@ -142,5 +143,55 @@ describe('isolatedSimPackBridge', () => {
       { kind: 'simulation.discover' },
       { kind: 'simulation.run', scenarioId: 'fixture-scenario' },
     ]);
+  });
+
+  it('rejects the proxy run immediately when the signal is already aborted', async () => {
+    const invoke = async (): Promise<unknown> => {
+      // Should never be called — an already-aborted signal must short-circuit
+      // before the RPC is even issued.
+      throw new Error('invoke should not run when pre-aborted');
+    };
+    const contributions = await isolatedSimPackBridge.createHostContributions(
+      hostContext(async (request) => {
+        if ((request as { kind?: unknown }).kind === 'simulation.discover') {
+          return await isolatedSimPackBridge.runInWorker(workerContext(request));
+        }
+        return invoke();
+      }),
+    );
+
+    const scenario = contributions[0]?.contribution as {
+      run: (signal: AbortSignal) => Promise<unknown>;
+    };
+    const ac = new AbortController();
+    ac.abort();
+    await expect(scenario.run(ac.signal)).rejects.toThrow(ScenarioAbortedError);
+  });
+
+  it('rejects the proxy run promptly when the signal aborts mid-flight, without waiting on the RPC', async () => {
+    // The RPC promise never resolves on its own (simulating a worker that
+    // never hears about the host abort — the bridge has no cancellation
+    // channel today). Without the fix, `run()` would hang forever.
+    let rpcRejectFromDiscover = false;
+    const contributions = await isolatedSimPackBridge.createHostContributions(
+      hostContext(async (request) => {
+        if ((request as { kind?: unknown }).kind === 'simulation.discover') {
+          rpcRejectFromDiscover = true;
+          return await isolatedSimPackBridge.runInWorker(workerContext(request));
+        }
+        // Never resolves/rejects — simulates a worker RPC hanging forever.
+        return new Promise(() => {});
+      }),
+    );
+    expect(rpcRejectFromDiscover).toBe(true);
+
+    const scenario = contributions[0]?.contribution as {
+      run: (signal: AbortSignal) => Promise<unknown>;
+    };
+    const ac = new AbortController();
+    const runPromise = scenario.run(ac.signal);
+    queueMicrotask(() => ac.abort());
+
+    await expect(runPromise).rejects.toThrow(ScenarioAbortedError);
   });
 });

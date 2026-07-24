@@ -6,6 +6,8 @@ import {
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
 
+import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
+
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
 import type { ScenarioExecutorResult } from '../framework/scenario-executor-result.js';
 
@@ -59,17 +61,56 @@ function descriptorFromScenario(scenario: RunnableScenario): SimScenarioDescript
   };
 }
 
+/**
+ * Invoke the worker-hosted scenario, racing it against the host abort
+ * signal so the caller is never left hanging.
+ *
+ * NOTE: `CapabilityHostBridgeContext.invoke` (the bridge RPC surface, see
+ * `@opensip-cli/core`'s `tools/capability.ts`) takes a bare `request:
+ * unknown` with no cancellation channel — there is no way to forward an
+ * abort into the in-flight worker call. So this can only reject the HOST
+ * side promptly; the worker keeps executing the scenario to completion (or
+ * its own internal timeout) with no signal that the host gave up. True
+ * worker-side cancellation requires the bridge contract itself to grow an
+ * abort parameter on `invoke` and thread it through the worker RPC.
+ */
+function runProxiedScenario(
+  descriptor: SimScenarioDescriptor,
+  invoke: (request: unknown) => Promise<unknown>,
+  abortSignal: AbortSignal,
+): Promise<ScenarioExecutorResult> {
+  if (abortSignal.aborted) {
+    return Promise.reject(new ScenarioAbortedError(descriptor.id));
+  }
+
+  return new Promise<ScenarioExecutorResult>((resolve, reject) => {
+    const onAbort = (): void => {
+      reject(new ScenarioAbortedError(descriptor.id));
+    };
+    abortSignal.addEventListener('abort', onAbort, { once: true });
+
+    invoke({
+      kind: 'simulation.run',
+      scenarioId: descriptor.id,
+    } satisfies SimRunRequest)
+      .then((result) => resolve(result as ScenarioExecutorResult))
+      .catch((error: unknown) => {
+        reject(error instanceof Error ? error : new Error(String(error)));
+      })
+      .finally(() => {
+        abortSignal.removeEventListener('abort', onAbort);
+      });
+  });
+}
+
 function createProxyScenario(
   descriptor: SimScenarioDescriptor,
   invoke: (request: unknown) => Promise<unknown>,
 ): RunnableScenario {
   return {
     ...descriptor,
-    run: async (_abortSignal: AbortSignal): Promise<ScenarioExecutorResult> =>
-      (await invoke({
-        kind: 'simulation.run',
-        scenarioId: descriptor.id,
-      } satisfies SimRunRequest)) as ScenarioExecutorResult,
+    run: (abortSignal: AbortSignal): Promise<ScenarioExecutorResult> =>
+      runProxiedScenario(descriptor, invoke, abortSignal),
   };
 }
 

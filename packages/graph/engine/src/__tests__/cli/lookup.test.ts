@@ -114,6 +114,35 @@ describe('graph lookup', () => {
     );
   });
 
+  // Regression: `catalog.functions` is a plain object deserialized from
+  // persisted JSON, so a bare `catalog.functions[name]` lookup for an
+  // Object.prototype member name resolves the inherited value instead of
+  // `undefined` — e.g. 'constructor' resolves to the `Object` function,
+  // which then fails `.map`/iteration downstream with a confusing
+  // SystemError instead of a clean "No function named 'constructor'".
+  it.each(['constructor', '__proto__', 'toString', 'hasOwnProperty'])(
+    "exits SUCCESS with a 'not found' message for the Object.prototype member name %s",
+    (name) => {
+      new CatalogRepo(datastore).replaceAll(makeCatalog([]));
+      const cli = mockCli(datastore);
+      const result = executeLookup({ name }, cli.cli);
+      expect(cli.setExitCode).toHaveBeenCalledWith(0);
+      expect(result).toMatchObject({ type: 'graph-status' });
+      expect((result as { lines: readonly string[] }).lines.join('\n')).toContain(
+        `No function named '${name}'`,
+      );
+    },
+  );
+
+  it("returns an empty matches array (not a crash) for --json lookup of 'constructor'", () => {
+    new CatalogRepo(datastore).replaceAll(makeCatalog([]));
+    const cli = mockCli(datastore);
+    const result = executeLookup({ name: 'constructor', json: true }, cli.cli);
+    expect(result).toMatchObject({ type: 'graph-lookup', name: 'constructor' });
+    if (result?.type !== 'graph-lookup') throw new Error('expected graph-lookup result');
+    expect(result.matches).toEqual([]);
+  });
+
   it('throws a typed configuration error when the catalog is missing', () => {
     const cli = mockCli(datastore);
     expect(() => executeLookup({ name: 'anything' }, cli.cli)).toThrow(ConfigurationError);

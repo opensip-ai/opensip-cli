@@ -79,6 +79,13 @@ export function executeLookup(opts: LookupCommandOptions, cli: ToolCliContext): 
 }
 
 function collectMatches(catalog: Catalog, name: string): readonly FunctionOccurrence[] {
+  // `catalog.functions` is a plain object deserialized from persisted JSON
+  // (prototype chain intact), so a bare `catalog.functions[name]` lookup for
+  // a name like 'constructor' or '__proto__' resolves an inherited
+  // Object.prototype member instead of returning undefined — surfacing a
+  // confusing downstream crash instead of "No function named '<name>'".
+  // Object.hasOwn guards every dynamic lookup against that.
+  if (!Object.hasOwn(catalog.functions, name)) return [];
   const bucket = catalog.functions[name];
   return bucket ?? [];
 }

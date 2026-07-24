@@ -16,6 +16,7 @@ import {
   classifyCatalog,
   computeFilesFingerprint,
   diffFingerprints,
+  parseFilesFingerprint,
 } from '../../cache/invalidate.js';
 
 import type { Catalog } from '../../types.js';
@@ -253,35 +254,83 @@ describe('classifyCatalog (Wave 4)', () => {
 });
 
 describe('diffFingerprints', () => {
+  // Lines mirror computeFilesFingerprint's real shape:
+  // `${path}|${mtimeNs}|${ctimeNs}|${size}` — three trailing numeric fields.
   it('returns the changed file when one of several has a new mtime', () => {
     const a = '/x/a.ts';
     const b = '/x/b.ts';
     const c = '/x/c.ts';
-    const cached = `3\n${a}|100|10\n${b}|200|20\n${c}|300|30`;
-    const current = `3\n${a}|100|10\n${b}|999|20\n${c}|300|30`;
+    const cached = `3\n${a}|100|10|1\n${b}|200|20|1\n${c}|300|30|1`;
+    const current = `3\n${a}|100|10|1\n${b}|999|20|1\n${c}|300|30|1`;
     expect(diffFingerprints(cached, current)).toEqual([b]);
   });
 
   it('flags an added file', () => {
-    const cached = `1\n/x/a.ts|100|10`;
-    const current = `2\n/x/a.ts|100|10\n/x/new.ts|500|50`;
+    const cached = `1\n/x/a.ts|100|10|1`;
+    const current = `2\n/x/a.ts|100|10|1\n/x/new.ts|500|50|1`;
     expect(diffFingerprints(cached, current)).toEqual(['/x/new.ts']);
   });
 
   it('flags a removed file', () => {
-    const cached = `2\n/x/a.ts|100|10\n/x/gone.ts|400|40`;
-    const current = `1\n/x/a.ts|100|10`;
+    const cached = `2\n/x/a.ts|100|10|1\n/x/gone.ts|400|40|1`;
+    const current = `1\n/x/a.ts|100|10|1`;
     expect(diffFingerprints(cached, current)).toEqual(['/x/gone.ts']);
   });
 
   it('returns empty for identical fingerprints', () => {
-    const fp = `2\n/x/a.ts|100|10\n/x/b.ts|200|20`;
+    const fp = `2\n/x/a.ts|100|10|1\n/x/b.ts|200|20|1`;
     expect(diffFingerprints(fp, fp)).toEqual([]);
   });
 
   it('returns paths sorted lexicographically when multiple files change', () => {
-    const cached = `2\n/x/zebra.ts|100|10\n/x/apple.ts|200|20`;
-    const current = `2\n/x/zebra.ts|999|10\n/x/apple.ts|999|20`;
+    const cached = `2\n/x/zebra.ts|100|10|1\n/x/apple.ts|200|20|1`;
+    const current = `2\n/x/zebra.ts|999|10|1\n/x/apple.ts|999|20|1`;
     expect(diffFingerprints(cached, current)).toEqual(['/x/apple.ts', '/x/zebra.ts']);
+  });
+
+  // Regression: a path containing '|' used to be truncated at the FIRST '|'
+  // (path/mark boundary picked by `line.indexOf('|')`), so the file's real
+  // identity collapsed to a prefix and its edits silently stopped
+  // invalidating the cache. The parser now walks in from the END of the
+  // line (the three trailing fields are always numeric), so the path may
+  // itself contain '|'.
+  it('detects a change to a file whose path contains a pipe character', () => {
+    const weird = '/x/weird|name.ts';
+    const cached = `1\n${weird}|100|10|1`;
+    const current = `1\n${weird}|999|10|1`;
+    expect(diffFingerprints(cached, current)).toEqual([weird]);
+  });
+
+  it('does not confuse two distinct pipe-bearing paths with a shared prefix', () => {
+    const first = '/x/a|one.ts';
+    const second = '/x/a|two.ts';
+    const cached = `2\n${first}|100|10|1\n${second}|200|20|1`;
+    const current = `2\n${first}|999|10|1\n${second}|200|20|1`;
+    expect(diffFingerprints(cached, current)).toEqual([first]);
+  });
+});
+
+describe('parseFilesFingerprint', () => {
+  it('preserves a path containing pipe characters as the map key', () => {
+    const weird = '/x/weird|name.ts';
+    const parsed = parseFilesFingerprint(`1\n${weird}|100|10|1`);
+    expect([...parsed.keys()]).toEqual([weird]);
+    expect(parsed.get(weird)).toBe('100|10|1');
+  });
+
+  it('preserves a pipe-bearing path in the `missing` branch', () => {
+    const weird = '/x/weird|name.ts';
+    const parsed = parseFilesFingerprint(`1\n${weird}|missing`);
+    expect([...parsed.keys()]).toEqual([weird]);
+    expect(parsed.get(weird)).toBe('missing');
+  });
+
+  it('round-trips a real computeFilesFingerprint line for a pipe-bearing path', () => {
+    // computeFilesFingerprint stats the path; a nonexistent pipe-bearing path
+    // exercises the real `missing` branch end-to-end.
+    const weird = '/definitely/does/not|exist.ts';
+    const fp = computeFilesFingerprint([weird]);
+    const parsed = parseFilesFingerprint(fp);
+    expect(parsed.get(weird)).toBe('missing');
   });
 });

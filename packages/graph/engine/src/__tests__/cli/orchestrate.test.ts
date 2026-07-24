@@ -524,6 +524,13 @@ describe('runGraph — incremental rebuild path', () => {
       // tests (`graph-catalog-drift`); here we just want to drive the
       // 'incremental' verdict branch in obtainCatalog.
       expect(result.cacheHit).toBe(false);
+      // Regression: the incremental rebuild is documented (and tested
+      // elsewhere) as byte-identical to a full rebuild, so it must be
+      // stamped 'complete' — not 'partial' — or every downstream consumer
+      // (impact analysis, MCP context) forces an unnecessary full rebuild
+      // on the very next call. See catalog-builder.ts's incremental
+      // correctness note.
+      expect(result.catalog?.buildCoverage?.status).toBe('complete');
     });
   });
 });

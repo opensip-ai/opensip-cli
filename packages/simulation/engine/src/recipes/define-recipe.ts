@@ -73,10 +73,14 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
 
   if (
     exec.timeout !== undefined &&
-    (!Number.isFinite(exec.timeout) || (exec.timeout as number) < 0)
+    (!Number.isFinite(exec.timeout) || (exec.timeout as number) <= 0)
   ) {
+    // A `timeout` of 0 is rejected rather than reinterpreted as "unlimited" —
+    // it would otherwise reach `runWithTimeout` as `setTimeout(fn, 0)`, which
+    // aborts the scenario before it ever gets to run. "Omit the field" is the
+    // documented way to request no timeout (see NO_TIMEOUT_MS in service.ts).
     throw new ValidationError(
-      `SimulationRecipe '${config.name}' execution.timeout must be a non-negative finite number (or omitted)`,
+      `SimulationRecipe '${config.name}' execution.timeout must be a positive finite number (or omitted for no timeout)`,
       { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_TIMEOUT' },
     );
   }

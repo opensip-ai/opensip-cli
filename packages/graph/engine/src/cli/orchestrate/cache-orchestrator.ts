@@ -122,10 +122,10 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
       // catalog IS the whole/merged catalog, so run the SAME cross-shard linker
       // the sharded engine runs post-merge over its syntactic boundary calls.
       const recovered = recoverExactBoundaryEdges(built, input.discovery.files, input.projectRoot);
-      return { built, recovered, useIncremental };
+      return { built, recovered };
     },
   });
-  const { built, recovered, useIncremental } = stableBuild.value;
+  const { built, recovered } = stableBuild.value;
 
   // Stamp packages (nearest package.json), then drop name-guessed edges that
   // contradict the import graph. Order matters: the constraint reads the
@@ -142,7 +142,16 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
         projectRoot: input.projectRoot,
         files: input.discovery.files,
         parseErrors: built.parseErrors,
-        status: useIncremental ? 'partial' : 'complete',
+        // Wave 4 incremental rebuild is byte-identical to a `--no-cache` full
+        // rebuild (see `buildAndResolveCatalogIncremental`'s correctness note
+        // and docs/public/40-graph/01-stages-and-catalog.md#incremental-rebuild):
+        // every file whose cached edges might point at a stale hash is itself
+        // re-walked, so no cached edge dangles. `catalogBuildCoverage` below
+        // still independently degrades this to 'partial' if it hits a
+        // malformed/unparseable path, so the incremental path isn't hard-coding
+        // false completeness — it's just no longer penalized for being
+        // incremental in the first place.
+        status: 'complete',
       }),
     },
     input.projectRoot,

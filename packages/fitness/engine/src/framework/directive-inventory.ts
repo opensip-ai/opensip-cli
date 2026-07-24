@@ -3,7 +3,7 @@
  * fitness-ignore directives.
  */
 
-import { stripCommentOpener } from './comment-openers.js';
+import { commentTextAfterOpener } from './comment-openers.js';
 
 // =============================================================================
 // Types
@@ -45,31 +45,31 @@ const WEAK_REASON_PATTERNS = Object.freeze<readonly RegExp[]>([
 /**
  * Parse a file-level or next-line directive from a comment line.
  *
- * Accepts every comment opener the suppression parser supports
- * (`//`, `/*`, `<!--`, `#`) — sourced from the shared COMMENT_OPENERS
- * table so the inventory and the suppressor stay in sync. Previously
- * the inventory only recognized `// ` and `/* `, so block-comment
- * directives suppressed findings but vanished from inventory counts.
+ * Must recognize exactly what the suppression matcher honours, or a directive
+ * suppresses findings while vanishing from the `appliedDirectives` audit.
+ * That means: the same string-aware anywhere-in-line comment scan the
+ * suppressor uses (`commentTextAfterOpener` — trailing comments after code
+ * count), and the same keyword separator rule (space OR tab).
  */
 export function parseDirectiveLine(line: string): {
   type: 'file' | 'next-line';
   checkId: string;
   reason: string | null;
 } | null {
-  const trimmed = line.trimStart();
-  const stripped = stripCommentOpener(trimmed);
-  if (stripped === null) return null;
+  const commentText = commentTextAfterOpener(line);
+  if (commentText === null) return null;
 
-  const afterComment = stripped.trimStart();
+  const afterComment = commentText.trimStart();
 
-  if (afterComment.startsWith('@fitness-ignore-file ')) {
-    const rest = afterComment.slice('@fitness-ignore-file '.length);
-    return parseDirectiveRest(rest, 'file');
-  }
-
-  if (afterComment.startsWith('@fitness-ignore-next-line ')) {
-    const rest = afterComment.slice('@fitness-ignore-next-line '.length);
-    return parseDirectiveRest(rest, 'next-line');
+  for (const [keyword, type] of [
+    ['@fitness-ignore-file', 'file'],
+    ['@fitness-ignore-next-line', 'next-line'],
+  ] as const) {
+    if (!afterComment.startsWith(keyword)) continue;
+    const separator = afterComment[keyword.length];
+    // Mirror the suppressor's separator rule: space or tab after the keyword.
+    if (separator !== ' ' && separator !== '\t') return null;
+    return parseDirectiveRest(afterComment.slice(keyword.length + 1), type);
   }
 
   return null;
@@ -91,14 +91,14 @@ function parseDirectiveRest(
 
   if (separatorIndex === -1) {
     const checkId = normalized.trim();
-    if (!checkId || checkId.includes(' ')) return null;
+    if (!checkId || /\s/.test(checkId)) return null;
     return { type, checkId, reason: null };
   }
 
   const checkId = normalized.slice(0, separatorIndex).trim();
   const reason = normalized.slice(separatorIndex + 4).trim();
 
-  if (!checkId || checkId.includes(' ')) return null;
+  if (!checkId || /\s/.test(checkId)) return null;
   return { type, checkId, reason: reason || null };
 }
 

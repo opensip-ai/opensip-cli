@@ -156,11 +156,33 @@ export function parseFilesFingerprint(fingerprint: string): ReadonlyMap<string, 
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (typeof line !== 'string' || line.length === 0) continue;
-    const firstPipe = line.indexOf('|');
-    if (firstPipe <= 0) continue;
-    const path = line.slice(0, firstPipe);
-    const mark = line.slice(firstPipe + 1);
-    out.set(path, mark);
+    const parsed = splitFingerprintLine(line);
+    if (!parsed) continue;
+    out.set(parsed.path, parsed.mark);
   }
   return out;
+}
+
+/**
+ * Split one `computeFilesFingerprint` line into its path and stat-mark.
+ * Lines are built as `${path}|${mtimeNs}|${ctimeNs}|${size}` (three trailing
+ * numeric fields) or `${path}|missing`. The path itself is an absolute
+ * filesystem path and MAY contain '|', so the split walks in from the END of
+ * the line — never trust the first '|' as the path/mark boundary, or a
+ * pipe-bearing path gets truncated and its edits silently stop invalidating
+ * the cache.
+ */
+function splitFingerprintLine(
+  line: string,
+): { readonly path: string; readonly mark: string } | undefined {
+  const lastPipe = line.lastIndexOf('|');
+  if (lastPipe <= 0) return undefined;
+  if (line.slice(lastPipe + 1) === 'missing') {
+    return { path: line.slice(0, lastPipe), mark: 'missing' };
+  }
+  const secondPipe = line.lastIndexOf('|', lastPipe - 1);
+  if (secondPipe <= 0) return undefined;
+  const thirdPipe = line.lastIndexOf('|', secondPipe - 1);
+  if (thirdPipe <= 0) return undefined;
+  return { path: line.slice(0, thirdPipe), mark: line.slice(thirdPipe + 1) };
 }

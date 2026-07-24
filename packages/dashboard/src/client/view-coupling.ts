@@ -22,14 +22,13 @@
  */
 
 import { el } from './el.js';
-import { passesFilter } from './filters.js';
 import { closeFunctionCard, getOrCreateOverlay } from './function-card.js';
 import { makeSectionHeading } from './function-row.js';
 import { resolveCalleeOcc } from './indexes.js';
 import { displayName, packageIdentityOf } from './path-utils.js';
 import { views } from './views-registry.js';
 
-import type { FilterStateLike, IndexesLike, OccLike } from './code-paths-types.js';
+import type { IndexesLike, OccLike } from './code-paths-types.js';
 
 /** A directed coupling edge row from the engine-emitted `edge` feature. */
 interface CouplingEdge {
@@ -65,7 +64,11 @@ views.push({
       },
     ],
   },
-  render(container, catalog, indexes, filterState) {
+  render(container, catalog, indexes) {
+    // The shared Explore filterState is intentionally NOT consulted here — the
+    // matrix is the WHOLE-GRAPH unfiltered count (see the module doc comment)
+    // and the drilldown below enumerates that same unfiltered population, so
+    // a non-empty cell can never resolve to "No call sites found".
     while (container.firstChild) container.firstChild.remove();
     if (!catalog?.functions) {
       container.append(el('div', { class: 'empty', text: 'No catalog loaded.' }));

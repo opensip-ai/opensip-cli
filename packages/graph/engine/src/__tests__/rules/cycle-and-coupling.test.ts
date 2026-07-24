@@ -263,6 +263,67 @@ describe('graph:unexpected-coupling package cycles', () => {
   it('returns [] when the feature table is absent', () => {
     expect(unexpectedCouplingRule.evaluate(catalog, indexes, {})).toEqual([]);
   });
+
+  it('anchors on the lowest-qualifiedName module-init occurrence, independent of iteration order', () => {
+    // Two module-init occurrences of pkg-a (e.g. two entry files in the same
+    // package) plus one of pkg-b. Regardless of which order they're inserted
+    // in — and therefore the order `indexes.byBodyHash` iterates them in —
+    // the anchor must always resolve to the lexicographically-lowest
+    // qualifiedName ('a-entry' < 'z-entry'), never "whichever happened to be
+    // visited first."
+    const zEntry = occ({
+      bodyHash: 'a-init-z',
+      simpleName: '<module-init:z>',
+      qualifiedName: 'z-entry',
+      kind: 'module-init',
+      package: 'pkg-a',
+      filePath: 'packages/a/src/z.ts',
+      line: 9,
+    });
+    const aEntry = occ({
+      bodyHash: 'a-init-a',
+      simpleName: '<module-init:a>',
+      qualifiedName: 'a-entry',
+      kind: 'module-init',
+      package: 'pkg-a',
+      filePath: 'packages/a/src/a.ts',
+      line: 3,
+    });
+    const bEntry = occ({
+      bodyHash: 'b-init',
+      simpleName: '<module-init:b>',
+      qualifiedName: 'b-entry',
+      kind: 'module-init',
+      package: 'pkg-b',
+      filePath: 'packages/b/src/index.ts',
+    });
+    const edges: PackageEdgeFeature[] = [
+      { callerPackage: 'pkg-a', calleePackage: 'pkg-b', count: 1 },
+      { callerPackage: 'pkg-b', calleePackage: 'pkg-a', count: 1 },
+    ];
+    const run = (occs: readonly typeof zEntry[]) =>
+      unexpectedCouplingRule.evaluate(
+        makeCatalog(occs),
+        buildIndexes(makeCatalog(occs)),
+        {},
+        undefined,
+        featureTable({ edge: edges }),
+      );
+
+    const forward = run([zEntry, bEntry, aEntry]);
+    const reversed = run([aEntry, bEntry, zEntry]);
+
+    expect(forward).toHaveLength(1);
+    expect(reversed).toHaveLength(1);
+    expect(forward[0]?.code).toEqual({
+      file: 'packages/a/src/a.ts',
+      line: 3,
+      // occ()'s default column is 0-based 0; createGraphSignal lifts it to
+      // Signal's 1-based contract (ADR-0179).
+      column: 1,
+    });
+    expect(reversed[0]?.code).toEqual(forward[0]?.code);
+  });
 });
 
 describe('graph:cycle ↔ graph:unexpected-coupling non-overlap', () => {
