@@ -6,6 +6,7 @@
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -873,6 +874,36 @@ describe('executeInit (AGENTS.md)', () => {
     ).toBe('updated');
     expect(claude).toContain('Custom guidance.');
     expect(claude).toContain('OpenSIP MCP First');
+  });
+
+  it('proceeds past a symlinked CLAUDE.md without writing through it', async () => {
+    // Symlinked guidance (dotfiles repos, CLAUDE.md → AGENTS.md) used to
+    // abort every init mode; it is now present-but-unmanaged.
+    writeFileSync(join(testDir, 'REAL.md'), '# real instructions\n', 'utf8');
+    symlinkSync('REAL.md', join(testDir, 'CLAUDE.md'));
+
+    const result = await executeInit(makeArgs({ language: ['typescript'] }));
+
+    expect(result.created).toBe(true);
+    const target = result.agentGuidance?.targets.find((t) => t.path.endsWith('CLAUDE.md'));
+    expect(target?.action).toBe('skipped');
+    expect(target?.reason).toBe('symlink');
+    // Never written through: the link and its target are byte-identical.
+    expect(lstatSync(join(testDir, 'CLAUDE.md')).isSymbolicLink()).toBe(true);
+    expect(readFileSync(join(testDir, 'REAL.md'), 'utf8')).toBe('# real instructions\n');
+  });
+
+  it('proceeds past an oversized AGENTS.md without touching it', async () => {
+    const oversized = 'x'.repeat(1024 * 1024 + 16);
+    writeFileSync(join(testDir, 'AGENTS.md'), oversized, 'utf8');
+
+    const result = await executeInit(makeArgs({ language: ['typescript'] }));
+
+    expect(result.created).toBe(true);
+    const target = result.agentGuidance?.targets.find((t) => t.path.endsWith('AGENTS.md'));
+    expect(target?.action).toBe('skipped');
+    expect(target?.reason).toBe('too-large');
+    expect(readFileSync(join(testDir, 'AGENTS.md'), 'utf8')).toBe(oversized);
   });
 });
 

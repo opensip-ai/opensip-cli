@@ -35,7 +35,7 @@ const GUIDANCE_TARGETS: readonly AgentGuidanceTargetSpec[] = [
 
 type ToolScaffoldLayout = Pick<ToolScaffold, 'layout'>;
 
-export type AgentGuidanceReadFailure = 'stat-error' | 'too-large' | 'read-error';
+export type AgentGuidanceReadFailure = 'stat-error' | 'too-large' | 'read-error' | 'symlink';
 
 export type AgentGuidanceTargetSnapshot =
   | {

@@ -57,6 +57,15 @@ export function buildGuidanceSnapshots(
           parent === '.' || (parentRecord?.exists === true && parentRecord.type === 'directory'),
       };
     }
+    if (record.type === 'unmanaged') {
+      // Present but unmanageable (symlink / beyond the managed cap): the
+      // renderer skips it — init proceeds and never writes through the path.
+      return {
+        relativePath: spec.relativePath,
+        status: 'unreadable',
+        reason: record.unmanagedReason === 'symlink' ? 'symlink' : 'too-large',
+      };
+    }
     if (record.type !== 'file') {
       authoredPlanFailure(`${spec.relativePath} must be a file`);
     }
@@ -85,7 +94,10 @@ function validateAbsentRecord(
 }
 
 function validateExistingIdentity(
-  record: Extract<InitAuthoredSnapshotRecord, { readonly exists: true }>,
+  record: Extract<
+    InitAuthoredSnapshotRecord,
+    { readonly exists: true; readonly type: 'file' | 'directory' }
+  >,
 ): void {
   if (
     !isCanonicalAuthoredPathMode(record.mode, record.type) ||
@@ -95,8 +107,19 @@ function validateExistingIdentity(
   }
 }
 
+function validateUnmanagedRecord(
+  record: Extract<InitAuthoredSnapshotRecord, { readonly type: 'unmanaged' }>,
+): void {
+  if (record.mode !== null || record.digest !== null || record.contentBase64 !== null) {
+    authoredPlanFailure(`${record.path} has an invalid unmanaged snapshot`);
+  }
+}
+
 function validateExistingRecord(
-  record: Extract<InitAuthoredSnapshotRecord, { readonly exists: true }>,
+  record: Extract<
+    InitAuthoredSnapshotRecord,
+    { readonly exists: true; readonly type: 'file' | 'directory' }
+  >,
 ): number {
   validateExistingIdentity(record);
   if (record.type === 'directory') {
@@ -116,7 +139,13 @@ function validateExistingRecord(
 }
 
 function validateRecord(record: InitAuthoredSnapshotRecord): number {
-  if (record.exists) return validateExistingRecord(record);
+  if (record.exists) {
+    if (record.type === 'unmanaged') {
+      validateUnmanagedRecord(record);
+      return 0;
+    }
+    return validateExistingRecord(record);
+  }
   validateAbsentRecord(record);
   return 0;
 }

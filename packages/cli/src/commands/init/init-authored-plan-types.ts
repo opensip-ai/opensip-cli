@@ -101,6 +101,23 @@ export type InitAuthoredSnapshotRecord =
       readonly mode: number;
       readonly digest: string;
       readonly contentBase64: string;
+    }
+  | {
+      /**
+       * A guidance target that EXISTS but cannot be managed: a symlink (init
+       * must never write through a link) or a file beyond the managed
+       * guidance cap. Init proceeds; the path gets NO mutation and renders as
+       * a skipped guidance target. Only guidance-spec paths may carry this
+       * arm — {@link stateFromSnapshot} fails closed if one ever reaches
+       * mutation planning.
+       */
+      readonly path: string;
+      readonly exists: true;
+      readonly type: 'unmanaged';
+      readonly mode: null;
+      readonly digest: null;
+      readonly contentBase64: null;
+      readonly unmanagedReason: 'symlink' | 'oversize';
     };
 
 export interface InitAuthoredSnapshot {
@@ -336,6 +353,11 @@ export function sameAuthoredPathState(
 }
 
 export function stateFromSnapshot(record: InitAuthoredSnapshotRecord): InitAuthoredPathState {
+  if (record.type === 'unmanaged') {
+    // Unmanaged guidance never becomes a mutation preimage — planning one
+    // would risk a write through a symlink.
+    authoredPlanFailure(`${record.path} is unmanaged and cannot be planned`);
+  }
   return {
     exists: record.exists,
     type: record.type,

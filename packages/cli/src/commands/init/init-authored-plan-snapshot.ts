@@ -1,6 +1,7 @@
 import { lstatSync, realpathSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
+import { listAgentGuidanceTargetSpecs } from './agent-guidance-renderer.js';
 import { classifyAuthoredPathPosture } from './authored-path-mode.js';
 import {
   inspectExistingSnapshotPath,
@@ -137,6 +138,7 @@ function observeTarget(
   folded: Map<string, string>,
   budget: SnapshotBudget,
   hooks: InitAuthoredSnapshotHooks | undefined,
+  tolerantGuidancePaths: ReadonlySet<string>,
 ): void {
   if (records.has(relativePath)) return;
   const segments = relativePath.split('/');
@@ -176,7 +178,7 @@ function observeTarget(
     addRecord(
       records,
       folded,
-      inspectExistingSnapshotPath(absolutePath, relativePath, budget, hooks),
+      inspectExistingSnapshotPath(absolutePath, relativePath, budget, hooks, tolerantGuidancePaths),
     );
   }
 }
@@ -206,8 +208,13 @@ export function readInitAuthoredSnapshot(
   const targets = [...new Set(input.targetPaths.map(normalizeProjectRelativePath))].sort(
     compareUtf8,
   );
+  // Guidance targets tolerate present-but-unmanageable shapes (symlink /
+  // beyond the managed cap) — they become skipped guidance, never a refusal.
+  const tolerantGuidancePaths = new Set(
+    listAgentGuidanceTargetSpecs().map((spec) => spec.relativePath),
+  );
   for (const target of targets) {
-    observeTarget(root, target, records, folded, budget, input.hooks);
+    observeTarget(root, target, records, folded, budget, input.hooks, tolerantGuidancePaths);
   }
   const rootAfter = lstatSync(root, { bigint: true });
   if (!sameSnapshotStat(rootBefore, rootAfter)) {

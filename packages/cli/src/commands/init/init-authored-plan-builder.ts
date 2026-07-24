@@ -278,7 +278,12 @@ function setGuidanceDesired(
     }
     desired.set(
       target.relativePath,
-      generatedFile(target.content, preimage.exists ? preimage.mode : FILE_MODE),
+      // An unmanaged preimage never reaches here (unreadable targets carry no
+      // content), so the null-mode arm safely falls back to the default.
+      generatedFile(
+        target.content,
+        preimage.exists && preimage.mode !== null ? preimage.mode : FILE_MODE,
+      ),
     );
   }
 }

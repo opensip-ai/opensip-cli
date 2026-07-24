@@ -8,6 +8,7 @@ import {
   readdirSync,
 } from 'node:fs';
 
+import { MAX_AGENT_GUIDANCE_FILE_BYTES } from './agent-guidance-renderer.js';
 import { isSafeAuthoredPathMode, normalizeAuthoredPathMode } from './authored-path-mode.js';
 import {
   INIT_AUTHORED_OPAQUE_DIRECTORY_NAMES,
@@ -249,11 +250,28 @@ function revalidateDirectory(
     authoredPlanFailure(`${relativePath} changed while planning`);
 }
 
+/** The present-but-unmanaged record for a tolerated guidance target. */
+function unmanagedRecord(
+  relativePath: string,
+  reason: 'symlink' | 'oversize',
+): InitAuthoredSnapshotRecord {
+  return {
+    path: relativePath,
+    exists: true,
+    type: 'unmanaged',
+    mode: null,
+    digest: null,
+    contentBase64: null,
+    unmanagedReason: reason,
+  };
+}
+
 export function inspectExistingSnapshotPath(
   absolutePath: string,
   relativePath: string,
   budget: SnapshotBudget,
   hooks: InitAuthoredSnapshotHooks | undefined,
+  tolerantGuidancePaths: ReadonlySet<string> = new Set(),
 ): InitAuthoredSnapshotRecord {
   let stat: BigIntStats;
   try {
@@ -262,8 +280,22 @@ export function inspectExistingSnapshotPath(
     authoredPlanFailure(`could not inspect ${relativePath}`);
   }
   addBudgetEntry(budget);
-  if (stat.isSymbolicLink()) authoredPlanFailure(`${relativePath} is a symbolic link`);
-  if (stat.isFile()) return readStableFile(absolutePath, relativePath, budget, hooks);
+  const tolerant = tolerantGuidancePaths.has(relativePath);
+  if (stat.isSymbolicLink()) {
+    // A symlinked guidance file (CLAUDE.md → dotfiles repo, etc.) is a normal
+    // setup: init must never write THROUGH the link, so the target becomes
+    // present-but-unmanaged instead of failing the whole init.
+    if (tolerant) return unmanagedRecord(relativePath, 'symlink');
+    authoredPlanFailure(`${relativePath} is a symbolic link`);
+  }
+  if (stat.isFile()) {
+    if (tolerant && stat.size > BigInt(MAX_AGENT_GUIDANCE_FILE_BYTES)) {
+      // Beyond the managed guidance cap: leave the customer's file alone
+      // (no read, no budget charge) rather than refusing init.
+      return unmanagedRecord(relativePath, 'oversize');
+    }
+    return readStableFile(absolutePath, relativePath, budget, hooks);
+  }
   if (!stat.isDirectory()) authoredPlanFailure(`${relativePath} has an unsupported file type`);
   validateSafeSnapshotStat(stat, 'directory', relativePath);
   revalidateDirectory(absolutePath, relativePath, stat);
