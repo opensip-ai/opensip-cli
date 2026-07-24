@@ -52,6 +52,11 @@ export interface ToolErrorOptions extends ErrorOptions {
    */
   metadata?: Readonly<Record<string, unknown>>;
   /**
+   * Optional resolved definition for legacy subclass constructors
+   * (`new NotFoundError(msg, { definition, metadata })`).
+   */
+  definition?: ErrorDefinition;
+  /**
    * Legacy open bag — preserved only in {@link ToolError.legacyCompatibility}
    * during migration; never treated as safe metadata. Marked for Plan 01 removal.
    */
@@ -163,7 +168,7 @@ export class ToolError extends Error {
       : String(codeOrMessage ?? options?.code ?? 'SYSTEM_ERROR');
     const definition = fromDefinition
       ? messageOrDefinition
-      : definitionFromLegacyCode(options?.code ?? code);
+      : (options?.definition ?? definitionFromLegacyCode(options?.code ?? code));
 
     super(message, options);
     this.name = 'ToolError';
@@ -176,7 +181,14 @@ export class ToolError extends Error {
         ? options.stderrTail.slice(0, MAX_STDERR_TAIL)
         : undefined;
 
-    const known = new Set(['code', 'failureClass', 'stderrTail', 'metadata', 'cause']);
+    const known = new Set([
+      'code',
+      'failureClass',
+      'stderrTail',
+      'metadata',
+      'cause',
+      'definition',
+    ]);
     /** @type {Record<string, unknown>} */
     const legacy: Record<string, unknown> = {};
     if (options) {

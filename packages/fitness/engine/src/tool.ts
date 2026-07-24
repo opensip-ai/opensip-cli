@@ -52,6 +52,7 @@
 import { defineTool, readPackageVersion } from '@opensip-cli/core';
 
 import { fitnessFingerprintStrategy } from './baseline-strategy.js';
+import { fitnessErrorCatalog } from './errors/fitness-error-catalog.js';
 import {
   fitExportCommandSpec,
   fitListGroupedCommandSpec,
@@ -258,6 +259,7 @@ export const fitnessTool: Tool = defineTool({
     contractVersions: {
       fitness: FITNESS_CONTRACT_VERSION,
     },
+    errorCatalog: fitnessErrorCatalog,
     contributeScope,
     collectReportData: collectFitnessReportData,
     sessionReplay: {

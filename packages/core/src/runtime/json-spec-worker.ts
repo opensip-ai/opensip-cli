@@ -1,8 +1,11 @@
 import { readFileSync } from 'node:fs';
 
-import { getWorkerErrorFailureClass } from './worker-error-failure-class.js';
 import { startWorkerHeartbeat } from './worker-heartbeat.js';
 import { sendWorkerIpcMessage, sendWorkerIpcMessageAndDrain } from './worker-ipc-send.js';
+import {
+  toWorkerFailureWire,
+  WORKER_FAILURE_WIRE_VERSION,
+} from './worker-failure-wire.js';
 
 import type { WorkerMessage } from './progress-transport.js';
 
@@ -26,12 +29,17 @@ function readJsonSpec<TArgs>(specPath: string): TArgs {
 }
 
 function toWorkerErrorMessage<TEvent, TResult>(error: unknown): WorkerMessage<TEvent, TResult> {
-  const failureClass = getWorkerErrorFailureClass(error);
+  const wire = toWorkerFailureWire(error);
   return {
     kind: 'error',
-    message: error instanceof Error ? error.message : String(error),
-    ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
-    ...(failureClass === undefined ? {} : { failureClass }),
+    message: wire.message,
+    // Stack is operator-only: omit from wire (Plan 00). Parent uses failure projection.
+    ...(wire.failureClass === undefined ? {} : { failureClass: wire.failureClass }),
+    ...(wire.code === undefined ? {} : { code: wire.code }),
+    ...(wire.detailCode === undefined ? {} : { detailCode: wire.detailCode }),
+    ...(wire.failure === undefined
+      ? {}
+      : { failure: wire.failure, failureWireVersion: WORKER_FAILURE_WIRE_VERSION }),
   };
 }
 

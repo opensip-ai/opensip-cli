@@ -6,6 +6,7 @@
 
 import { logger, ConfigurationError } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { resolveChecks, validateCheckReferences } from './check-resolution.js';
 
 import type { FitnessRecipe } from './types.js';
@@ -79,6 +80,7 @@ export function resolveAndFilterChecks(
     const requested = missingExplicitChecks[0] ?? recipe.checks.checkIds[0] ?? '(unknown)';
     throw new ConfigurationError(`Unknown check '${requested}'.`, {
       code: 'CONFIG.UNKNOWN_CHECK',
+      definition: fitnessErrorCatalog.require('CONFIG.UNKNOWN_CHECK'),
       metadata: { check: requested },
     });
   }

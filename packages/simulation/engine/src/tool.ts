@@ -24,6 +24,7 @@ import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/co
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { isolatedSimPackBridge } from './capability/isolated-sim-pack.js';
+import { simulationErrorCatalog } from './errors/simulation-error-catalog.js';
 import { collectSimulationReportData } from './cli/report-data.js';
 import { simulationConfigDeclaration } from './cli/sim-config-schema.js';
 import { simRecipesCommandSpec } from './cli/sim-recipes.js';
@@ -377,6 +378,7 @@ export const simulationTool: Tool = defineTool({
     contractVersions: {
       simulation: SIMULATION_CONTRACT_VERSION,
     },
+    errorCatalog: simulationErrorCatalog,
     contributeScope: simulationScope.contributeScope,
     collectReportData: collectSimulationReportData,
     sessionReplay: {

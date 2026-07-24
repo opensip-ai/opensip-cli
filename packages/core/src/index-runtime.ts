@@ -26,6 +26,11 @@ export {
   IpcPayloadTooLargeError,
 } from './runtime/worker-ipc-send.js';
 export { getWorkerErrorFailureClass } from './runtime/worker-error-failure-class.js';
+export {
+  toWorkerFailureWire,
+  WORKER_FAILURE_WIRE_VERSION,
+} from './runtime/worker-failure-wire.js';
+export type { WorkerFailureWire } from './runtime/worker-failure-wire.js';
 export { runJsonSpecWorker } from './runtime/json-spec-worker.js';
 export type { JsonSpecWorkerOptions } from './runtime/json-spec-worker.js';
 export {

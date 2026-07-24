@@ -84,10 +84,12 @@ describe('runJsonSpecWorker', () => {
       expect.objectContaining({
         kind: 'error',
         message: 'worker timed out',
-        stack: expect.stringContaining('worker timed out'),
         failureClass: 'timeout',
+        failureWireVersion: 1,
+        failure: expect.objectContaining({ schemaVersion: 1 }),
       }),
     ]);
+    expect(messages[0]).not.toHaveProperty('stack');
   });
 
   it('omits the failure class when the Error has none', async () => {
@@ -104,9 +106,11 @@ describe('runJsonSpecWorker', () => {
       expect.objectContaining({
         kind: 'error',
         message: 'plain failure',
-        stack: expect.stringContaining('plain failure'),
+        failureWireVersion: 1,
+        failure: expect.objectContaining({ schemaVersion: 1 }),
       }),
     ]);
     expect(messages[0]).not.toHaveProperty('failureClass');
+    expect(messages[0]).not.toHaveProperty('stack');
   });
 });

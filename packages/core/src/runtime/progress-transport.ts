@@ -121,4 +121,12 @@ export type WorkerMessage<TEvent, TResult> =
        * subclass after IPC flattens its prototype.
        */
       readonly detailCode?: string;
+      /**
+       * Versioned machine failure projection (Plan 00). Optional for wire-compat
+       * with older workers; when present, parent reconstructs via normalize path
+       * without message-substring inference.
+       */
+      readonly failure?: Readonly<Record<string, unknown>>;
+      /** Wire schema for `failure` (present when failure is set). */
+      readonly failureWireVersion?: number;
     };

@@ -17,6 +17,7 @@ import {
   runWithScope,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { FileCache } from '../framework/file-cache.js';
 import { type CheckRegistry } from '../framework/registry.js';
 import {
@@ -119,6 +120,7 @@ export class FitnessRecipeService {
     if (this.activeSession) {
       throw new SystemError('Recipe execution already in progress', {
         code: 'SYSTEM.FITNESS.SESSION_IN_PROGRESS',
+        definition: fitnessErrorCatalog.require('SYSTEM.FITNESS.SESSION_IN_PROGRESS'),
       });
     }
 
@@ -128,6 +130,7 @@ export class FitnessRecipeService {
       const identifier = typeof recipeOrName === 'string' ? recipeOrName : recipeOrName.name;
       throw new NotFoundError(`Recipe not found: ${identifier}`, {
         code: 'RESOURCE.NOT_FOUND.RECIPE',
+        definition: fitnessErrorCatalog.require('RESOURCE.NOT_FOUND.RECIPE'),
         metadata: { entity: 'recipe', identifier },
       });
     }
