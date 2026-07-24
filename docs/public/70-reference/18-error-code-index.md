@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **5**
-- Definitions: **21**
+- Definitions: **22**
 
 ## Catalogs
 
@@ -22,7 +22,7 @@ generated: true
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
 | `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 3 |
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 1 |
-| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 2 |
+| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 3 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 
 ## Codes
@@ -36,6 +36,7 @@ generated: true
 | `CORE.SYSTEM.PERMISSION` | `@opensip-cli/core` | infrastructure | environment | permission | never | error | runtime | active | Check filesystem permissions for the affected path. |
 | `CORE.SYSTEM.RESOURCE` | `@opensip-cli/core` | infrastructure | environment | resource | caller-policy | error | runtime | active | Free resources (disk, file descriptors, or memory) and retry. |
 | `EXTERNAL.SCANNER.BINARY_MISSING` | `@opensip-cli/external-tool-adapter` | external | operator | not-found | never | error | configuration | active | Install the scanner binary, add it to PATH, or set the tool binary path config/env pin. |
+| `EXTERNAL.SCANNER.KILLED_BY_SIGNAL` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | The scanner was killed by an external signal (OOM killer, kill -9, container stop). Check system memory and process limits, then retry. |
 | `EXTERNAL.SCANNER.SPAWN_FAILED` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check binary permissions and OS errno; retry after fixing the environment. |
 | `MCP.STDIO.PROTOCOL` | `@opensip-cli/mcp` | application | tool-author | compatibility | never | error | runtime | active | Fix the JSON-RPC request shape and reconnect the MCP client. |
 | `MCP.STDIO.SHUTDOWN` | `@opensip-cli/mcp` | application | user | cancelled | never | error | cancelled | active | MCP server shut down. Restart opensip mcp if more queries are needed. |
