@@ -162,6 +162,12 @@ export const EXPECTED_NON_ZERO_EXIT = new Map([
   ['resilience.symlink-root', new Set([1])],
   ['macos.path-semantics', new Set([1])],
   ['macos.pty-human-view', new Set([1])],
+  // The linux case-sensitivity journey runs `fit --check no-console-log` in two
+  // case-only-distinct project roots; each legitimately exits 1 on the seeded
+  // finding (asserted by the journey). Register both as expected non-zero exits
+  // so the terminal-hygiene check does not read them as abnormal (mirrors
+  // analysis.fit / macos.path-semantics).
+  ['linux.case-sensitivity', new Set([1])],
 ]);
 export const EXPECTED_POSITIVE_EXIT = new Set([
   'extensions.sim-pack',

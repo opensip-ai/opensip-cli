@@ -87,6 +87,7 @@ test('the REAL verifier allowlist is consistent with the shipped profiles', () =
       'macos.permissions',
       'macos.browser-open',
       'macos.contention-recovery',
+      'linux.case-sensitivity',
     ],
   );
   assert.deepEqual(issues, [], `verifier allowlist inconsistent: ${issues.join('; ')}`);
