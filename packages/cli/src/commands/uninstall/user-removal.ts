@@ -241,6 +241,7 @@ const USER_UNINSTALL_MARKER_BASENAME_BYTES = Buffer.from(USER_UNINSTALL_MARKER_B
 const MAX_RECEIPT_TRANSITIONS = 10;
 const MAX_REMOVAL_RECEIPTS = 2;
 
+/** @throws {Error} Always — a resume precondition the recovery path cannot satisfy safely. */
 function recoveryFailure(message: string): never {
   throw new Error(`Cannot recover user uninstall safely: ${message}`);
 }

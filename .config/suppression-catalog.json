@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T11:43:54.824Z",
+  "generatedAt": "2026-07-24T19:10:53.310Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 249,
+        "total": 250,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -52,7 +52,7 @@
           "fastify-schema-coverage": 2,
           "unused-config-options": 13,
           "no-generic-error": 4,
-          "numeric-validation": 11,
+          "numeric-validation": 12,
           "fitness-check-architecture": 4,
           "unsafe-secret-comparison": 8,
           "canonical-result-usage": 3,
@@ -109,7 +109,7 @@
           "dashboard": 1,
           "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
-          "fitness/checks-universal": 101,
+          "fitness/checks-universal": 102,
           "fitness/engine": 12,
           "graph/engine": 12,
           "graph/graph-typescript": 1,
@@ -201,7 +201,7 @@
     },
     "check-package": {
       "fitness": {
-        "total": 170,
+        "total": 171,
         "bySlug": {
           "shipped-checks-must-be-generic": 12,
           "fitness-check-standards": 16,
@@ -214,7 +214,7 @@
           "throws-documentation": 3,
           "unused-config-options": 13,
           "no-generic-error": 4,
-          "numeric-validation": 11,
+          "numeric-validation": 12,
           "fitness-check-architecture": 4,
           "no-hardcoded-timeouts": 7,
           "unsafe-secret-comparison": 5,
@@ -259,7 +259,7 @@
         "byPackage": {
           "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
-          "fitness/checks-universal": 101
+          "fitness/checks-universal": 102
         }
       },
       "graph": {
@@ -466,14 +466,14 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 249,
+    "budgetGateFitness": 250,
     "budgetGateFitnessSlugs": 73,
     "productRuntimeFitness": 77,
     "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
     "productRuntimeCombined": 109,
-    "checkPackageFitness": 170,
+    "checkPackageFitness": 171,
     "testSupportFitness": 2,
     "testsFitness": 62,
     "testsGraph": 34,
@@ -495,8 +495,8 @@
       "productRuntimeFitness": -228,
       "productRuntimeGraph": 25,
       "productRuntimeCombined": -203,
-      "budgetGateFitness": -293,
-      "checkPackageFitness": -64,
+      "budgetGateFitness": -292,
+      "checkPackageFitness": -63,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
     },

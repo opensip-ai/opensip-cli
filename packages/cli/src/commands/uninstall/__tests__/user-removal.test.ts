@@ -444,8 +444,7 @@ describe('executeUserRemoval', () => {
       removeDirectory: (path) => rmdirSync(path),
     });
 
-    // Byte-exact expected path built without Buffer.concat (fixed tiny inputs;
-    // the stream-buffer-size-limits guard targets unbounded stream accumulation).
+    // Byte-exact expected path spread from fixed tiny inputs.
     expect(removedPath).toEqual(
       Buffer.from([...Buffer.from(tombstonePath + sep, 'utf8'), ...invalidName]),
     );
