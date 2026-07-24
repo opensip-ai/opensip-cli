@@ -3,11 +3,18 @@
  * (Plan 06). Combines core error types with contracts exit-code policy.
  */
 
-import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
+import {
+  EXIT_CODES,
+  mapExitClassToExitCode,
+  mapToolErrorToExitCode,
+} from '@opensip-cli/contracts';
 import {
   SystemError,
   ToolError,
   formatCliDiagnosticHuman,
+  normalizeFailure,
+  toMachineFailureProjection,
+  toSafeDiagnosticRecord,
   type CliDiagnostic,
   type DiagnosticsBus,
   type Logger,
@@ -38,40 +45,51 @@ function deriveErrorDefaults(error: unknown): {
   readonly message?: string;
   readonly exitCode: number;
   readonly code?: string;
+  readonly suggestion?: string;
+  readonly failure?: Readonly<Record<string, unknown>>;
 } {
-  if (error instanceof ToolError) {
-    return {
-      message: truncateDerivedMessage(error.message),
-      exitCode: mapToolErrorToExitCode(error),
-      code: error.code,
-    };
-  }
-  if (error instanceof Error) {
-    return {
-      message: truncateDerivedMessage(error.message),
-      exitCode: EXIT_CODES.RUNTIME_ERROR,
-    };
-  }
-  if (error === undefined) {
-    return { exitCode: EXIT_CODES.RUNTIME_ERROR };
-  }
+  // Single normalize path (Plan 00) — definition axes drive exit/code/action.
+  const envelope = normalizeFailure(error);
+  const exitCode =
+    error instanceof ToolError
+      ? mapToolErrorToExitCode(error)
+      : mapExitClassToExitCode(envelope.definition.exitClass);
   return {
-    message: truncateDerivedMessage(stringFromUnknown(error)),
-    exitCode: EXIT_CODES.RUNTIME_ERROR,
+    message: truncateDerivedMessage(envelope.message),
+    exitCode,
+    code: envelope.code,
+    suggestion: envelope.operatorAction,
+    failure: toMachineFailureProjection(envelope),
   };
 }
 
 /** Resolve a {@link ReportFailureDetail} into a plain, effect-ready payload. */
 function applyErrorDefaults(
   detail: ReportFailureDetail,
-  fields: { message?: string; exitCode?: number; code?: string },
-): { message?: string; exitCode?: number; code?: string } {
+  fields: {
+    message?: string;
+    exitCode?: number;
+    code?: string;
+    suggestion?: string;
+    failure?: Readonly<Record<string, unknown>>;
+  },
+): {
+  message?: string;
+  exitCode?: number;
+  code?: string;
+  suggestion?: string;
+  failure?: Readonly<Record<string, unknown>>;
+} {
   if (detail.error === undefined) return fields;
   const derived = deriveErrorDefaults(detail.error);
   return {
+    // Explicit caller overrides win for presentation, but failure projection
+    // always preserves the normalized definition axes when an error is present.
     message: fields.message ?? derived.message,
     code: fields.code ?? derived.code,
     exitCode: fields.exitCode ?? derived.exitCode,
+    suggestion: fields.suggestion ?? derived.suggestion,
+    failure: derived.failure,
   };
 }
 
@@ -80,6 +98,7 @@ export function resolveReportFailure(detail: ReportFailureDetail): ResolvedRepor
     message: detail.message,
     exitCode: detail.exitCode,
     code: detail.code,
+    suggestion: detail.suggestion,
   });
   const message = derived.message;
   const exitCode = derived.exitCode;
@@ -94,11 +113,23 @@ export function resolveReportFailure(detail: ReportFailureDetail): ResolvedRepor
   return {
     message,
     exitCode,
-    ...(detail.suggestion === undefined ? {} : { suggestion: detail.suggestion }),
+    ...(detail.suggestion === undefined && derived.suggestion === undefined
+      ? {}
+      : { suggestion: detail.suggestion ?? derived.suggestion }),
     ...(code === undefined ? {} : { code }),
     ...(detail.diagnostic === undefined ? {} : { diagnostic: detail.diagnostic }),
     ...(detail.jsonRequested === undefined ? {} : { jsonRequested: detail.jsonRequested }),
-    ...(detail.log === undefined ? {} : { log: detail.log }),
+    ...(detail.log === undefined
+      ? {}
+      : {
+          log: {
+            ...detail.log,
+            ...(detail.log.data === undefined
+              ? {}
+              : { data: toSafeDiagnosticRecord(detail.log.data) as Record<string, unknown> }),
+          },
+        }),
+    ...(derived.failure === undefined ? {} : { failure: derived.failure }),
   };
 }
 

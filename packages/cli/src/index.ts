@@ -69,12 +69,16 @@ import {
   buildToolPluginGroups,
 } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
+import { installLastResortFailureNet } from './bootstrap/last-resort-failure-net.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { resolvedCommandLabel } from './telemetry/command-label.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { printWelcome } from './welcome.js';
 
 export * from './api.js';
+
+// Process-edge last-resort net (Plan 00): install before any async work.
+installLastResortFailureNet();
 
 const cliVersion = readPackageVersion(import.meta.url);
 

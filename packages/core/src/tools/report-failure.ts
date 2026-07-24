@@ -49,6 +49,9 @@ export interface ReportFailureDetail {
 /**
  * Wire-safe resolved failure detail (no live Error instances). Used by the CLI
  * worker replay protocol after {@link resolveReportFailure} runs worker-side.
+ *
+ * Plan 00: optional versioned failure projection carries definition axes without
+ * requiring live Error / definition objects on the wire.
  */
 export interface ResolvedReportFailure {
   readonly message: string;
@@ -58,4 +61,9 @@ export interface ResolvedReportFailure {
   readonly diagnostic?: CliDiagnostic;
   readonly jsonRequested?: boolean;
   readonly log?: ReportFailureLogDetail;
+  /**
+   * Machine-safe failure projection (schemaVersion + axes). Additive; older
+   * consumers ignore unknown fields.
+   */
+  readonly failure?: Readonly<Record<string, unknown>>;
 }
