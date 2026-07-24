@@ -10,10 +10,29 @@ import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 
 import { resolveChecks, validateCheckReferences } from './check-resolution.js';
 
-import type { FitnessRecipe } from './types.js';
+import type { CheckSelector, FitnessRecipe } from './types.js';
 import type { Check, CheckRegistry } from '../framework/registry.js';
 
 const MODULE_FITNESS_RECIPES = 'fitness:recipes';
+
+/**
+ * Describe a zero-matched cli-adhoc selector for the "unknown check" error
+ * message — the same identifier a user typed on the CLI (`--check` slug/glob
+ * or `--tags` value(s)), so the explicit/pattern/tags arms all read as "here
+ * is what you asked for and it matched nothing."
+ */
+function describeZeroMatchSelector(
+  checks: Exclude<CheckSelector, { type: 'all' }>,
+  missingExplicitChecks: readonly string[],
+): string {
+  if (checks.type === 'explicit') {
+    return missingExplicitChecks[0] ?? checks.checkIds[0] ?? '(unknown)';
+  }
+  if (checks.type === 'pattern') {
+    return checks.include[0] ?? '(unknown)';
+  }
+  return checks.include.join(', ') || '(unknown)';
+}
 
 /** Options for {@link resolveAndFilterChecks}. */
 export interface CheckResolutionOptions {
@@ -77,9 +96,28 @@ export function resolveAndFilterChecks(
     }
   }
 
-  if (recipe.name === 'cli-adhoc' && recipe.checks.type === 'explicit' && checks.length === 0) {
-    const requested = missingExplicitChecks[0] ?? recipe.checks.checkIds[0] ?? '(unknown)';
-    throw new ConfigurationError(`Unknown check '${requested}'.`, {
+  // A CLI ad-hoc run (`--check`/`--tags`) that resolves to zero checks must
+  // never silently proceed as a clean, zero-check pass — that reads as a
+  // green run to the caller (exit 0, no findings) when the user's selector
+  // simply never matched anything. This originally guarded only the
+  // `explicit` arm (an unknown exact slug); `pattern` (`--check` glob) and
+  // `tags` (`--tags`) selectors fell through this guard entirely, resolving
+  // to zero checks with no error at all.
+  if (
+    recipe.name === 'cli-adhoc' &&
+    checks.length === 0 &&
+    (recipe.checks.type === 'explicit' ||
+      recipe.checks.type === 'pattern' ||
+      recipe.checks.type === 'tags')
+  ) {
+    const requested = describeZeroMatchSelector(recipe.checks, missingExplicitChecks);
+    const message =
+      recipe.checks.type === 'explicit'
+        ? `Unknown check '${requested}'.`
+        : recipe.checks.type === 'pattern'
+          ? `No checks match pattern '${requested}'.`
+          : `No checks match tags '${requested}'.`;
+    throw new ConfigurationError(message, {
       code: 'CONFIG.UNKNOWN_CHECK',
       definition: fitnessErrorCatalog.require('CONFIG.UNKNOWN_CHECK'),
       metadata: { check: requested },

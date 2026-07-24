@@ -246,6 +246,47 @@ describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
     expect(cr?.error).toBeUndefined();
   });
 
+  it('does not let a throwing onCheckStart abort the check it announces (catch path)', async () => {
+    // Regression: onCheckStart used to be invoked outside any try/catch, so a
+    // throwing observer callback rejected runOneCheck's own promise entirely —
+    // the check it was announcing never ran, and (at the scheduler level) the
+    // whole session was recoverable only via the top-level executeRecipeInScope
+    // catch, which marks status 'failed' and aborts every remaining check.
+    // Isolating it (mirroring how onCheckComplete failures are recovered in
+    // check-result-processor.ts) means the check still completes normally.
+    const analyze = vi.fn(() => Promise.resolve([]));
+    const check = defineCheck({
+      id: uid(),
+      slug: 'runs-despite-start-callback-throw',
+      description: 'passes',
+      tags: ['quality'],
+      analyzeAll: analyze,
+    });
+
+    const outcome = await runOneCheck(
+      check,
+      {
+        cwd: process.cwd(),
+        checkIndex: 1,
+        totalChecks: 1,
+        recipeTimeoutMs: 5000,
+        retryEnabled: false,
+        maxRetries: 0,
+      },
+      makeProcessorContext({
+        onCheckStart: () => {
+          throw new Error('onCheckStart exploded');
+        },
+      }),
+    );
+
+    expect(analyze).toHaveBeenCalled();
+    const cr = outcome.processOutput?.checkResult;
+    expect(cr).toBeDefined();
+    expect(cr?.passed).toBe(true);
+    expect(cr?.error).toBeUndefined();
+  });
+
   it('does NOT flag timedOut=true when the check completes well within the timeout', async () => {
     // Pin the invariant: the only abort source on the per-check
     // controller is the local setTimeout. A check that finishes promptly

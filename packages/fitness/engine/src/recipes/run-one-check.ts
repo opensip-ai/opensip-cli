@@ -93,7 +93,21 @@ export async function runOneCheck(
   const checkTimeout = check.config.timeout ?? opts.recipeTimeoutMs;
 
   const memoryBeforeMB = resolveMemoryProfiler().recordCheckStart();
-  ctx.callbacks.onCheckStart?.(checkSlug, opts.checkIndex, opts.totalChecks);
+  try {
+    ctx.callbacks.onCheckStart?.(checkSlug, opts.checkIndex, opts.totalChecks);
+  } catch (cbError) {
+    // Callbacks are observers, not participants: a throwing onCheckStart must
+    // not abort the check it announces (or the whole scheduling promise/session
+    // — this call sits outside the try/catch below that recovers processing
+    // failures). Mirrors how `check-result-processor.ts` isolates
+    // `onCheckComplete` throws (log + continue, no session-status impact).
+    logger.warn({
+      evt: 'fitness.check.callback_error',
+      module: MODULE_TAG,
+      checkSlug,
+      error: cbError instanceof Error ? cbError.message : String(cbError),
+    });
+  }
   logger.info({
     evt: 'fitness.check.start',
     module: MODULE_TAG,

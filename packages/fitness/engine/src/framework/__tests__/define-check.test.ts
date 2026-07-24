@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { enterScope, LanguageRegistry, RunScope, runWithScopeSync } from '@opensip-cli/core';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { enterScope, LanguageRegistry, logger, RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../define-check.js';
 import { fileCache } from '../file-cache.js';
@@ -737,5 +737,60 @@ describe('defineCheck — command mode end-to-end run', () => {
     expect(result.passed).toBe(false);
     expect(result.errors).toBeGreaterThanOrEqual(1);
     expect(result.metadata.extra?.skipped).toBeUndefined();
+  });
+});
+
+describe('defineCheck — analyze mode oversized-file skip (fail-loud posture)', () => {
+  it('skips a >10MB file at warn level (not debug) and surfaces it on the diagnostics bus', async () => {
+    // Explicit targetFiles (mirrors the production scope-resolver path,
+    // fit.ts's checkTargetFiles) rather than relying on the fileCache
+    // fallback: prewarm() itself skips >10MB files, so an oversized file
+    // never appears in fc.paths() and the no-scope fallback would never
+    // exercise ExecutionContext.readFile's size guard at all.
+    const hugePath = join(testDir, 'huge.ts');
+    writeFileSync(hugePath, Buffer.alloc(10_000_001));
+    const smallPath = fixture('small.ts', 'const x = "FOO";');
+
+    const warnSpy = vi.spyOn(logger, 'warn');
+    try {
+      const check = defineCheck({
+        id: 'dd000000-dd00-4dd0-8dd0-dd0000000001',
+        slug: 'oversized-rt',
+        description: 'd',
+        tags: ['quality'],
+        analyze: (content, filePath) =>
+          content.includes('FOO')
+            ? [{ line: 1, message: 'found FOO', severity: 'error' as const, filePath }]
+            : [],
+      });
+
+      const result = await check.run(testDir, { targetFiles: [hugePath, smallPath] });
+
+      // The oversized file is skipped without crashing the check (still a
+      // 'skip', not a thrown/unhandled error) — the other target file is
+      // still analyzed normally, proving the run isn't aborted.
+      expect(result.passed).toBe(false);
+      expect(result.errors).toBeGreaterThanOrEqual(1);
+
+      // Surfaced loudly: a warn-level log line naming the file and check
+      // slug (previously this only logged at debug).
+      const warnCall = warnSpy.mock.calls.find(
+        (call) =>
+          (call[1] as { evt?: string } | undefined)?.evt === 'fitness.check.file.skip.too_large',
+      );
+      expect(warnCall).toBeDefined();
+      const warnFields = warnCall?.[1] as
+        | { filePath?: string; checkSlug?: string }
+        | undefined;
+      expect(warnFields?.filePath).toBe(hugePath);
+      expect(warnFields?.checkSlug).toBe('oversized-rt');
+
+      // ...and on the per-run diagnostics bus, so a --json consumer sees it
+      // too (not just the human log stream).
+      const events = runScope.diagnostics.snapshot().events;
+      expect(events.some((e) => e.level === 'warn' && e.message.includes('huge.ts'))).toBe(true);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });

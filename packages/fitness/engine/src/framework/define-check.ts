@@ -136,8 +136,33 @@ async function analyzeSingleFile(
     rawContent = await ctx.readFile(filePath);
   } catch (error) {
     if (error instanceof CheckAbortedError) throw error;
-    // Only filesystem/read failures are skippable. Analyze bugs must not
-    // silently green-pass the rest of the run.
+
+    // FILE_TOO_LARGE is a deliberate, structural skip (files over the 10MB
+    // read bound), not a transient fs race — burying it at debug contradicts
+    // the fail-loud posture (a >10MB file silently drops out of every
+    // analyze-mode check with no visible trace). Surface it at warn, and
+    // through the per-run diagnostics bus (the same channel `service.ts`
+    // uses for run-lifecycle events) so a `--json` consumer sees it too.
+    if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE') {
+      logger.warn('Skipping oversized file', {
+        evt: 'fitness.check.file.skip.too_large',
+        module: 'fitness:framework',
+        filePath,
+        checkSlug: config.slug,
+        err: error,
+      });
+      currentScope()?.diagnostics.event(
+        'execute',
+        'warn',
+        `Skipped oversized file for check '${config.slug}': ${filePath}`,
+        { checkSlug: config.slug, filePath, reason: 'file-too-large' },
+      );
+      return 'skip';
+    }
+
+    // Genuine filesystem races (ENOENT, permission errors, etc.) stay
+    // skippable at debug. Analyze bugs must not silently green-pass the
+    // rest of the run.
     logger.debug('Skipping unreadable file', {
       evt: 'fitness.check.file.skip',
       module: 'fitness:framework',

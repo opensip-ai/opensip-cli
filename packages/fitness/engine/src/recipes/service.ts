@@ -238,6 +238,13 @@ export class FitnessRecipeService {
       this.activeSession.totalChecks = checks.length;
 
       if (checks.length === 0) {
+        // A legitimate empty run (e.g. a named recipe whose selector matches
+        // zero registered checks) must still transition the session out of
+        // 'running' — mirroring the non-empty completion below — so it is
+        // not left stuck 'running' (the session getter, `getActiveSession()`,
+        // and `buildRecipeResult`'s `success` computation all read `status`).
+        this.activeSession.directives = collectAppliedDirectives(this.activeSession);
+        this.activeSession.status = 'completed';
         return buildRecipeResult(this.session);
       }
 

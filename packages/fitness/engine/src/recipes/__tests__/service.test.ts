@@ -219,6 +219,49 @@ describe('FitnessRecipeService — parallel execution', () => {
     expect(onComplete).toBe(true);
   });
 
+  it('a throwing onCheckStart does not abort the session or the checks after it', async () => {
+    // Regression: onCheckStart used to run outside runOneCheck's try/catch,
+    // so a throwing observer callback rejected the check-scheduling promise
+    // entirely — the whole session was caught by executeRecipeInScope's
+    // top-level catch, marked 'failed', and every remaining check was
+    // aborted. `svc.start()` must still resolve, and BOTH checks (including
+    // the one after the throwing callback's check, run sequentially) must
+    // complete.
+    const completes: string[] = [];
+
+    const checkRegistry = new CheckRegistry();
+    checkRegistry.register(makeMarkerCheck('first', 'X'));
+    checkRegistry.register(makeMarkerCheck('second', 'X'));
+    writeFixture('a.ts', 'const x = "X";');
+
+    const svc = new FitnessRecipeService({
+      cwd: testDir,
+      checkRegistry,
+      recipeRegistry: new FitnessRecipeRegistry(),
+      prewarmCache: false,
+      callbacks: {
+        onCheckStart: (slug) => {
+          if (slug === 'first') throw new Error('onCheckStart exploded');
+        },
+        onCheckComplete: (slug) => completes.push(slug),
+      },
+    });
+
+    const result = await svc.start(
+      makeRecipe({
+        execution: {
+          mode: 'sequential',
+          stopOnFirstFailure: false,
+          timeout: 30_000,
+        },
+      }),
+    );
+
+    expect(completes.sort()).toEqual(['first', 'second']);
+    expect(result.summary.totalChecks).toBe(2);
+    expect(result.checkResults.every((cr) => cr.error === undefined)).toBe(true);
+  });
+
   it('returns a result with success=false when score < threshold', async () => {
     const checkRegistry = new CheckRegistry();
     checkRegistry.register(makeMarkerCheck('flag-fail', 'FAIL', 'error'));
@@ -257,6 +300,31 @@ describe('FitnessRecipeService — parallel execution', () => {
     expect(result.summary.totalChecks).toBe(0);
     expect(result.summary.failedChecks).toBe(0);
     expect(result.summary.totalViolations).toBe(0);
+  });
+
+  it('marks the session completed (not stuck "running") on a legitimate empty run', async () => {
+    // Regression: the zero-checks early return in executeRecipeInScope used to
+    // skip the session.status = 'completed' transition applied on every other
+    // path, leaving the session stuck 'running'. `buildRecipeResult`'s
+    // `success` field requires `status === 'completed'`, so before the fix an
+    // empty (but legitimate, e.g. a non-cli-adhoc recipe with zero matched
+    // checks) run always reported `success: false` regardless of its 100%
+    // (0-total) passRate — and any consumer reading session status directly
+    // would see it never leave 'running'.
+    const svc = new FitnessRecipeService({
+      cwd: testDir,
+      checkRegistry: new CheckRegistry(),
+      recipeRegistry: new FitnessRecipeRegistry(),
+      prewarmCache: false,
+    });
+
+    const result = await svc.start(makeRecipe());
+    expect(result.success).toBe(true);
+    // The session is cleared (activeSession = null) once execution finishes —
+    // for either an empty or a non-empty run — so `getActiveSession()` is the
+    // externally-observable confirmation the run reached a terminal state
+    // rather than hanging mid-flight.
+    expect(svc.getActiveSession()).toBeNull();
   });
 });
 
@@ -453,6 +521,47 @@ describe('FitnessRecipeService — errors', () => {
 
     await expect(
       svc.start(FitnessRecipeService.createAdHocRecipe({ check: 'ghost-check' })),
+    ).rejects.toBeInstanceOf(ConfigurationError);
+  });
+
+  it('throws ConfigurationError when --tags matches zero registered checks', async () => {
+    // Regression: the zero-matched guard originally only covered the
+    // `explicit` selector arm (an unknown exact --check slug). A --tags
+    // filter that matches nothing fell through unguarded, resolving to zero
+    // checks with no error — the run then silently completed as a clean
+    // (green) zero-check pass instead of surfacing the typo/mismatch.
+    const checkRegistry = new CheckRegistry();
+    checkRegistry.register(makeMarkerCheck('has-quality-tag', 'X', 'warning', ['quality']));
+    writeFixture('a.ts', '');
+
+    const svc = new FitnessRecipeService({
+      cwd: testDir,
+      checkRegistry,
+      recipeRegistry: new FitnessRecipeRegistry(),
+      prewarmCache: false,
+    });
+
+    await expect(
+      svc.start(FitnessRecipeService.createAdHocRecipe({ tagFilters: ['no-such-tag'] })),
+    ).rejects.toBeInstanceOf(ConfigurationError);
+  });
+
+  it('throws ConfigurationError when a --check glob matches zero registered checks', async () => {
+    // Regression: same guard gap as --tags above, for the `pattern` selector
+    // arm (a --check value containing '*'/'?').
+    const checkRegistry = new CheckRegistry();
+    checkRegistry.register(makeMarkerCheck('flag-foo', 'X'));
+    writeFixture('a.ts', '');
+
+    const svc = new FitnessRecipeService({
+      cwd: testDir,
+      checkRegistry,
+      recipeRegistry: new FitnessRecipeRegistry(),
+      prewarmCache: false,
+    });
+
+    await expect(
+      svc.start(FitnessRecipeService.createAdHocRecipe({ check: 'nonexistent-*' })),
     ).rejects.toBeInstanceOf(ConfigurationError);
   });
 
