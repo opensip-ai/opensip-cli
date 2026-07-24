@@ -91,6 +91,10 @@ const TRIAGE_DISPOSITION = {
   'error-handling-suite': 'b',
   'module-coupling-metrics': 'b',
   'no-direct-stdout-in-tool-engine': 'b',
+  // Process-edge boundary (Plan 00): the last-resort failure net and the
+  // second-SIGINT force-exit ARE the sanctioned exit points; the blanket
+  // no-local-exit ban does not model the host process edge.
+  'no-local-exit-or-stdout': 'a',
   'no-markdown-references': 'b',
   'only-documented-toolcli-seams': 'b',
   'unsafe-secret-comparison': 'b',
