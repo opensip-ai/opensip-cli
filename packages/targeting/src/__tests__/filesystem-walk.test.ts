@@ -274,9 +274,10 @@ describe('walkTargetFilesystem (real filesystem)', () => {
     expect(offered).toEqual(['real/value.ts']);
   });
 
-  it('marks evidence capped when a file vanishes between directory read and stat', async () => {
+  it('skips a file that vanishes between directory read and stat, without capping', async () => {
     writeFileSync(join(root, 'a.ts'), '');
     writeFileSync(join(root, 'b.ts'), '');
+    writeFileSync(join(root, 'c.ts'), '');
     const offered: string[] = [];
 
     const walk = await walkTargetFilesystem(root, ({ relativePath }) => {
@@ -284,8 +285,34 @@ describe('walkTargetFilesystem (real filesystem)', () => {
       if (relativePath === 'a.ts') rmSync(join(root, 'b.ts'));
     });
 
-    expect(walk.capped).toBe(true);
-    expect(offered).toEqual(['a.ts']);
+    // b.ts vanished before it could be stat'd: it is skipped, not capped, and
+    // the walk continues past it to c.ts instead of abandoning the rest of the
+    // tree (regression: a per-entry stat failure used to set `capped = true`,
+    // which the main loop's `!state.capped` guard treated the same as a
+    // genuine TARGET_WALK_MAX_* resource-bound truncation).
+    expect(walk.capped).toBe(false);
+    expect(offered).toEqual(['a.ts', 'c.ts']);
+  });
+
+  it('skips a dangling symlink and continues walking the rest of the tree without capping', async () => {
+    if (platform() === 'win32') return;
+    writeFileSync(join(root, 'a.ts'), '');
+    symlinkSync(join(root, 'missing-target'), join(root, 'm-broken-link'));
+    mkdirSync(join(root, 'nested'));
+    writeFileSync(join(root, 'nested/n.ts'), '');
+    writeFileSync(join(root, 'z.ts'), '');
+    const offered: string[] = [];
+
+    const walk = await walkTargetFilesystem(root, ({ relativePath }) => {
+      offered.push(relativePath);
+    });
+
+    // `m-broken-link` sorts between `a.ts` and both `nested/` and `z.ts`;
+    // its stat() ENOENT is skipped and the walk still reaches every regular
+    // file that sorts after it, in a sibling directory or not.
+    expect(offered).toEqual(['a.ts', 'nested/n.ts', 'z.ts']);
+    expect(walk.capped).toBe(false);
+    expect(walk.cancelled).toBe(false);
   });
 });
 

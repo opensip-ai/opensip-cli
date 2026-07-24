@@ -167,9 +167,12 @@ async function safeRegularFile(absolutePath: string, context: WalkContext): Prom
     if (isAborted(context)) return false;
     return fileStat.isFile() && isPathInside(absolutePath, context.rootDir);
   } catch {
-    // @swallow-ok entries can disappear between directory read and stat; mark
-    // the walk incomplete rather than silently claiming complete evidence.
-    context.state.capped = true;
+    // @swallow-ok a single entry can fail to stat (vanished between directory
+    // read and stat, or a dangling symlink whose target does not exist). This
+    // is a per-entry condition, not a resource-bound truncation: skip just this
+    // entry and let the walk continue. `capped` is reserved for genuine
+    // TARGET_WALK_MAX_* ceilings (see the main loop's `!state.capped` guard,
+    // which would otherwise abandon the rest of the tree over one bad entry).
     return false;
   }
 }

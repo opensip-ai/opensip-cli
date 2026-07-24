@@ -20,6 +20,15 @@ import { COMMON_TARGET_IGNORE } from './resolve-common.js';
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';
 
+// Mirrors glob 13's platform-derived `nocase` default (path-scurry: Darwin and
+// Windows are case-insensitive filesystems, everything else is case-sensitive;
+// see the identical constant in filesystem-walk.ts / bounded-resolve-matchers.ts).
+// `resolveTargets` feeds a target's `exclude` globs into `globSync`'s `ignore`
+// option, which inherits that platform default. The shared post-glob filter
+// below must use the same default for target excludes so a differently-cased
+// exclude behaves identically regardless of which resolution path evaluates it.
+const PLATFORM_NOCASE = process.platform === 'darwin' || process.platform === 'win32';
+
 // =============================================================================
 // Global excludes
 // =============================================================================
@@ -131,8 +140,12 @@ function filterOneTargetFiles(
   const hasTargetExcludes = targetExclude.length > 0;
   const hasGlobals = compiledGlobalExcludes.length > 0;
   if (hasTargetExcludes || hasGlobals) {
+    // nocase: PLATFORM_NOCASE — target excludes are also fed into globSync's
+    // `ignore` option by resolveTargets, which is nocase on darwin/win32; this
+    // post-filter must match that so preResolveAllTargets (which relies on this
+    // filter alone for target excludes) does not diverge from resolveTargets.
     const compiledTargetExcludes = hasTargetExcludes
-      ? targetExclude.map((ex) => new Minimatch(ex, { dot: true }))
+      ? targetExclude.map((ex) => new Minimatch(ex, { dot: true, nocase: PLATFORM_NOCASE }))
       : [];
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];
     return [...files]

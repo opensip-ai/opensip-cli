@@ -485,9 +485,10 @@ describe('resolveTargetsBounded', () => {
     expect(offered).toEqual(['a.ts']);
   });
 
-  it('marks evidence capped when an entry vanishes after its directory batch is sorted', async () => {
+  it('skips an entry that vanishes after its directory batch is sorted, without capping', async () => {
     fixture('a.ts');
     const later = fixture('b.ts');
+    fixture('c.ts');
     const offered: string[] = [];
 
     const walk = await walkTargetFilesystem(testDir, ({ relativePath }) => {
@@ -495,8 +496,11 @@ describe('resolveTargetsBounded', () => {
       if (relativePath === 'a.ts') rmSync(later);
     });
 
-    expect(walk).toMatchObject({ capped: true, cancelled: false });
-    expect(offered).toEqual(['a.ts']);
+    // b.ts vanished before it could be stat'd: it is skipped, not capped, and
+    // the walk continues past it to c.ts rather than abandoning the rest of
+    // the tree (a per-entry stat failure is not a resource-bound truncation).
+    expect(walk).toMatchObject({ capped: false, cancelled: false });
+    expect(offered).toEqual(['a.ts', 'c.ts']);
   });
 
   it('never follows directory symlinks and only returns contained file symlinks', async () => {
