@@ -8,7 +8,8 @@
  *     `--json` short-circuit vs. human `render` for `command-result`,
  *     envelope-vs-render for `signal-envelope` (ADR-0027 parity);
  *   - the explicit FRR seam fields (`render`/`envelope`/`json`/`raw`/`error`/
- *     `exitCode`) replay through their host counterparts, exit code LAST;
+ *     `exitCode`) replay through their host counterparts, exit code applied
+ *     before the output seams and re-asserted LAST;
  *   - a returned `session` is staged via the host `completeRun` hook.
  *
  * The forked end-to-end boundary is proven in `external-tool-dispatch.test.ts`;
@@ -134,11 +135,14 @@ describe('replayResult', () => {
       message: 'worker failed',
       exitCode: 2,
     });
-    expect(cap.calls[0]).toMatch(/^reportFailure:/);
+    // Exit code is applied first (so any output emitted during replay reads the
+    // worker's final code) and re-asserted last (final word).
+    expect(cap.calls[0]).toBe('exit:9');
+    expect(cap.calls[1]).toMatch(/^reportFailure:/);
     expect(cap.calls.at(-1)).toBe('exit:9');
   });
 
-  it('replays every explicit FRR seam field, exit code LAST', async () => {
+  it('replays every explicit FRR seam field, exit code first and LAST', async () => {
     const { cap, ctx } = makeCtx();
     const result: ToolCommandResult = {
       output: 'command-result',
@@ -155,8 +159,23 @@ describe('replayResult', () => {
     expect(cap.envelopes).toHaveLength(1);
     expect(cap.jsons).toHaveLength(1);
     expect(cap.raws).toHaveLength(1);
-    // Exit code applied last.
+    // Exit code applied before the output seams AND re-asserted last.
+    expect(cap.calls[0]).toBe('exit:7');
     expect(cap.calls.at(-1)).toBe('exit:7');
+  });
+
+  it('applies the worker exit code before dispatchOutput so the --json outcome agrees', async () => {
+    const { ctx } = makeCtx();
+    const result: ToolCommandResult = {
+      output: 'command-result',
+      returned: { type: 'list-checks', checks: [] },
+      exitCode: 3,
+    };
+    const out = await captureStdout(() => replayResult(result, ctx, invocation({ json: true })));
+    const outcome = JSON.parse(out) as { exitCode?: number };
+    // Regression: the outcome used to snapshot exit code 0 (unset) while the
+    // process later exited 3 — machine output disagreed with the exit status.
+    expect(outcome.exitCode).toBe(3);
   });
 
   it('stages a returned session via completeRun', async () => {

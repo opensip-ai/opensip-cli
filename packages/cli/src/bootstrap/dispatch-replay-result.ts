@@ -53,8 +53,10 @@ export interface ReplayContext {
  *     envelope handler calling `ctx.emitEnvelope`), never together with `returned`
  *     for the same payload.
  *
- * The exit code is applied LAST so it is the final word (matching the in-process
- * `setExitCode` semantics).
+ * The exit code is applied BEFORE the output seams (they snapshot
+ * `getExitCode()` at emit time, so the printed `--json` outcome must agree with
+ * the process exit status) and re-asserted LAST so it stays the final word
+ * (matching the in-process `setExitCode` semantics).
  */
 export async function replayResult(
   result: ToolCommandResult,
@@ -85,6 +87,14 @@ export async function replayResult(
       ...(result.session === undefined ? {} : { session: result.session }),
       ...(completionEnvelope === undefined ? {} : { envelope: completionEnvelope }),
     });
+  }
+  // Apply the worker's exit code BEFORE any output seam: `dispatchOutput` →
+  // assemble-outcome and `emitEnvelope` snapshot `getExitCode()` at emit time,
+  // so a late-applied code would print a `--json` outcome that disagrees with
+  // the process exit status. It is re-asserted after the seams below so it
+  // stays the final word (matching in-process `setExitCode` semantics).
+  if (result.exitCode !== undefined) {
+    ctx.setExitCode(result.exitCode);
   }
   if (result.reportedFailure !== undefined) {
     await ctx.reportFailure(result.reportedFailure);
@@ -118,6 +128,9 @@ export async function replayResult(
   if (result.raw !== undefined) {
     ctx.emitRaw(result.raw);
   }
+  // Final word: restore the worker's captured exit code over any intermediate
+  // host-side derivation (e.g. `emitError`'s per-detail code) — the worker
+  // already folded those effects into `result.exitCode`.
   if (result.exitCode !== undefined) {
     ctx.setExitCode(result.exitCode);
   }
