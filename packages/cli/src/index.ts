@@ -69,6 +69,7 @@ import {
   buildToolPluginGroups,
 } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
+import { installInterruptAbortCoordinator } from './bootstrap/interrupt-abort.js';
 import { installLastResortFailureNet } from './bootstrap/last-resort-failure-net.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
 import { resolvedCommandLabel } from './telemetry/command-label.js';
@@ -79,6 +80,11 @@ export * from './api.js';
 
 // Process-edge last-resort net (Plan 00): install before any async work.
 installLastResortFailureNet();
+// Host-owned SIGINT/SIGTERM → per-invocation AbortSignal (Plan 00 Phase 4).
+const interruptCoordinator = installInterruptAbortCoordinator();
+process.once('exit', () => {
+  interruptCoordinator.dispose();
+});
 
 const cliVersion = readPackageVersion(import.meta.url);
 

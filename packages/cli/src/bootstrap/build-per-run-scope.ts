@@ -44,6 +44,7 @@ import { admitCapabilityPackage } from './load-tool-capabilities.js';
 import { flushPolicyAuditEvents } from './policy-audit-flush.js';
 import { resolvePolicyForRun } from './run-policy.js';
 import { shouldRunHookInHost } from './tool-provenance.js';
+import { getActiveInterruptSignal } from './interrupt-abort.js';
 import { buildDeniedWorkerDatastoreThunk } from './worker-datastore.js';
 
 import type { BuildPerRunScopeInput } from './build-per-run-scope-contract.js';
@@ -187,6 +188,10 @@ export function buildPerRunScope(input: BuildPerRunScopeInput): RunScope {
     languages,
     tools,
     signalSink,
+    // Host-owned cooperative cancel (Plan 00); distinct from signalSink.
+    ...(getActiveInterruptSignal() === undefined
+      ? {}
+      : { abortSignal: getActiveInterruptSignal() }),
     runId,
     // Closure-based lazy datastore (or denied worker thunk). Local mode
     // materialises SQLite only on first access. The thunk captures `project`
