@@ -151,3 +151,77 @@ describe('aggregateErrorCatalogs', () => {
     expect(byCode.get('A.ONLY.ONE')?.toolName).toBe('a');
   });
 });
+
+describe('aggregateErrorCatalogs — substrate catalogs (Plan 01 ruling D1)', () => {
+  const substrateOwner = {
+    id: '@opensip-cli/datastore',
+    displayName: 'Datastore',
+    packageName: '@opensip-cli/datastore',
+  };
+
+  it('registers a code owned by a non-Tool package', () => {
+    // Before D1 the only registration path was ToolExtensionPoints.errorCatalog, so a
+    // substrate had no way to own a code at all.
+    const catalog = defineErrorCatalog(substrateOwner, {
+      'DATASTORE.MIGRATION.FAILED': { ...def, code: 'DATASTORE.MIGRATION.FAILED' },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/datastore', catalog }],
+    );
+    expect(collisions).toEqual([]);
+    expect(byCode.get('DATASTORE.MIGRATION.FAILED')?.owner.id).toBe('@opensip-cli/datastore');
+  });
+
+  it('rejects a substrate registering a code it does not own', () => {
+    // Ownership is the point: a package may not register a code attributed elsewhere.
+    const catalog = defineErrorCatalog(substrateOwner, {
+      'DATASTORE.MIGRATION.OTHER': { ...def, code: 'DATASTORE.MIGRATION.OTHER' },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/output', catalog }],
+    );
+    expect(collisions).toHaveLength(1);
+    expect(byCode.has('DATASTORE.MIGRATION.OTHER')).toBe(false);
+  });
+
+  it('reports a collision rather than letting a substrate overwrite core', () => {
+    // Pick a core code that satisfies the OWNER.DOMAIN.CONDITION grammar, since legacy
+    // single-token codes cannot be re-declared through defineErrorCatalog at all.
+    const coreCode = coreSystemErrorCatalog.list.find((d) => d.code.split('.').length === 3)?.code;
+    expect(coreCode).toBeDefined();
+    const catalog = defineErrorCatalog(substrateOwner, {
+      [coreCode as string]: { ...def, code: coreCode as string },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/datastore', catalog }],
+    );
+    expect(collisions.some((c) => c.code === coreCode)).toBe(true);
+    expect(byCode.get(coreCode as string)?.owner.id).not.toBe('@opensip-cli/datastore');
+  });
+
+  it('reports a collision when a tool claims a code a substrate already owns', () => {
+    // Substrates fold in first precisely so this is caught rather than silently
+    // reassigned to whichever contributor happened to be merged last.
+    const shared = 'SHARED.CODE.X';
+    const substrate = defineErrorCatalog(substrateOwner, { [shared]: { ...def, code: shared } });
+    const toolCatalog = defineErrorCatalog(ownerA, { [shared]: { ...def, code: shared } });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [{ toolName: 'a', toolId: ownerA.id, catalog: toolCatalog }],
+      [{ packageName: '@opensip-cli/datastore', catalog: substrate }],
+    );
+    expect(collisions.some((c) => c.code === shared)).toBe(true);
+    expect(byCode.get(shared)?.owner.id).toBe('@opensip-cli/datastore');
+  });
+
+  it('omitting substrate catalogs preserves the previous behaviour', () => {
+    const toolCatalog = defineErrorCatalog(ownerA, { 'A.B.C': { ...def, code: 'A.B.C' } });
+    const { byCode, collisions } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: toolCatalog },
+    ]);
+    expect(collisions).toEqual([]);
+    expect(byCode.get('A.B.C')?.toolName).toBe('a');
+  });
+});

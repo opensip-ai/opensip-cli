@@ -110,11 +110,35 @@ export function validateToolErrorCatalogContribution(
 }
 
 /**
- * Merge core system catalog with loaded tool catalogs; fail on code collisions
- * across tools (same code, different owner).
+ * A catalog owned by a non-Tool package (Plan 01 ruling D1).
+ *
+ * Before this existed the only registration path was `ToolExtensionPoints.errorCatalog`,
+ * so a substrate such as config, datastore, session-store, output, codebase or targeting
+ * had no way to own a code: its failures either normalized at the CLI composition root —
+ * making the host the recorded owner of failures it never raised — or fell back to a
+ * legacy family, which erases the axes that make a code useful. `DataStoreVersionError`
+ * is the worked example: its message IS the user's upgrade instruction, yet a
+ * `SYSTEM_ERROR` fallback carries `exposure: 'redacted'` and hides it.
+ *
+ * Ownership is keyed on the package name, so attribution stays honest and the generated
+ * code index stays complete.
+ */
+export interface SubstrateErrorCatalogContribution {
+  /** npm package name; must equal every contributed definition's `owner.id`. */
+  readonly packageName: string;
+  readonly catalog: ErrorCatalog;
+}
+
+/**
+ * Merge the core system catalog with loaded tool catalogs and substrate catalogs; fail on
+ * code collisions across owners (same code, different owner).
+ *
+ * Substrates are folded in BEFORE tools so that a tool contributing a code a substrate
+ * already owns is reported as a collision rather than silently taking ownership.
  */
 export function aggregateErrorCatalogs(
   toolCatalogs: readonly { toolName: string; toolId: string; catalog: ErrorCatalog }[],
+  substrateCatalogs: readonly SubstrateErrorCatalogContribution[] = [],
 ): {
   readonly byCode: ReadonlyMap<string, ErrorDefinition & { readonly toolName?: string }>;
   readonly collisions: readonly { code: string; owners: readonly string[] }[];
@@ -124,6 +148,22 @@ export function aggregateErrorCatalogs(
 
   for (const def of coreSystemErrorCatalog.list) {
     byCode.set(def.code, def);
+  }
+
+  for (const entry of substrateCatalogs) {
+    for (const def of entry.catalog.list) {
+      const existing = byCode.get(def.code);
+      // A substrate may only register codes it declares itself the owner of, and may not
+      // overwrite a code already registered by core or another substrate.
+      if (def.owner.id !== entry.packageName || existing !== undefined) {
+        collisions.push({
+          code: def.code,
+          owners: [existing?.owner.id ?? entry.packageName, def.owner.id],
+        });
+        continue;
+      }
+      byCode.set(def.code, Object.freeze({ ...def }));
+    }
   }
 
   for (const entry of toolCatalogs) {
