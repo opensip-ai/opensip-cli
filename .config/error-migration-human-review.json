@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "note": "Plan 01 Phase A.2 step 7 / A.5 — patterns that are NOT mechanically expressible, each with the specific semantic judgement that blocks a static rule. Recorded so that an ABSENT check is a decision on the record rather than an oversight. Sites are assigned to a class by matcher; a class must never be a convenience bucket, so each carries a concrete reason and the evidence that a rule cannot decide it.",
+  "measuredContext": {
+    "shippedCheckRecall": 0,
+    "phaseACheckRecall": 0.0065,
+    "note": "The 226 shipped checks catch 0 of the 4,640 actionable ledger sites; the 7 Phase A.2 checks catch 30. These classes explain the structural reason most of the remainder cannot be mechanised, rather than implying the check set is merely immature."
+  },
+  "classes": [
+    {
+      "id": "boundary-vs-leaf",
+      "reason": "Whether a given catch is the correct NORMALIZING BOUNDARY or a leaf that should propagate depends on the caller's contract, which is not visible in the file being scanned. Ruling D6 places classification at the enclosing boundary, so the same syntax is correct in one file and wrong in another.",
+      "match": { "kinds": ["catch", "error-construction", "throw"] },
+      "governingDecision": "D6"
+    },
+    {
+      "id": "degrade-vs-hard-fail",
+      "reason": "Whether an incomplete result should degrade-and-surface or hard-fail is a trustworthiness judgement (ruling D7): unparseable scanner output yielding zero findings is untrustworthy, while a capped walk is a legitimate bounded result. The two are syntactically identical.",
+      "match": { "kinds": ["fallback", "silent-fallback", "coverage"] },
+      "governingDecision": "D7"
+    },
+    {
+      "id": "already-classified-value",
+      "reason": "Ruling D6's no-downgrade rule requires knowing whether the value reaching a boundary ALREADY carries an ErrorDefinition. That is cross-file type flow, not a file-local AST property, so a static per-file rule cannot decide it without whole-program type information.",
+      "match": { "families": ["cli-failure-reporting", "worker-ipc-process"] },
+      "governingDecision": "D6"
+    },
+    {
+      "id": "responsibility-attribution",
+      "reason": "Whether a failure's defaultResponsibility is user, tool-author, or environment is a product judgement encoded in the definition, not a property of the throw site. No syntax distinguishes a user's bad config from an environment fault.",
+      "match": {
+        "families": ["release-init", "plugin-trust-compatibility", "filesystem-datastore"]
+      },
+      "governingDecision": "D9"
+    },
+    {
+      "id": "plane-failure-posture",
+      "reason": "Whether a plane should fail open or closed is per-plane policy (ruling D14): trust/provenance fails closed, governance stays open with an explicit absent record. A rule cannot infer which plane a call belongs to from its shape.",
+      "match": { "families": ["plugin-trust-compatibility", "http-egress-retry"] },
+      "governingDecision": "D14"
+    },
+    {
+      "id": "exposure-and-redaction-intent",
+      "reason": "Whether a specific field is safe to expose depends on what the value can contain at runtime, which the ledger reviewers established by reading the producing code path. Ruling D8 moves redaction to one host choke point precisely because per-site static judgement is unreliable.",
+      "match": { "families": ["logging-redaction-telemetry", "mcp-stdio-transport"] },
+      "governingDecision": "D8"
+    },
+    {
+      "id": "cancellation-exemption",
+      "reason": "Ruling D5 exempts CPU-bound synchronous work and journal-backed destructive work from cooperative cancellation. Deciding whether a given loop is CPU-bound, or whether aborting mid-transaction would create the state recovery must repair, is a semantic judgement about the operation, not its syntax.",
+      "match": { "families": ["cancellation-timeout"] },
+      "governingDecision": "D5"
+    },
+    {
+      "id": "subprocess-lifecycle-contract",
+      "reason": "For a worker/subprocess boundary, whether the timeout, output bound and kill-tree obligation belong at THIS call or at the enclosing supervisor is a contract question between the two. The mechanical half — a call with neither bound — is already covered by error-subprocess-bounds; what remains is deciding which layer owns the bound, which the call site alone does not reveal.",
+      "match": { "kinds": ["worker-boundary"] },
+      "governingDecision": "D6"
+    },
+    {
+      "id": "whole-program-reachability",
+      "reason": "A remove-obsolete-path disposition asserts that a code path has no production caller. That is cross-package call-graph reachability (the graph tool's domain), not a property a file-local fitness check can observe — a file cannot see who imports it.",
+      "match": { "kinds": ["retry", "dead-path"] },
+      "governingDecision": "n/a"
+    },
+    {
+      "id": "browser-runtime-lifecycle",
+      "reason": "Dashboard client code is formally outside ADR-0181 scope (ruling D12); its bar is that every swallow produces a visible in-page state. Whether a document-level listener outliving its detached DOM is a leak depends on the page lifecycle the module participates in, which is not visible in the module.",
+      "match": { "kinds": ["signal-listener"] },
+      "governingDecision": "D12"
+    },
+    {
+      "id": "human-discovered-non-ts",
+      "reason": "The structural detector covers TypeScript/JavaScript only; Python, Go, Rust, Java and C/C++ sites were found by human review and have no static detector in this repository. Their absence from check coverage is a declared detector boundary, not a check regression.",
+      "match": { "sources": ["human"] },
+      "governingDecision": "n/a"
+    }
+  ]
+}

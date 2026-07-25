@@ -144,6 +144,9 @@
     "error-inventory:schema-check": "node scripts/error-resiliency-inventory.mjs schema-check",
     "error-inventory:ratchet": "node scripts/error-resiliency-inventory.mjs ratchet",
     "error-inventory:recall": "node scripts/error-resiliency-recall.mjs",
+    "fit:migration": "node packages/cli/dist/index.js fit --recipe error-migration --json",
+    "fit:migration:ratchet": "node scripts/error-migration-ratchet.mjs",
+    "error-inventory:reconcile-corpora": "node scripts/error-resiliency-reconcile-corpora.mjs",
     "error-inventory:review-shard": "node scripts/error-resiliency-review-shard.mjs",
     "docs:error-index": "node scripts/extract-error-catalog-metadata.mjs | node scripts/build-error-index.mjs - > docs/public/70-reference/18-error-code-index.md",
     "docs:error-index:check": "node scripts/extract-error-catalog-metadata.mjs | node scripts/build-error-index.mjs - --check"
