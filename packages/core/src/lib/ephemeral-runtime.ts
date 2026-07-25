@@ -38,6 +38,7 @@ import {
   type EphemeralMarker,
   type EphemeralMarkerReadResult,
 } from './ephemeral-runtime-marker.js';
+import { normalizeFailure } from './failure-envelope.js';
 import { withFileLock, type FileLockEvent } from './file-lock.js';
 import {
   legacyEphemeralProjectCacheKey,
@@ -46,6 +47,7 @@ import {
   type EphemeralProjectIdentityStrength,
   type EphemeralProjectPaths,
 } from './paths.js';
+import { currentLogger } from './run-scope.js';
 import {
   mutateAnchoredRecord,
   readAnchoredRecord,
@@ -233,8 +235,23 @@ export function touchEphemeralRuntime(
           (paths as EphemeralPathsWithTestHooks)[EPHEMERAL_RUNTIME_TEST_HOOKS],
         ),
     );
-  } catch {
-    // intentionally best-effort hygiene; never fail the user run
+  } catch (error) {
+    // Best-effort hygiene must never fail a user's run — but "best effort" is not "invisible".
+    // This catch sits over ensureEphemeralRuntimeDirectory and withFileLock, so it absorbed
+    // the cache's security and integrity refusals along with every lock timeout: a
+    // world-writable cache root produced exactly the same silence as a successful update, on
+    // every run, forever. Ruling D7: surface always, fail configurably.
+    const envelope = normalizeFailure(error);
+    try {
+      currentLogger().warn({
+        evt: 'core.ephemeral_cache.marker_skipped',
+        code: envelope.code,
+        kind: envelope.definition.kind,
+        msg: envelope.message,
+      });
+    } catch {
+      // @swallow-ok A diagnostic must not be able to fail the run it describes.
+    }
   }
 }
 

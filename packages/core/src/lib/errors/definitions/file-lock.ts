@@ -200,7 +200,11 @@ export const fileLockDefinitions = {
       'The user cache directory changed identity while it was in use. Remove the named cache directory and re-run.',
     stability: 'public',
     lifecycle: 'active',
-    publicMetadataKeys: ['condition'],
+    // `hop` names WHICH directory in the fixed hierarchy refused (home/cache/projects/
+    // runtime). The absolute path is deliberately never published: it contains the user's
+    // home directory, and a public definition that carries $HOME is how a public exposure
+    // becomes a leak.
+    publicMetadataKeys: ['condition', 'hop'],
   },
 
   /**
@@ -222,7 +226,7 @@ export const fileLockDefinitions = {
       'The user cache directory is not owned by this user or is world-writable. Fix its ownership and permissions, or remove it so opensip can recreate it.',
     stability: 'public',
     lifecycle: 'active',
-    publicMetadataKeys: ['condition'],
+    publicMetadataKeys: ['condition', 'hop'],
   },
 
   /** The ephemeral cache root could not be prepared at all. */
@@ -239,6 +243,6 @@ export const fileLockDefinitions = {
       'The user cache directory could not be created. Check the reported errno, free space, and permissions on the parent directory.',
     stability: 'public',
     lifecycle: 'active',
-    publicMetadataKeys: ['errno', 'condition'],
+    publicMetadataKeys: ['errno', 'condition', 'hop'],
   },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

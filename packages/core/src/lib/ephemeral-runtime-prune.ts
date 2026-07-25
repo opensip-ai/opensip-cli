@@ -37,7 +37,9 @@ import {
   type PruneEphemeralInput,
   type PruneEphemeralResult,
 } from './ephemeral-runtime.js';
+import { normalizeFailure } from './failure-envelope.js';
 import { withFileLockAsync, type FileLockEvent } from './file-lock.js';
+import { currentLogger } from './run-scope.js';
 import { acquireRuntimeExclusiveLease, type RuntimeLeaseEvent } from './runtime-lease.js';
 
 const MAX_PRUNE_LOCK_ATTEMPTS = 128;
@@ -320,8 +322,8 @@ export async function pruneEphemeralRuntimes(
   let userPaths;
   try {
     userPaths = inspectEphemeralRuntimeRoot();
-  } catch {
-    return emptyPruneResult();
+  } catch (error) {
+    return prunePassAbandoned('inspect-root', error);
   }
   if (userPaths === undefined) return emptyPruneResult();
   const root = userPaths.ephemeralProjectsDir;
@@ -357,7 +359,34 @@ export async function pruneEphemeralRuntimes(
           hooks,
         }),
     );
-  } catch {
-    return emptyPruneResult();
+  } catch (error) {
+    return prunePassAbandoned('prune-pass', error);
   }
+}
+
+/**
+ * Degrade a prune pass, but never silently.
+ *
+ * Pruning is best-effort by design — it must not fail a user's run — so returning an empty
+ * result is right. Doing it from a BARE catch was not: `inspectEphemeralRuntimeRoot` raises
+ * the cache's security and integrity refusals, so a persistently unsafe cache posture (a
+ * world-writable cache root, a TOCTOU race) was absorbed with no log, no diagnostic event and
+ * no rationale, forever. Ruling D7: surface always, fail configurably. The failure is now
+ * classified and logged at warn; the pass still degrades.
+ */
+function prunePassAbandoned(stage: string, error: unknown): PruneEphemeralResult {
+  const envelope = normalizeFailure(error);
+  try {
+    currentLogger().warn({
+      evt: 'core.ephemeral_cache.prune_abandoned',
+      stage,
+      code: envelope.code,
+      kind: envelope.definition.kind,
+      msg: envelope.message,
+    });
+  } catch {
+    // @swallow-ok The diagnostic must never be able to fail the run it is describing; prune
+    // is best-effort and a missing logger is not a reason to abort the user's command.
+  }
+  return emptyPruneResult();
 }

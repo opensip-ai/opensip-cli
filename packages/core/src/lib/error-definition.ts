@@ -561,7 +561,7 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Check filesystem permissions for the affected path.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['errno'],
+      publicMetadataKeys: ['errno', 'hop'],
     },
     'CORE.SYSTEM.RESOURCE': {
       code: 'CORE.SYSTEM.RESOURCE',
