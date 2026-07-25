@@ -157,7 +157,15 @@ function pushSite(sites, pathValue, sourceFile, node, kind, structure) {
   const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
   const fingerprint = fingerprintStructure(pathValue, kind, structure);
   // Disambiguate same structure at different ordinals within a file without using line in the id.
-  const ordinal = sites.filter((s) => s.kind === kind && s.fingerprint === fingerprint).length;
+  // Count PRIOR OCCURRENCES OF THE SAME STRUCTURE, identified by the structure text itself
+  // (mirrored in `rationale`). Counting stored `fingerprint` values instead is wrong: after the
+  // first occurrence the stored value is the ordinal-mangled fingerprint, so every occurrence
+  // from the second onward measured ordinal 1 and collapsed onto ONE id — which is how a single
+  // siteId came to cover nine distinct sites in one file.
+  const structuralRationale = `structural:${structure}`;
+  const ordinal = sites.filter(
+    (s) => s.kind === kind && s.rationale === structuralRationale,
+  ).length;
   const ordinalFingerprint =
     ordinal === 0 ? fingerprint : fingerprintStructure(pathValue, kind, `${structure}#${ordinal}`);
   sites.push(
