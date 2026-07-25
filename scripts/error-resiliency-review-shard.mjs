@@ -33,17 +33,28 @@ export function main(argv = process.argv.slice(2)) {
   const role = flags.role === 'secondary' ? 'secondary' : 'primary';
   const shardId = String(flags.shard ?? '');
   if (!shardId) {
-    console.error('Usage: --shard <id> [--role primary|secondary] [--reviewer <id>]');
+    console.error(
+      'Usage: --shard <id> [--role primary|secondary] [--reviewer <id>] [--snapshot <id>]',
+    );
+    process.exitCode = 2;
+    return;
+  }
+  // Snapshot selector: the post-infrastructure pass reviews the code AFTER Plan 00's
+  // infrastructure landed, which is the snapshot that feeds the Plan 01 ledger.
+  // Defaults to pre-infra so existing callers are unchanged.
+  const snapshot = String(flags.snapshot ?? 'pre-infra');
+  if (!/^[\w.-]+$/.test(snapshot)) {
+    console.error(`Invalid --snapshot ${snapshot}`);
     process.exitCode = 2;
     return;
   }
 
   const coop = join(repoRoot, INVENTORY_COOP_DIR);
   const scope = JSON.parse(
-    readFileSync(join(coop, 'snapshots/pre-infra/scope-manifest.json'), 'utf8'),
+    readFileSync(join(coop, `snapshots/${snapshot}/scope-manifest.json`), 'utf8'),
   );
   const shards = JSON.parse(
-    readFileSync(join(coop, 'snapshots/pre-infra/shard-manifest.json'), 'utf8'),
+    readFileSync(join(coop, `snapshots/${snapshot}/shard-manifest.json`), 'utf8'),
   );
   const shard = shards.shards.find((s) => s.id === shardId);
   if (!shard) {
