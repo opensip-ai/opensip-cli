@@ -7,6 +7,7 @@
  * at composition boundaries.
  */
 
+import { ErrorDefinitionError } from './error-definition-error.js';
 import { isPlainDataObject } from './plain-data-object.js';
 
 /** Where the failure arose. */
@@ -116,14 +117,16 @@ export interface ErrorCatalog<TCodes extends string = string> {
   require(code: TCodes): ErrorDefinition;
 }
 
-/** Thrown when an error definition or catalog fails validation. */
-export class ErrorDefinitionError extends Error {
-  readonly code = 'CORE.ERROR_DEFINITION.INVALID';
-  constructor(message: string) {
-    super(message);
-    this.name = 'ErrorDefinitionError';
-  }
-}
+/**
+ * Re-exported from its leaf module so existing importers are untouched (ruling D10).
+ * The class itself lives in `error-definition-error.ts` because it is thrown *by* catalog
+ * validation and therefore cannot import a catalog to resolve its own definition.
+ */
+export {
+  ErrorDefinitionError,
+  ERROR_DEFINITION_ERROR_BRAND,
+  isErrorDefinitionErrorLike,
+} from './error-definition-error.js';
 
 /**
  * Deep-freeze a plain JSON-like value. Used so catalogs are runtime-immutable,

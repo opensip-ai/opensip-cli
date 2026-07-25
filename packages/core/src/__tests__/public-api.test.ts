@@ -217,6 +217,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'isContributionWithDisposer',
   'isEmbeddedRender',
   'isEphemeralProjectContext',
+  'isErrorDefinitionErrorLike',
   'isErrorSeverity',
   'isErrorSignal',
   'isIdentChar',
@@ -342,6 +343,7 @@ const EXPECTED_VALUE_EXPORTS = [
   // Plan 00 error/resiliency surface (ADR-0181 / ADR-0183).
   'CORE_SYSTEM_ERROR_OWNER',
   'ERROR_CATALOG_SCHEMA_VERSION',
+  'ERROR_DEFINITION_ERROR_BRAND',
   'ErrorDefinitionError',
   'FAILURE_ENVELOPE_VERSION',
   'FAILURE_PROJECTION_SCHEMA_VERSION',
@@ -353,6 +355,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'abortableSleep',
   'assertErrorCodeShape',
   'composeAbortSignals',
+  'coreErrorCatalog',
   'coreSystemErrorCatalog',
   'createCancelledError',
   'createDeadlineError',

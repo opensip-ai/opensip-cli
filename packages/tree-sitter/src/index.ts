@@ -11,6 +11,10 @@
  * predicates live in each `lang-*` package.
  */
 
+export {
+  treeSitterErrorCatalog,
+  TREE_SITTER_ERROR_OWNER_ID,
+} from './errors/tree-sitter-error-catalog.js';
 export * from './types.js';
 export * from './lifecycle.js';
 export * from './nodes.js';

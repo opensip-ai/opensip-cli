@@ -249,6 +249,9 @@ importers:
       '@opensip-cli/targeting':
         specifier: workspace:*
         version: link:../targeting
+      '@opensip-cli/tree-sitter':
+        specifier: workspace:*
+        version: link:../tree-sitter
       '@opensip-cli/yagni':
         specifier: workspace:*
         version: link:../yagni/engine
@@ -1688,6 +1691,9 @@ importers:
 
   packages/tree-sitter:
     dependencies:
+      '@opensip-cli/core':
+        specifier: workspace:*
+        version: link:../core
       web-tree-sitter:
         specifier: 0.26.11
         version: 0.26.11
@@ -6443,6 +6449,7 @@ snapshots:
 
   '@opensip-cli/tree-sitter@file:packages/tree-sitter':
     dependencies:
+      '@opensip-cli/core': file:packages/core
       web-tree-sitter: 0.26.11
 
   '@opentelemetry/api-logs@0.220.0':

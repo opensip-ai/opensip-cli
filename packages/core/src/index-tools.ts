@@ -67,6 +67,9 @@ export type {
   HostGovernance,
   HostAudit,
   HostEntitlements,
+  // Ruling D1: the composition root declares substrate-owned error catalogs, so the
+  // contribution shape has to be nameable outside core.
+  SubstrateErrorCatalogContribution,
 } from './tools/index.js';
 // Static tool-plugin manifest + the plugin-API epoch + provenance types
 // (launch raw-vs-admitted contract). Re-exported by @opensip-cli/
