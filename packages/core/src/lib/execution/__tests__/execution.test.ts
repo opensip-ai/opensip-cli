@@ -472,3 +472,46 @@ describe('executePipeline (combinator)', () => {
     expect(seen.length).toBeGreaterThan(0);
   });
 });
+
+describe('runWithTimeout — a completed result outlives a concurrent cancellation', () => {
+  it('returns the result when the parent aborts while the unit is finishing', async () => {
+    // Regression: the parent-abort branch used to run AFTER the work resolved and
+    // replaced the value with a cancellation error. That branch was effectively dead
+    // until parentSignal began defaulting to the ambient scope signal, at which point
+    // every interrupt silently discarded evidence a unit had already produced.
+    const parent = new AbortController();
+    const out = await runWithTimeout({
+      run: () => {
+        parent.abort(); // interrupt arrives while this unit is completing
+        return Promise.resolve('observed');
+      },
+      timeoutMs: 1000,
+      parentSignal: parent.signal,
+    });
+    expect(out.status).toBe('ok');
+    expect(out.status === 'ok' && out.result).toBe('observed');
+  });
+
+  it('still reports cancellation when the unit produced nothing', async () => {
+    const parent = new AbortController();
+    parent.abort();
+    const out = await runWithTimeout({
+      run: () => Promise.resolve(1),
+      timeoutMs: 1000,
+      parentSignal: parent.signal,
+    });
+    // Pre-aborted: the unit never runs, so there is no evidence to preserve.
+    expect(out.status).toBe('error');
+  });
+
+  it('a timeout still wins over a late result', async () => {
+    const out = await runWithTimeout({
+      run: (signal) =>
+        new Promise<string>((resolve) => {
+          signal.addEventListener('abort', () => resolve('late'), { once: true });
+        }),
+      timeoutMs: 10,
+    });
+    expect(out.status, 'the single-source abort invariant must hold').toBe('timeout');
+  });
+});
