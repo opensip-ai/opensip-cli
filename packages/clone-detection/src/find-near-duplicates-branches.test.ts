@@ -51,8 +51,12 @@ describe('findNearDuplicates branch behavior', () => {
     );
     const result = findNearDuplicates(members, { minBodySize: 1 });
     expect(result.coverage.complete).toBe(false);
-    expect(result.coverage.reasons).toEqual(['lsh-bucket-cap']);
+    // 300 mutually-similar members also exceed MAX_CLUSTER_SIZE (50), so this pass is
+    // bounded TWICE. Before the cluster cap was surfaced, this assertion read
+    // `['lsh-bucket-cap']` — it passed only because the second truncation was invisible.
+    expect(result.coverage.reasons).toEqual(['lsh-bucket-cap', 'cluster-size-cap']);
     expect(result.coverage.cappedBuckets).toBeGreaterThan(0);
+    expect(result.coverage.cappedClusters).toBeGreaterThan(0);
     // The sampled bucket still yields the cluster (bounded, not dropped).
     expect(result.clusters.length).toBeGreaterThan(0);
   });
@@ -65,7 +69,12 @@ describe('findNearDuplicates branch behavior', () => {
       ],
       { minBodySize: 1 },
     );
-    expect(result.coverage).toEqual({ complete: true, reasons: [], cappedBuckets: 0 });
+    expect(result.coverage).toEqual({
+      complete: true,
+      reasons: [],
+      cappedBuckets: 0,
+      cappedClusters: 0,
+    });
   });
 
   it('throws when lshBands cannot evenly partition the signature, instead of silently returning complete:true empty', () => {
@@ -199,10 +208,38 @@ describe('findNearDuplicates branch behavior', () => {
         language: 'typescript',
       }),
     );
-    const { clusters } = findNearDuplicates(members, { minBodySize: 1 });
+    const { clusters, coverage } = findNearDuplicates(members, { minBodySize: 1 });
     expect(clusters).toHaveLength(1);
     expect(clusters[0]?.clusterSize).toBe(50);
     expect(clusters[0]?.nearMembers.length).toBeLessThanOrEqual(50);
+
+    // The truncation MUST be visible in coverage. Asserting only the cluster shape is
+    // what let the cap stay silent: the pass dropped 10 members and still reported
+    // `complete: true`, which a consumer branching on `!coverage.complete` reads as
+    // "analysed everything and found nothing more".
+    expect(coverage.cappedClusters).toBe(1);
+    expect(coverage.complete).toBe(false);
+    expect(coverage.reasons).toContain('cluster-size-cap');
+  });
+
+  it('reports complete coverage when no cap was applied', () => {
+    // The negative half of the same invariant: an unbounded pass must not claim a
+    // cap reason, or `!complete` stops meaning anything.
+    const sharedSignature = signature();
+    const members = Array.from({ length: 3 }, (_, i) =>
+      cand({
+        bodyHash: `u${String(i)}`,
+        bodySignature: sharedSignature,
+        filePath: `u${String(i)}.ts`,
+        line: 1,
+        qualifiedName: `u${String(i)}`,
+        language: 'typescript',
+      }),
+    );
+    const { coverage } = findNearDuplicates(members, { minBodySize: 1 });
+    expect(coverage.cappedClusters).toBe(0);
+    expect(coverage.complete).toBe(true);
+    expect(coverage.reasons).toEqual([]);
   });
 });
 
