@@ -1,15 +1,24 @@
 import { isAbsolute } from 'node:path';
 
-import { isPlainRecord, tryCatch, tryCatchAsync } from '@opensip-cli/core';
+import { currentScope, isPlainRecord, tryCatch, tryCatchAsync } from '@opensip-cli/core';
 
-import { CONTROL_CHARACTER, INVENTORY_CANCELLED_REASON } from './inventory-helpers.js';
-import { MAX_TARGET_NAME, MAX_TARGET_RESOLVED_PATH_LENGTH } from './types.js';
+import {
+  BOUNDED_CAPABILITY_TIMEOUT_REASON,
+  CONTROL_CHARACTER,
+  INVENTORY_CANCELLED_REASON,
+} from './inventory-helpers.js';
+import {
+  MAX_BOUNDED_CAPABILITY_MS,
+  MAX_TARGET_NAME,
+  MAX_TARGET_RESOLVED_PATH_LENGTH,
+} from './types.js';
 
 import type {
   BoundedTargetMembershipResolution,
   BoundedTargetMembershipResolver,
   BoundedTargetResolution,
   BoundedTargetResolver,
+  Result,
   TargetResolver,
 } from '@opensip-cli/core';
 
@@ -272,6 +281,90 @@ export function validateBoundedTargetMembershipResolution(
   return checked.value.resolution;
 }
 
+/** The capability never answered: the wait ended on a bound, not on an observation. */
+type CapabilityInterrupt = 'cancelled' | 'timeout';
+
+/**
+ * Await one foreign capability with a hard bound, WITHOUT discarding an answer it already
+ * gave.
+ *
+ * `try/catch` alone only covers the case where foreign code FAILS, never the case where it
+ * does not answer at all: a resolver that hangs outlives every entry, byte and file bound
+ * inventory owns, and ignores cancellation entirely. So the wait is raced against a
+ * deadline and the cancel signal.
+ *
+ * The race deliberately PREFERS a settled call over a simultaneous interrupt, and that is
+ * why this is not `runWithTimeout` from the core execution substrate. That primitive is
+ * built for scheduling units, where a cancelled unit's result is worthless, so its
+ * parent-abort arm resolves ahead of an already-rejected work promise. Here the result is
+ * evidence: a capability that returned a malformed value, or threw, has told us something
+ * about the host that a concurrent Ctrl-C must not erase. Deferring the interrupt arm by
+ * one macrotask makes the preference deterministic rather than a microtask-ordering
+ * accident — a promise that has settled always drains before the check phase — while a
+ * genuinely hung call is still abandoned immediately after the abort.
+ *
+ * Per ruling D5 the cancel plane falls back to the ambient run signal when the caller
+ * threads none.
+ */
+async function settleBoundedCapability(
+  invoke: () => Promise<unknown>,
+  signal: AbortSignal | undefined,
+): Promise<Result<unknown, Error> | CapabilityInterrupt> {
+  const work = tryCatchAsync(invoke);
+  // Only a real AbortSignal can be raced. A caller that hands an internal seam a
+  // duck-typed object still gets the deadline plus the `.aborted` polling the surrounding
+  // code performs, instead of a crash inside the race wiring; `buildProjectInventory`
+  // refuses such a value at its own boundary (ruling D6).
+  const cancel = signal instanceof AbortSignal ? signal : currentScope()?.abortSignal;
+  const interrupt = new Promise<CapabilityInterrupt>((resolve) => {
+    const timer = setTimeout(() => resolve('timeout'), MAX_BOUNDED_CAPABILITY_MS);
+    timer.unref?.();
+    const onAbort = (): void => {
+      setImmediate(() => resolve('cancelled'));
+    };
+    if (cancel?.aborted === true) onAbort();
+    else cancel?.addEventListener('abort', onAbort, { once: true });
+    void work.finally(() => {
+      clearTimeout(timer);
+      cancel?.removeEventListener('abort', onAbort);
+    });
+  });
+  return Promise.race([work, interrupt]);
+}
+
+/**
+ * Invoke and classify one host-supplied bounded capability.
+ *
+ * Returns the raw capability value, or `undefined` after recording why there is none. An
+ * interrupt and an observed fault are reported differently on purpose: attributing
+ * `reasonCodes.failure` to a call that was merely cancelled would publish a host fault
+ * that was never committed.
+ */
+async function invokeBoundedCapability(
+  invoke: () => Promise<unknown>,
+  reasons: Set<string>,
+  reasonCodes: BoundedResolutionReasons,
+  signal: AbortSignal | undefined,
+): Promise<{ readonly ok: true; readonly value: unknown } | { readonly ok: false }> {
+  const settled = await settleBoundedCapability(invoke, signal);
+  if (settled === 'timeout') {
+    reasons.add(BOUNDED_CAPABILITY_TIMEOUT_REASON);
+    reasons.add(reasonCodes.failure);
+    return { ok: false };
+  }
+  if (settled === 'cancelled') {
+    reasons.add(INVENTORY_CANCELLED_REASON);
+    return { ok: false };
+  }
+  if (!settled.ok) {
+    if (signal?.aborted === true) reasons.add(INVENTORY_CANCELLED_REASON);
+    reasons.add(reasonCodes.failure);
+    // @swallow-ok: the failure is surfaced as a bounded reason code; the error detail is intentionally not logged here.
+    return { ok: false };
+  }
+  return { ok: true, value: settled.value };
+}
+
 /** Invoke and validate one bounded host capability, adding stable trust reasons. */
 export async function invokeBoundedTargetResolution(
   invoke: () => Promise<unknown>,
@@ -280,13 +373,8 @@ export async function invokeBoundedTargetResolution(
   reasonCodes: BoundedResolutionReasons,
   signal?: AbortSignal,
 ): Promise<BoundedTargetResolution | undefined> {
-  const invoked = await tryCatchAsync(invoke);
-  if (!invoked.ok) {
-    if (signal?.aborted === true) reasons.add(INVENTORY_CANCELLED_REASON);
-    reasons.add(reasonCodes.failure);
-    // @swallow-ok: the failure is surfaced as a bounded reason code; the error detail is intentionally not logged here.
-    return undefined;
-  }
+  const invoked = await invokeBoundedCapability(invoke, reasons, reasonCodes, signal);
+  if (!invoked.ok) return undefined;
   const validated = validateBoundedTargetResolution(invoked.value, maximumFiles);
   const aborted = signal?.aborted === true;
   if (aborted) reasons.add(INVENTORY_CANCELLED_REASON);
@@ -305,13 +393,13 @@ export async function invokeBoundedTargetMembershipResolution(input: {
   readonly reasons: Set<string>;
   readonly signal?: AbortSignal;
 }): Promise<BoundedTargetMembershipResolution | undefined> {
-  const invoked = await tryCatchAsync(input.invoke);
-  if (!invoked.ok) {
-    if (input.signal?.aborted === true) input.reasons.add(INVENTORY_CANCELLED_REASON);
-    input.reasons.add(input.reasonCodes.failure);
-    // @swallow-ok: the failure is surfaced as a bounded reason code; the error detail is intentionally not logged here.
-    return undefined;
-  }
+  const invoked = await invokeBoundedCapability(
+    input.invoke,
+    input.reasons,
+    input.reasonCodes,
+    input.signal,
+  );
+  if (!invoked.ok) return undefined;
   const validated = validateBoundedTargetMembershipResolution(
     invoked.value,
     input.maximumFiles,

@@ -34,6 +34,28 @@ const ROOT_STRUCTURAL_MARKERS: readonly {
   },
 ];
 
+/**
+ * Bounds a project-relative file identity must satisfy to be publishable.
+ *
+ * These are `relativePathSchema` (`@opensip-cli/contracts`) restated at the producer, plus
+ * the control-character rejection inventory adds. The producer must be no wider than the
+ * schema: a path this function admits but the schema rejects turns the whole snapshot into
+ * a validation failure at the very end of the build, discarding every other observation
+ * for one unlucky filename. The bounds the schema does NOT state (length ceiling, control
+ * characters) stay here.
+ */
+function publishableRelativePath(relativePath: string): boolean {
+  return (
+    relativePath.length > 0 &&
+    relativePath.length <= 1024 &&
+    !CONTROL_CHARACTER.test(relativePath) &&
+    !relativePath.startsWith('/') &&
+    !/^[A-Za-z]:/u.test(relativePath) &&
+    !relativePath.includes('\\') &&
+    relativePath.split('/').every((part) => part !== '' && part !== '.' && part !== '..')
+  );
+}
+
 export function canonicalFile(
   filePath: string,
   projectRoot: string,
@@ -61,15 +83,7 @@ export function canonicalFile(
   // is the stable file identity shared with graph and agent requests. Retaining
   // it keeps an in-root symlink addressable without admitting symlink escapes.
   const relativePath = toPosixRelative(identityRoot, filePath);
-  if (
-    relativePath.length === 0 ||
-    relativePath.length > 1024 ||
-    CONTROL_CHARACTER.test(relativePath) ||
-    relativePath === '..' ||
-    relativePath.startsWith('../')
-  ) {
-    return undefined;
-  }
+  if (!publishableRelativePath(relativePath)) return undefined;
   return { absolutePath, relativePath };
 }
 

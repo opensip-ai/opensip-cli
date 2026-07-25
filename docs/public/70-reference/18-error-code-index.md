@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-24
+last_verified: 2026-07-25
 release: v0.8.4
 title: "Error code index"
 audience: [contributors, operators, agents]
@@ -12,8 +12,8 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **5**
-- Definitions: **22**
+- Catalog sources: **6**
+- Definitions: **24**
 
 ## Catalogs
 
@@ -24,6 +24,7 @@ generated: true
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 1 |
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 3 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
+| `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 
 ## Codes
 
@@ -51,6 +52,8 @@ generated: true
 | `UNKNOWN_FAILURE` | `@opensip-cli/core` | application | unknown | invariant | never | fatal | fatal | active | Capture the run id and operator detail; do not retry blindly. |
 | `UNKNOWN_LIVE_VIEW` | `@opensip-cli/core` | application | tool-author | not-found | never | error | runtime | active | Use a registered live view key for this tool. |
 | `VALIDATION_ERROR` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Fix the invalid input, flag, or configuration value and retry. |
+| `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` | `@opensip-cli/codebase` | application | user | validation | never | error | configuration | active | Remove the circular reference or non-JSON (bigint) value from the project configuration document, then re-run. |
+| `VALIDATION.CODEBASE.INVENTORY_INPUT_INVALID` | `@opensip-cli/codebase` | application | tool-author | validation | never | error | runtime | active | Correct the named buildProjectInventory input: bounds must be positive finite numbers, and `signal` must be a real AbortSignal. Omit a bound to accept the built-in maximum. |
 
 ## See also
 

@@ -45,6 +45,14 @@ const CATALOG_SOURCES = [
     file: 'packages/mcp/src/errors/mcp-error-catalog.ts',
     exportName: 'mcpErrorCatalog',
   },
+  {
+    // Substrate catalog (Plan 01 ruling D1): a non-Tool package owns codes keyed on its
+    // own npm package name, so the index attributes them to codebase rather than the host.
+    packageName: '@opensip-cli/codebase',
+    ownerId: '@opensip-cli/codebase',
+    file: 'packages/codebase/src/errors/codebase-error-catalog.ts',
+    exportName: 'codebaseErrorCatalog',
+  },
 ];
 
 const AXES = [

@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
+import { createToolError } from '@opensip-cli/core';
+
+import { codebaseErrorCatalog } from './errors/codebase-error-catalog.js';
 import { byCodePoint } from './freeze.js';
+
+import type { ToolError } from '@opensip-cli/core';
 
 type CanonicalFrame =
   | { readonly type: 'text'; readonly value: string }
@@ -15,9 +20,23 @@ function appendFrames(stack: CanonicalFrame[], frames: readonly CanonicalFrame[]
 }
 
 /**
+ * The one definition every unencodable-document condition carries (ruling D9). The
+ * specific branch travels in the allowlisted `metadata.condition` key, not in the code.
+ */
+const UNENCODABLE = codebaseErrorCatalog.require('VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
+
+/** Build the coded refusal for one unencodable-document condition. */
+function unencodable(condition: 'bigint-scalar' | 'circular-reference', detail: string): ToolError {
+  return createToolError(UNENCODABLE, `project config identity cannot encode ${detail}`, {
+    metadata: { condition },
+  });
+}
+
+/**
  * Append one JSON-compatible scalar to the canonical digest stream.
  *
- * @throws {TypeError} When the supplied scalar is a bigint, which JSON cannot encode.
+ * @throws {ToolError} `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the supplied
+ * scalar is a bigint, which JSON cannot encode.
  */
 function appendScalar(
   hash: ReturnType<typeof createHash>,
@@ -39,7 +58,7 @@ function appendScalar(
       return true;
     }
     case 'bigint': {
-      throw new TypeError('project config identity cannot encode bigint values');
+      throw unencodable('bigint-scalar', 'bigint values');
     }
     case 'undefined':
     case 'function':
@@ -90,7 +109,8 @@ function objectFrames(value: object): readonly CanonicalFrame[] {
 /**
  * Hash one value with deterministic JSON object-key ordering.
  *
- * @throws {TypeError} When the value contains a bigint or circular object reference.
+ * @throws {ToolError} `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the value
+ * contains a bigint or circular object reference.
  */
 function canonicalJsonDigest(value: unknown): string {
   const hash = createHash('sha256');
@@ -110,7 +130,7 @@ function canonicalJsonDigest(value: unknown): string {
     if (appendScalar(hash, item, frame.arrayElement)) continue;
     const objectItem = item as object;
     if (active.has(objectItem)) {
-      throw new TypeError('project config identity cannot encode circular values');
+      throw unencodable('circular-reference', 'circular values');
     }
     active.add(objectItem);
     appendFrames(stack, objectFrames(objectItem));
@@ -121,7 +141,8 @@ function canonicalJsonDigest(value: unknown): string {
 /**
  * Stable bounded identity of one already-captured, host-validated config document.
  *
- * @throws {TypeError} When the document contains a bigint or circular object reference.
+ * @throws {ToolError} `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the document
+ * contains a bigint or circular object reference.
  */
 export function projectConfigIdentity(
   document: Readonly<Record<string, unknown>> | undefined,

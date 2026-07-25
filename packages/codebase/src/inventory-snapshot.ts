@@ -5,7 +5,14 @@ import {
 } from '@opensip-cli/contracts';
 
 import { byCodePoint, deepFreeze } from './freeze.js';
-import { normalizeConfigIdentity } from './inventory-helpers.js';
+import {
+  INVENTORY_CANCELLED_REASON,
+  INVENTORY_DEADLINE_REASON,
+  INVENTORY_SNAPSHOT_INVALID_REASON,
+  REASON_CAP_REACHED,
+  normalizeConfigIdentity,
+} from './inventory-helpers.js';
+import { MAX_COVERAGE_REASON_CODES } from './types.js';
 
 import type { PackageManifestFacts, ProjectInventory, ProjectInventoryInput } from './types.js';
 import type {
@@ -201,12 +208,44 @@ export function enforceSerializedBudget(input: {
   };
 }
 
+/**
+ * Reason codes whose LOSS would change what the evidence means, not merely how much of it
+ * there is. Truncation drops ordinary cap/read reasons; dropping one of these would make a
+ * cancelled or timed-out run read as an ordinary partial one (ruling D7), so they are
+ * retained first and the tail is truncated around them.
+ */
+const PINNED_REASONS: readonly string[] = [INVENTORY_CANCELLED_REASON, INVENTORY_DEADLINE_REASON];
+
+/**
+ * Project a deduplicated reason set down to the contract's bound.
+ *
+ * The producer must cap here: `contextCoverageSchema` rejects more than
+ * {@link MAX_COVERAGE_REASON_CODES} codes, so an uncapped coverage object makes the
+ * DEGRADATION path itself fail validation — precisely when there is nothing left to fall
+ * back to. Truncation is itself reported, via {@link REASON_CAP_REACHED}.
+ */
+function retainedCoverageReasons(reasons: readonly string[]): readonly string[] {
+  const unique = [...new Set(reasons)].sort(byCodePoint);
+  if (unique.length <= MAX_COVERAGE_REASON_CODES) return unique;
+  const pinned = PINNED_REASONS.filter((reason) => unique.includes(reason));
+  const retained = new Set<string>([...pinned, REASON_CAP_REACHED]);
+  for (const reason of unique) {
+    if (retained.size >= MAX_COVERAGE_REASON_CODES) break;
+    retained.add(reason);
+  }
+  return [...retained].sort(byCodePoint);
+}
+
 function coverage(
   files: readonly FileFact[],
   available: boolean,
   reasons: readonly string[],
 ): ContextCoverage {
-  const uniqueReasons = [...new Set(reasons)].sort(byCodePoint);
+  const uniqueReasons = retainedCoverageReasons(reasons);
+  // `complete` requires an EMPTY retained set, and truncation never empties one, so an
+  // interrupted run can never be published as complete. That guarantee rests on pinning:
+  // if a cancellation reason could be truncated away it would still leave a non-empty set
+  // here, but the verdict would read as an ordinary capped run (ruling D7).
   let status: ContextCoverage['status'];
   if (available) status = uniqueReasons.length > 0 ? 'partial' : 'complete';
   else status = 'unavailable';
@@ -218,34 +257,75 @@ function coverage(
   });
 }
 
-export function emptyInventory(
-  input: ProjectInventoryInput,
-  reasons: Set<string>,
-): ProjectInventory {
-  const configIdentity = normalizeConfigIdentity(input.configIdentity, reasons);
-  const snapshotInput: Omit<ProjectInventorySnapshot, 'snapshotId' | 'metadataIdentity'> = {
+type SnapshotBase = Omit<ProjectInventorySnapshot, 'snapshotId' | 'metadataIdentity'>;
+
+/** Stamp identities onto a base and freeze it, with no validation step that can fail. */
+function stampSnapshot(base: SnapshotBase): ProjectInventorySnapshot {
+  return deepFreeze({ ...base, ...buildProjectInventorySnapshotIdentities(base) });
+}
+
+/**
+ * Validate a base and stamp it, or fall back to a snapshot that cannot fail validation.
+ *
+ * `emptyInventory` IS the failure path — unresolvable root, cancelled pre-flight, missing
+ * capability all land here — so it may not contain a step that throws. `safeParse` keeps
+ * the contract check (a malformed empty snapshot must not be published as if it were
+ * valid) while turning a rejection into a narrower snapshot built only from values this
+ * module owns, so it cannot fail in turn.
+ *
+ * `preserved` carries the pinned interruption reasons forward: withdrawing a projection
+ * must not also withdraw the fact that the run was cancelled (ruling D7).
+ */
+function validatedOrLastResort(
+  base: SnapshotBase,
+  preserved: readonly string[],
+): ProjectInventorySnapshot {
+  const parsed = projectInventorySnapshotSchema.safeParse({
+    ...base,
+    ...buildProjectInventorySnapshotIdentities(base),
+  });
+  if (parsed.success) return deepFreeze(parsed.data);
+  return stampSnapshot({
     schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
     project: {
       workspacePatterns: [],
       languages: [],
       fileCount: 0,
       packageCount: 0,
-      configIdentity,
+      configIdentity: 'config:unavailable',
     },
     packages: [],
     files: [],
-    coverage: {
+    coverage: deepFreeze({
       status: 'unavailable' as const,
-      reasonCodes: [...reasons].sort(byCodePoint),
+      reasonCodes: [...new Set([...preserved, INVENTORY_SNAPSHOT_INVALID_REASON])].sort(
+        byCodePoint,
+      ),
       observed: 0,
-    },
-  };
-  const identities = buildProjectInventorySnapshotIdentities(snapshotInput);
-  const snapshot = deepFreeze(
-    projectInventorySnapshotSchema.parse({
-      ...snapshotInput,
-      ...identities,
     }),
+  });
+}
+
+export function emptyInventory(
+  input: ProjectInventoryInput,
+  reasons: Set<string>,
+): ProjectInventory {
+  const configIdentity = normalizeConfigIdentity(input.configIdentity, reasons);
+  const snapshot = validatedOrLastResort(
+    {
+      schemaVersion: PROJECT_INVENTORY_SCHEMA_VERSION,
+      project: {
+        workspacePatterns: [],
+        languages: [],
+        fileCount: 0,
+        packageCount: 0,
+        configIdentity,
+      },
+      packages: [],
+      files: [],
+      coverage: coverage([], false, [...reasons]),
+    },
+    PINNED_REASONS.filter((reason) => reasons.has(reason)),
   );
   return Object.freeze({
     snapshot,
