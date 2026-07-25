@@ -1,0 +1,31 @@
+# Fixture-only fit config for the error-subprocess-bounds dogfood check.
+#
+# The repo-level config excludes `**/__fixtures__/**`, so this fixture config
+# deliberately re-includes only this check's synthetic pass/fail tree. (The check
+# itself carries the matching self-fixture carve-out, so every OTHER check's
+# fixtures stay out of scope — several of them hold unbounded subprocess calls
+# on purpose, as the payload their own rule detects.)
+#
+# Run from the repo root:
+#   node packages/cli/dist/index.js fit \
+#     --check error-subprocess-bounds \
+#     --config opensip-cli/fit/checks/__fixtures__/error-subprocess-bounds/fit.fixture.config.yml
+#
+# Expected result: exactly TWO findings — one on violation/git-safety.ts and one
+# on violation/kill-tree.ts. Both clean/ files must be silent.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: error-subprocess-bounds fixtures
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/error-subprocess-bounds/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  error-subprocess-bounds: [fixtures]

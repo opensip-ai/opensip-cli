@@ -1,0 +1,29 @@
+# Fixture-only fit config for the error-floating-async-operation dogfood check.
+#
+# The repo-level config excludes `**/__fixtures__/**`, so this fixture config
+# deliberately re-includes only this check's synthetic pass/fail tree.
+#
+# Run from the repo root:
+#   node packages/cli/dist/index.js fit \
+#     --check error-floating-async-operation \
+#     --config opensip-cli/fit/checks/__fixtures__/error-floating-async-operation/fit.fixture.config.yml
+#
+# Expected result: exactly THREE findings, all in violation/bad.ts
+# (two detached `.then(...)` chains, one `void <in-file async call>()`),
+# and ZERO findings in clean/good.ts.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: error-floating-async-operation fixtures
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/error-floating-async-operation/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  error-floating-async-operation: [fixtures]
