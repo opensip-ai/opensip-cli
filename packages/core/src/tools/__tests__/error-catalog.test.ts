@@ -189,17 +189,21 @@ describe('aggregateErrorCatalogs — substrate catalogs (Plan 01 ruling D1)', ()
   it('reports a collision rather than letting a substrate overwrite core', () => {
     // Pick a core code that satisfies the OWNER.DOMAIN.CONDITION grammar, since legacy
     // single-token codes cannot be re-declared through defineErrorCatalog at all.
-    const coreCode = coreSystemErrorCatalog.list.find((d) => d.code.split('.').length === 3)?.code;
-    expect(coreCode).toBeDefined();
+    // Narrow by guard rather than `as string` / `!`: the assertion-style rule rejects the
+    // cast, and this repo's no-non-null-assertions check rejects the bang.
+    const found = coreSystemErrorCatalog.list.find((d) => d.code.split('.').length === 3)?.code;
+    if (found === undefined)
+      throw new Error('expected at least one OWNER.DOMAIN.CONDITION core code');
+    const coreCode: string = found;
     const catalog = defineErrorCatalog(substrateOwner, {
-      [coreCode as string]: { ...def, code: coreCode as string },
+      [coreCode]: { ...def, code: coreCode },
     });
     const { byCode, collisions } = aggregateErrorCatalogs(
       [],
       [{ packageName: '@opensip-cli/datastore', catalog }],
     );
     expect(collisions.some((c) => c.code === coreCode)).toBe(true);
-    expect(byCode.get(coreCode as string)?.owner.id).not.toBe('@opensip-cli/datastore');
+    expect(byCode.get(coreCode)?.owner.id).not.toBe('@opensip-cli/datastore');
   });
 
   it('reports a collision when a tool claims a code a substrate already owns', () => {
