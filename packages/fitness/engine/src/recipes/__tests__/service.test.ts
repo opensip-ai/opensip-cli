@@ -257,7 +257,10 @@ describe('FitnessRecipeService — parallel execution', () => {
       }),
     );
 
-    expect([...completes].toSorted()).toEqual(['first', 'second']);
+    // `.sort()` on the spread copy, not `.toSorted()`: toSorted is ES2023 and this repo
+    // compiles against `lib: ["ES2022"]`, so the latter does not type-check. Sorting a
+    // fresh copy is not a mutation, which is why unicorn/no-array-sort permits it.
+    expect([...completes].sort()).toEqual(['first', 'second']);
     expect(result.summary.totalChecks).toBe(2);
     expect(result.checkResults.every((cr) => cr.error === undefined)).toBe(true);
   });
