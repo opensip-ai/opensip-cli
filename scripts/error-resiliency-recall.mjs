@@ -131,11 +131,30 @@ export function collectFindings(root = REPO_ROOT, findingsPath) {
     );
 }
 
-/** Ledger paths are repo-relative; findings may be absolute. */
-export function normalizePath(p) {
-  const s = String(p).replaceAll('\\', '/');
-  const i = s.indexOf('/opensip-cli/');
-  if (s.startsWith('/') && i >= 0) return s.slice(i + '/opensip-cli/'.length);
+/**
+ * Ledger paths are repo-relative; findings arrive absolute.
+ *
+ * Anchoring on the checkout root (rather than the first `/opensip-cli/` segment) is
+ * load-bearing: inside a git worktree the absolute path contains the repository name
+ * TWICE — `…/opensip-cli/.claude/worktrees/<branch>/packages/…` — so slicing at the
+ * first occurrence leaves a `.claude/worktrees/<branch>/` prefix, every join silently
+ * fails, and the measurement reports a recall of zero that is an artefact rather than
+ * a result.
+ *
+ * @param {string} p
+ * @param {string} root checkout root the findings were produced from
+ */
+export function normalizePath(p, root = REPO_ROOT) {
+  let s = String(p).replaceAll('\\', '/');
+  const rootPrefix = `${String(root).replaceAll('\\', '/').replace(/\/$/, '')}/`;
+  if (s.startsWith(rootPrefix)) s = s.slice(rootPrefix.length);
+  // Fall back to the last worktree segment for paths produced by another checkout.
+  const wt = s.match(/^.*\/\.claude\/worktrees\/[^/]+\//);
+  if (wt) s = s.slice(wt[0].length);
+  else if (s.startsWith('/')) {
+    const i = s.lastIndexOf('/opensip-cli/');
+    if (i >= 0) s = s.slice(i + '/opensip-cli/'.length);
+  }
   return s.replace(/^\.\//, '');
 }
 
