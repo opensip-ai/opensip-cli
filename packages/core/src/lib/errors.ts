@@ -6,9 +6,12 @@
 import {
   type ErrorCatalogOwner,
   type ErrorDefinition,
+  coreSystemErrorCatalog,
   definitionFromLegacyCode,
   normalizeErrorDefinition,
 } from './error-definition.js';
+import { currentLogger } from './run-scope.js';
+
 
 // =============================================================================
 // ERROR CLASSES
@@ -409,9 +412,14 @@ export class ToolError extends Error {
         : definitionFromLegacyCode(this.code);
     this.failureClass =
       typeof options?.failureClass === 'string' ? options.failureClass.slice(0, 128) : undefined;
+    // Redacted like `metadata`, not merely truncated. A child process's stderr tail is the
+    // single most credential-dense field on this type — a failing `git` or scanner routinely
+    // echoes a remote URL with an embedded token — and it was reaching persisted logs and
+    // worker messages verbatim. D8: one choke point, applied at construction, so no caller
+    // has to remember.
     this.stderrTail =
       typeof options?.stderrTail === 'string'
-        ? options.stderrTail.slice(0, MAX_STDERR_TAIL)
+        ? redactCredentialText(options.stderrTail).slice(0, MAX_STDERR_TAIL)
         : undefined;
 
     const known = new Set([
@@ -430,8 +438,14 @@ export class ToolError extends Error {
         legacy[key] = value;
       }
     }
-    this.legacyCompatibility =
-      Object.keys(legacy).length > 0 ? sanitizeErrorMetadata(legacy) : undefined;
+    // The open `[key: string]: unknown` bag on ToolErrorOptions is marked for removal, but
+    // 41 production files across every wave still populate it, so deleting the field now
+    // would break Waves 2-5 rather than migrating them. It warns instead: the residual is
+    // visible on every run that hits one, and the field itself is retired in Phase 6 once
+    // the last caller moves to bounded `metadata`.
+    const legacyKeys = Object.keys(legacy);
+    this.legacyCompatibility = legacyKeys.length > 0 ? sanitizeErrorMetadata(legacy) : undefined;
+    if (legacyKeys.length > 0) warnLegacyOptionBag(this.code, legacyKeys);
     this.metadata = sanitizeErrorMetadata(options?.metadata ?? {});
 
     Object.defineProperty(this, TOOL_ERROR_BRAND, {
@@ -724,13 +738,77 @@ export function formatUnknownErrorMessage(error: unknown): string {
   return redactCredentialText(message).slice(0, MAX_METADATA_STRING);
 }
 
+/**
+ * Coerce an arbitrary throwable to an `Error` without discarding what it already carried.
+ *
+ * A bare `new Error(...)` here erased the code, definition and exit class of anything that
+ * was structurally `ToolError`-like — which is exactly what a ToolError looks like after it
+ * crosses a duplicate-core boundary, where `instanceof` is false but the brand is intact
+ * (pnpm's `injectWorkspacePackages` puts two physical copies of core in one process). The
+ * result normalized to `known: 'unknown'`, so a fully classified failure arrived at the CLI
+ * boundary indistinguishable from a thrown string.
+ */
+/**
+ * Warn once per (code, key-set) that a caller used the legacy open option bag.
+ *
+ * Deduplicated because these constructions sit on hot paths — a per-file walk can raise
+ * thousands — and an unbounded warn stream is indistinguishable from noise, which is how a
+ * migration signal gets ignored. The set is bounded so a hostile or generated key space
+ * cannot grow it without limit.
+ */
+const warnedLegacyOptionBags = new Set<string>();
+const MAX_LEGACY_BAG_WARNINGS = 64;
+
+function warnLegacyOptionBag(code: string, keys: readonly string[]): void {
+  const signature = `${code}|${[...keys].sort().join(',')}`;
+  if (warnedLegacyOptionBags.has(signature)) return;
+  if (warnedLegacyOptionBags.size >= MAX_LEGACY_BAG_WARNINGS) return;
+  warnedLegacyOptionBags.add(signature);
+  try {
+    currentLogger().warn({
+      evt: 'core.error.legacy_option_bag',
+      code,
+      keys: [...keys].sort(),
+      msg: 'ToolError constructed with unrecognized options; move them into bounded `metadata` (the open bag is scheduled for removal)',
+    });
+  } catch {
+    // @swallow-ok A migration warning must never be able to fail the construction of the
+    // error it is describing — that would replace a real failure with a diagnostic one.
+  }
+}
+
+/** Test seam: the warn set is process-lived by design, so tests must be able to reset it. */
+export function resetLegacyOptionBagWarnings(): void {
+  warnedLegacyOptionBags.clear();
+}
+
 function ensureError(error: unknown): Error {
   try {
     if (error instanceof Error) return error;
   } catch {
     // @swallow-ok probe/optional capability: revoked/hostile instanceof failure falls through to a safe Error.
   }
-  return new Error(formatUnknownErrorMessage(error));
+  if (isToolErrorLike(error)) {
+    const rebuilt = new ToolError(
+      readToolErrorMessage(error),
+      typeof error.code === 'string' ? error.code : 'SYSTEM_ERROR',
+    );
+    return rebuilt;
+  }
+  // The catalog KEY is the legacy token; the definition's published `code` is the dotted
+  // form. Resolve through the catalog so the two can never drift at this call site.
+  return new SystemError(formatUnknownErrorMessage(error), {
+    code: coreSystemErrorCatalog.require('UNKNOWN_FAILURE').code,
+  });
+}
+
+/** Read a cross-copy ToolError-like message without invoking a hostile getter. */
+function readToolErrorMessage(value: { readonly message?: unknown }): string {
+  try {
+    return typeof value.message === 'string' ? value.message : 'Tool error';
+  } catch {
+    return 'Tool error';
+  }
 }
 
 // =============================================================================

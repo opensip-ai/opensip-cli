@@ -490,6 +490,9 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Verify the resource name and list available options.',
       stability: 'public',
       lifecycle: 'active',
+      // fromNativeError records the errno here; without the allowlist
+      // `allowlistedMetadata` discards the one machine-classification datum it captured.
+      publicMetadataKeys: ['errno'],
     },
     SYSTEM_ERROR: {
       code: 'SYSTEM_ERROR',
@@ -503,6 +506,9 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Retry once; if it persists, capture the run id and report a bug.',
       stability: 'public',
       lifecycle: 'active',
+      // fromNativeError records the errno here; without the allowlist
+      // `allowlistedMetadata` discards the one machine-classification datum it captured.
+      publicMetadataKeys: ['errno'],
     },
     TIMEOUT: {
       code: 'TIMEOUT',
