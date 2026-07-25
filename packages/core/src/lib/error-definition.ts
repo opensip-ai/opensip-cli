@@ -300,8 +300,41 @@ function requireEnum<T extends string>(value: unknown, allowed: readonly T[], la
 }
 
 /**
+ * Enforce that a `supersededBy` pointer means something.
+ *
+ * This replaces an empty `if (lifecycle === 'tombstoned' && !supersededBy) {}` branch whose
+ * only content was a comment. The rule that branch gestured at — "a tombstone must name a
+ * successor" — is **deliberately not enforced**, because the comment it carried states the
+ * opposite intent: a code can be permanently retired with no replacement, and requiring a
+ * successor would make that legitimate state unrepresentable.
+ *
+ * What was genuinely unguarded is the pointer itself. `supersededBy` was accepted as any
+ * string, truncated to 128 characters, frozen, and published into the generated error-code
+ * index — so a typo'd or self-referential pointer became a permanent dangling reference in a
+ * public document, and a resolution loop for anything that follows it.
+ *
+ * @throws {ErrorDefinitionError} When `supersededBy` is not a valid code, points at its own
+ * code, or is present on a definition still declared `active`.
+ */
+function assertSupersessionCoherent(definition: ErrorDefinition): void {
+  const successor = definition.supersededBy;
+  if (successor === undefined) return;
+  // Legacy codes are allowed: a superseded code may well point at a legacy-grammar one
+  // during migration, which is exactly when supersession is used.
+  assertErrorCodeShape(successor, { allowLegacy: true });
+  if (successor === definition.code) {
+    throw new ErrorDefinitionError(`definition ${definition.code}: supersededBy points at itself`);
+  }
+  if (definition.lifecycle === 'active') {
+    throw new ErrorDefinitionError(
+      `definition ${definition.code}: supersededBy requires lifecycle 'deprecated' or 'tombstoned'`,
+    );
+  }
+}
+
+/**
  * Copy and validate a hostile external definition object into a plain frozen definition.
- * @throws {ErrorDefinitionError} When raw is not a plain object, the code/operatorAction are invalid, or any axis fails enum validation.
+ * @throws {ErrorDefinitionError} When raw is not a plain object, the code/operatorAction are invalid, any axis fails enum validation, or `supersededBy` is incoherent.
  */
 export function normalizeErrorDefinition(
   raw: unknown,
@@ -352,9 +385,7 @@ export function normalizeErrorDefinition(
     ...(publicMetadataKeys === undefined ? {} : { publicMetadataKeys }),
   };
 
-  if (definition.lifecycle === 'tombstoned' && !definition.supersededBy) {
-    // tombstones may omit supersededBy when permanently retired without replacement
-  }
+  assertSupersessionCoherent(definition);
   return deepFreeze(definition);
 }
 

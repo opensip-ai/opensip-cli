@@ -5,7 +5,7 @@
  *   1. Explicit path — passed from --config CLI flag or programmatic caller.
  *   2. Default — <rootDir>/opensip-cli.config.yml.
  *
- * Throws ValidationError if none of the above resolve to an existing file.
+ * Throws a registered ToolError if none of the above resolve to an existing file.
  * This is intentional: running fitness checks with no config silently
  * produces zero findings (file-based checks get zero files), which looks
  * green but actually didn't run anything.
@@ -14,7 +14,8 @@
 import { existsSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
-import { ValidationError } from './lib/errors.js';
+import { coreErrorCatalog } from './lib/errors/core-error-catalog.js';
+import { createToolError } from './lib/errors.js';
 
 /** Canonical filename for the opensip-cli project config. */
 export const PROJECT_CONFIG_FILENAME = 'opensip-cli.config.yml';
@@ -25,9 +26,11 @@ export const PROJECT_CONFIG_FILENAME = 'opensip-cli.config.yml';
  * @param rootDir - Absolute path to the project root.
  * @param explicitPath - Optional path from `--config` CLI flag. May be
  *   absolute or relative to `rootDir`.
- * @throws {ValidationError} When no config file exists at any resolved
- *   location. The error message enumerates every path attempted so
- *   operators can diagnose without re-running with --debug.
+ * @throws {ToolError} `CONFIGURATION.CONFIG.NOT_FOUND` when no config file exists at any
+ *   resolved location, or `CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING` when an explicit
+ *   `--config` path is absent. Both definitions are `exposure: 'public'`, which is what keeps
+ *   the enumerated attempt list in the outward message — under the previous unmapped
+ *   `ERRORS.` code the whole list was replaced by "An unexpected internal failure occurred."
  */
 export function resolveProjectConfigPath(rootDir: string, explicitPath?: string): string {
   const attempts: string[] = [];
@@ -37,10 +40,10 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
     const resolved = isAbsolute(explicitPath) ? explicitPath : resolve(rootDir, explicitPath);
     attempts.push(`--config ${resolved}`);
     if (existsSync(resolved)) return resolved;
-    throw new ValidationError(`Config path from --config flag does not exist: ${resolved}`, {
-      operation: 'resolve',
-      loader: 'project-config',
-    });
+    throw createToolError(
+      coreErrorCatalog.require('CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING'),
+      `Config path from --config flag does not exist: ${resolved}`,
+    );
   }
 
   // 2. Default: <rootDir>/opensip-cli.config.yml
@@ -48,15 +51,11 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
   attempts.push(defaultPath);
   if (existsSync(defaultPath)) return defaultPath;
 
-  throw new ValidationError(
+  throw createToolError(
+    coreErrorCatalog.require('CONFIGURATION.CONFIG.NOT_FOUND'),
     `No ${PROJECT_CONFIG_FILENAME} found. Checked:\n` +
       attempts.map((a) => `  - ${a}`).join('\n') +
       `\n\nRun 'opensip init' to scaffold one, or pass --config <path> ` +
       `to point at an existing config.`,
-    {
-      operation: 'resolve',
-      loader: 'project-config',
-      code: 'ERRORS.CONFIG.NOT_FOUND',
-    },
   );
 }

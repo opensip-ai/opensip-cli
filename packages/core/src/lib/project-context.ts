@@ -12,7 +12,7 @@
  *
  * Strict `--config` semantics: when the caller passes `explicitConfigPath`
  * and `resolveProjectConfigPath` rejects it at the starting ancestor,
- * the resolver propagates the underlying `ValidationError` rather than
+ * the resolver propagates the underlying `ToolError` rather than
  * silently walking up. Silently walking up would let `--config /typo.yml`
  * land on some unrelated ancestor's config — exactly the surprise this
  * module exists to prevent. Implicit ancestor discovery still swallows
@@ -32,7 +32,8 @@ import { dirname, join, resolve } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
 
-import { ValidationError } from './errors.js';
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
+import { isToolErrorLike } from './errors.js';
 import { logger } from './logger.js';
 
 const MODULE_TAG = 'core:project-context';
@@ -91,7 +92,7 @@ export interface ResolveProjectContextInput {
  * Resolve the project context for an invocation. Pure function — no side
  * effects beyond debug logging.
  *
- * @throws {ValidationError} when `explicitConfigPath` is provided and
+ * @throws {ToolError} when `explicitConfigPath` is provided and
  * `resolveProjectConfigPath` rejects it at the starting ancestor.
  */
 export function resolveProjectContext(input: ResolveProjectContextInput): ProjectContext {
@@ -180,6 +181,12 @@ function canonicalDirectory(path: string): string {
     return absolute;
   }
 }
+
+/**
+ * The one discovery outcome that means "keep walking up", as a registered definition rather
+ * than a message pattern. Bound once at module load so a typo is a load-time failure.
+ */
+const CONFIG_NOT_FOUND = coreErrorCatalog.require('CONFIGURATION.CONFIG.NOT_FOUND');
 
 /** True for fixed marker names whose filesystem type is itself authoritative. */
 function hasFileSystemMarker(
@@ -313,6 +320,13 @@ export function hasRuntimeProjectContext(
  * implicit walking is just "no config here." When the caller passed
  * `--config <path>`, an unresolvable path is a USER ERROR and must
  * propagate — silently walking up would land on the wrong config.
+ *
+ * WHY THIS SWITCHES ON A CODE AND NOT ON THE MESSAGE
+ * It used to test `/No .*? found\. Checked:/` against `error.message`. That made a
+ * user-facing English string load-bearing for control flow: rewording it — something a
+ * translator, a copy edit, or a message-length bound would do without a second thought —
+ * silently converts implicit ancestor discovery into a hard failure, or the reverse, with
+ * every test still passing. The registered code is the stable contract.
  */
 function tryResolveConfig(dir: string, explicit: string | undefined): string | undefined {
   try {
@@ -323,7 +337,7 @@ function tryResolveConfig(dir: string, explicit: string | undefined): string | u
     // Only swallow the terminal "no config discovered at this root after all
     // attempts". This allows upward walking when a directory simply has no
     // OpenSIP config. Propagate other resolution problems.
-    if (error instanceof ValidationError && /No .*? found\. Checked:/.test(error.message)) {
+    if (isToolErrorLike(error) && error.code === CONFIG_NOT_FOUND.code) {
       return undefined;
     }
     throw error;

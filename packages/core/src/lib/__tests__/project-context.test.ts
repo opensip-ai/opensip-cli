@@ -13,7 +13,7 @@ import { join, resolve } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ValidationError } from '../errors.js';
+import { ToolError } from '../errors.js';
 import { logger } from '../logger.js';
 import {
   hasRuntimeProjectContext,
@@ -345,17 +345,30 @@ describe('resolveProjectContext', () => {
       }
     });
 
-    it('THROWS ValidationError when explicitConfigPath does not resolve (strict --config)', () => {
+    it('THROWS the explicit-path code when explicitConfigPath does not resolve (strict --config)', () => {
       // No silent walk-up: an explicit --config that misses is a USER ERROR.
       const missing = join(testDir, 'definitely-not-here.yml');
-      expect(() =>
+      const attempt = () =>
         resolveProjectContext({
           cwd: testDir,
           cwdExplicit: false,
           explicitConfigPath: missing,
           stopAt: testDir,
-        }),
-      ).toThrow(ValidationError);
+        });
+      expect(attempt).toThrow(ToolError);
+      try {
+        attempt();
+        expect.unreachable('an explicit --config miss must throw');
+      } catch (error) {
+        expect((error as ToolError).code).toBe('CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING');
+        // The class changed from ValidationError to a registered ToolError, so pin the axis
+        // that decides the exit code: D13 batches exit-code corrections into ONE change with
+        // a CHANGELOG table, and this migration must not smuggle one in. `configuration` is
+        // what mapExitClassToExitCode turns into the same EXIT_CODES.CONFIGURATION_ERROR the
+        // ValidationError subclass ladder returned. (core cannot import contracts, where the
+        // numeric mapping and its own tests live.)
+        expect((error as ToolError).definition.exitClass).toBe('configuration');
+      }
     });
 
     it('does not apply explicitConfigPath beyond the starting ancestor', () => {

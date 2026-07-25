@@ -229,3 +229,101 @@ describe('error definition axes coverage', () => {
     expect(catalog.get('MISSING')).toBeUndefined();
   });
 });
+
+describe('supersession coherence (Plan 01 Task 1.2)', () => {
+  const owner = { id: 'test.owner', displayName: 'Test' };
+  const base = {
+    source: 'application' as const,
+    defaultResponsibility: 'user' as const,
+    kind: 'validation' as const,
+    retry: 'never' as const,
+    severity: 'error' as const,
+    exposure: 'public' as const,
+    exitClass: 'configuration' as const,
+    operatorAction: 'fix it',
+    stability: 'public' as const,
+  };
+
+  it('accepts a tombstone with NO successor', () => {
+    // Deliberately permitted: a code can be permanently retired without a replacement.
+    // The empty branch this guard replaced gestured at forbidding it, which would have made
+    // permanent retirement unrepresentable.
+    const definition = normalizeErrorDefinition(
+      { ...base, code: 'TEST.DEMO.GONE', lifecycle: 'tombstoned' },
+      owner,
+    );
+    expect(definition.lifecycle).toBe('tombstoned');
+    expect(definition.supersededBy).toBeUndefined();
+  });
+
+  it('rejects a successor that is not a valid code', () => {
+    // Was accepted, truncated to 128 chars, frozen, and published into the generated
+    // error-code index — a permanent dangling reference in a public document.
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.DEMO.OLD', lifecycle: 'deprecated', supersededBy: 'not a code' },
+        owner,
+      ),
+    ).toThrow(ErrorDefinitionError);
+  });
+
+  it('rejects a self-referential successor', () => {
+    expect(() =>
+      normalizeErrorDefinition(
+        {
+          ...base,
+          code: 'TEST.DEMO.LOOP',
+          lifecycle: 'deprecated',
+          supersededBy: 'TEST.DEMO.LOOP',
+        },
+        owner,
+      ),
+    ).toThrow(/points at itself/);
+  });
+
+  it('rejects a successor on a definition still declared active', () => {
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.DEMO.ACTIVE', lifecycle: 'active', supersededBy: 'TEST.DEMO.NEW' },
+        owner,
+      ),
+    ).toThrow(/lifecycle 'deprecated' or 'tombstoned'/);
+  });
+
+  it('accepts a deprecated definition pointing at a legacy-grammar successor', () => {
+    // Supersession is used precisely DURING migration, when the successor may still be a
+    // legacy single-token code.
+    const definition = normalizeErrorDefinition(
+      {
+        ...base,
+        code: 'TEST.DEMO.OLD',
+        lifecycle: 'deprecated',
+        supersededBy: 'VALIDATION_ERROR',
+      },
+      owner,
+    );
+    expect(definition.supersededBy).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('legacyFamilyCode stays total (ruling D11)', () => {
+  it('resolves an unknown head to UNKNOWN_FAILURE rather than throwing', () => {
+    // D11: the runtime must never throw on a hostile or unknown code. The build-time
+    // `error-resiliency-inventory code-heads` ratchet is what stops NEW unmapped heads
+    // being introduced; the runtime stays total so a third-party tool cannot crash the host
+    // by shipping a code nobody registered.
+    const resolved = definitionFromLegacyCode('WHOLLY.UNKNOWN.HEAD');
+    expect(resolved.code).toBe('CORE.SYSTEM.UNKNOWN_FAILURE');
+  });
+
+  it('does NOT map the two heads Wave 1 retired', () => {
+    // Adding `ERRORS` or `TOOL` to the switch is exactly what D11 forbids: it would make the
+    // fallback quieter without registering anything.
+    expect(definitionFromLegacyCode('ERRORS.CONFIG.NOT_FOUND').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+    expect(definitionFromLegacyCode('TOOL.IDENTITY.INVALID_NAME').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+  });
+});
