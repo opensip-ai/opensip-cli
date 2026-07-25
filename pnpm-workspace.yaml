@@ -41,9 +41,6 @@ minimumReleaseAgeIgnoreMissingTime: false
 # Remove an entry once the version is past minimumReleaseAge (or after the
 # next routine dep refresh supersedes it).
 minimumReleaseAgeExclude:
-  # js-yaml 5.2.2 security patch for GHSA-pm4m-ph32-ghv5 (HIGH: flow-collection
-  # parsing DoS) — published 2026-07-23, taken early 2026-07-24.
-  - 'js-yaml@5.2.2'
   # OpenTelemetry 2026-06-11 update
   - '@opentelemetry/api-logs@0.219.0'
   - '@opentelemetry/context-async-hooks@2.8.0'
