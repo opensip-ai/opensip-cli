@@ -62,8 +62,8 @@ import type { ScanCompletion } from './scan-emit.js';
 import type { AdapterProvenance, BinarySpec, ExternalCommandSpec } from './types.js';
 import type { FingerprintStrategy, ToolCliContext } from '@opensip-cli/core';
 
-
 // Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const SCAN_FAULT = externalToolErrorCatalog.require('EXTERNAL.SCANNER.FAULT');
 const BINARY_MISSING = externalToolErrorCatalog.require('EXTERNAL.SCANNER.BINARY_MISSING');
 const SCAN_UNAVAILABLE = externalToolErrorCatalog.require('EXTERNAL.SCANNER.SCAN_UNAVAILABLE');
 
@@ -277,7 +277,8 @@ export async function runScanLoop(
       message: `${tool}: scan faulted (exit ${String(proc.code)})`,
       data: { reason: 'exit-fault', code: proc.code },
     });
-    throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
+    throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, SCAN_FAULT.code, {
+      definition: SCAN_FAULT,
       stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }
@@ -339,7 +340,8 @@ export async function runScanLoop(
       message: `${tool}: empty stdout with findings exit`,
       data: { reason: 'empty-stdout-findings', code: proc.code },
     });
-    throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, 'ADAPTER.SCAN.FAULT', {
+    throw new ToolError(`${tool} scan failed (exit ${String(proc.code)})`, SCAN_FAULT.code, {
+      definition: SCAN_FAULT,
       stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }

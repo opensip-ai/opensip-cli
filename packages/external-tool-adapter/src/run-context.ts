@@ -16,7 +16,6 @@ import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.j
 import type { AdapterRunContext, ResolvedBinary } from './types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
-
 // Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
 const SCAN_UNAVAILABLE = externalToolErrorCatalog.require('EXTERNAL.SCANNER.SCAN_UNAVAILABLE');
 

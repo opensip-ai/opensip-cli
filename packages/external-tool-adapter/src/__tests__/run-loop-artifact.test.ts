@@ -214,7 +214,7 @@ describe('runScanLoop — A11: invalid file-backed report ⇒ fault, report not 
     const { cli, spies } = makeCli();
     await expect(
       runScanLoop(input(cli, sarifCommand()), makeDeps({ code: 0, artifact: '' })),
-    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' });
 
     // The empty read buffer is NEVER written back over the scanner's report (A11).
     expect(spies.writeArtifact).not.toHaveBeenCalled();
@@ -226,7 +226,7 @@ describe('runScanLoop — A11: invalid file-backed report ⇒ fault, report not 
     const { cli, spies } = makeCli();
     await expect(
       runScanLoop(input(cli, sarifCommand()), makeDeps({ code: 0, artifact: 'not json <<<' })),
-    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' });
     expect(spies.writeArtifact).not.toHaveBeenCalled();
   });
 
@@ -243,7 +243,7 @@ describe('runScanLoop — A11: invalid file-backed report ⇒ fault, report not 
         }),
       ),
     ).rejects.toMatchObject({
-      code: 'ADAPTER.ARTIFACT.INVALID',
+      code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
       message: expect.stringContaining('MiB cap'),
     });
     expect(spies.writeArtifact).not.toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe('runScanLoop — OBS-SARIF: structural acceptance at the run-loop bound
         makeDeps({ code: 0, artifact: '{"version":"2.1.0","runs":{}}' }),
       ),
     ).rejects.toMatchObject({
-      code: 'ADAPTER.ARTIFACT.INVALID',
+      code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
       message: expect.stringContaining('structure'),
     });
     expect(spies.writeArtifact).not.toHaveBeenCalled();
@@ -291,7 +291,7 @@ describe('runScanLoop — OBS-SARIF: structural acceptance at the run-loop bound
         makeDeps({ code: 0, artifact: '{"error":"database not found"}' }),
       ),
     ).rejects.toMatchObject({
-      code: 'ADAPTER.ARTIFACT.INVALID',
+      code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
       message: expect.stringMatching(/structure|error-shaped|unsupported-version/),
     });
     expect(spies.writeArtifact).not.toHaveBeenCalled();
@@ -308,7 +308,7 @@ describe('runScanLoop — OBS-SARIF: structural acceptance at the run-loop bound
           artifact: '{"version":"2.1.0","runs":[{"results":{}}]}',
         }),
       ),
-    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' });
     expect(spies.writeArtifact).not.toHaveBeenCalled();
   });
 });
@@ -350,7 +350,7 @@ describe('runScanLoop — okWithoutArtifact: scanners that write no report on an
     const { cli, spies } = makeCli();
     await expect(
       runScanLoop(input(cli, jsonCommand()), missingReportDeps(0)),
-    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' });
     expect(spies.deliverSignals).not.toHaveBeenCalled();
   });
 
@@ -366,6 +366,6 @@ describe('runScanLoop — okWithoutArtifact: scanners that write no report on an
         ),
         makeDeps({ code: 128, artifact: 'not json at all' }),
       ),
-    ).rejects.toMatchObject({ code: 'ADAPTER.ARTIFACT.INVALID' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' });
   });
 });

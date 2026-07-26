@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **18**
-- Definitions: **171**
+- Definitions: **175**
 
 ## Catalogs
 
@@ -22,7 +22,7 @@ generated: true
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
 | `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 10 |
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
-| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 6 |
+| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 18 |
@@ -34,9 +34,9 @@ generated: true
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 21 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/file-lock.ts` | 11 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 23 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 24 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/plugin-capability.ts` | 17 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 17 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 18 |
 
 ## Codes
 
@@ -58,6 +58,7 @@ generated: true
 | `CONFIGURATION.AGENT_FILTER.INVALID_TOP` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Pass a non-negative whole number to --top. |
 | `CONFIGURATION.AGENT_FILTER.MISSING_ARGUMENT` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Supply a value after the filter prefix, e.g. --filter category:security. |
 | `CONFIGURATION.AGENT_FILTER.UNKNOWN_TOKEN` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Use one of the filter tokens listed in the message. |
+| `CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE` | `@opensip-cli/core` | application | user | not-found | never | error | configuration | active | Run inside a git repository, install git, or pass explicit --files instead of --changed/--since. |
 | `CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING` | `@opensip-cli/core` | application | user | not-found | never | error | configuration | active | Correct the --config path, or omit --config to discover the config file. |
 | `CONFIGURATION.CONFIG.NOT_FOUND` | `@opensip-cli/core` | application | user | not-found | never | error | configuration | active | Run `opensip init` to create opensip-cli.config.yml, or pass --config with the path to an existing one. |
 | `CONFIGURATION.GATE.BASELINE_INVALID` | `opensip-cli` | application | user | validation | never | error | configuration | active | Run the tool with --gate-save to capture a baseline before comparing; if the message reports unstamped signals, report it to the tool author. |
@@ -111,8 +112,10 @@ generated: true
 | `DATASTORE.READ.BOUND_INVALID` | `@opensip-cli/datastore` | application | tool-author | validation | never | error | runtime | active | Pass a positive integer limit; omit it to accept the built-in default. |
 | `DATASTORE.WRITE.RECORD_TOO_LARGE` | `@opensip-cli/datastore` | application | tool-author | resource | never | error | runtime | active | Reduce the size of the named field or payload before persisting it; the datastore bound protects shared storage. |
 | `EXTERNAL.ADAPTER.SPEC_INVALID` | `@opensip-cli/external-tool-adapter` | application | tool-author | validation | never | error | plugin-incompatible | active | Declare at least one command on the external tool adapter, and give every command a parser. |
+| `EXTERNAL.SCANNER.ARTIFACT_INVALID` | `@opensip-cli/external-tool-adapter` | external | environment | integrity | never | error | runtime | active | The scanner did not produce output this adapter can read. Check the scanner version matches the one the adapter supports. |
 | `EXTERNAL.SCANNER.BINARY_MISSING` | `@opensip-cli/external-tool-adapter` | external | operator | not-found | never | error | configuration | active | Install the scanner binary, add it to PATH, or set the tool binary path config/env pin. |
 | `EXTERNAL.SCANNER.CONFIG_REQUIRED` | `@opensip-cli/external-tool-adapter` | application | user | not-found | never | error | configuration | active | Provide the input the scanner needs (its config file, dependency manifest, or build output) and re-run. |
+| `EXTERNAL.SCANNER.FAULT` | `@opensip-cli/external-tool-adapter` | external | environment | I/O | caller-policy | error | runtime | active | The scanner failed. Check its own output for the cause; the captured stderr tail is on the error. |
 | `EXTERNAL.SCANNER.KILLED_BY_SIGNAL` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | The scanner was killed by an external signal (OOM killer, kill -9, container stop). Check system memory and process limits, then retry. |
 | `EXTERNAL.SCANNER.SCAN_UNAVAILABLE` | `@opensip-cli/external-tool-adapter` | external | environment | timeout | caller-policy | error | runtime | active | The scan could not complete. Run from inside a project, or raise the scanner timeout for large workloads. |
 | `EXTERNAL.SCANNER.SPAWN_FAILED` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check binary permissions and OS errno; retry after fixing the environment. |
@@ -140,6 +143,7 @@ generated: true
 | `SESSION.WRITE.RECORD_INVALID` | `@opensip-cli/session-store` | application | tool-author | validation | never | error | runtime | active | Correct the named field on the run, step or session record before persisting it. |
 | `SIMULATION.SCENARIO.ABORTED` | `@opensip-cli/simulation` | application | user | cancelled | never | error | cancelled | active | Scenario was cancelled. Re-run if the work is still needed. |
 | `SYSTEM_ERROR` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Retry once; if it persists, capture the run id and report a bug. |
+| `SYSTEM.AGENT_CATALOG.UNPUBLISHABLE` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The agent catalog could not be assembled completely. Capture the run id and report a bug; re-running after a full `opensip graph` may clear a stale overlay. |
 | `SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The tool that declares this capability domain never wired its registrar. Report it to the tool author with the run id. |
 | `SYSTEM.CORE.SELECTOR_INVALID` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Correct the recipe selector: use a known arm type, and supply a `match` matcher for arms that require one. |
 | `SYSTEM.FILE.TOO_LARGE` | `@opensip-cli/core` | application | user | resource | never | error | configuration | active | The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set. |

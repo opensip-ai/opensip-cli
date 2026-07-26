@@ -125,6 +125,51 @@ export const externalToolErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['condition', 'scanner'],
     },
+    /**
+     * A scanner produced output this adapter cannot ingest: a missing or unparsable artifact,
+     * or a result shape the parser rejected.
+     *
+     * `external` source and `environment` responsibility — the scanner wrote it, and the
+     * actionable step is about that tool's version or invocation rather than about opensip.
+     */
+    'EXTERNAL.SCANNER.ARTIFACT_INVALID': {
+      code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
+      source: 'external',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'The scanner did not produce output this adapter can read. Check the scanner version matches the one the adapter supports.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'scanner'],
+    },
+
+    /**
+     * The scanner ran but failed: a non-zero exit that is not a findings result, or a fault the
+     * adapter could not attribute.
+     *
+     * `caller-policy` retry — a scanner fault is often transient (a lock, a partial index), and
+     * the caller owns whether re-running is worth it.
+     */
+    'EXTERNAL.SCANNER.FAULT': {
+      code: 'EXTERNAL.SCANNER.FAULT',
+      source: 'external',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'The scanner failed. Check its own output for the cause; the captured stderr tail is on the error.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'scanner', 'exitCode'],
+    },
   },
   { allowLegacyCodes: true },
 );

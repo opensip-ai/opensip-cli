@@ -40,7 +40,6 @@ import type {
   ToolRunCompletion,
 } from '@opensip-cli/core';
 
-
 // Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
 const SPEC_INVALID = externalToolErrorCatalog.require('EXTERNAL.ADAPTER.SPEC_INVALID');
 

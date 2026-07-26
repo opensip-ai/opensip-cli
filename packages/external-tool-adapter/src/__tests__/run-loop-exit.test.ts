@@ -141,7 +141,7 @@ describe('runScanLoop — scanner-error exit ⇒ fault (never a silent clean sca
         ),
         makeDeps(2, '[]'),
       ),
-    ).rejects.toMatchObject({ code: 'ADAPTER.SCAN.FAULT' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.FAULT' });
 
     expect(spies.writeArtifact).not.toHaveBeenCalled();
     expect(spies.deliverSignals).not.toHaveBeenCalled();
@@ -161,7 +161,7 @@ describe('runScanLoop — scanner-error exit ⇒ fault (never a silent clean sca
         ),
         makeDeps(1, ''),
       ),
-    ).rejects.toMatchObject({ code: 'ADAPTER.SCAN.FAULT' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.FAULT' });
 
     expect(spies.writeArtifact).not.toHaveBeenCalled();
     expect(spies.deliverSignals).not.toHaveBeenCalled();
@@ -177,7 +177,7 @@ describe('runScanLoop — scanner-error exit ⇒ fault (never a silent clean sca
         ),
         makeDeps(2, ''),
       ),
-    ).rejects.toMatchObject({ code: 'ADAPTER.SCAN.FAULT' });
+    ).rejects.toMatchObject({ code: 'EXTERNAL.SCANNER.FAULT' });
 
     expect(spies.writeArtifact).not.toHaveBeenCalled();
     expect(spies.deliverSignals).not.toHaveBeenCalled();

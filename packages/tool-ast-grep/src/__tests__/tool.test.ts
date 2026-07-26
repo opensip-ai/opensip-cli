@@ -133,7 +133,7 @@ describe('ast-grep tool — stdout SARIF parse', () => {
     // ADR-0175 centralization), which must be free to change without breaking
     // every consuming scanner's test.
     expect(() => parseAstGrepSarif(raw, ctx)).toThrow(
-      expect.objectContaining({ code: 'ADAPTER.ARTIFACT.INVALID' }),
+      expect.objectContaining({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' }),
     );
   });
 });

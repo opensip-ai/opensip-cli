@@ -39,7 +39,6 @@ import type {
   GraphConfig,
 } from '../types.js';
 
-
 /** Registered replacement for the un-catalogued `GRAPH.READ.VERIFY_FAILED` reason code. */
 const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');
 

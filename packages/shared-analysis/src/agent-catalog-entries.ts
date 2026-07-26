@@ -1,7 +1,11 @@
 import { compareCodePoint } from '@opensip-cli/contracts';
-import { ValidationError } from '@opensip-cli/core';
+import { ValidationError, coreErrorCatalog  } from '@opensip-cli/core';
 
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
+
+
+/** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
+const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('SYSTEM.AGENT_CATALOG.UNPUBLISHABLE');
 
 export { compareCodePoint } from '@opensip-cli/contracts';
 
@@ -240,7 +244,11 @@ export function assertAgentCatalogOverlayKeys(
     sortedStaleKeys.sort(compareCodePoint);
     throw new ValidationError(
       `agent-catalog: tool overlay key(s) do not match a registered public primary, alias, or layout key: ${sortedStaleKeys.join(', ')}`,
-      { code: 'AGENT_CATALOG.STALE_TOOL_OVERLAY' },
+      {
+        code: AGENT_CATALOG_UNPUBLISHABLE.code,
+        definition: AGENT_CATALOG_UNPUBLISHABLE,
+        metadata: { condition: 'stale-tool-overlay' },
+      },
     );
   }
 }

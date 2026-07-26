@@ -15,7 +15,7 @@
  *   primary surface excludes internal workers.
  */
 
-import { ValidationError } from '@opensip-cli/core';
+import { ValidationError, coreErrorCatalog  } from '@opensip-cli/core';
 
 import {
   INTERNAL_COMMAND_NAME_RE,
@@ -28,6 +28,10 @@ import {
 
 import type { AgentCatalog, AgentCatalogBuildInput, CommandTier } from '@opensip-cli/contracts';
 import type { Tool, ToolRegistry } from '@opensip-cli/core';
+
+
+/** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
+const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('SYSTEM.AGENT_CATALOG.UNPUBLISHABLE');
 
 export {
   agentCatalogOverlayKeys,
@@ -60,7 +64,11 @@ function assertNoInternalEntryPoints(
     throw new ValidationError(
       `agent-catalog: Tier-3 internal command '${leaked.command}' must not appear in the ` +
         'agent-catalog primary surface (tool-command-surface-taxonomy). Remove it from entryPoints.',
-      { code: 'AGENT_CATALOG.INTERNAL_ENTRY_POINT' },
+      {
+        code: AGENT_CATALOG_UNPUBLISHABLE.code,
+        definition: AGENT_CATALOG_UNPUBLISHABLE,
+        metadata: { condition: 'internal-entry-point' },
+      },
     );
   }
 }

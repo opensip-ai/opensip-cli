@@ -294,4 +294,25 @@ export const toolContractDefinitions = {
       'Choose a name, namespace, or layout domain outside the host-reserved set; the reserved value is named in the message.',
     publicMetadataKeys: ['field', 'value'],
   },
+  /**
+   * The agent catalog cannot be assembled honestly: the runtime command inventory is
+   * incomplete, a tool overlay is stale, or an entry point is internal-only.
+   *
+   * `redacted` and `tool-author`: the agent catalog is the machine discovery surface, and every
+   * one of these means the HOST assembled something it should not publish. Serving a catalog
+   * that silently omits commands is worse than refusing — an agent would treat the gap as
+   * "this tool has no such command" rather than "ask again".
+   *
+   * One code (D9); `metadata.condition` names which of the three.
+   */
+  'SYSTEM.AGENT_CATALOG.UNPUBLISHABLE': {
+    ...TOOL_AUTHORING,
+    code: 'SYSTEM.AGENT_CATALOG.UNPUBLISHABLE',
+    kind: 'invariant',
+    exposure: 'redacted',
+    exitClass: 'runtime',
+    operatorAction:
+      'The agent catalog could not be assembled completely. Capture the run id and report a bug; re-running after a full `opensip graph` may clear a stale overlay.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

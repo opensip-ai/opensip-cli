@@ -19,7 +19,6 @@ import type { SourceRoleMatcher } from './source-filter.js';
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
-
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');

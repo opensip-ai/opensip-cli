@@ -4,7 +4,6 @@ import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import { computeFilesFingerprint } from './invalidate.js';
 
-
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 const BUILD_INCOMPLETE = graphErrorCatalog.require('GRAPH.BUILD.INCOMPLETE');

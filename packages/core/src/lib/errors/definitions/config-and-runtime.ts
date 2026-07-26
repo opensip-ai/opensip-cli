@@ -230,4 +230,24 @@ export const configAndRuntimeDefinitions = {
       'The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set.',
     publicMetadataKeys: ['maxBytes'],
   },
+  /**
+   * A changed-file basis could not be resolved: not a git repository, git unavailable, or a
+   * ref that does not exist.
+   *
+   * Replaces a code built by TEMPLATE LITERAL — `CONFIG.GRAPH.${reason.toUpperCase()}` — which
+   * is unregisterable by construction: no catalog can declare a code that does not exist until
+   * runtime, and no reader can enumerate one. The three reasons are a closed union, so they
+   * travel in allowlisted `metadata.condition` instead.
+   *
+   * `user` / `configuration`: `--changed` outside a repository is something the caller fixes by
+   * passing `--files` or running somewhere else, and exit 2 is what it has always returned.
+   */
+  'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE': {
+    ...USER_CONFIGURATION,
+    code: 'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE',
+    kind: 'not-found',
+    operatorAction:
+      'Run inside a git repository, install git, or pass explicit --files instead of --changed/--since.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

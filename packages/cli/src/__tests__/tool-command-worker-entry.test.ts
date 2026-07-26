@@ -204,7 +204,7 @@ describe('runToolCommandWorker', () => {
     // so the host rebuilds a ConfigurationError → exit 2.
     const msg = await runInScope(writeSpec(specFor({ commandName: 'throws' })), {
       tool: toolThatThrows(
-        new ConfigurationError('gitleaks: binary not found', { code: 'ADAPTER.BINARY.NOT_FOUND' }),
+        new ConfigurationError('gitleaks: binary not found', { code: 'EXTERNAL.SCANNER.BINARY_MISSING' }),
       ),
     });
     expect(msg.kind).toBe('error');
