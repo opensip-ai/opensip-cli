@@ -5,11 +5,16 @@
 import { PluginIncompatibleError, SystemError, type Logger } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import {
   buildDeniedWorkerDatastoreThunk,
   resolveDatastoreAccess,
   resolveStartupExecutionMode,
 } from '../worker-datastore.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 const logger: Logger = {
   debug: vi.fn(),
@@ -43,7 +48,7 @@ describe('resolveDatastoreAccess', () => {
       expect.unreachable('expected MODE_MISMATCH');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.WORKER.MODE_MISMATCH');
+      expect((error as SystemError).code).toBe('SYSTEM.HOST.WIRING_INVALID');
     }
   });
 
@@ -53,7 +58,7 @@ describe('resolveDatastoreAccess', () => {
       expect.unreachable('expected MODE_MISMATCH');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.WORKER.MODE_MISMATCH');
+      expect((error as SystemError).code).toBe('SYSTEM.HOST.WIRING_INVALID');
     }
   });
 });
@@ -80,16 +85,34 @@ describe('resolveStartupExecutionMode', () => {
       resolveStartupExecutionMode(['tools', 'list'], {
         OPENSIP_CLI_IN_TOOL_WORKER: '1',
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
+    ).toThrow(
+      expect.objectContaining({
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'worker-mode-mismatch' },
+      }),
+    );
   });
 
   it('rejects the internal command without the host marker', () => {
     expect(() =>
       resolveStartupExecutionMode(['__tool-command-worker', '/project/spec.json'], {}),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
+    ).toThrow(
+      expect.objectContaining({
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'worker-mode-mismatch' },
+      }),
+    );
     expect(() =>
       resolveStartupExecutionMode(['__capability-pack-worker', '/project/spec.json'], {}),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.WORKER.MODE_MISMATCH' }));
+    ).toThrow(
+      expect.objectContaining({
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'worker-mode-mismatch' },
+      }),
+    );
   });
 });
 

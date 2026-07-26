@@ -7,6 +7,8 @@
 
 import { ValidationError } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import {
   COMMAND_RESULT,
   defineCommand,
@@ -17,6 +19,10 @@ import { executeRunsList, executeRunsShow } from './run-history.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const RUN_READ_INPUT = hostErrorCatalog.require('VALIDATION.RUN_READ.INPUT_INVALID');
 
 const DECIMAL_INTEGER = /^\d+$/u;
 const RUN_ID = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -30,7 +36,15 @@ interface BoundedIntegerOptions {
   readonly flag: '--limit' | '--offset';
   readonly minimum: number;
   readonly maximum: number;
-  readonly code: string;
+  /**
+   * Which bounded input this is, for `metadata.condition`.
+   *
+   * Was a per-call `code: string`, i.e. three distinct codes for one condition. The four
+   * run-read inputs now share `VALIDATION.RUN_READ.INPUT_INVALID` and are told apart by this
+   * field — bounded, allowlisted, and projectable, which a code string in an options bag is
+   * not.
+   */
+  readonly condition: 'list-limit' | 'step-limit' | 'offset';
 }
 
 function parseBoundedInteger(raw: string, options: BoundedIntegerOptions): number {
@@ -38,7 +52,11 @@ function parseBoundedInteger(raw: string, options: BoundedIntegerOptions): numbe
   if (!Number.isSafeInteger(value) || value < options.minimum || value > options.maximum) {
     throw new ValidationError(
       `Invalid ${options.flag} value: '${raw}'. Must be an integer between ${String(options.minimum)} and ${String(options.maximum)}.`,
-      { code: options.code },
+      {
+        code: RUN_READ_INPUT.code,
+        definition: RUN_READ_INPUT,
+        metadata: { condition: options.condition },
+      },
     );
   }
   return value;
@@ -49,7 +67,7 @@ function parseListLimit(raw: string): number {
     flag: '--limit',
     minimum: 1,
     maximum: MAX_READ_LIMIT,
-    code: 'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
+    condition: 'list-limit',
   });
 }
 
@@ -58,7 +76,7 @@ function parseStepLimit(raw: string): number {
     flag: '--limit',
     minimum: 1,
     maximum: MAX_READ_LIMIT,
-    code: 'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
+    condition: 'step-limit',
   });
 }
 
@@ -67,7 +85,7 @@ function parseStepOffset(raw: string): number {
     flag: '--offset',
     minimum: 0,
     maximum: MAX_STEP_OFFSET,
-    code: 'VALIDATION.RUN_READ.OFFSET_INVALID',
+    condition: 'offset',
   });
 }
 
@@ -75,7 +93,11 @@ function requireRunId(value: unknown): string {
   if (typeof value !== 'string' || !RUN_ID.test(value)) {
     throw new ValidationError(
       'Parent Run ID must contain 1-128 letters, numbers, underscores, or hyphens.',
-      { code: 'VALIDATION.RUN_READ.RUN_ID_INVALID' },
+      {
+        code: RUN_READ_INPUT.code,
+        definition: RUN_READ_INPUT,
+        metadata: { condition: 'run-id' },
+      },
     );
   }
   return value;

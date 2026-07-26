@@ -30,6 +30,7 @@ import { buildInitRecoverySpec } from '../commands/host-command-specs.js';
 import { registerCliCommands } from '../commands/index.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
 import { handleParseError } from '../error-handler.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import { buildCommandRegistrationInput } from './build-command-registration-input.js';
 import { createCommandActionScopeRunner } from './pre-action-hook.js';
@@ -42,6 +43,10 @@ import { bootstrapCli } from './index.js';
 
 import type { ToolRuntimeExecutionMode } from './worker-datastore.js';
 import type { CliCommandsContext } from '../commands/shared.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const PROBE_LIMIT = hostErrorCatalog.require('SYSTEM.HOST.PROBE_LIMIT');
 
 class ContinueToLeasedBootstrap extends Error {
   constructor() {
@@ -79,7 +84,9 @@ function createBoundedOutputCapture(): {
     capturedBytes += Buffer.byteLength(chunk);
     if (capturedBytes > MAX_CAPTURED_COMMANDER_OUTPUT_BYTES) {
       throw new SystemError('Trusted command probe output exceeded its safety bound.', {
-        code: 'SYSTEM.COMMAND_PROBE.OUTPUT_LIMIT',
+        code: PROBE_LIMIT.code,
+        definition: PROBE_LIMIT,
+        metadata: { condition: 'output-limit' },
       });
     }
     target.push(chunk);
@@ -186,7 +193,9 @@ function createInitRecoveryCommandContext(
     toolScaffolds: [],
     datastore: () => {
       throw new SystemError('The lean Init recovery probe cannot open the datastore.', {
-        code: 'SYSTEM.INIT.RECOVERY_PROBE_DATASTORE',
+        code: PROBE_LIMIT.code,
+        definition: PROBE_LIMIT,
+        metadata: { condition: 'recovery-datastore' },
       });
     },
   };
@@ -210,7 +219,9 @@ function createInitRecoveryScope(
     runId,
     datastore: () => {
       throw new SystemError('The lean Init recovery scope cannot open the datastore.', {
-        code: 'SYSTEM.INIT.RECOVERY_PROBE_DATASTORE',
+        code: PROBE_LIMIT.code,
+        definition: PROBE_LIMIT,
+        metadata: { condition: 'recovery-datastore' },
       });
     },
   });

@@ -1,5 +1,11 @@
 import { ConfigurationError, type OptionSpec } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
+
 const NO_PREVIOUS_VALUE: unknown = undefined;
 
 export interface AssembleOptsInput {
@@ -76,7 +82,11 @@ function validateChoices(key: string, spec: OptionSpec, value: unknown): void {
     if (!spec.choices.includes(text)) {
       throw new ConfigurationError(
         `Invalid value for option '${key}': ${text}. Expected one of: ${spec.choices.join(', ')}`,
-        { code: 'CONFIG.SUITE.OPTION_CHOICE' },
+        {
+          code: SUITE_INVALID.code,
+          definition: SUITE_INVALID,
+          metadata: { condition: 'option-choice' },
+        },
       );
     }
   }
@@ -85,7 +95,9 @@ function validateChoices(key: string, spec: OptionSpec, value: unknown): void {
 function validateRequired(key: string, spec: OptionSpec, value: unknown): void {
   if (spec.required !== true || (value !== undefined && value !== '')) return;
   throw new ConfigurationError(`Missing required option '${key}'.`, {
-    code: 'CONFIG.SUITE.OPTION_REQUIRED',
+    code: SUITE_INVALID.code,
+    definition: SUITE_INVALID,
+    metadata: { condition: 'option-required' },
   });
 }
 
@@ -100,6 +112,8 @@ function stringifyOptionValue(value: unknown): string {
   }
   if (value === null) return 'null';
   throw new ConfigurationError(`Invalid non-scalar value for option parsing.`, {
-    code: 'CONFIG.SUITE.OPTION_VALUE_TYPE',
+    code: SUITE_INVALID.code,
+    definition: SUITE_INVALID,
+    metadata: { condition: 'option-value-type' },
   });
 }

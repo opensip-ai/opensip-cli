@@ -16,7 +16,12 @@ import { makeTestScope, withScope } from '@opensip-cli/test-support';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createRuntimeLeaseLifecycle } from '../../commands/host-runtime-access.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 /** A scope whose datastore thunk throws the given error. */
 function scopeThrowing(error: unknown) {
@@ -30,14 +35,16 @@ function scopeThrowing(error: unknown) {
 describe('getProjectDatastore', () => {
   it('converts DATASTORE_OUTSIDE_PROJECT into a user-actionable ConfigurationError', async () => {
     const outside = new SystemError('no datastore outside a project', {
-      code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT',
+      code: WIRING_INVALID.code,
+      definition: WIRING_INVALID,
+      metadata: { condition: 'datastore-outside-project' },
     });
     await withScope(scopeThrowing(outside), () => {
       expect(() => getProjectDatastore()).toThrow(/requires an OpenSIP CLI project/);
       try {
         getProjectDatastore();
       } catch (error) {
-        expect((error as { code?: string }).code).toBe('CONFIGURATION.REQUIRES_PROJECT');
+        expect((error as { code?: string }).code).toBe('CONFIGURATION.HOST.PROJECT_REQUIRED');
       }
       return Promise.resolve();
     });

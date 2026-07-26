@@ -11,13 +11,15 @@
  * first-run failure in the product — came to tell users "An unexpected internal failure
  * occurred." instead of listing the directories it searched.
  *
- * Ruling D11 forbids fixing this by widening the switch: adding heads makes the fallback
- * quieter without making any code actually registered. Registration is the destination, so
- * the build fails on an unregistered head instead.
+ * AFTER THE CLEAN BREAK the rule is simpler and stronger. `legacyFamilyCode` — the head-guessing
+ * switch this originally had to read — is gone, so there is no longer any such thing as a
+ * "mapped" head that resolves without being registered. A constructed code either resolves to a
+ * definition some package declared, or it resolves to `UNKNOWN_FAILURE`. The check is therefore
+ * exactly: every constructed code literal must be REGISTERED.
  *
- * BOTH AUTHORITIES ARE READ FROM SOURCE, NEVER RESTATED HERE. A hard-coded copy of the head
- * list would drift the moment someone edited the switch, and a drifted guard that still
- * passes is worse than no guard.
+ * The registered set is read from the build-time catalog manifest, never restated here: a
+ * hard-coded copy would drift the moment someone edited a catalog, and a drifted guard that
+ * still passes is worse than no guard.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -31,18 +33,22 @@ const CODE_GRAMMAR = /^[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9_]*){2,}$/u;
 const CONSTRUCTED_CODE = /\bcode:\s*(['"])([A-Z][A-Z0-9_.]+)\1/gu;
 
 /**
- * Read the heads `legacyFamilyCode` maps, from the function body itself.
+ * Confirm the head-guessing switch really is gone.
+ *
+ * If someone reintroduces `legacyFamilyCode`, unregistered codes start silently acquiring axes
+ * again and this rule's premise quietly stops holding — so the guard fails loudly rather than
+ * passing on a false assumption.
  *
  * @param {string} repoRoot
- * @returns {Set<string>}
  */
-export function readMappedHeads(repoRoot) {
+export function assertNoFamilyFallback(repoRoot) {
   const source = readFileSync(join(repoRoot, 'packages/core/src/lib/error-definition.ts'), 'utf8');
-  const start = source.indexOf('function legacyFamilyCode');
-  if (start < 0) throw new Error('legacyFamilyCode not found in error-definition.ts');
-  const end = source.indexOf('\n}', start);
-  const body = source.slice(start, end);
-  return new Set([...body.matchAll(/case\s+'([A-Z][A-Z0-9]*)'/gu)].map((m) => m[1]));
+  if (source.includes('function legacyFamilyCode')) {
+    throw new Error(
+      'legacyFamilyCode was reintroduced in error-definition.ts. The clean break (Plan 01) removed ' +
+        'head-guessing on purpose: register the code instead of mapping its head.',
+    );
+  }
 }
 
 /**
@@ -78,8 +84,8 @@ export function readRegisteredHeads(repoRoot) {
  * @returns {{ path: string, line: number, code: string, head: string }[]}
  */
 export function findUnmappedCodeHeads(repoRoot, relFiles) {
-  const mapped = readMappedHeads(repoRoot);
-  const { heads: registered, codes } = readRegisteredHeads(repoRoot);
+  assertNoFamilyFallback(repoRoot);
+  const { codes } = readRegisteredHeads(repoRoot);
   /** @type {{ path: string, line: number, code: string, head: string }[]} */
   const violations = [];
 
@@ -101,11 +107,9 @@ export function findUnmappedCodeHeads(repoRoot, relFiles) {
       while ((match = CONSTRUCTED_CODE.exec(line)) !== null) {
         const code = match[2];
         if (!CODE_GRAMMAR.test(code)) continue;
-        // An exactly-registered code is fine whatever its head — that IS the destination.
+        // Registration is the ONLY thing that makes a code resolve now.
         if (codes.has(code)) continue;
-        const head = code.slice(0, code.indexOf('.'));
-        if (registered.has(head) || mapped.has(head)) continue;
-        violations.push({ path: rel, line: index + 1, code, head });
+        violations.push({ path: rel, line: index + 1, code, head: code.slice(0, code.indexOf('.')) });
       }
     }
   }
@@ -162,7 +166,7 @@ export function formatCodeHeadViolations(violations) {
   }
   lines.push(
     '',
-    'Repair — register the code, do not widen the switch (ruling D11):',
+    'Repair — register the code (ruling D11; there is no head-guessing fallback any more):',
     '  1. Add the definition to a catalog module, e.g.',
     '     packages/core/src/lib/errors/definitions/<domain>.ts',
     '  2. Add its module to CATALOG_SOURCES in scripts/extract-error-catalog-metadata.mjs',

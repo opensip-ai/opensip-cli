@@ -17,9 +17,16 @@ import {
   type RunScope,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { DEFAULT_ARTIFACT_RETENTION_KEEP, pruneArtifactRetention } from './artifact-retention.js';
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { resolveStateLockPolicy } from './state-lock-policy.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const ARTIFACT_WRITE_FAILED = hostErrorCatalog.require('SYSTEM.HOST.ARTIFACT_WRITE_FAILED');
+const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
 
 /** Options for {@link createWriteArtifactSeam}. */
 export interface WriteArtifactSeamOptions {
@@ -84,7 +91,9 @@ function assertWritableFileTarget(path: string): void {
       throw new ConfigurationError(
         `writeArtifact target must be a file path, not a directory: '${path}'`,
         {
-          code: 'CONFIGURATION.ARTIFACT_TARGET_IS_DIRECTORY',
+          code: OPTION_INVALID.code,
+          definition: OPTION_INVALID,
+          metadata: { condition: 'target-is-directory' },
         },
       );
     }
@@ -127,7 +136,11 @@ export function createEnsureArtifactDirSeam(
       } catch (error) {
         throw new SystemError(
           `ensureArtifactDir failed for '${dir}': ${error instanceof Error ? error.message : String(error)}`,
-          { code: 'SYSTEM.ARTIFACT_DIR_FAILED' },
+          {
+            code: ARTIFACT_WRITE_FAILED.code,
+            definition: ARTIFACT_WRITE_FAILED,
+            metadata: { condition: 'mkdir' },
+          },
         );
       }
       logger.debug({ evt: 'state.artifact.dir.ensured', module: 'cli:artifact-seams', dir });
@@ -158,7 +171,11 @@ export function createWriteArtifactSeam(
         if (error instanceof ToolError) throw error;
         throw new SystemError(
           `writeArtifact failed for '${target}': ${error instanceof Error ? error.message : String(error)}`,
-          { code: 'SYSTEM.ARTIFACT_WRITE_FAILED' },
+          {
+            code: ARTIFACT_WRITE_FAILED.code,
+            definition: ARTIFACT_WRITE_FAILED,
+            metadata: { condition: 'write' },
+          },
         );
       }
       // Retention runs AFTER the write succeeds and covers worker writes too (the

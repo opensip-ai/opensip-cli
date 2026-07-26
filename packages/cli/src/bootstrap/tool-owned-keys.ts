@@ -14,7 +14,13 @@ import {
   type Tool,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { isReservedHostPlaneIdentity } from './host-plane-state.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED');
 
 function primaryCommandName(tool: Tool): string | undefined {
   const commands = resolveToolCommands(tool);
@@ -86,7 +92,9 @@ export function toolOwnedKeys(tool: Tool): ReadonlySet<string> {
       throw new PluginIncompatibleError(
         `tool '${tool.metadata.name || tool.metadata.id}' claims reserved host-plane identity via ${candidate.field}`,
         {
-          code: 'PLUGIN.HOST_PLANE_IDENTITY_RESERVED',
+          code: HOST_IDENTITY_RESERVED.code,
+          definition: HOST_IDENTITY_RESERVED,
+          metadata: { condition: 'host-plane' },
           diagnostic: `reserved host-plane identity on ${candidate.field}`,
         },
       );

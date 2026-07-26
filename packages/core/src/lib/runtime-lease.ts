@@ -517,6 +517,7 @@ const COORDINATION_BUSY = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.BU
 const COORDINATION_INPUT = coreErrorCatalog.require('VALIDATION.RUNTIME_COORDINATION.INPUT');
 const LEASE_CAPACITY = coreErrorCatalog.require('CORE.RUNTIME_LEASE.CAPACITY');
 const RECOVERY_REQUIRED = coreErrorCatalog.require('CORE.RUNTIME_RECOVERY.REQUIRED');
+const COORDINATION_MUTEX_TIMEOUT = coreErrorCatalog.require('TIMEOUT.RUNTIME_COORDINATION.MUTEX');
 
 /**
  * The coordination root is in a state this process refuses to touch.
@@ -3562,7 +3563,7 @@ function acquireRuntimeMutex(
         });
         throw new TimeoutError(
           `Timed out waiting for runtime coordination mutex after ${waitMs}ms`,
-          { code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX' },
+          { code: COORDINATION_MUTEX_TIMEOUT.code, definition: COORDINATION_MUTEX_TIMEOUT },
         );
       }
       emitMutexEvent(environment, onEvent, {
@@ -3615,7 +3616,8 @@ function acquireRuntimeMutexSync(
     const remainingMs = deadline - environment.monotonicNow();
     if (remainingMs <= 0) {
       throw new TimeoutError('Timed out releasing runtime coordination state', {
-        code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX',
+        code: COORDINATION_MUTEX_TIMEOUT.code,
+        definition: COORDINATION_MUTEX_TIMEOUT,
       });
     }
     const delay = Math.min(policy.pollMs, Math.max(1, remainingMs));

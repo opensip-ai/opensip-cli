@@ -650,58 +650,25 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
 );
 
 /**
- * Map common subcode families (e.g. `PLUGIN.WORKER.*`, `CONFIGURATION.GATE.*`)
- * onto the canonical legacy catalog entry so custom detail codes keep the
- * parent exit class / axes instead of demoting to {@link UNKNOWN_FAILURE}.
- */
-function legacyFamilyCode(code: string): string | undefined {
-  if (!code.includes('.')) return undefined;
-  const head = code.slice(0, code.indexOf('.'));
-  switch (head) {
-    case 'CONFIG':
-    case 'CONFIGURATION': {
-      return 'CONFIGURATION_ERROR';
-    }
-    case 'VALIDATION': {
-      return 'VALIDATION_ERROR';
-    }
-    case 'PLUGIN': {
-      return 'PLUGIN_INCOMPATIBLE';
-    }
-    case 'TIMEOUT': {
-      return 'TIMEOUT';
-    }
-    case 'SYSTEM': {
-      return 'SYSTEM_ERROR';
-    }
-    case 'NETWORK': {
-      return 'NETWORK_ERROR';
-    }
-    case 'CAPABILITY': {
-      // Unknown domain → not-found; schema/contribution mismatch → validation.
-      return code.includes('.DOMAIN.') ? 'NOT_FOUND' : 'VALIDATION_ERROR';
-    }
-    default: {
-      return undefined;
-    }
-  }
-}
-
-/**
- * Resolve a legacy ToolError string code to a core definition when possible.
+ * Resolve a ToolError string code against the core adapter catalog.
  *
- * Exact catalog hits win. Dotted subcodes fall back to their family bucket
- * (exit class preserved). Only truly unknown codes map to UNKNOWN_FAILURE.
+ * CLEAN BREAK (Plan 01): the family fallback is GONE. This used to guess a definition from the
+ * first token of the code — `CONFIG.*` meant "configuration error", `SYSTEM.*` meant "internal
+ * invariant" — which made an unregistered code look classified while carrying axes nobody
+ * chose for it, and quietly demoted anything whose head was not in the switch. Guessing is now
+ * impossible: a code either resolves to a definition some package actually declared, or it is
+ * honestly unknown.
+ *
+ * The function stays TOTAL (ruling D11). An unknown code resolves to `UNKNOWN_FAILURE` rather
+ * than throwing, because a third-party tool shipping a code nobody registered must not be able
+ * to crash the host — and because this runs while something has already failed.
+ *
+ * Callers should prefer `resolveDefinitionForCode`, which consults every registered catalog
+ * (core's own, plus substrates and loaded tools via the per-run registry) before falling back
+ * here.
  */
 export function definitionFromLegacyCode(code: string): ErrorDefinition {
-  const direct = coreSystemErrorCatalog.get(code);
-  if (direct) return direct;
-  const family = legacyFamilyCode(code);
-  if (family) {
-    const familyDef = coreSystemErrorCatalog.get(family);
-    if (familyDef) return familyDef;
-  }
-  return coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
+  return coreSystemErrorCatalog.get(code) ?? coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
 }
 
 /**

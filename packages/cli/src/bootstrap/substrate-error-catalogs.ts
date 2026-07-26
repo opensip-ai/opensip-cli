@@ -24,6 +24,8 @@ import { codebaseErrorCatalog } from '@opensip-cli/codebase';
 import { coreErrorCatalog, type SubstrateErrorCatalogContribution } from '@opensip-cli/core';
 import { treeSitterErrorCatalog } from '@opensip-cli/tree-sitter';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 /**
  * Substrate catalogs in registration order.
  *
@@ -35,6 +37,7 @@ import { treeSitterErrorCatalog } from '@opensip-cli/tree-sitter';
  */
 export const HOST_SUBSTRATE_ERROR_CATALOGS: readonly SubstrateErrorCatalogContribution[] = [
   { packageName: 'opensip-cli.core', catalog: coreErrorCatalog },
+  { packageName: 'opensip-cli', catalog: hostErrorCatalog },
   { packageName: '@opensip-cli/codebase', catalog: codebaseErrorCatalog },
   { packageName: '@opensip-cli/tree-sitter', catalog: treeSitterErrorCatalog },
 ];

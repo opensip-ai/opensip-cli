@@ -1,5 +1,7 @@
 import { ConfigurationError, type ToolProvenance } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import {
   BUILT_IN_AGENT_CONTEXT_PLANES,
   BUILT_IN_GRAPH_PACKAGE_NAME,
@@ -9,11 +11,17 @@ import {
 
 import type { ValidatedSuite } from './validate-suite.js';
 
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
+
 const CONTEXT_COMMAND_SOURCE = 'packages/graph/engine/src/cli/context/context-command-specs.ts';
 
 function invalid(message: string): never {
   throw new ConfigurationError(`Built-in agent-context authority check failed: ${message}`, {
-    code: 'CONFIG.SUITE.CONTEXT_AUTHORITY_INVALID',
+    code: SUITE_INVALID.code,
+    definition: SUITE_INVALID,
+    metadata: { condition: 'context-authority' },
   });
 }
 

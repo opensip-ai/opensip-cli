@@ -343,4 +343,21 @@ export const runtimeLeaseDefinitions = {
     operatorAction:
       'Timed out waiting for global runtime maintenance. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.',
   },
+  /**
+   * Releasing a runtime lease failed for a reason the release path could not classify.
+   *
+   * `integrity` and `transient`: the lease may or may not still be held, so the safe reading is
+   * that runtime state is uncertain rather than that the caller did something wrong. The
+   * original failure is preserved on `cause`.
+   */
+  'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED': {
+    ...LEASE_CALLER_CONTRACT,
+    code: 'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED',
+    defaultResponsibility: 'environment',
+    kind: 'integrity',
+    retry: 'transient',
+    operatorAction:
+      'A runtime lease could not be released cleanly. Re-run; if it repeats, run `opensip status` to inspect runtime state.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

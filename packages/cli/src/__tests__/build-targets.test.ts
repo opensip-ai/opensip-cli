@@ -321,7 +321,7 @@ describe('buildTargets — invalid blocks surface as ConfigurationError', () => 
     }
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error).message).toMatch(/Invalid 'targets:' block/);
-    expect((caught as { code?: string }).code).toBe('CONFIGURATION.TARGETS.INVALID');
+    expect((caught as { code?: string }).code).toBe('CONFIGURATION.HOST.OPTION_INVALID');
   });
 
   it('throws CONFIGURATION.TARGETS.INVALID on a malformed globalExcludes: block', () => {

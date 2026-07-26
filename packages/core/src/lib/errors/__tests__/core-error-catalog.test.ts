@@ -176,11 +176,13 @@ describe('resolveDefinitionForCode (Plan 01 Wave 1)', () => {
     expect(error.definition.exitClass).toBe('configuration');
   });
 
-  it('keeps the legacy family fallback and stays total', () => {
-    // Registered codes win; everything else keeps documented behaviour, and a hostile code
-    // must never throw here (D11) because this runs when something has already failed.
+  it('no longer guesses from the code head, and stays total', () => {
+    // CLEAN BREAK: `CONFIGURATION.ANYTHING.ELSE` used to acquire configuration axes purely
+    // because of its first token. An unregistered code is now honestly unknown — which is the
+    // whole point: a code either resolves to a definition some package declared, or it does
+    // not resolve. Totality is preserved (D11): unknown never throws.
     expect(resolveDefinitionForCode('CONFIGURATION.ANYTHING.ELSE').code).toBe(
-      'CONFIGURATION_ERROR',
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
     );
     expect(resolveDefinitionForCode('WHOLLY.UNKNOWN.HEAD').code).toBe(
       'CORE.SYSTEM.UNKNOWN_FAILURE',

@@ -42,6 +42,7 @@ import {
   type RunActionHooks,
   type RunPlaneDeps,
 } from '../../../bootstrap/run-plane.js';
+import { hostErrorCatalog } from '../../../errors/host-error-catalog.js';
 import { runCommandSpecAction } from '../../run-command-spec-action.js';
 import {
   BUILT_IN_AGENT_CONTEXT_PLANES,
@@ -50,6 +51,10 @@ import {
   BUILT_IN_GRAPH_TOOL_ID,
 } from '../built-in-suites.js';
 import { deriveSuiteAggregate, runSuite, type RunSuiteInput } from '../orchestrator.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
 const loadCapabilitiesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(0));
@@ -441,7 +446,9 @@ describe('runSuite', () => {
         ),
       ).rejects.toMatchObject({
         name: 'ConfigurationError',
-        code: 'CONFIG.SUITE.CONTEXT_SELECTOR_UNSUPPORTED',
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'context-selector' },
       });
     },
   );
@@ -481,7 +488,9 @@ describe('runSuite', () => {
       ),
     ).rejects.toMatchObject({
       name: 'ConfigurationError',
-      code: 'CONFIG.SUITE.CONTEXT_PROJECT_ROOT_INVALID',
+      code: SUITE_INVALID.code,
+      definition: SUITE_INVALID,
+      metadata: { condition: 'context-project-root' },
     });
   });
 

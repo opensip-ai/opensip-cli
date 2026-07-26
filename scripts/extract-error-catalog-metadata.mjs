@@ -54,6 +54,12 @@ const CATALOG_SOURCES = [
     exportName: 'codebaseErrorCatalog',
   },
   {
+    packageName: 'opensip-cli',
+    ownerId: 'opensip-cli',
+    file: 'packages/cli/src/errors/host-error-catalog.ts',
+    exportName: 'hostErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/tree-sitter',
     ownerId: '@opensip-cli/tree-sitter',
     file: 'packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts',

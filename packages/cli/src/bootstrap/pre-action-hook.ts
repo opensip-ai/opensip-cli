@@ -30,6 +30,7 @@ import {
   type SafeRuntimeLeaseEventBuffer,
 } from '../commands/host-runtime-access.js';
 import { hostEnv } from '../env/host-env-specs.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 import { setResolvedCommandLabel } from '../telemetry/command-label.js';
 
 import { executePostBailoutBootstrap } from './execute-post-bailout-bootstrap.js';
@@ -40,6 +41,11 @@ import type { PreActionRuntime } from './pre-action-runtime.js';
 import type { StartupRuntimeLeaseHandoff } from './startup-runtime-lease.js';
 import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 import type { Command } from 'commander';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 export { resolveOwningTool } from './owning-tool-init.js';
 export type { PreActionRuntime } from './pre-action-runtime.js';
@@ -67,7 +73,9 @@ export function createCommandActionScopeRunner(): CommandActionScopeController {
     stage: (scope: RunScope): void => {
       if (stagedScope !== undefined || activeScope !== undefined) {
         throw new SystemError('A command scope is already staged for dispatch.', {
-          code: 'SYSTEM.SCOPE.REENTRANT',
+          code: WIRING_INVALID.code,
+          definition: WIRING_INVALID,
+          metadata: { condition: 'scope-reentrant' },
         });
       }
       stagedScope = scope;
@@ -160,7 +168,11 @@ function recoveryGuidance(error: unknown): never {
 function unstableRuntimeContext(): ConfigurationError {
   return new ConfigurationError(
     'The canonical OpenSIP project root changed during startup. Retry after concurrent Init or project movement completes.',
-    { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
+    {
+      code: PROJECT_REQUIRED.code,
+      definition: PROJECT_REQUIRED,
+      metadata: { condition: 'context-unstable' },
+    },
   );
 }
 
@@ -203,7 +215,11 @@ function declaredScopeForCommand(input: PrepareLeasedBootstrapPlanInput): Comman
   if (commandEntry === undefined) {
     throw new ConfigurationError(
       `No declared runtime scope exists for mounted command '${input.commandPath}'.`,
-      { code: 'CONFIGURATION.COMMAND_SCOPE_UNDECLARED' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'scope-undeclared' },
+      },
     );
   }
   return commandEntry.scope;
@@ -317,7 +333,11 @@ export async function prepareLeasedBootstrapPlan(
 
   throw new ConfigurationError(
     'The canonical OpenSIP project root changed repeatedly during startup. Stop concurrent project moves or Init operations and retry.',
-    { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
+    {
+      code: PROJECT_REQUIRED.code,
+      definition: PROJECT_REQUIRED,
+      metadata: { condition: 'context-unstable' },
+    },
   );
 }
 

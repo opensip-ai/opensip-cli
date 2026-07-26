@@ -27,6 +27,8 @@
 
 import { currentScope, SystemError, type ToolSource } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import {
   DEFAULT_DISPATCH_TIMEOUT_MS,
   requirePackageDir,
@@ -40,6 +42,10 @@ import {
 
 import type { DispatchExternalToolCommandArgs } from './dispatch-external-tool-command-types.js';
 import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
 
 /**
  * Fork the worker, await its slim {@link ToolCommandResult}, and replay it
@@ -56,7 +62,11 @@ export async function dispatchExternalToolCommand(
   if (args.provenance.source === 'bundled') {
     throw new SystemError(
       'dispatchExternalToolCommand called for a bundled tool; bundled tools run in-process.',
-      { code: 'SYSTEM.DISPATCH.BUNDLED_MISUSE' },
+      {
+        code: DISPATCH_FAILED.code,
+        definition: DISPATCH_FAILED,
+        metadata: { condition: 'bundled-misuse' },
+      },
     );
   }
 

@@ -21,6 +21,7 @@ import {
   defineHostCommand,
   type AcquireHostRuntimeLeaseInput,
 } from '../../commands/host-runtime-access.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { executePostBailoutBootstrap } from '../execute-post-bailout-bootstrap.js';
 import {
   planPreActionBootstrap,
@@ -40,6 +41,12 @@ import {
 
 import type { BuildPerRunScopeInput } from '../build-per-run-scope.js';
 import type { PreActionRuntime } from '../pre-action-runtime.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 function projectSpec(name = 'fit') {
   return defineHostCommand({
@@ -107,7 +114,11 @@ describe('Commander action scope handoff', () => {
     scope.onDispose(() => disposedWithScopeCurrent(currentScope() === scope));
     runner.stage(scope);
     expect(() => runner.stage(scope)).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.SCOPE.REENTRANT' }),
+      expect.objectContaining({
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'scope-reentrant' },
+      }),
     );
 
     runner.disposeStaged();
@@ -212,11 +223,21 @@ describe('startup discovery lease', () => {
 
   it('rejects missing early option values before discovery', () => {
     expect(() => resolveStartupProjectSelection(['fit', '--cwd'], process.cwd())).toThrow(
-      expect.objectContaining({ code: 'CONFIGURATION.STARTUP_OPTION_INVALID' }),
+      expect.objectContaining({
+        code: OPTION_INVALID.code,
+        definition: OPTION_INVALID,
+        metadata: { condition: 'startup-option' },
+      }),
     );
     expect(() =>
       resolveStartupProjectSelection(['fit', '--config', '--json'], process.cwd()),
-    ).toThrow(expect.objectContaining({ code: 'CONFIGURATION.STARTUP_OPTION_INVALID' }));
+    ).toThrow(
+      expect.objectContaining({
+        code: OPTION_INVALID.code,
+        definition: OPTION_INVALID,
+        metadata: { condition: 'startup-option' },
+      }),
+    );
   });
 
   it('releases and reacquires when the canonical root changes during acquisition', async () => {
@@ -310,7 +331,9 @@ describe('startup discovery lease', () => {
           { acquire },
         ),
       ).rejects.toMatchObject({
-        code: 'CONFIGURATION.STARTUP_PROJECT_UNRESOLVED',
+        code: PROJECT_REQUIRED.code,
+        definition: PROJECT_REQUIRED,
+        metadata: { condition: 'unresolved' },
       });
 
       expect(acquire).toHaveBeenCalledOnce();
@@ -363,7 +386,9 @@ describe('startup discovery lease', () => {
           { acquire },
         ),
       ).rejects.toMatchObject({
-        code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE',
+        code: PROJECT_REQUIRED.code,
+        definition: PROJECT_REQUIRED,
+        metadata: { condition: 'context-unstable' },
       });
 
       expect(acquire).toHaveBeenCalledTimes(3);
@@ -537,7 +562,11 @@ describe('leased bootstrap planning', () => {
         },
         { acquire },
       ),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.COMMAND_SCOPE_UNDECLARED' });
+    ).rejects.toMatchObject({
+      code: WIRING_INVALID.code,
+      definition: WIRING_INVALID,
+      metadata: { condition: 'scope-undeclared' },
+    });
     expect(acquire).not.toHaveBeenCalled();
   });
 
@@ -874,7 +903,9 @@ describe('leased bootstrap planning', () => {
           { acquire, plan: fakePlan },
         ),
       ).rejects.toMatchObject({
-        code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE',
+        code: PROJECT_REQUIRED.code,
+        definition: PROJECT_REQUIRED,
+        metadata: { condition: 'context-unstable' },
       });
       expect(acquisitions).toHaveLength(3);
       expect(acquisitions[0]?.ownerToken).toBeUndefined();

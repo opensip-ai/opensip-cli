@@ -18,6 +18,8 @@
 
 import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
 
 import type {
@@ -59,24 +61,34 @@ const RECOGNIZED_SEAMS = new Set<HostRpcCall['seam']>([
 
 const HOST_PLANE_KINDS = new Set<string>(Object.keys(HOST_PLANE_METHODS));
 
-/** Stable subcodes permitted to cross from the host back into an external worker. */
-const ALLOWED_HOST_RPC_ERROR_CODES = new Set([
-  'CONFIGURATION.GATE.BASELINE_MISSING',
-  'CONFIGURATION.GATE.UNSTAMPED_SIGNAL',
-  'CONFIGURATION.GATE.BASELINE_IDENTITY_MISSING',
-  'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
-  'CONFIGURATION.GATE.BASELINE_INCONSISTENT',
-  'CONFIGURATION.POLICY.DENIED',
-  'CONFIGURATION.ARTIFACT_TARGET_IS_DIRECTORY',
-  'SYSTEM.ARTIFACT_DIR_FAILED',
-  'SYSTEM.ARTIFACT_WRITE_FAILED',
+/**
+ * Stable codes permitted to cross from the host back into an external worker.
+ *
+ * A SECURITY BOUNDARY, so it stays an explicit list rather than a predicate over the catalog —
+ * "every registered code may cross" is a different and much weaker policy than "these eleven
+ * may". But the list must name codes that can actually be raised: when Plan 01 clustered the
+ * host codes, the old literals here stopped matching anything, which would have silently
+ * filtered every one of them out at the worker boundary. Derived from the host catalog's
+ * definitions so a rename is a compile error, not a silent narrowing.
+ */
+const ALLOWED_HOST_RPC_ERROR_CODES = new Set<string>([
+  hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID').code,
+  hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED').code,
+  hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID').code,
+  hostErrorCatalog.require('SYSTEM.HOST.ARTIFACT_WRITE_FAILED').code,
+  hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED').code,
   'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE',
-  'PLUGIN.IDENTITY_NAMESPACE_MISMATCH',
 ]);
 
-const FIXED_CODE_MESSAGES: Readonly<Record<string, string>> = {
-  'CONFIGURATION.GATE.BASELINE_MISSING':
-    'No baseline found for this tool — run with --gate-save first',
+/**
+ * Fixed operator-facing text for conditions whose own message would leak host detail.
+ *
+ * Keyed by `metadata.condition`, not by code: the gate conditions now SHARE
+ * `CONFIGURATION.GATE.BASELINE_INVALID` (ruling D9 clustering), so a code-keyed map would
+ * never match again — a silent loss of the one message this table exists to fix.
+ */
+const FIXED_CONDITION_MESSAGES: Readonly<Record<string, string>> = {
+  'baseline-missing': 'No baseline found for this tool — run with --gate-save first',
 };
 
 function replyRpcId(request: unknown): number {
@@ -271,10 +283,12 @@ export async function handleHostRpc(request: unknown, ctx: ToolCliContext): Prom
     // codes may map to fixed, allowlisted user messages; everything else uses
     // a generic seam message.
     const code = allowlistedErrorCode(error);
-    const message =
-      code !== undefined && FIXED_CODE_MESSAGES[code] !== undefined
-        ? FIXED_CODE_MESSAGES[code]
-        : 'host-RPC seam failed';
+    // The condition is read only for an ALREADY-ALLOWLISTED code, so a hostile value cannot
+    // reach this table by supplying its own metadata.
+    const condition =
+      code !== undefined && error instanceof ToolError ? error.metadata.condition : undefined;
+    const fixed = typeof condition === 'string' ? FIXED_CONDITION_MESSAGES[condition] : undefined;
+    const message = fixed ?? 'host-RPC seam failed';
     return {
       kind: 'rpc-reply',
       rpcId,

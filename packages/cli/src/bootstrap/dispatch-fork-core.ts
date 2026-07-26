@@ -36,6 +36,8 @@ import {
   type WorkerMessage,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { buildExternalWorkerChildEnv } from './build-external-worker-child-env.js';
 import { BOOTSTRAP_MODULE } from './constants.js';
 import { handleHostRpc } from './dispatch-host-rpc-handler.js';
@@ -50,6 +52,10 @@ import type {
   ToolCommandWorkerSpec,
 } from './tool-command-dispatch-types.js';
 import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-adapter';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
 
 /** Default supervisor wall-clock timeout for one forked worker run (ms). */
 export const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;
@@ -82,7 +88,11 @@ export function requirePackageDir(provenance: ToolProvenance): string {
   if (dir === undefined || dir.length === 0) {
     throw new SystemError(
       `external tool '${provenance.id}' has no resolved package path to dispatch from`,
-      { code: 'SYSTEM.DISPATCH.NO_PACKAGE_DIR' },
+      {
+        code: DISPATCH_FAILED.code,
+        definition: DISPATCH_FAILED,
+        metadata: { condition: 'no-package-dir' },
+      },
     );
   }
   return dir;

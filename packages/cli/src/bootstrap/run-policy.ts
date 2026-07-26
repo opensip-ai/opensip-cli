@@ -6,10 +6,16 @@ import {
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { PolicyAuditCollector } from './policy-audit.js';
 import { policyCiEvidenceFromCurrentEnv } from './policy-evidence.js';
 import { evaluatePolicyPep } from './policy-pep.js';
 import { readValidatedProjectPolicy, resolveRuntimePolicy } from './policy-source.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const POLICY_DENIED = hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED');
 
 export interface ResolvedRunPolicy {
   readonly policy: ResolvedTrustPolicy;
@@ -87,7 +93,8 @@ function enforceDisabledChecksPolicy(args: {
     action: 'Remove fitness.disabledChecks entries or add explicit policy exceptions.',
   });
   throw new ConfigurationError(`Policy denied fitness.disabledChecks: ${denied.join(' | ')}`, {
-    code: 'CONFIGURATION.POLICY.DENIED',
+    code: POLICY_DENIED.code,
+    definition: POLICY_DENIED,
   });
 }
 

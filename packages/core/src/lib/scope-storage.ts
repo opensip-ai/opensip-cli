@@ -5,9 +5,13 @@
 
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
 import { SystemError } from './errors.js';
 
 import type { RunScope } from './run-scope-class.js';
+
+/** Registered replacement for the un-catalogued `SYSTEM.SCOPE.REENTRANT` literal. */
+const SCOPE_REENTRANT = coreErrorCatalog.require('SYSTEM.SCOPE.REENTRANT');
 
 const SCOPE_STORAGE_KEY = Symbol.for('@opensip-cli/core/scopeStorage');
 
@@ -43,7 +47,7 @@ export function enterScope(scope: RunScope): void {
     throw new SystemError(
       'enterScope called while a different scope is already current. ' +
         'Concurrent or nested work must use runWithScope(scope, fn), not a shared enterScope.',
-      { code: 'SYSTEM.SCOPE.REENTRANT' },
+      { code: SCOPE_REENTRANT.code, definition: SCOPE_REENTRANT },
     );
   }
   scopeStorage().enterWith(scope);

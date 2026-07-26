@@ -137,9 +137,8 @@ Commands:
   status                    Coverage/progress summary for a snapshot
   reconcile --from pre-infra --to post-infra
   ratchet                   Temporary no-new-debt check vs C5 baseline (Plan 01)
-  code-heads                D11: fail on a constructed code head that is neither
-                            registered in the catalog manifest nor mapped by
-                            legacyFamilyCode (permanent rule, not campaign state)
+  code-heads                D11: fail on a constructed error code that no catalog
+                            registers (permanent rule, not campaign state)
 
 Options:
   --commit <sha>   Freeze inventory to this git commit (default HEAD)

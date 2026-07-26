@@ -21,8 +21,13 @@ import { describe, it, expect } from 'vitest';
 import { bindToolCliContext } from '../bootstrap/bind-tool-context.js';
 import { dispatchExternalToolCommand } from '../bootstrap/dispatch-external-tool-command.js';
 import { dispatchExternalToolHook } from '../bootstrap/dispatch-external-tool-hook.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import { makeDispatchHostCtx, type CapturedHostCtx } from './harness/dispatch-host-ctx.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESULT_WORKER = join(HERE, 'fixtures', 'dispatch-result-worker.mjs');
@@ -150,7 +155,7 @@ describe('dispatchExternalToolHook — M4-F lifecycle hook supervisor', () => {
         ok: false,
         error: {
           message: 'host-RPC seam failed',
-          code: 'PLUGIN.IDENTITY_NAMESPACE_MISMATCH',
+          code: HOST_IDENTITY_RESERVED.code,
           toolErrorCode: 'PLUGIN_INCOMPATIBLE',
         },
       },

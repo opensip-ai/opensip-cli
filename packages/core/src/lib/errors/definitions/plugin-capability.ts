@@ -278,4 +278,32 @@ export const pluginCapabilityDefinitions = {
     operatorAction: 'Contribute scope values as plain data; see the tool contract for the shape.',
     publicMetadataKeys: ['key'],
   },
+  /**
+   * `enterScope` was called while a different scope was already current.
+   *
+   * A host wiring bug: concurrent or nested work must use `runWithScope(scope, fn)`, which
+   * scopes the value to one async context, rather than a shared `enterScope` that would let
+   * two commands observe each other's run state.
+   */
+  'SYSTEM.SCOPE.REENTRANT': {
+    ...HOST_WIRING_INVARIANT,
+    code: 'SYSTEM.SCOPE.REENTRANT',
+    operatorAction:
+      'Use runWithScope(scope, fn) for nested or concurrent work. Capture the run id and report a bug.',
+  },
+  /**
+   * A recipe selector arm is unusable: an unknown arm type, or an arm that needs a `match`
+   * matcher and was given none.
+   *
+   * One code for both (D9) — a recipe author fixes either the same way, in the same file, and
+   * `metadata.condition` says which. `redacted`: the message quotes the author's selector, and
+   * no end user can act on it.
+   */
+  'SYSTEM.CORE.SELECTOR_INVALID': {
+    ...HOST_WIRING_INVARIANT,
+    code: 'SYSTEM.CORE.SELECTOR_INVALID',
+    operatorAction:
+      'Correct the recipe selector: use a known arm type, and supply a `match` matcher for arms that require one.',
+    publicMetadataKeys: ['condition', 'arm'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

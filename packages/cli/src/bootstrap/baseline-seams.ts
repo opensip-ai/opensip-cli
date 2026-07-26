@@ -26,6 +26,8 @@ import {
 import { BaselineRepo, type DataStore } from '@opensip-cli/datastore';
 import { diffBaseline } from '@opensip-cli/output';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { writeArtifactAtomically } from './atomic-artifact-write.js';
 import { writeEnvelopeSarif } from './deliver-envelope.js';
 import { policyCiEvidenceFromCurrentEnv } from './policy-evidence.js';
@@ -37,6 +39,11 @@ import {
 import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 import type { SignalEnvelope } from '@opensip-cli/contracts';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const GATE_BASELINE_INVALID = hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID');
+const POLICY_DENIED = hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED');
 
 /** The four host baseline/ratchet seam implementations, bound to a datastore resolver. */
 export interface BaselineSeams {
@@ -55,7 +62,11 @@ function missingBaseline(tool: string): ConfigurationError {
       `\`opensip-cli ${tool} --gate-save\` to (re)capture one. The git-trackable ` +
       `JSON fingerprint baseline (graph-baseline-export) is a file, not a DB row, and ` +
       `is untouched.`,
-    { code: 'CONFIGURATION.GATE.BASELINE_MISSING' },
+    {
+      code: GATE_BASELINE_INVALID.code,
+      definition: GATE_BASELINE_INVALID,
+      metadata: { condition: 'baseline-missing' },
+    },
   );
 }
 
@@ -71,7 +82,11 @@ function requireStampedEntries(
       throw new ConfigurationError(
         `${operation}(${tool}): signal ${s.ruleId} is not fingerprint-stamped. The tool must ` +
           `stamp its signals (stampFingerprints) before the seam — the plane never fingerprints.`,
-        { code: 'CONFIGURATION.GATE.UNSTAMPED_SIGNAL' },
+        {
+          code: GATE_BASELINE_INVALID.code,
+          definition: GATE_BASELINE_INVALID,
+          metadata: { condition: 'unstamped-signal' },
+        },
       );
     }
     return { fingerprint: s.fingerprint, payload: s };
@@ -89,7 +104,11 @@ function requireEnvelopeBaselineIdentity(
     throw new ConfigurationError(
       `${operation}(${tool}): envelope is missing baseline identity metadata. ` +
         `Build the envelope with buildSignalEnvelope so strategy id/version are stamped.`,
-      { code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISSING' },
+      {
+        code: GATE_BASELINE_INVALID.code,
+        definition: GATE_BASELINE_INVALID,
+        metadata: { condition: 'identity-missing' },
+      },
     );
   }
   return envelope.baselineIdentity;
@@ -130,7 +149,7 @@ function enforceBaselineSavePolicy(tool: string): void {
   });
   throw new ConfigurationError(
     `Policy denied baseline save for '${tool}': ${decision.decision.reasons.join('; ')}`,
-    { code: 'CONFIGURATION.POLICY.DENIED' },
+    { code: POLICY_DENIED.code, definition: POLICY_DENIED },
   );
 }
 
@@ -201,7 +220,9 @@ export function buildBaselineSeams(deps: {
         emitIdentityMismatchDiagnostic(tool, env, stored);
         return Promise.reject(
           new ConfigurationError(formatBaselineIdentityMismatch(tool, identity, stored), {
-            code: 'CONFIGURATION.GATE.BASELINE_IDENTITY_MISMATCH',
+            code: GATE_BASELINE_INVALID.code,
+            definition: GATE_BASELINE_INVALID,
+            metadata: { condition: 'identity-mismatch' },
           }),
         );
       }
@@ -217,7 +238,11 @@ export function buildBaselineSeams(deps: {
       if (capturedAt === undefined) {
         throw new ConfigurationError(
           `Baseline meta row for '${tool}' missing after exists() reported present.`,
-          { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
+          {
+            code: GATE_BASELINE_INVALID.code,
+            definition: GATE_BASELINE_INVALID,
+            metadata: { condition: 'inconsistent' },
+          },
         );
       }
       const storedMeta = repo.loadMeta(tool);
@@ -274,7 +299,11 @@ export function buildBaselineSeams(deps: {
       if (capturedAt === undefined) {
         throw new ConfigurationError(
           `Baseline meta row for '${tool}' missing after exists() reported present.`,
-          { code: 'CONFIGURATION.GATE.BASELINE_INCONSISTENT' },
+          {
+            code: GATE_BASELINE_INVALID.code,
+            definition: GATE_BASELINE_INVALID,
+            metadata: { condition: 'inconsistent' },
+          },
         );
       }
       const storedMeta = repo.loadMeta(tool);

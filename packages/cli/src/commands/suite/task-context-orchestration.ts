@@ -12,6 +12,8 @@ import {
 } from '@opensip-cli/contracts';
 import { ConfigurationError, currentLogger, currentScope, isRecord } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import { validateBuiltInAgentContextAuthority } from './agent-context-authority.js';
 import { BUILT_IN_AGENT_CONTEXT_SUITE_NAME, type SuiteSource } from './built-in-suites.js';
 import { buildTaskContextManifest } from './task-context-manifest.js';
@@ -20,6 +22,10 @@ import { captureTaskContextSourceIdentity } from './task-context-source-identity
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteLedgerIdentity } from './run-ledger-persist.js';
 import type { ValidatedSuite } from './validate-suite.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
 
 interface TaskContextGraphReadScope {
   readonly contextCatalog: {
@@ -89,7 +95,9 @@ async function canonicalTaskContextRoot(projectRoot: string): Promise<string> {
     return await realpath(projectRoot);
   } catch {
     throw new ConfigurationError('The task-context project root could not be canonicalized.', {
-      code: 'CONFIG.SUITE.CONTEXT_PROJECT_ROOT_INVALID',
+      code: SUITE_INVALID.code,
+      definition: SUITE_INVALID,
+      metadata: { condition: 'context-project-root' },
     });
   }
 }
@@ -103,7 +111,11 @@ function assertSupportedSelectors(input: TaskContextPreparationInput): void {
   ) {
     throw new ConfigurationError(
       'The built-in agent-context suite does not support --changed or --since; use repeatable --files for task selection.',
-      { code: 'CONFIG.SUITE.CONTEXT_SELECTOR_UNSUPPORTED' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'context-selector' },
+      },
     );
   }
 }
@@ -114,7 +126,9 @@ function taskContextFileScope(rawFiles: unknown): TaskContextFileScope {
     (!Array.isArray(rawFiles) || rawFiles.some((file) => typeof file !== 'string'))
   ) {
     throw new ConfigurationError('Task-context files must be project-relative path strings.', {
-      code: 'CONFIG.SUITE.CONTEXT_FILES_INVALID',
+      code: SUITE_INVALID.code,
+      definition: SUITE_INVALID,
+      metadata: { condition: 'context-files' },
     });
   }
   try {
@@ -122,7 +136,11 @@ function taskContextFileScope(rawFiles: unknown): TaskContextFileScope {
   } catch {
     throw new ConfigurationError(
       'Task-context files must be a bounded set of normalized project-relative paths.',
-      { code: 'CONFIG.SUITE.CONTEXT_FILES_INVALID' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'context-files' },
+      },
     );
   }
 }
@@ -149,7 +167,11 @@ export async function prepareTaskContext(
   if (!contextDatastoreAvailable()) {
     throw new ConfigurationError(
       'The built-in agent-context suite requires an initialized project datastore.',
-      { code: 'CONFIG.SUITE.CONTEXT_DATASTORE_REQUIRED' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'context-datastore-required' },
+      },
     );
   }
   const fileScope = taskContextFileScope(input.suiteOpts.files);

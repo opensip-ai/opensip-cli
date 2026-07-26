@@ -2,11 +2,16 @@ import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import { ConfigurationError, ValidationError } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { executeRunsList, executeRunsShow } from '../run-history.js';
 
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type * as SessionStoreModule from '@opensip-cli/session-store';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 const readMocks = vi.hoisted(() => ({
   listParentRuns: vi.fn(),
@@ -263,7 +268,9 @@ describe('executeRunsShow', () => {
     expect(() => executeRunsShow({ store: STORE, runId: exactRun.id })).toThrow(
       expect.objectContaining({
         name: 'SystemError',
-        code: 'SYSTEM.RUN_READ.UNSAFE_SESSION_ID',
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'unsafe-session-id' },
       }),
     );
   });

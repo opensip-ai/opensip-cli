@@ -119,7 +119,7 @@ describe('Registry<T> — duplicatePolicy: throw', () => {
       throw new Error('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
-      expect((error as ValidationError).code).toBe('VALIDATION.REGISTRY.DUPLICATE');
+      expect((error as ValidationError).code).toBe('CORE.REGISTRY.DUPLICATE');
     }
   });
 
@@ -259,7 +259,7 @@ describe("Registry<T> — nameCollisionMode: 'throw'", () => {
       throw new Error('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
-      expect((error as ValidationError).code).toBe('VALIDATION.REGISTRY.NAME_COLLISION');
+      expect((error as ValidationError).code).toBe('CORE.REGISTRY.NAME_COLLISION');
     }
   });
 

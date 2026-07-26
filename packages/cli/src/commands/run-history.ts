@@ -2,7 +2,13 @@ import { type RunDetailResult, type RunHistoryResult } from '@opensip-cli/contra
 import { ConfigurationError, SystemError } from '@opensip-cli/core';
 import { listParentRuns, resolveParentRun } from '@opensip-cli/session-store';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 const FOLLOW_UP_ID = /^[A-Za-z0-9_-]{1,128}$/u;
 
@@ -73,7 +79,9 @@ export function executeRunsShow(input: ExecuteRunsShowInput): RunDetailResult {
       if (step.sessionId === undefined) return [];
       if (!FOLLOW_UP_ID.test(step.sessionId)) {
         throw new SystemError('A linked Tool Session has an unsupported stored ID.', {
-          code: 'SYSTEM.RUN_READ.UNSAFE_SESSION_ID',
+          code: WIRING_INVALID.code,
+          definition: WIRING_INVALID,
+          metadata: { condition: 'unsafe-session-id' },
         });
       }
       return [

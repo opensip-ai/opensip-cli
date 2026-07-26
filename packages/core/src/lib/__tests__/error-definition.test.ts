@@ -91,24 +91,34 @@ describe('defineErrorCatalog', () => {
     expect(MACHINE_CONSUMER_COMPATIBILITY.catalogSchemaVersion).toBe(ERROR_CATALOG_SCHEMA_VERSION);
   });
 
-  it('maps dotted subcodes to family exit classes instead of UNKNOWN_FAILURE', () => {
-    expect(definitionFromLegacyCode('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS').exitClass).toBe(
-      'plugin-incompatible',
-    );
-    // Deliberately still the LEGACY literal: this asserts the `CONFIGURATION` head's family
-    // fallback, so it must use a code that is NOT registered. Plan 01 moved the production
-    // site to CORE.RUNTIME_RECOVERY.REQUIRED; the fallback it left behind still has to work,
-    // because third-party tools may ship codes under a mapped head forever.
-    expect(definitionFromLegacyCode('CONFIGURATION.RECOVERY_REQUIRED').exitClass).toBe(
-      'configuration',
-    );
-    expect(definitionFromLegacyCode('CONFIG.GRAPH.NOT_A_REPO').exitClass).toBe('configuration');
-    expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE').exitClass).toBe(
-      'runtime',
-    );
-    expect(definitionFromLegacyCode('CAPABILITY.DOMAIN.UNKNOWN').exitClass).toBe('not-found');
-    expect(definitionFromLegacyCode('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH').exitClass).toBe(
-      'configuration',
+  it('no longer guesses a definition from the code head (Plan 01 clean break)', () => {
+    // WAS: `legacyFamilyCode` mapped eight heads onto family buckets, so an UNREGISTERED
+    // `CONFIG.*` code silently acquired configuration axes and a `PLUGIN.*` code acquired
+    // plugin-incompatible axes. That made an unregistered code look classified while carrying
+    // axes nobody chose for it — and demoted anything whose head was not in the switch.
+    //
+    // Guessing is now impossible: a code either resolves to a definition some package actually
+    // declared, or it is honestly unknown. Every code these assertions used to cover is now
+    // REGISTERED and resolves through `resolveDefinitionForCode`.
+    for (const unregistered of [
+      'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+      'CONFIGURATION.RECOVERY_REQUIRED',
+      'CONFIG.GRAPH.NOT_A_REPO',
+      'CAPABILITY.DOMAIN.UNKNOWN',
+    ]) {
+      expect(definitionFromLegacyCode(unregistered).code, unregistered).toBe(
+        'CORE.SYSTEM.UNKNOWN_FAILURE',
+      );
+    }
+  });
+
+  it('stays total for a hostile or unknown code (ruling D11)', () => {
+    // The runtime must never throw here: a third-party tool shipping a code nobody registered
+    // must not be able to crash the host, and this path runs when something has already failed.
+    expect(() => definitionFromLegacyCode('')).not.toThrow();
+    expect(() => definitionFromLegacyCode('\u0000\u0000')).not.toThrow();
+    expect(definitionFromLegacyCode('WHOLLY.UNKNOWN.HEAD').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
     );
   });
 

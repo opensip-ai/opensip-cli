@@ -13,6 +13,7 @@
 import { ConfigurationError, NotFoundError, ToolError } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { createWorkerRpcClient } from '../tool-command-worker-rpc.js';
 
 import type {
@@ -22,6 +23,10 @@ import type {
   RpcReply,
 } from '../tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const GATE_BASELINE_INVALID = hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID');
 
 type Outbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
@@ -220,7 +225,9 @@ describe('createWorkerRpcClient — host fault reply', () => {
       ok: false,
       error: {
         message: "No baseline found for 'gitleaks'",
-        code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+        code: GATE_BASELINE_INVALID.code,
+        definition: GATE_BASELINE_INVALID,
+        metadata: { condition: 'baseline-missing' },
         stack: 'Error: no baseline\n  at host',
         toolErrorCode: 'CONFIGURATION_ERROR',
       },
@@ -229,7 +236,7 @@ describe('createWorkerRpcClient — host fault reply', () => {
     const err = (await pending.catch((error: unknown) => error)) as ToolError;
     expect(err).toBeInstanceOf(ConfigurationError);
     // The original subcode round-trips onto the rebuilt instance for diagnostics.
-    expect(err.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
+    expect(err.code).toBe('CONFIGURATION.GATE.BASELINE_INVALID');
     expect(err.stack).toBe('Error: no baseline\n  at host');
   });
 

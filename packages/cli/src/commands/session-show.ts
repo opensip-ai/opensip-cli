@@ -2,12 +2,17 @@ import { EXIT_CODES } from '@opensip-cli/contracts';
 import { buildToolIdentityIndex, currentScope, SystemError } from '@opensip-cli/core';
 import { resolveAndReplaySession } from '@opensip-cli/session-store';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 import { SessionReplayRegistry } from '../session-replay-registry.js';
 
 import type { CliCommandsContext } from './shared.js';
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
 import type { ToolRegistry, ToolShortId } from '@opensip-cli/core';
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
 
 export interface ExecuteSessionShowOptions {
   readonly replayRegistry?: SessionReplayRegistry;
@@ -48,7 +53,11 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
   if (datastore == null) {
     throw new SystemError(
       'Datastore not available via scope for session show (project scope commands must have an open datastore thunk).',
-      { code: 'SYSTEM.SCOPE.DATASTORE_UNAVAILABLE' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'datastore-unavailable' },
+      },
     );
   }
   const registry = opts.registry ?? currentScope()?.tools;

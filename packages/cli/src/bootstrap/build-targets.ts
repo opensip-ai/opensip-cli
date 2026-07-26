@@ -41,6 +41,12 @@ import {
   resolveTargetMembershipsBounded,
 } from '@opensip-cli/targeting';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+
 /**
  * Default per-target exclusion globs, applied when a target declares no
  * explicit `exclude`. Mirrors the fitness loader's fallback normalization so
@@ -85,7 +91,7 @@ function validateConventionPath(targetName: string, field: string, pattern: stri
   throw new ConfigurationError(
     `Invalid 'targets.${targetName}.conventions.${field}' glob in opensip-cli.config.yml: ` +
       `'${pattern}' must be project-relative and must not contain '..' path segments.`,
-    { code: 'CONFIGURATION.TARGETS.INVALID' },
+    { code: OPTION_INVALID.code, definition: OPTION_INVALID, metadata: { condition: 'targets' } },
   );
 }
 
@@ -132,7 +138,9 @@ export function buildTargets(args: {
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new ConfigurationError(`Invalid 'targets:' block in opensip-cli.config.yml: ${detail}`, {
-      code: 'CONFIGURATION.TARGETS.INVALID',
+      code: OPTION_INVALID.code,
+      definition: OPTION_INVALID,
+      metadata: { condition: 'targets' },
     });
   }
 
@@ -147,7 +155,7 @@ export function buildTargets(args: {
     const detail = error instanceof Error ? error.message : String(error);
     throw new ConfigurationError(
       `Invalid 'globalExcludes:' block in opensip-cli.config.yml: ${detail}`,
-      { code: 'CONFIGURATION.TARGETS.INVALID' },
+      { code: OPTION_INVALID.code, definition: OPTION_INVALID, metadata: { condition: 'targets' } },
     );
   }
 

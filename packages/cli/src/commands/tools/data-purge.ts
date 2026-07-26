@@ -29,8 +29,13 @@ import {
   isReservedHostPlaneIdentity,
 } from '../../bootstrap/host-plane-state.js';
 import { toolOwnedKeys } from '../../bootstrap/tool-owned-keys.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
 
 /**
  * Reject empty/whitespace or reserved-prefix purge input before opening any
@@ -43,13 +48,19 @@ export function assertToolDataPurgeId(toolId: string): string {
   const trimmed = toolId.trim();
   if (trimmed.length === 0) {
     throw new ConfigurationError('tools data-purge: tool id must be non-empty', {
-      code: 'CONFIGURATION.TOOLS.DATA_PURGE_INVALID_ID',
+      code: OPTION_INVALID.code,
+      definition: OPTION_INVALID,
+      metadata: { condition: 'data-purge-id' },
     });
   }
   if (isReservedHostPlaneIdentity(trimmed)) {
     throw new ConfigurationError(
       'tools data-purge: reserved host-plane identities cannot be purged by id; pass the ordinary tool id',
-      { code: 'CONFIGURATION.TOOLS.DATA_PURGE_RESERVED_ID' },
+      {
+        code: OPTION_INVALID.code,
+        definition: OPTION_INVALID,
+        metadata: { condition: 'data-purge-reserved-id' },
+      },
     );
   }
   return trimmed;

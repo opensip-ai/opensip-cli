@@ -67,6 +67,16 @@ export function redactCredentialText(text: string): string {
   return redacted;
 }
 
+/**
+ * Errors this copy of core actually constructed.
+ *
+ * A `WeakSet` rather than a brand: a brand is a property, and any property can be forged with
+ * `Object.defineProperty`. Membership can only be granted by running the constructor, which is
+ * the property "trusted by construction" is supposed to mean. Weak so it never retains an
+ * error, and unexported so no caller can add to it.
+ */
+const constructedToolErrors = new WeakSet<object>();
+
 /** Constructor options for {@link ToolError}: `code` plus bounded diagnostic metadata. */
 export interface ToolErrorOptions extends ErrorOptions {
   code?: string;
@@ -327,10 +337,9 @@ export function normalizeToolErrorDefinition(value: unknown): ErrorDefinition | 
 
 function definitionMatchesCode(code: string, definition: ErrorDefinition): boolean {
   if (definition.code === code) return true;
-  // Legacy detail codes intentionally carry the canonical family definition
-  // (for example CONFIGURATION.GATE.* -> CONFIGURATION_ERROR). No other
-  // code/definition mismatch is valid: accepting one would let a forged
-  // cross-copy brand pair a public code with unrelated retry/exposure axes.
+  // A subcode may carry the definition its code RESOLVES to. No other code/definition
+  // mismatch is valid for an untrusted value: accepting one would let a forged cross-copy
+  // brand pair a public code with unrelated retry/exposure axes.
   return resolveDefinitionForCode(code).code === definition.code;
 }
 
@@ -394,6 +403,19 @@ export class ToolError extends Error {
     messageOrDefinition: string | ErrorDefinition,
     codeOrMessage?: string,
     options?: ToolErrorOptions,
+    /**
+     * The subclass's own default code, used when `this.code` resolves to nothing.
+     *
+     * NOT a revival of the deleted family fallback. That guessed a definition from the first
+     * token of the code STRING — a value the author may never have thought about. This uses the
+     * CLASS the author explicitly chose: `new PluginIncompatibleError(msg, { code: 'PLUGIN.X.Y' })`
+     * states plugin-incompatibility whatever the subcode says, and honouring that keeps the
+     * definition-derived exit class agreeing with the `mapToolErrorToExitCode` subclass ladder.
+     * Without it the two diverge for unregistered subcodes: the ladder returns the subclass's
+     * exit while the definition says `fatal`, so an in-realm throw and its cross-copy twin
+     * would exit differently.
+     */
+    classDefaultCode?: string,
   ) {
     const construction = resolveToolErrorConstruction(messageOrDefinition, codeOrMessage, options);
 
@@ -408,7 +430,7 @@ export class ToolError extends Error {
       construction.definition !== undefined &&
       definitionMatchesCode(this.code, construction.definition)
         ? construction.definition
-        : resolveDefinitionForCode(this.code);
+        : resolveWithClassDefault(this.code, classDefaultCode);
     this.failureClass =
       typeof options?.failureClass === 'string' ? options.failureClass.slice(0, 128) : undefined;
     // Redacted like `metadata`, not merely truncated. A child process's stderr tail is the
@@ -447,6 +469,8 @@ export class ToolError extends Error {
     if (legacyKeys.length > 0) warnLegacyOptionBag(this.code, legacyKeys);
     this.metadata = sanitizeErrorMetadata(options?.metadata ?? {});
 
+    constructedToolErrors.add(this);
+
     Object.defineProperty(this, TOOL_ERROR_BRAND, {
       value: TOOL_ERROR_BRAND_VERSION,
       enumerable: false,
@@ -470,6 +494,18 @@ export class ToolError extends Error {
  */
 export function isToolErrorLike(value: unknown): value is ToolError {
   if (typeof value !== 'object' || value === null) return false;
+  // An error THIS COPY actually constructed is trusted: its definition was assigned by the
+  // constructor below, which is the only code entitled to decide it. The structural checks
+  // that follow exist to validate an UNTRUSTED cross-copy object, and applying them to a
+  // genuinely-constructed instance is wrong — a `ConfigurationError` carrying an unregistered
+  // subcode legitimately holds its class's own definition, which re-resolving the code string
+  // cannot reproduce, so the strict check rejected real errors and sent them down the native
+  // path as SYSTEM_ERROR / known:'unknown'.
+  //
+  // Membership, NOT `instanceof`: `Object.create(ToolError.prototype)` satisfies `instanceof`
+  // and is exactly how a forged brand is built, so the prototype proves nothing. The registry
+  // is a WeakSet the constructor writes and nothing else can reach.
+  if (constructedToolErrors.has(value)) return true;
   const brand = readOwnData(value, TOOL_ERROR_BRAND);
   const message = readOwnData(value, 'message');
   const code = readOwnData(value, 'code');
@@ -501,7 +537,7 @@ export function createToolError(
 /** Thrown when user-supplied input (config, CLI flags, recipes) fails schema or domain validation. */
 export class ValidationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
-    super(message, options?.code ?? 'VALIDATION_ERROR', options);
+    super(message, options?.code ?? 'VALIDATION_ERROR', options, 'VALIDATION_ERROR');
     this.name = 'ValidationError';
   }
 }
@@ -509,7 +545,7 @@ export class ValidationError extends ToolError {
 /** Thrown when a named resource (check, recipe, file, session) cannot be located. */
 export class NotFoundError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
-    super(message, options?.code ?? 'NOT_FOUND', options);
+    super(message, options?.code ?? 'NOT_FOUND', options, 'NOT_FOUND');
     this.name = 'NotFoundError';
   }
 }
@@ -517,7 +553,7 @@ export class NotFoundError extends ToolError {
 /** Thrown for internal invariant violations or unexpected runtime failures. */
 export class SystemError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
-    super(message, options?.code ?? 'SYSTEM_ERROR', options);
+    super(message, options?.code ?? 'SYSTEM_ERROR', options, 'SYSTEM_ERROR');
     this.name = 'SystemError';
   }
 }
@@ -528,7 +564,7 @@ export class TimeoutError extends ToolError {
 
   constructor(message: string, timeoutOrOptions?: number | ToolErrorOptions) {
     const options = typeof timeoutOrOptions === 'number' ? undefined : timeoutOrOptions;
-    super(message, options?.code ?? 'TIMEOUT', options);
+    super(message, options?.code ?? 'TIMEOUT', options, 'TIMEOUT');
     this.name = 'TimeoutError';
     this.timeoutMs = typeof timeoutOrOptions === 'number' ? timeoutOrOptions : undefined;
   }
@@ -539,7 +575,7 @@ export class NetworkError extends ToolError {
   readonly statusCode?: number;
 
   constructor(message: string, options?: ToolErrorOptions & { statusCode?: number }) {
-    super(message, options?.code ?? 'NETWORK_ERROR', options);
+    super(message, options?.code ?? 'NETWORK_ERROR', options, 'NETWORK_ERROR');
     this.name = 'NetworkError';
     this.statusCode = options?.statusCode;
   }
@@ -548,7 +584,7 @@ export class NetworkError extends ToolError {
 /** Thrown when project or tool configuration is missing, malformed, or contradictory. */
 export class ConfigurationError extends ToolError {
   constructor(message: string, options?: ToolErrorOptions) {
-    super(message, options?.code ?? 'CONFIGURATION_ERROR', options);
+    super(message, options?.code ?? 'CONFIGURATION_ERROR', options, 'CONFIGURATION_ERROR');
     this.name = 'ConfigurationError';
   }
 }
@@ -570,7 +606,7 @@ export class PluginIncompatibleError extends ToolError {
   readonly diagnostic?: string;
 
   constructor(message: string, options?: ToolErrorOptions & { diagnostic?: string }) {
-    super(message, options?.code ?? 'PLUGIN_INCOMPATIBLE', options);
+    super(message, options?.code ?? 'PLUGIN_INCOMPATIBLE', options, 'PLUGIN_INCOMPATIBLE');
     this.name = 'PluginIncompatibleError';
     this.diagnostic = options?.diagnostic;
   }
@@ -779,6 +815,23 @@ function warnLegacyOptionBag(code: string, keys: readonly string[]): void {
 /** Test seam: the warn set is process-lived by design, so tests must be able to reset it. */
 export function resetLegacyOptionBagWarnings(): void {
   warnedLegacyOptionBags.clear();
+}
+
+/**
+ * Resolve `code`, falling back to the constructing class's own default when it resolves to
+ * nothing.
+ *
+ * The fallback is a DECLARED classification, not an inferred one — see the `classDefaultCode`
+ * parameter docs on {@link ToolError}.
+ */
+function resolveWithClassDefault(
+  code: string,
+  classDefaultCode: string | undefined,
+): ErrorDefinition {
+  const resolved = resolveDefinitionForCode(code);
+  if (resolved.code !== 'CORE.SYSTEM.UNKNOWN_FAILURE') return resolved;
+  if (classDefaultCode === undefined || classDefaultCode === code) return resolved;
+  return resolveDefinitionForCode(classDefaultCode);
 }
 
 function ensureError(error: unknown): Error {
