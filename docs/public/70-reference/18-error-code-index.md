@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **14**
-- Definitions: **144**
+- Definitions: **149**
 
 ## Catalogs
 
@@ -30,7 +30,7 @@ generated: true
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 21 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/file-lock.ts` | 11 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 18 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 23 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/plugin-capability.ts` | 17 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 17 |
 
@@ -177,10 +177,15 @@ generated: true
 | `VALIDATION.SIMULATION.RECIPE_INVALID` | `@opensip-cli/simulation` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the named field on the simulation recipe; see the simulation recipe reference for the required shape. |
 | `VALIDATION.SIMULATION.SCENARIO_INVALID` | `@opensip-cli/simulation` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the scenario configuration; see the scenario reference. |
 | `VALIDATION.TASK_CONTEXT.MANIFEST_INVALID` | `@opensip-cli/core` | application | environment | validation | never | error | runtime | active | The stored task-context manifest is not readable by this version. Re-run the tool that produced it to regenerate the evidence. |
+| `VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Regenerate the tool manifest so its aliases match the runtime identity, then reinstall. |
 | `VALIDATION.TOOL_IDENTITY.CONFLICT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Two installed tools claim the same name or alias. Uninstall one, or ask its author to rename it. |
+| `VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Remove the repeated alias; each alias must appear once. |
 | `VALIDATION.TOOL_IDENTITY.INVALID_NAME` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Rename the tool identity value to kebab-case (lowercase letters, digits, and single hyphens). |
+| `VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Remove the tool name from its own alias list; the name is already reserved. |
 | `VALIDATION.TOOL_IDENTITY.PARENT_MISMATCH` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Set the command parent to the tool that declares it, or move the command to the declared parent tool. |
+| `VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Declare the primary command before declaring subcommands under it. |
 | `VALIDATION.TOOL_IDENTITY.REQUIRED` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Add an `identity` block to the tool definition; it is the single source of truth for the tool name and aliases. |
+| `VALIDATION.TOOL_IDENTITY.RESERVED` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Choose a name, namespace, or layout domain outside the host-reserved set; the reserved value is named in the message. |
 | `VALIDATION.TOOL_MANIFEST.DRIFT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Regenerate the tool manifest so it matches the runtime tool definition, then reinstall the tool. |
 
 ## See also

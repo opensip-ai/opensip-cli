@@ -246,4 +246,52 @@ export const toolContractDefinitions = {
       'The stored task-context manifest is not readable by this version. Re-run the tool that produced it to regenerate the evidence.',
     publicMetadataKeys: ['field'],
   },
+  /** Two aliases on one tool are the same string. */
+  'VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS': {
+    ...TOOL_AUTHORING,
+    code: 'VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS',
+    operatorAction: 'Remove the repeated alias; each alias must appear once.',
+    publicMetadataKeys: ['field', 'value'],
+  },
+
+  /** A tool lists its own name among its aliases. */
+  'VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES': {
+    ...TOOL_AUTHORING,
+    code: 'VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES',
+    operatorAction: 'Remove the tool name from its own alias list; the name is already reserved.',
+    publicMetadataKeys: ['field', 'value'],
+  },
+
+  /** The shipped alias set disagrees with the runtime identity's aliases. */
+  'VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT': {
+    ...TOOL_AUTHORING,
+    code: 'VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT',
+    operatorAction:
+      'Regenerate the tool manifest so its aliases match the runtime identity, then reinstall.',
+    publicMetadataKeys: ['field', 'expected', 'actual'],
+  },
+
+  /** A subcommand was declared without the primary command that owns it. */
+  'VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED': {
+    ...TOOL_AUTHORING,
+    code: 'VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED',
+    operatorAction: 'Declare the primary command before declaring subcommands under it.',
+    publicMetadataKeys: ['field'],
+  },
+
+  /**
+   * A tool claimed a namespace, layout domain, or session-tool role the host reserves.
+   *
+   * `security` kind: the namespace boundary is what stops one tool impersonating the host or
+   * another tool. One code for the three refusals (D9) — same audience, same fix, and the
+   * specific reservation travels in `metadata.field`.
+   */
+  'VALIDATION.TOOL_IDENTITY.RESERVED': {
+    ...TOOL_AUTHORING,
+    code: 'VALIDATION.TOOL_IDENTITY.RESERVED',
+    kind: 'security',
+    operatorAction:
+      'Choose a name, namespace, or layout domain outside the host-reserved set; the reserved value is named in the message.',
+    publicMetadataKeys: ['field', 'value'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

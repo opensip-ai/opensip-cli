@@ -2,6 +2,7 @@
  * Tool identity index — resolve canonical name | alias | layoutKey.
  */
 
+import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { ValidationError } from '../lib/errors.js';
 
 import { validateToolIdentity } from './identity.js';
@@ -9,6 +10,12 @@ import { resolveToolHooks } from './resolve-tool-hooks.js';
 
 import type { ToolIdentity } from './identity.js';
 import type { ToolRegistry } from './registry.js';
+
+
+// Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
+// mapped — every one of these reported as an operator-only internal fatal.
+const IDENTITY_CONFLICT = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.CONFLICT');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.REQUIRED');
 
 /** Canonical tool identity plus its resolved plugin layout key. */
 export interface ToolIdentityBinding {
@@ -35,7 +42,7 @@ function assertIdentityInputAvailable(
   }
   throw new ValidationError(
     `Tool identity input '${input}' is declared by both '${incumbent.canonicalName}' and '${binding.canonicalName}'.`,
-    { code: 'TOOL.IDENTITY.CONFLICT' },
+    { code: IDENTITY_CONFLICT.code, definition: IDENTITY_CONFLICT },
   );
 }
 
@@ -68,7 +75,8 @@ export function buildToolIdentityIndex(registry: ToolRegistry): ToolIdentityInde
     const identity = tool.identity;
     if (identity === undefined) {
       throw new ValidationError(`Registered tool '${tool.metadata.name}' is missing identity.`, {
-        code: 'TOOL.IDENTITY.REQUIRED',
+        code: IDENTITY_REQUIRED.code,
+        definition: IDENTITY_REQUIRED,
       });
     }
 
