@@ -372,5 +372,40 @@ export const hostErrorCatalog = defineErrorCatalog(
         'The tool contributed an evidence snapshot the host cannot store. Report it to the tool author with the run id.',
       publicMetadataKeys: ['field'],
     },
+
+    /**
+     * The runtime-promotion journal cannot be trusted: it is not canonically encoded, or names a
+     * phase this version does not accept.
+     *
+     * Registered rather than left on the `SYSTEM.INIT.` literal, which was mapped by nothing and
+     * so resolved to `UNKNOWN_FAILURE` — fatal, operator-only — for a condition the recovery path
+     * BRANCHES on. The recovery code reads this to decide `journal-phase-invalid`, so a demotion
+     * here does not merely misreport: it hides the distinction the caller is switching over.
+     */
+    'CLI.INIT.PROMOTION_JOURNAL_INVALID': {
+      ...HOST_WIRING,
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
+      kind: 'integrity',
+      exposure: 'public',
+      operatorAction:
+        'The promotion journal is not readable. Re-run `opensip init`; if it repeats, remove the runtime directory and initialize again.',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * Promotion stopped in a state that cannot be resumed automatically.
+     *
+     * Separate from `PROMOTION_JOURNAL_INVALID` because the operator does something different:
+     * this one needs an explicit recovery pass rather than a retry.
+     */
+    'CLI.INIT.PROMOTION_RECOVERY_REQUIRED': {
+      ...HOST_WIRING,
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
+      kind: 'conflict',
+      exposure: 'public',
+      operatorAction:
+        'Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it.',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

@@ -142,6 +142,42 @@ function registeredErrorCodes(
   });
 }
 
+/** Registries recognised by filename, for projects whose codes live in a constant table. */
+const REGISTRY_FILE_PATTERN = /(?:error-codes|error-registry|errors|error-catalog)\.ts$/;
+
+/**
+ * Registries recognised by content — the general rule.
+ *
+ * Any call to a `define*Catalog` / `create*Registry`-shaped builder marks the file as the place
+ * codes are declared, regardless of what it is named. Deliberately shape-based rather than
+ * naming one framework's function: this check ships to consumers whose registry helper we
+ * cannot know.
+ */
+const CATALOG_DECLARATION_PATTERN =
+  /\b(?:define|create|build)[A-Za-z]*(?:ErrorCatalog|ErrorRegistry|ErrorCodes)\s*[(<]/u;
+
+/**
+ * Registries recognised by SHAPE — the rule that catches a registry split across modules.
+ *
+ * A catalog large enough to be worth having usually outgrows one file: the builder call sits in
+ * an assembling module while the definitions live in siblings that merely export objects. Those
+ * siblings match neither the name nor the builder-call rule, so their codes read as unregistered
+ * everywhere they are used.
+ *
+ * What they do have is a declaration shape: the same literal appears as a property KEY and again
+ * as that entry's `code` value. A file that USES a code never does both. This is deliberately a
+ * statement about shape rather than about any one framework.
+ */
+function declaresErrorCodes(content: string): boolean {
+  for (const match of content.matchAll(/['"]([A-Z][A-Z0-9_]*(?:\.[A-Z][A-Z0-9_]*)+)['"]\s*:/gu)) {
+    const code = match[1];
+    if (code !== undefined && new RegExp(`\\bcode:\\s*['"]${code}['"]`, 'u').test(content)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Check: resilience/error-code-registration
  *
@@ -151,6 +187,8 @@ function registeredErrorCodes(
 export const errorCodeRegistration = defineCheck({
   id: '346b53d8-58a3-4fd5-8340-d7bd42da406a',
   slug: 'error-code-registration',
+  // Stays disabled until its remaining findings are closed; see the Plan 01 wave tasks.
+  // Enabling it against a non-zero backlog would be the false green the plan exists to remove.
   disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
   contentFilter: 'raw',
@@ -171,15 +209,26 @@ export const errorCodeRegistration = defineCheck({
   async analyzeAll(files: FileAccessor): Promise<CheckViolation[]> {
     const violations: CheckViolation[] = [];
 
-    // Phase 1: Collect all registered error codes from registry files
+    // Phase 1: Collect all registered error codes from registry files.
+    //
+    // Registration is recognised by NAME or by CONTENT. Name alone was not enough: a project
+    // that registers through a catalog builder puts its codes in files this pattern never
+    // matched, so every registered code read as unregistered — the check reported a wall of
+    // false positives on a correctly-registered codebase, which is why it shipped disabled.
+    // Content detection is the general rule; the name patterns stay for projects whose registry
+    // is a plain constant table.
     const registeredCodes = new Set<string>();
-    const registryFilePattern = /(?:error-codes|error-registry|errors)\.ts$/;
 
-    const registryPaths = files.paths.filter((fp) => registryFilePattern.test(fp));
-    const registryContents = await files.readMany(registryPaths);
+    const allContents = await files.readMany(files.paths);
+    const isRegistry = (fp: string): boolean =>
+      REGISTRY_FILE_PATTERN.test(fp) ||
+      CATALOG_DECLARATION_PATTERN.test(allContents.get(fp) ?? '') ||
+      declaresErrorCodes(allContents.get(fp) ?? '');
+
+    const registryPaths = files.paths.filter((fp) => isRegistry(fp));
 
     for (const filePath of registryPaths) {
-      const content = registryContents.get(filePath);
+      const content = allContents.get(filePath);
       if (!content) continue;
 
       // Registry files define their catalog through literal values in
@@ -192,12 +241,9 @@ export const errorCodeRegistration = defineCheck({
     }
 
     // Phase 2: Scan non-registry files for error code usage
-    const nonRegistryPaths = files.paths.filter((fp) => !registryFilePattern.test(fp));
-    const nonRegistryContents = await files.readMany(nonRegistryPaths);
-
-    for (const filePath of nonRegistryPaths) {
-      if (!filePath) continue;
-      const content = nonRegistryContents.get(filePath);
+    for (const filePath of files.paths) {
+      if (!filePath || isRegistry(filePath)) continue;
+      const content = allContents.get(filePath);
       if (!content) continue;
       const lines = content.split('\n');
       const codeMask = createCodeMask(filePath, content);
@@ -210,7 +256,7 @@ export const errorCodeRegistration = defineCheck({
           line,
           message: `Error code '${usage.code}' is used but not registered in any error registry file`,
           severity: 'warning',
-          suggestion: `Register '${usage.code}' in the appropriate error-codes.ts or error-registry.ts file`,
+          suggestion: `Add '${usage.code}' to your error registry — a catalog builder (e.g. defineErrorCatalog) or an error-codes.ts / error-registry.ts table`,
           type: 'unregistered-error-code',
           match: (lines[line - 1] ?? usage.code).trim().slice(0, 120),
         });

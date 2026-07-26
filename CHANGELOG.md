@@ -42,13 +42,32 @@ conditions that differs from the one the legacy class ladder produced. These are
 condition is listed only when its numeric exit actually moves; migrations that preserve the
 exit code are deliberately absent.
 
-| Condition                                                             | Before | After | Why                                                                                                                                                                 |
-| --------------------------------------------------------------------- | -----: | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Ephemeral user-cache refuses an unsafe ownership/permission posture   |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE` (`security`, `configuration`): the operator fixes the directory, so this is a configuration failure, not a runtime fault. |
-| Ephemeral user-cache detects an identity change or containment escape |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED` (`integrity`, `configuration`). Same reasoning.                                                                         |
-| Ephemeral user-cache root cannot be prepared                          |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.PREPARE_FAILED`.                                                                                                                          |
-| Runtime coordination refuses an unsafe containment state              |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.UNSAFE_STATE` (`security`, `configuration`): a foreign entry or symlinked segment in the coordination root is fixed by the operator. |
-| Runtime coordination record is structurally corrupt                   |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.CORRUPT_RECORD` (`integrity`, `configuration`): remove the named record. Distinct from the containment case above.                   |
+| Condition                                                             | Before | After | Why                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | -----: | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ephemeral user-cache refuses an unsafe ownership/permission posture   |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE` (`security`, `configuration`): the operator fixes the directory, so this is a configuration failure, not a runtime fault.                      |
+| Ephemeral user-cache detects an identity change or containment escape |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED` (`integrity`, `configuration`). Same reasoning.                                                                                              |
+| Ephemeral user-cache root cannot be prepared                          |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.PREPARE_FAILED`.                                                                                                                                               |
+| Runtime coordination refuses an unsafe containment state              |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.UNSAFE_STATE` (`security`, `configuration`): a foreign entry or symlinked segment in the coordination root is fixed by the operator.                      |
+| Runtime coordination record is structurally corrupt                   |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.CORRUPT_RECORD` (`integrity`, `configuration`): remove the named record. Distinct from the containment case above.                                        |
+| Runtime-promotion journal is unreadable or names an invalid phase     |      1 |     2 | Now `CLI.INIT.PROMOTION_JOURNAL_INVALID` (`integrity`, `configuration`). The recovery path already BRANCHED on this condition; it previously reported as an unknown internal failure.    |
+| Runtime promotion stopped in a state needing recovery                 |      1 |     2 | Now `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` (`conflict`, `configuration`): the operator re-runs `opensip init` to resume, so this is a configuration failure rather than a runtime fault. |
+
+#### Behaviour changes: error codes are now owner-scoped (Plan 01)
+
+Every error code now begins with a segment naming the package or tool that owns it — `CORE.`,
+`CLI.`, `FIT.`, `GRAPH.`, `SESSION.`, `DATASTORE.`, `CONFIG.`, `MCP.`, `SIMULATION.`,
+`EXTERNAL.`, `CODEBASE.`, `TREESITTER.`. 102 codes are renamed.
+
+Heads previously described the failure KIND (`VALIDATION.`, `SYSTEM.`, `TIMEOUT.`), which was
+both redundant — `kind`, `severity`, `source` and `exitClass` are structured fields on every
+definition — and free to contradict those fields. Ownership is the one thing a code string could
+not otherwise tell you, and scoping heads to owners makes codes collision-proof across packages
+without a central allocator.
+
+The full mapping is the generated index at
+`docs/public/70-reference/18-error-code-index.md`. Consumers matching on a leading `VALIDATION.`
+/ `SYSTEM.` / `CONFIGURATION.` / `TIMEOUT.` / `PLUGIN.` / `CAPABILITY.` segment must update;
+matching on the trailing `DOMAIN.CONDITION` segments is unaffected.
 
 Unchanged on purpose: the missing-config failure keeps exit **2** — `CORE.CONFIG.NOT_FOUND`
 declares `exitClass: 'configuration'`, reproducing exactly what the `ValidationError` subclass

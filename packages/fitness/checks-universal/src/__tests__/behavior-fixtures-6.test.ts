@@ -791,11 +791,17 @@ describe('node-version-consistency malformed root', () => {
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
 
-  it('returns gracefully on malformed root package.json', async () => {
+  it('reports the unreadable root rather than passing clean', async () => {
+    // This used to assert zero signals. That made an unparsable root package.json
+    // indistinguishable from a consistent one: the check reported a clean pass for a file it
+    // could not read, which is the honest-by-omission failure the resiliency work removed.
+    // Degrading is still correct — one bad manifest must not fail the run — but it has to be
+    // VISIBLE.
     const result = await findCheck('node-version-consistency').run(cwd, {
       targetFiles: [join(cwd, 'package.json')],
     });
-    expect(result.signals.length).toBe(0);
+    expect(result.signals.length).toBe(1);
+    expect(result.signals[0]?.message).toMatch(/could not be (read|parsed)|malformed|unreadable/iu);
   });
 });
 
