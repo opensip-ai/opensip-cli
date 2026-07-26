@@ -6,7 +6,7 @@
  * - **Plugin admission** (`PLUGIN.*`, `CAPABILITY.*`, `SYSTEM.PLUGINS.*`) — a third-party
  *   pack shipped something the host will not admit. `tool-author` responsibility, `public`
  *   exposure, `plugin-incompatible` exit: the pack author must read what is wrong.
- * - **Host wiring invariants** (`SYSTEM.SCOPE.*`, `SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED`,
+ * - **Host wiring invariants** (`SYSTEM.SCOPE.*`, `CORE.CAPABILITY.REGISTRAR_NOT_WIRED`,
  *   `SYSTEM.IMPACT.*`) — the composition root failed to wire itself. Nobody outside this
  *   repository can act on those, so they keep `tool-author` / `redacted` and say so.
  */
@@ -55,9 +55,9 @@ export const pluginCapabilityDefinitions = {
    * `metadata.condition`, because the ten rejections have one audience and one fix
    * ("correct the catalog you shipped").
    */
-  'PLUGIN.ERROR_CATALOG.INVALID': {
+  'CORE.ERROR_CATALOG.INVALID': {
     ...PLUGIN_ADMISSION,
-    code: 'PLUGIN.ERROR_CATALOG.INVALID',
+    code: 'CORE.ERROR_CATALOG.INVALID',
     kind: 'validation',
     operatorAction:
       "Correct the tool's errorCatalog contribution: it must be a plain data object at the supported schema version, owned by the contributing tool.",
@@ -71,9 +71,9 @@ export const pluginCapabilityDefinitions = {
    * re-thrown on every subsequent read so a collision can never be swallowed by the cache.
    * `conflict` kind: neither catalog is malformed, they simply cannot coexist.
    */
-  'PLUGIN.ERROR_CATALOG.COLLISION': {
+  'CORE.ERROR_CATALOG.COLLISION': {
     ...PLUGIN_ADMISSION,
-    code: 'PLUGIN.ERROR_CATALOG.COLLISION',
+    code: 'CORE.ERROR_CATALOG.COLLISION',
     kind: 'conflict',
     operatorAction:
       'Two tools declare the same error code. Uninstall one, or ask its author to move the code under a namespace the tool owns.',
@@ -90,8 +90,8 @@ export const pluginCapabilityDefinitions = {
    * class: the signals are still credible, they are merely un-stamped, and the baseline
    * ratchet degrades rather than the scan failing.
    */
-  'PLUGIN.FINGERPRINT_STRATEGY.STAMP_FAILED': {
-    code: 'PLUGIN.FINGERPRINT_STRATEGY.STAMP_FAILED',
+  'CORE.FINGERPRINT_STRATEGY.STAMP_FAILED': {
+    code: 'CORE.FINGERPRINT_STRATEGY.STAMP_FAILED',
     source: 'application',
     defaultResponsibility: 'tool-author',
     kind: 'invariant',
@@ -113,9 +113,9 @@ export const pluginCapabilityDefinitions = {
    * `capability-export-reader` emits a structured `capability.discovery.bad_export`
    * diagnostic — this path threw a bare `TypeError` instead.
    */
-  'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH': {
+  'CORE.CONTRIBUTION.SCHEMA_MISMATCH': {
     ...PLUGIN_ADMISSION,
-    code: 'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH',
+    code: 'CORE.CONTRIBUTION.SCHEMA_MISMATCH',
     kind: 'validation',
     operatorAction:
       'Export the capability contribution in the documented shape (an array for list-valued contributions).',
@@ -131,8 +131,8 @@ export const pluginCapabilityDefinitions = {
    * diagnostic at any level. `warning` severity because discovery degrades rather than
    * aborting, but it must be visible (D7).
    */
-  'SYSTEM.PLUGINS.FS_PROBE_FAILED': {
-    code: 'SYSTEM.PLUGINS.FS_PROBE_FAILED',
+  'CORE.PLUGINS.FS_PROBE_FAILED': {
+    code: 'CORE.PLUGINS.FS_PROBE_FAILED',
     source: 'infrastructure',
     defaultResponsibility: 'environment',
     kind: 'I/O',
@@ -154,9 +154,9 @@ export const pluginCapabilityDefinitions = {
    * an unresolvable entry point crossed the boundary untyped and `normalizeFailure` could
    * only call it `CORE.SYSTEM.UNKNOWN_FAILURE` — severity fatal, exposure operator-only.
    */
-  'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED': {
+  'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED': {
     ...PLUGIN_ADMISSION,
-    code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+    code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
     kind: 'compatibility',
     operatorAction:
       'A required pack has no readable entry point. Reinstall the package, or remove it from the plugins list.',
@@ -169,9 +169,9 @@ export const pluginCapabilityDefinitions = {
    * `security` kind: this is a containment check. The npm leg of the same resolver already
    * performs it; the authored-sidecar leg did not, which is the asymmetry the ledger flagged.
    */
-  'SYSTEM.PLUGINS.ENTRY_ESCAPES_PACKAGE': {
+  'CORE.PLUGINS.ENTRY_ESCAPES_PACKAGE': {
     ...PLUGIN_ADMISSION,
-    code: 'SYSTEM.PLUGINS.ENTRY_ESCAPES_PACKAGE',
+    code: 'CORE.PLUGINS.ENTRY_ESCAPES_PACKAGE',
     kind: 'security',
     operatorAction:
       "Point the pack's entry field at a file inside its own package directory; entries that escape the package are refused.",
@@ -185,26 +185,26 @@ export const pluginCapabilityDefinitions = {
    * capability is worse than a loud refusal — but the condition deserved its own subcode
    * instead of the bare `SYSTEM_ERROR` default it had.
    */
-  'SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED': {
+  'CORE.CAPABILITY.REGISTRAR_NOT_WIRED': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED',
+    code: 'CORE.CAPABILITY.REGISTRAR_NOT_WIRED',
     operatorAction:
       'The tool that declares this capability domain never wired its registrar. Report it to the tool author with the run id.',
     publicMetadataKeys: ['domain'],
   },
 
   /** Code that requires a `RunScope` ran outside one — a host composition-root wiring bug. */
-  'SYSTEM.SCOPE.NOT_ENTERED': {
+  'CORE.SCOPE.NOT_ENTERED': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.SCOPE.NOT_ENTERED',
+    code: 'CORE.SCOPE.NOT_ENTERED',
     operatorAction:
       'This code path requires an entered RunScope. Capture the run id and report a bug.',
   },
 
   /** `scope.capabilities` was absent where the bootstrap contract requires it. */
-  'SYSTEM.SCOPE.CAPABILITIES_MISSING': {
+  'CORE.SCOPE.CAPABILITIES_MISSING': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.SCOPE.CAPABILITIES_MISSING',
+    code: 'CORE.SCOPE.CAPABILITIES_MISSING',
     operatorAction:
       'The RunScope was constructed without capabilities. Capture the run id and report a bug.',
   },
@@ -216,9 +216,9 @@ export const pluginCapabilityDefinitions = {
    * subclass with no definition and no structural brand, invisible to both the detector and
    * `normalizeFailure`.
    */
-  'SYSTEM.IMPACT.INDEX_GENERATION_MISMATCH': {
+  'CORE.IMPACT.INDEX_GENERATION_MISMATCH': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.IMPACT.INDEX_GENERATION_MISMATCH',
+    code: 'CORE.IMPACT.INDEX_GENERATION_MISMATCH',
     operatorAction:
       'The impact index does not match the graph catalog generation. Rebuild the graph and retry.',
   },
@@ -231,8 +231,8 @@ export const pluginCapabilityDefinitions = {
    * The definition is registered here so the asynchronous path (Task 1.8) has a real code to
    * carry; the unreachable synchronous arm is removed rather than left as decoration.
    */
-  'SYSTEM.WORKER.SPAWN_FAILED': {
-    code: 'SYSTEM.WORKER.SPAWN_FAILED',
+  'CORE.WORKER.SPAWN_FAILED': {
+    code: 'CORE.WORKER.SPAWN_FAILED',
     source: 'infrastructure',
     defaultResponsibility: 'environment',
     kind: 'resource',
@@ -252,9 +252,9 @@ export const pluginCapabilityDefinitions = {
    * The guard tests `key in scope`, not own-property, so prototype members like `dispose` are
    * protected from shadowing too — a tool cannot capture the scope by redefining a method.
    */
-  'PLUGIN.SCOPE_CONTRIBUTION.COLLISION': {
+  'CORE.SCOPE_CONTRIBUTION.COLLISION': {
     ...PLUGIN_ADMISSION,
-    code: 'PLUGIN.SCOPE_CONTRIBUTION.COLLISION',
+    code: 'CORE.SCOPE_CONTRIBUTION.COLLISION',
     kind: 'conflict',
     operatorAction:
       'Rename the scope contribution; a tool may not overwrite a key the host or another tool already owns.',
@@ -262,18 +262,18 @@ export const pluginCapabilityDefinitions = {
   },
 
   /** A tool tried to contribute a scope key the host reserves. */
-  'PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY': {
+  'CORE.SCOPE_CONTRIBUTION.FORBIDDEN_KEY': {
     ...PLUGIN_ADMISSION,
-    code: 'PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY',
+    code: 'CORE.SCOPE_CONTRIBUTION.FORBIDDEN_KEY',
     kind: 'security',
     operatorAction: 'Choose a scope contribution key outside the host-reserved namespace.',
     publicMetadataKeys: ['key'],
   },
 
   /** A tool's scope contribution is not a usable shape. */
-  'PLUGIN.SCOPE_CONTRIBUTION.INVALID': {
+  'CORE.SCOPE_CONTRIBUTION.INVALID': {
     ...PLUGIN_ADMISSION,
-    code: 'PLUGIN.SCOPE_CONTRIBUTION.INVALID',
+    code: 'CORE.SCOPE_CONTRIBUTION.INVALID',
     kind: 'validation',
     operatorAction: 'Contribute scope values as plain data; see the tool contract for the shape.',
     publicMetadataKeys: ['key'],
@@ -285,9 +285,9 @@ export const pluginCapabilityDefinitions = {
    * scopes the value to one async context, rather than a shared `enterScope` that would let
    * two commands observe each other's run state.
    */
-  'SYSTEM.SCOPE.REENTRANT': {
+  'CORE.SCOPE.REENTRANT': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.SCOPE.REENTRANT',
+    code: 'CORE.SCOPE.REENTRANT',
     operatorAction:
       'Use runWithScope(scope, fn) for nested or concurrent work. Capture the run id and report a bug.',
   },
@@ -299,9 +299,9 @@ export const pluginCapabilityDefinitions = {
    * `metadata.condition` says which. `redacted`: the message quotes the author's selector, and
    * no end user can act on it.
    */
-  'SYSTEM.CORE.SELECTOR_INVALID': {
+  'CORE.CORE.SELECTOR_INVALID': {
     ...HOST_WIRING_INVARIANT,
-    code: 'SYSTEM.CORE.SELECTOR_INVALID',
+    code: 'CORE.CORE.SELECTOR_INVALID',
     operatorAction:
       'Correct the recipe selector: use a known arm type, and supply a `match` matcher for arms that require one.',
     publicMetadataKeys: ['condition', 'arm'],

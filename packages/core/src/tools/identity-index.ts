@@ -13,8 +13,8 @@ import type { ToolRegistry } from './registry.js';
 
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
-const IDENTITY_CONFLICT = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.CONFLICT');
-const IDENTITY_REQUIRED = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.REQUIRED');
+const IDENTITY_CONFLICT = coreErrorCatalog.require('CORE.TOOL_IDENTITY.CONFLICT');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.REQUIRED');
 
 /** Canonical tool identity plus its resolved plugin layout key. */
 export interface ToolIdentityBinding {

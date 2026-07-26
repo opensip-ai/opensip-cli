@@ -22,7 +22,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const RUN_READ_INPUT = hostErrorCatalog.require('VALIDATION.RUN_READ.INPUT_INVALID');
+const RUN_READ_INPUT = hostErrorCatalog.require('CLI.RUN_READ.INPUT_INVALID');
 
 const DECIMAL_INTEGER = /^\d+$/u;
 const RUN_ID = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -40,7 +40,7 @@ interface BoundedIntegerOptions {
    * Which bounded input this is, for `metadata.condition`.
    *
    * Was a per-call `code: string`, i.e. three distinct codes for one condition. The four
-   * run-read inputs now share `VALIDATION.RUN_READ.INPUT_INVALID` and are told apart by this
+   * run-read inputs now share `CLI.RUN_READ.INPUT_INVALID` and are told apart by this
    * field — bounded, allowlisted, and projectable, which a code string in an options bag is
    * not.
    */

@@ -109,7 +109,12 @@ export function findUnmappedCodeHeads(repoRoot, relFiles) {
         if (!CODE_GRAMMAR.test(code)) continue;
         // Registration is the ONLY thing that makes a code resolve now.
         if (codes.has(code)) continue;
-        violations.push({ path: rel, line: index + 1, code, head: code.slice(0, code.indexOf('.')) });
+        violations.push({
+          path: rel,
+          line: index + 1,
+          code,
+          head: code.slice(0, code.indexOf('.')),
+        });
       }
     }
   }

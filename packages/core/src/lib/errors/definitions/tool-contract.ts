@@ -32,9 +32,9 @@ const TOOL_AUTHORING = {
 
 export const toolContractDefinitions = {
   /** A tool name, alias, or layout key is not kebab-case. Highest-frequency identity check. */
-  'VALIDATION.TOOL_IDENTITY.INVALID_NAME': {
+  'CORE.TOOL_IDENTITY.INVALID_NAME': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.INVALID_NAME',
+    code: 'CORE.TOOL_IDENTITY.INVALID_NAME',
     operatorAction:
       'Rename the tool identity value to kebab-case (lowercase letters, digits, and single hyphens).',
     publicMetadataKeys: ['field', 'value'],
@@ -47,27 +47,27 @@ export const toolContractDefinitions = {
    * fatal that named neither tool. `public` exposure and the two owning package names are
    * what make it fixable.
    */
-  'VALIDATION.TOOL_IDENTITY.CONFLICT': {
+  'CORE.TOOL_IDENTITY.CONFLICT': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.CONFLICT',
+    code: 'CORE.TOOL_IDENTITY.CONFLICT',
     operatorAction:
       'Two installed tools claim the same name or alias. Uninstall one, or ask its author to rename it.',
     publicMetadataKeys: ['field', 'value'],
   },
 
   /** A subcommand's declared parent does not match the tool that registered it. */
-  'VALIDATION.TOOL_IDENTITY.PARENT_MISMATCH': {
+  'CORE.TOOL_IDENTITY.PARENT_MISMATCH': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.PARENT_MISMATCH',
+    code: 'CORE.TOOL_IDENTITY.PARENT_MISMATCH',
     operatorAction:
       'Set the command parent to the tool that declares it, or move the command to the declared parent tool.',
     publicMetadataKeys: ['field', 'value'],
   },
 
   /** A registered tool has no `identity` block at all. */
-  'VALIDATION.TOOL_IDENTITY.REQUIRED': {
+  'CORE.TOOL_IDENTITY.REQUIRED': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.REQUIRED',
+    code: 'CORE.TOOL_IDENTITY.REQUIRED',
     operatorAction:
       'Add an `identity` block to the tool definition; it is the single source of truth for the tool name and aliases.',
     publicMetadataKeys: ['field'],
@@ -80,25 +80,25 @@ export const toolContractDefinitions = {
    * `VALIDATION_ERROR` and an operator could not tell an id mismatch from an alias mismatch
    * from a command-set mismatch. `field` is allowlisted precisely to restore that.
    */
-  'VALIDATION.TOOL_MANIFEST.DRIFT': {
+  'CORE.TOOL_MANIFEST.DRIFT': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_MANIFEST.DRIFT',
+    code: 'CORE.TOOL_MANIFEST.DRIFT',
     operatorAction:
       'Regenerate the tool manifest so it matches the runtime tool definition, then reinstall the tool.',
     publicMetadataKeys: ['field', 'expected', 'actual'],
   },
 
   /** A command spec is not an object — the entry guard of untrusted spec admission. */
-  'VALIDATION.COMMAND_SPEC.NOT_AN_OBJECT': {
+  'CORE.COMMAND_SPEC.NOT_AN_OBJECT': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_SPEC.NOT_AN_OBJECT',
+    code: 'CORE.COMMAND_SPEC.NOT_AN_OBJECT',
     operatorAction: 'Pass a plain object to defineCommand.',
   },
 
   /** A command spec has no usable `name`. Runs before a name exists to quote. */
-  'VALIDATION.COMMAND_SPEC.MISSING_NAME': {
+  'CORE.COMMAND_SPEC.MISSING_NAME': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_SPEC.MISSING_NAME',
+    code: 'CORE.COMMAND_SPEC.MISSING_NAME',
     operatorAction: 'Give the command spec a non-empty `name`.',
   },
 
@@ -109,9 +109,9 @@ export const toolContractDefinitions = {
    * admission. It surfaced as an untyped `TypeError`, which normalizes to `runtime` rather
    * than to a plugin-compatibility rejection.
    */
-  'VALIDATION.COMMAND_SPEC.ACCESSOR_REJECTED': {
+  'CORE.COMMAND_SPEC.ACCESSOR_REJECTED': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_SPEC.ACCESSOR_REJECTED',
+    code: 'CORE.COMMAND_SPEC.ACCESSOR_REJECTED',
     operatorAction:
       'Declare command spec fields as plain data properties; getters and setters are rejected during admission.',
     publicMetadataKeys: ['field'],
@@ -124,9 +124,9 @@ export const toolContractDefinitions = {
    * `{ complete: false, reasons: [] }` is how MCP came to report an incomplete inventory
    * whose cause was unrecoverable.
    */
-  'VALIDATION.COMMAND_INVENTORY.INCOMPLETE_WITHOUT_REASON': {
+  'CORE.COMMAND_INVENTORY.INCOMPLETE_WITHOUT_REASON': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_INVENTORY.INCOMPLETE_WITHOUT_REASON',
+    code: 'CORE.COMMAND_INVENTORY.INCOMPLETE_WITHOUT_REASON',
     operatorAction:
       'Supply at least one reason code whenever a runtime command inventory reports incomplete or partial coverage.',
   },
@@ -138,18 +138,18 @@ export const toolContractDefinitions = {
    * carried an arbitrary identity into the frozen inventory and out to MCP evidence.
    * Validation keyed on a self-declared discriminator is the shape this code retires.
    */
-  'VALIDATION.COMMAND_INVENTORY.PACKAGE_IDENTITY_INVALID': {
+  'CORE.COMMAND_INVENTORY.PACKAGE_IDENTITY_INVALID': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_INVENTORY.PACKAGE_IDENTITY_INVALID',
+    code: 'CORE.COMMAND_INVENTORY.PACKAGE_IDENTITY_INVALID',
     operatorAction:
       'Supply a bounded, well-formed package identity on every command inventory leaf, regardless of its declared owner.',
     publicMetadataKeys: ['field'],
   },
 
   /** A leaf's `provenanceSource` is unbounded, unsafe, or carries control characters. */
-  'VALIDATION.COMMAND_INVENTORY.PROVENANCE_SOURCE_INVALID': {
+  'CORE.COMMAND_INVENTORY.PROVENANCE_SOURCE_INVALID': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.COMMAND_INVENTORY.PROVENANCE_SOURCE_INVALID',
+    code: 'CORE.COMMAND_INVENTORY.PROVENANCE_SOURCE_INVALID',
     operatorAction:
       'Supply a bounded provenance source name containing no control characters on every command inventory leaf.',
     publicMetadataKeys: ['field'],
@@ -237,9 +237,9 @@ export const toolContractDefinitions = {
    * path for persisted evidence (suite / MCP replay), i.e. data that has already been on
    * disk — `environment` responsibility, because the user did not hand-author it.
    */
-  'VALIDATION.TASK_CONTEXT.MANIFEST_INVALID': {
+  'CORE.TASK_CONTEXT.MANIFEST_INVALID': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TASK_CONTEXT.MANIFEST_INVALID',
+    code: 'CORE.TASK_CONTEXT.MANIFEST_INVALID',
     defaultResponsibility: 'environment',
     exitClass: 'runtime',
     operatorAction:
@@ -247,34 +247,34 @@ export const toolContractDefinitions = {
     publicMetadataKeys: ['field'],
   },
   /** Two aliases on one tool are the same string. */
-  'VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS': {
+  'CORE.TOOL_IDENTITY.DUPLICATE_ALIAS': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS',
+    code: 'CORE.TOOL_IDENTITY.DUPLICATE_ALIAS',
     operatorAction: 'Remove the repeated alias; each alias must appear once.',
     publicMetadataKeys: ['field', 'value'],
   },
 
   /** A tool lists its own name among its aliases. */
-  'VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES': {
+  'CORE.TOOL_IDENTITY.NAME_IN_ALIASES': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES',
+    code: 'CORE.TOOL_IDENTITY.NAME_IN_ALIASES',
     operatorAction: 'Remove the tool name from its own alias list; the name is already reserved.',
     publicMetadataKeys: ['field', 'value'],
   },
 
   /** The shipped alias set disagrees with the runtime identity's aliases. */
-  'VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT': {
+  'CORE.TOOL_IDENTITY.ALIAS_DRIFT': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT',
+    code: 'CORE.TOOL_IDENTITY.ALIAS_DRIFT',
     operatorAction:
       'Regenerate the tool manifest so its aliases match the runtime identity, then reinstall.',
     publicMetadataKeys: ['field', 'expected', 'actual'],
   },
 
   /** A subcommand was declared without the primary command that owns it. */
-  'VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED': {
+  'CORE.TOOL_IDENTITY.PRIMARY_REQUIRED': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED',
+    code: 'CORE.TOOL_IDENTITY.PRIMARY_REQUIRED',
     operatorAction: 'Declare the primary command before declaring subcommands under it.',
     publicMetadataKeys: ['field'],
   },
@@ -286,9 +286,9 @@ export const toolContractDefinitions = {
    * another tool. One code for the three refusals (D9) — same audience, same fix, and the
    * specific reservation travels in `metadata.field`.
    */
-  'VALIDATION.TOOL_IDENTITY.RESERVED': {
+  'CORE.TOOL_IDENTITY.RESERVED': {
     ...TOOL_AUTHORING,
-    code: 'VALIDATION.TOOL_IDENTITY.RESERVED',
+    code: 'CORE.TOOL_IDENTITY.RESERVED',
     kind: 'security',
     operatorAction:
       'Choose a name, namespace, or layout domain outside the host-reserved set; the reserved value is named in the message.',
@@ -305,9 +305,9 @@ export const toolContractDefinitions = {
    *
    * One code (D9); `metadata.condition` names which of the three.
    */
-  'SYSTEM.AGENT_CATALOG.UNPUBLISHABLE': {
+  'CORE.AGENT_CATALOG.UNPUBLISHABLE': {
     ...TOOL_AUTHORING,
-    code: 'SYSTEM.AGENT_CATALOG.UNPUBLISHABLE',
+    code: 'CORE.AGENT_CATALOG.UNPUBLISHABLE',
     kind: 'invariant',
     exposure: 'redacted',
     exitClass: 'runtime',

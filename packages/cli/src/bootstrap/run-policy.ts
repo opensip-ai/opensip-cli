@@ -15,7 +15,7 @@ import { readValidatedProjectPolicy, resolveRuntimePolicy } from './policy-sourc
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const POLICY_DENIED = hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED');
+const POLICY_DENIED = hostErrorCatalog.require('CLI.POLICY.DENIED');
 
 export interface ResolvedRunPolicy {
   readonly policy: ResolvedTrustPolicy;

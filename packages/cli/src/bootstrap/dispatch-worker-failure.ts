@@ -16,7 +16,7 @@ import type { ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 const MAX_WORKER_DETAIL_CODE_LENGTH = 128;
 const ALLOWED_WORKER_DETAIL_CODES = new Set(['PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS']);

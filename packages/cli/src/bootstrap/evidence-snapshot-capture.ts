@@ -10,7 +10,7 @@ import {
 import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 /** Registered replacement for the un-catalogued `RUN.EVIDENCE.INVALID` literal. */
-const RUN_EVIDENCE_INVALID = hostErrorCatalog.require('VALIDATION.RUN_EVIDENCE.INVALID');
+const RUN_EVIDENCE_INVALID = hostErrorCatalog.require('CLI.RUN_EVIDENCE.INVALID');
 
 export const MAX_EVIDENCE_SNAPSHOT_CONTRIBUTIONS = 16;
 const MAX_REASONS = 32;

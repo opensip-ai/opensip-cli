@@ -35,7 +35,7 @@ import type {
 
 // Plan 01: the `ERRORS.` head was mapped by nothing, so a config typo reported as an
 // operator-only internal fatal. One registered user-facing code, branch in metadata.
-const FIT_SCOPE_INVALID = fitnessErrorCatalog.require('CONFIG.FIT_SCOPE.INVALID');
+const FIT_SCOPE_INVALID = fitnessErrorCatalog.require('FIT.FIT_SCOPE.INVALID');
 
 const YAML_FILENAME = PROJECT_CONFIG_FILENAME;
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];

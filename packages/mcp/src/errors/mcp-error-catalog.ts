@@ -42,5 +42,4 @@ export const mcpErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
     },
   },
-  { allowLegacyCodes: true },
 );

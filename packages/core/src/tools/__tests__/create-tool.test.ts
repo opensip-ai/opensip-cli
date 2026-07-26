@@ -148,7 +148,7 @@ describe('createTool', () => {
       // Plan 01: the three host-reservation refusals share one REGISTERED code (D9), told
       // apart by metadata.field. The `TOOL.` head was never mapped, so every one of these
       // used to report as an operator-only internal fatal.
-      expect((error as { code?: string }).code).toBe('VALIDATION.TOOL_IDENTITY.RESERVED');
+      expect((error as { code?: string }).code).toBe('CORE.TOOL_IDENTITY.RESERVED');
       expect((error as { metadata?: { field?: string } }).metadata?.field).toBe('namespace');
     }
   });

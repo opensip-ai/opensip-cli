@@ -87,7 +87,7 @@ describe('defineTool', () => {
       });
       expect.fail('expected defineTool to throw');
     } catch (error) {
-      expect((error as { code?: string }).code).toBe('VALIDATION.TOOL_IDENTITY.REQUIRED');
+      expect((error as { code?: string }).code).toBe('CORE.TOOL_IDENTITY.REQUIRED');
     }
   });
 

@@ -25,8 +25,8 @@ import { resolveStateLockPolicy } from './state-lock-policy.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const ARTIFACT_WRITE_FAILED = hostErrorCatalog.require('SYSTEM.HOST.ARTIFACT_WRITE_FAILED');
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const ARTIFACT_WRITE_FAILED = hostErrorCatalog.require('CLI.HOST.ARTIFACT_WRITE_FAILED');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 /** Options for {@link createWriteArtifactSeam}. */
 export interface WriteArtifactSeamOptions {

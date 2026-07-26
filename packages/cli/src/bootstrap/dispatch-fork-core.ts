@@ -55,7 +55,7 @@ import type { ExternalAdapterProgressEvent } from '@opensip-cli/external-tool-ad
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 /** Default supervisor wall-clock timeout for one forked worker run (ms). */
 export const DEFAULT_DISPATCH_TIMEOUT_MS = 120_000;

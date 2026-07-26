@@ -1,7 +1,7 @@
 /**
  * Configuration, baseline, execution and subprocess error definitions (Plan 01 Wave 1).
  *
- * `CONFIGURATION.CONFIG.NOT_FOUND` is the highest-impact entry in the file and the reason
+ * `CORE.CONFIG.NOT_FOUND` is the highest-impact entry in the file and the reason
  * ruling D11 exists. The site throws `ValidationError(…, { code: 'ERRORS.CONFIG.NOT_FOUND' })`
  * — head `ERRORS`, which `legacyFamilyCode` does not map — so the **most common first-run
  * failure in the product** demoted to `CORE.SYSTEM.UNKNOWN_FAILURE`: severity `fatal`,
@@ -47,33 +47,33 @@ export const configAndRuntimeDefinitions = {
    * `public` exposure is the entire point: the message enumerates the directories that were
    * checked, and that list is what makes the failure self-service.
    */
-  'CONFIGURATION.CONFIG.NOT_FOUND': {
+  'CORE.CONFIG.NOT_FOUND': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.CONFIG.NOT_FOUND',
+    code: 'CORE.CONFIG.NOT_FOUND',
     kind: 'not-found',
     operatorAction:
       'Run `opensip init` to create opensip-cli.config.yml, or pass --config with the path to an existing one.',
   },
 
   /** An explicit `--config <path>` does not exist. Distinct from the discovery walk miss. */
-  'CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING': {
+  'CORE.CONFIG.EXPLICIT_PATH_MISSING': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING',
+    code: 'CORE.CONFIG.EXPLICIT_PATH_MISSING',
     kind: 'not-found',
     operatorAction: 'Correct the --config path, or omit --config to discover the config file.',
   },
 
   /** A `--top` / `top:` value is not a non-negative integer. */
-  'CONFIGURATION.AGENT_FILTER.INVALID_TOP': {
+  'CORE.AGENT_FILTER.INVALID_TOP': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.AGENT_FILTER.INVALID_TOP',
+    code: 'CORE.AGENT_FILTER.INVALID_TOP',
     operatorAction: 'Pass a non-negative whole number to --top.',
   },
 
   /** A `--filter` token was empty or whitespace. */
-  'CONFIGURATION.AGENT_FILTER.EMPTY_TOKEN': {
+  'CORE.AGENT_FILTER.EMPTY_TOKEN': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.AGENT_FILTER.EMPTY_TOKEN',
+    code: 'CORE.AGENT_FILTER.EMPTY_TOKEN',
     operatorAction: 'Remove the empty --filter token, or give it a value.',
   },
 
@@ -83,42 +83,42 @@ export const configAndRuntimeDefinitions = {
    * Failing loud rather than degrading to a match-nothing predicate is the right call: a
    * silent empty result set is indistinguishable from a clean run.
    */
-  'CONFIGURATION.AGENT_FILTER.MISSING_ARGUMENT': {
+  'CORE.AGENT_FILTER.MISSING_ARGUMENT': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.AGENT_FILTER.MISSING_ARGUMENT',
+    code: 'CORE.AGENT_FILTER.MISSING_ARGUMENT',
     operatorAction: 'Supply a value after the filter prefix, e.g. --filter category:security.',
     publicMetadataKeys: ['token'],
   },
 
   /** A `--filter` token is outside the closed vocabulary; the message enumerates it. */
-  'CONFIGURATION.AGENT_FILTER.UNKNOWN_TOKEN': {
+  'CORE.AGENT_FILTER.UNKNOWN_TOKEN': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.AGENT_FILTER.UNKNOWN_TOKEN',
+    code: 'CORE.AGENT_FILTER.UNKNOWN_TOKEN',
     operatorAction: 'Use one of the filter tokens listed in the message.',
     publicMetadataKeys: ['token'],
   },
 
   /** `--gate-save` and `--gate-compare` were both supplied. */
-  'CONFIGURATION.GATE.MUTUALLY_EXCLUSIVE_FLAGS': {
+  'CORE.GATE.MUTUALLY_EXCLUSIVE_FLAGS': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.GATE.MUTUALLY_EXCLUSIVE_FLAGS',
+    code: 'CORE.GATE.MUTUALLY_EXCLUSIVE_FLAGS',
     operatorAction: 'Pass either --gate-save or --gate-compare, not both.',
     publicMetadataKeys: ['flags'],
   },
 
   /** A tool's config namespace failed schema validation. Issue list rides on `cause`. */
-  'CONFIGURATION.TOOL_NAMESPACE.PARSE_FAILED': {
+  'CORE.TOOL_NAMESPACE.PARSE_FAILED': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.TOOL_NAMESPACE.PARSE_FAILED',
+    code: 'CORE.TOOL_NAMESPACE.PARSE_FAILED',
     operatorAction:
       'Correct the named tool configuration block in opensip-cli.config.yml; the schema issues are listed on the error cause.',
     publicMetadataKeys: ['namespace'],
   },
 
   /** A tool's config namespace is present but is not a mapping. */
-  'CONFIGURATION.TOOL_NAMESPACE.NOT_AN_OBJECT': {
+  'CORE.TOOL_NAMESPACE.NOT_AN_OBJECT': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.TOOL_NAMESPACE.NOT_AN_OBJECT',
+    code: 'CORE.TOOL_NAMESPACE.NOT_AN_OBJECT',
     operatorAction:
       'Make the named tool configuration block a mapping of keys to values, or remove it.',
     publicMetadataKeys: ['namespace'],
@@ -170,9 +170,9 @@ export const configAndRuntimeDefinitions = {
    * `mode` originates in recipe-authored options, so this is a plugin-authored value
    * surfacing as a registered validation failure rather than a bare `Error`.
    */
-  'VALIDATION.EXECUTION.INVALID_MODE': {
+  'CORE.EXECUTION.INVALID_MODE': {
     ...TOOL_AUTHORED_DECLARATION,
-    code: 'VALIDATION.EXECUTION.INVALID_MODE',
+    code: 'CORE.EXECUTION.INVALID_MODE',
     operatorAction: 'Set the workflow execution mode to one of the documented values.',
     publicMetadataKeys: ['value'],
   },
@@ -220,9 +220,9 @@ export const configAndRuntimeDefinitions = {
    * `resource`, not `validation`: the bound is an anti-DoS work limit over untrusted input,
    * and the actionable fact is the size, not the caller's request.
    */
-  'SYSTEM.FILE.TOO_LARGE': {
+  'CORE.FILE.TOO_LARGE': {
     ...USER_CONFIGURATION,
-    code: 'SYSTEM.FILE.TOO_LARGE',
+    code: 'CORE.FILE.TOO_LARGE',
     defaultResponsibility: 'user',
     kind: 'resource',
     exitClass: 'configuration',
@@ -242,9 +242,9 @@ export const configAndRuntimeDefinitions = {
    * `user` / `configuration`: `--changed` outside a repository is something the caller fixes by
    * passing `--files` or running somewhere else, and exit 2 is what it has always returned.
    */
-  'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE': {
+  'CORE.CHANGED_FILES.BASIS_UNAVAILABLE': {
     ...USER_CONFIGURATION,
-    code: 'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE',
+    code: 'CORE.CHANGED_FILES.BASIS_UNAVAILABLE',
     kind: 'not-found',
     operatorAction:
       'Run inside a git repository, install git, or pass explicit --files instead of --changed/--since.',

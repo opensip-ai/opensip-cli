@@ -30,15 +30,11 @@ import type { PluginLayout } from '../plugins/types.js';
 
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
-const IDENTITY_ALIAS_DRIFT = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT');
-const IDENTITY_PARENT_MISMATCH = coreErrorCatalog.require(
-  'VALIDATION.TOOL_IDENTITY.PARENT_MISMATCH',
-);
-const IDENTITY_PRIMARY_REQUIRED = coreErrorCatalog.require(
-  'VALIDATION.TOOL_IDENTITY.PRIMARY_REQUIRED',
-);
-const IDENTITY_REQUIRED = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.REQUIRED');
-const IDENTITY_RESERVED = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.RESERVED');
+const IDENTITY_ALIAS_DRIFT = coreErrorCatalog.require('CORE.TOOL_IDENTITY.ALIAS_DRIFT');
+const IDENTITY_PARENT_MISMATCH = coreErrorCatalog.require('CORE.TOOL_IDENTITY.PARENT_MISMATCH');
+const IDENTITY_PRIMARY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.PRIMARY_REQUIRED');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.REQUIRED');
+const IDENTITY_RESERVED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.RESERVED');
 
 /** Input to {@link defineTool} — the small author surface. */
 export interface DefineToolInput {

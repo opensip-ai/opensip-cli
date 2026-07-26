@@ -15,8 +15,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
     packageName: '@opensip-cli/fitness',
   },
   {
-    'RESOURCE.NOT_FOUND.RECIPE': {
-      code: 'RESOURCE.NOT_FOUND.RECIPE',
+    'FIT.NOT_FOUND.RECIPE': {
+      code: 'FIT.NOT_FOUND.RECIPE',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'not-found',
@@ -29,8 +29,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['entity', 'identifier'],
     },
-    'CONFIG.UNKNOWN_CHECK': {
-      code: 'CONFIG.UNKNOWN_CHECK',
+    'FIT.CHECK.UNKNOWN': {
+      code: 'FIT.CHECK.UNKNOWN',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'validation',
@@ -43,8 +43,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['check'],
     },
-    'SYSTEM.FITNESS.SESSION_IN_PROGRESS': {
-      code: 'SYSTEM.FITNESS.SESSION_IN_PROGRESS',
+    'FIT.FITNESS.SESSION_IN_PROGRESS': {
+      code: 'FIT.FITNESS.SESSION_IN_PROGRESS',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'conflict',
@@ -69,8 +69,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * destroy the verdict the other 225 produced. The run reports the check as errored and
      * continues, which is what the engine already did; the definition now says so.
      */
-    'SYSTEM.FITNESS.CHECK_ERROR': {
-      code: 'SYSTEM.FITNESS.CHECK_ERROR',
+    'FIT.FITNESS.CHECK_ERROR': {
+      code: 'FIT.FITNESS.CHECK_ERROR',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'invariant',
@@ -86,8 +86,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
     },
 
     /** A check was cancelled — the interruption, not a check defect (ruling D5). */
-    'SYSTEM.FITNESS.CHECK_ABORTED': {
-      code: 'SYSTEM.FITNESS.CHECK_ABORTED',
+    'FIT.FITNESS.CHECK_ABORTED': {
+      code: 'FIT.FITNESS.CHECK_ABORTED',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'cancelled',
@@ -108,8 +108,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * `warning` / `success` for the same D7 reason as CHECK_ERROR: one oversized file must not
      * fail the whole scan, it must be reported as not analyzed.
      */
-    'SYSTEM.FITNESS.FILE_TOO_LARGE': {
-      code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
+    'FIT.FITNESS.FILE_TOO_LARGE': {
+      code: 'FIT.FITNESS.FILE_TOO_LARGE',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'resource',
@@ -131,8 +131,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * `security` for the containment case: the target set is the boundary of what a run is
      * allowed to read, and honouring a path outside it would widen the scan silently.
      */
-    'VALIDATION.FITNESS.PATH_REJECTED': {
-      code: 'VALIDATION.FITNESS.PATH_REJECTED',
+    'FIT.FITNESS.PATH_REJECTED': {
+      code: 'FIT.FITNESS.PATH_REJECTED',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'security',
@@ -156,8 +156,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * audience and the same non-action, and `redacted` says so honestly rather than inventing
      * an operator step that does not exist.
      */
-    'SYSTEM.FITNESS.ENGINE_STATE_INVALID': {
-      code: 'SYSTEM.FITNESS.ENGINE_STATE_INVALID',
+    'FIT.FITNESS.ENGINE_STATE_INVALID': {
+      code: 'FIT.FITNESS.ENGINE_STATE_INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'invariant',
@@ -177,8 +177,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * `external` source: the failure is the other program's, and the operator's action is about
      * that program's availability rather than about opensip.
      */
-    'SYSTEM.FITNESS.EXEC_FAILED': {
-      code: 'SYSTEM.FITNESS.EXEC_FAILED',
+    'FIT.FITNESS.EXEC_FAILED': {
+      code: 'FIT.FITNESS.EXEC_FAILED',
       source: 'external',
       defaultResponsibility: 'environment',
       kind: 'I/O',
@@ -205,8 +205,8 @@ export const fitnessErrorCatalog = defineErrorCatalog(
      * One code (D9): every member is fixed in the same file, and `metadata.field` names the
      * block and `metadata.condition` whether it was missing, unknown, or invalid.
      */
-    'CONFIG.FIT_SCOPE.INVALID': {
-      code: 'CONFIG.FIT_SCOPE.INVALID',
+    'FIT.FIT_SCOPE.INVALID': {
+      code: 'FIT.FIT_SCOPE.INVALID',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'validation',
@@ -221,5 +221,4 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['field', 'condition'],
     },
   },
-  { allowLegacyCodes: true },
 );

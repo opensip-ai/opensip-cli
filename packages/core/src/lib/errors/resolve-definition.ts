@@ -30,10 +30,26 @@
  * read per-run state; there is deliberately no process-global catalog map.
  */
 
+import { ambientStore } from '../ambient-store.js';
 import { definitionFromLegacyCode, type ErrorDefinition } from '../error-definition.js';
-import { currentScope } from '../scope-storage.js';
 
 import { coreErrorCatalog } from './core-error-catalog.js';
+
+/**
+ * The only part of the ambient scope this module needs.
+ *
+ * Declared structurally rather than importing `RunScope`: naming that type would pull the
+ * registry → tools → baseline graph back into the error kernel and close a type cycle. `RunScope`
+ * satisfies this shape, so `ambientStore` hands back the same store under a narrower lens.
+ *
+ * Everything is optional because this is read while a failure is already in flight — see
+ * `fromRunRegistry`.
+ */
+interface AmbientErrorCatalogLookup {
+  readonly tools?: {
+    getErrorCatalogIndex: () => { readonly byCode: ReadonlyMap<string, ErrorDefinition> };
+  };
+}
 
 /**
  * Look the code up in the per-invocation aggregate (substrates + loaded tools).
@@ -44,7 +60,10 @@ import { coreErrorCatalog } from './core-error-catalog.js';
  */
 function fromRunRegistry(code: string): ErrorDefinition | undefined {
   try {
-    return currentScope()?.tools?.getErrorCatalogIndex().byCode.get(code);
+    return ambientStore<AmbientErrorCatalogLookup>()
+      .getStore()
+      ?.tools?.getErrorCatalogIndex()
+      .byCode.get(code);
   } catch {
     return undefined;
   }

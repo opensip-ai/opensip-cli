@@ -26,8 +26,8 @@ export const PROJECT_CONFIG_FILENAME = 'opensip-cli.config.yml';
  * @param rootDir - Absolute path to the project root.
  * @param explicitPath - Optional path from `--config` CLI flag. May be
  *   absolute or relative to `rootDir`.
- * @throws {ToolError} `CONFIGURATION.CONFIG.NOT_FOUND` when no config file exists at any
- *   resolved location, or `CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING` when an explicit
+ * @throws {ToolError} `CORE.CONFIG.NOT_FOUND` when no config file exists at any
+ *   resolved location, or `CORE.CONFIG.EXPLICIT_PATH_MISSING` when an explicit
  *   `--config` path is absent. Both definitions are `exposure: 'public'`, which is what keeps
  *   the enumerated attempt list in the outward message — under the previous unmapped
  *   `ERRORS.` code the whole list was replaced by "An unexpected internal failure occurred."
@@ -41,7 +41,7 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
     attempts.push(`--config ${resolved}`);
     if (existsSync(resolved)) return resolved;
     throw createToolError(
-      coreErrorCatalog.require('CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING'),
+      coreErrorCatalog.require('CORE.CONFIG.EXPLICIT_PATH_MISSING'),
       `Config path from --config flag does not exist: ${resolved}`,
     );
   }
@@ -52,7 +52,7 @@ export function resolveProjectConfigPath(rootDir: string, explicitPath?: string)
   if (existsSync(defaultPath)) return defaultPath;
 
   throw createToolError(
-    coreErrorCatalog.require('CONFIGURATION.CONFIG.NOT_FOUND'),
+    coreErrorCatalog.require('CORE.CONFIG.NOT_FOUND'),
     `No ${PROJECT_CONFIG_FILENAME} found. Checked:\n` +
       attempts.map((a) => `  - ${a}`).join('\n') +
       `\n\nRun 'opensip init' to scaffold one, or pass --config <path> ` +

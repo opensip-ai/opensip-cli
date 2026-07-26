@@ -781,9 +781,9 @@ describe('executeRuntimeStatus', () => {
   });
 
   it.each([
-    'TIMEOUT.RUNTIME_LEASE.READ',
-    'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
-    'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+    'CORE.RUNTIME_LEASE.READ',
+    'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
+    'CORE.RUNTIME_COORDINATION.EXISTS',
     'CORE.RUNTIME_LEASE.CAPACITY',
     'CORE.RUNTIME_LEASE.CAPACITY',
   ])('maps bounded lease unavailability %s to busy without reading storage', async (code) => {
@@ -847,7 +847,7 @@ describe('executeRuntimeStatus', () => {
         inspect: () =>
           Promise.reject(
             Object.assign(new Error('private snapshot detail'), {
-              code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+              code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
             }),
           ),
         acquireRead: () => {

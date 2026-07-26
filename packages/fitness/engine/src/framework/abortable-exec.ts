@@ -15,7 +15,7 @@ import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const EXEC_FAILED = fitnessErrorCatalog.require('SYSTEM.FITNESS.EXEC_FAILED');
+const EXEC_FAILED = fitnessErrorCatalog.require('FIT.FITNESS.EXEC_FAILED');
 
 /**
  * Options for abortable command execution

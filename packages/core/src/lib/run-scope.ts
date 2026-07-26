@@ -21,7 +21,7 @@
 import { logger as defaultLogger } from './logger.js';
 import { currentScope } from './scope-storage.js';
 
-import type { Logger, LoggerImpl } from './logger.js';
+import type { LoggerImpl } from './logger.js';
 
 export { RunScope, type RunScopeOptions } from './run-scope-class.js';
 
@@ -38,8 +38,6 @@ export {
  * before a RunScope exists. Scoped production code should prefer this helper
  * over importing the singleton logger directly.
  */
-export function currentLogger(): Logger {
-  return currentScope()?.logger ?? defaultLogger;
-}
+export { currentLogger } from './ambient-logger.js';
 
 (defaultLogger as LoggerImpl).setRunIdProvider(() => currentScope()?.runId);

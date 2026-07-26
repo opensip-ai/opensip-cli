@@ -1,1 +1,4 @@
-{"entries":[],"note":"Ruling D11 ratchet. Every entry is a constructed error code whose head resolves to CORE.SYSTEM.UNKNOWN_FAILURE at runtime. This file only shrinks: each Plan 01 wave removes its own entries. Adding one requires registering the code instead."}
+{
+  "entries": [],
+  "note": "Ruling D11 ratchet. Every entry is a constructed error code whose head resolves to CORE.SYSTEM.UNKNOWN_FAILURE at runtime. This file only shrinks: each Plan 01 wave removes its own entries. Adding one requires registering the code instead."
+}

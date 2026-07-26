@@ -22,9 +22,9 @@ import type { FileCache } from './file-cache.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const CHECK_ABORTED = fitnessErrorCatalog.require('SYSTEM.FITNESS.CHECK_ABORTED');
-const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
-const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');
+const CHECK_ABORTED = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_ABORTED');
+const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
+const FILE_TOO_LARGE = fitnessErrorCatalog.require('FIT.FITNESS.FILE_TOO_LARGE');
 
 /**
  * Check identifier (UUID format).
@@ -254,7 +254,7 @@ export function createExecutionContext(
         } catch (error) {
           // If stat itself fails, let the subsequent get() surface the real FS
           // error (directory, permission, etc.). Only rethrow our size error.
-          if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE')
+          if (error instanceof SystemError && error.code === 'FIT.FITNESS.FILE_TOO_LARGE')
             throw error;
         }
         content = await fc.get(filePath);

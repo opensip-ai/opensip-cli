@@ -33,7 +33,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 type HostSpec = HostRuntimeCommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';

@@ -48,6 +48,9 @@ const EXPECTED = [
   'codePointSortKey',
   'continuationToken',
   'toGraphSymbolRef',
+  // Plan 01: MCP is bound to this surface by the `mcp-graph-root-registrar-only` rule, so the
+  // codes naming a failed read have to be reachable from it too.
+  'graphErrorCatalog',
   'graphPackageOf',
   'toGraphPackageName',
   'GRAPH_SYMBOL_PATH_MAX',

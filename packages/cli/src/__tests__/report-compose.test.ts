@@ -289,7 +289,13 @@ describe('composeAndWriteReport', () => {
           selection: { view: 'change-impact', runId: 'run-missing' },
         }),
       ),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' });
+      // One code, two conditions (ruling D9): the operator's action is the same — pick a
+      // different Run — so the branch travels in `metadata.condition`, which is asserted here
+      // precisely so the two cases stay distinguishable to a machine consumer.
+    ).rejects.toMatchObject({
+      code: 'CLI.REPORT.RUN_UNAVAILABLE',
+      metadata: { condition: 'run-not-found' },
+    });
     expect(launch).not.toHaveBeenCalled();
   });
 
@@ -311,7 +317,10 @@ describe('composeAndWriteReport', () => {
           selection: { view: 'change-impact', runId: 'run-fit-only' },
         }),
       ),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE' });
+    ).rejects.toMatchObject({
+      code: 'CLI.REPORT.RUN_UNAVAILABLE',
+      metadata: { condition: 'change-impact-unavailable' },
+    });
     expect(launch).not.toHaveBeenCalled();
   });
 

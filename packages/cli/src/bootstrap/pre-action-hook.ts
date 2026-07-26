@@ -44,8 +44,8 @@ import type { Command } from 'commander';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export { resolveOwningTool } from './owning-tool-init.js';
 export type { PreActionRuntime } from './pre-action-runtime.js';
@@ -86,7 +86,7 @@ export function createCommandActionScopeRunner(): CommandActionScopeController {
         throw new SystemError(
           'Command action started before pre-action bootstrap staged its scope.',
           {
-            code: 'SYSTEM.SCOPE.NOT_ENTERED',
+            code: 'CORE.SCOPE.NOT_ENTERED',
           },
         );
       }

@@ -21,7 +21,7 @@ import type { CapabilityWorkerSpec } from './types.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 export const CAPABILITY_WORKER_SUBCOMMAND = '__capability-pack-worker';
 const DEFAULT_CAPABILITY_WORKER_TIMEOUT_MS = 120_000;

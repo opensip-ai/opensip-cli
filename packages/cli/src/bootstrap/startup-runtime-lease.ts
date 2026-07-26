@@ -25,9 +25,9 @@ import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
-const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
-const STARTUP_LEASE = hostErrorCatalog.require('CONFIGURATION.HOST.STARTUP_LEASE');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const STARTUP_LEASE = hostErrorCatalog.require('CLI.HOST.STARTUP_LEASE');
 
 export interface StartupProjectSelection {
   readonly cwd: string;

@@ -97,7 +97,7 @@ describe('fitness scope-registry — readers throw outside a scope', () => {
       // Plan 01 clean break: the five "engine was misdriven" conditions share one REGISTERED
       // code (D9 clustering) with the specific condition in allowlisted metadata, replacing
       // five bare literals that only resolved through the family fallback.
-      expect((error as SystemError).code).toBe('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
+      expect((error as SystemError).code).toBe('FIT.FITNESS.ENGINE_STATE_INVALID');
       expect((error as SystemError).metadata.condition).toBe('no-subscope');
       expect((error as SystemError).definition.exposure).toBe('redacted');
     }

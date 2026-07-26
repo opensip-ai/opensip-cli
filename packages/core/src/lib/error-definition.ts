@@ -111,6 +111,12 @@ export interface ErrorCatalogOwner {
 export interface ErrorCatalog<TCodes extends string = string> {
   readonly schemaVersion: typeof ERROR_CATALOG_SCHEMA_VERSION;
   readonly owner: ErrorCatalogOwner;
+  /**
+   * The single `OWNER` segment every code in this catalog starts with, derived from the
+   * definitions rather than declared. `undefined` only for the legacy class-default catalog,
+   * whose codes predate the dotted grammar.
+   */
+  readonly codeHead: string | undefined;
   readonly definitions: Readonly<Record<TCodes, ErrorDefinition>>;
   readonly list: readonly ErrorDefinition[];
   get(code: string): ErrorDefinition | undefined;
@@ -391,7 +397,23 @@ export function normalizeErrorDefinition(
 
 /**
  * Build an immutable package/tool error catalog.
- * @throws {ErrorDefinitionError} When the owner lacks id/displayName, the definition count exceeds the cap, or two entries share a code.
+ *
+ * Every code in one catalog must share one head — the `OWNER` segment of
+ * `OWNER.DOMAIN.CONDITION`. The head is not declared; it is READ from the first definition and
+ * the rest are held to it, so a catalog cannot disagree with itself and there is no second
+ * place for the head to drift out of sync with the codes.
+ *
+ * The rule buys two things. Codes become collision-proof across owners without any central
+ * allocator: two packages that both need a "config is invalid" condition cannot mint the same
+ * string. And the head names the OWNER rather than the failure kind, which is what makes it
+ * worth reading — `kind`, `severity`, `source` and `exitClass` are already structured fields on
+ * the definition, so a head like `VALIDATION.` was both redundant and free to contradict them.
+ *
+ * `allowLegacyCodes` opts out, and exists for exactly one catalog: the class-default codes
+ * (`VALIDATION_ERROR`, `UNKNOWN_FAILURE`, …) that predate the dotted grammar and are the
+ * totality fallback for unregistered input (ruling D11).
+ *
+ * @throws {ErrorDefinitionError} When the owner lacks id/displayName, the definition count exceeds the cap, two entries share a code, or the codes do not share one head.
  */
 export function defineErrorCatalog<
   const TDefs extends Record<string, Omit<ErrorDefinition, 'owner'> & { code?: string }>,
@@ -418,11 +440,22 @@ export function defineErrorCatalog<
   const definitions: Record<string, ErrorDefinition> = {};
   const seen = new Set<string>();
 
+  let head: string | undefined;
+
   for (const key of keys) {
     const raw = ownData(definitionsInput, key);
     const def = normalizeErrorDefinition(raw, normalizedOwner, { ...opts, defaultCode: key });
     if (seen.has(def.code)) {
       throw new ErrorDefinitionError(`duplicate error code in catalog: ${def.code}`);
+    }
+    if (opts.allowLegacyCodes !== true) {
+      const codeHead = def.code.slice(0, def.code.indexOf('.'));
+      head ??= codeHead;
+      if (codeHead !== head) {
+        throw new ErrorDefinitionError(
+          `definition ${def.code}: catalog head is '${head}', so every code in it must start with '${head}.'`,
+        );
+      }
     }
     seen.add(def.code);
     definitions[key] = def;
@@ -436,6 +469,7 @@ export function defineErrorCatalog<
   const catalog: ErrorCatalog<Extract<keyof TDefs, string>> = {
     schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
     owner: normalizedOwner,
+    codeHead: head,
     definitions: frozenDefs,
     list,
     get(code: string) {

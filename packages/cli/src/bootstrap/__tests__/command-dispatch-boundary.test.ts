@@ -67,7 +67,7 @@ describe('command dispatch boundary', () => {
     expect(currentScope()).toBeUndefined();
 
     // Embedded-mode second command in the same process: staging + entering a
-    // fresh scope succeeds without SYSTEM.SCOPE.REENTRANT.
+    // fresh scope succeeds without CORE.SCOPE.REENTRANT.
     const next = createCommandActionScopeRunner();
     const nextScope = new RunScope();
     next.stage(nextScope);

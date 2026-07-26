@@ -171,5 +171,4 @@ export const externalToolErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'scanner', 'exitCode'],
     },
   },
-  { allowLegacyCodes: true },
 );

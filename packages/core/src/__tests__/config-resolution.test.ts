@@ -36,7 +36,7 @@ describe('resolveProjectConfigPath', () => {
       expect.unreachable('resolveProjectConfigPath must throw when no config exists');
     } catch (error) {
       expect((error as Error).message).toContain('No opensip-cli.config.yml found');
-      expect((error as ToolError).code).toBe('CONFIGURATION.CONFIG.NOT_FOUND');
+      expect((error as ToolError).code).toBe('CORE.CONFIG.NOT_FOUND');
       expect((error as ToolError).definition.defaultResponsibility).toBe('user');
       expect((error as ToolError).definition.severity).toBe('error');
     }
@@ -57,7 +57,7 @@ describe('resolveProjectConfigPath', () => {
     expect(projection.message).toContain('No opensip-cli.config.yml found');
     expect(projection.message).toContain(PROJECT_CONFIG_FILENAME);
     expect(projection.message).not.toContain('An unexpected internal failure occurred');
-    expect(projection.code).toBe('CONFIGURATION.CONFIG.NOT_FOUND');
+    expect(projection.code).toBe('CORE.CONFIG.NOT_FOUND');
   });
 
   describe('explicit --config path', () => {
@@ -85,7 +85,7 @@ describe('resolveProjectConfigPath', () => {
         // Distinct from the discovery-walk miss: the repair is different (fix the flag vs
         // run init), so collapsing both onto one code would make the operator action wrong
         // for one of them.
-        expect((error as ToolError).code).toBe('CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING');
+        expect((error as ToolError).code).toBe('CORE.CONFIG.EXPLICIT_PATH_MISSING');
       }
     });
 

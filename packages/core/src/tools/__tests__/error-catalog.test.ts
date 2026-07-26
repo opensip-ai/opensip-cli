@@ -229,3 +229,74 @@ describe('aggregateErrorCatalogs — substrate catalogs (Plan 01 ruling D1)', ()
     expect(byCode.get('A.B.C')?.toolName).toBe('a');
   });
 });
+
+describe('one head per owner, one owner per head', () => {
+  it('refuses a catalog whose codes do not share one head', () => {
+    expect(() =>
+      defineErrorCatalog(ownerA, {
+        'AAA.CONFIG.INVALID': { ...def, code: 'AAA.CONFIG.INVALID' },
+        'BBB.CONFIG.MISSING': { ...def, code: 'BBB.CONFIG.MISSING' },
+      }),
+    ).toThrow(/catalog head is 'AAA'/u);
+  });
+
+  it('derives the head from the definitions rather than a declared field', () => {
+    const catalog = defineErrorCatalog(ownerA, {
+      'AAA.CONFIG.INVALID': { ...def, code: 'AAA.CONFIG.INVALID' },
+      'AAA.READ.DENIED': { ...def, code: 'AAA.READ.DENIED' },
+    });
+    expect(catalog.codeHead).toBe('AAA');
+  });
+
+  it('reports a collision when a second owner claims a head, even with no shared code', () => {
+    // The point of the cross-owner half: these two catalogs share NO code, so the per-code
+    // collision check passes them. Only the head claim catches the overlap.
+    const a = defineErrorCatalog(ownerA, {
+      'DUP.ONE.X': { ...def, code: 'DUP.ONE.X' },
+    });
+    const b = defineErrorCatalog(ownerB, {
+      'DUP.TWO.Y': { ...def, code: 'DUP.TWO.Y' },
+    });
+    const { collisions } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: a },
+      { toolName: 'b', toolId: ownerB.id, catalog: b },
+    ]);
+    expect(collisions).toEqual([{ code: 'DUP.*', owners: [ownerA.id, ownerB.id] }]);
+  });
+
+  it('lets one owner register the same head from more than one catalog', () => {
+    const first = defineErrorCatalog(ownerA, { 'SAME.ONE.X': { ...def, code: 'SAME.ONE.X' } });
+    const second = defineErrorCatalog(ownerA, { 'SAME.TWO.Y': { ...def, code: 'SAME.TWO.Y' } });
+    const { collisions, byCode } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: first },
+      { toolName: 'a', toolId: ownerA.id, catalog: second },
+    ]);
+    expect(collisions).toEqual([]);
+    expect(byCode.has('SAME.TWO.Y')).toBe(true);
+  });
+
+  it('exempts only the legacy class-default catalog, whose codes are un-dotted', () => {
+    expect(coreSystemErrorCatalog.codeHead).toBeUndefined();
+    // Its keys are the `ToolErrorCode` wire tokens; the codes they resolve to are a mix of
+    // bare class defaults and dotted ones, which is exactly why it is exempt.
+    expect(coreSystemErrorCatalog.require('VALIDATION_ERROR').code).toBe('VALIDATION_ERROR');
+    expect(coreSystemErrorCatalog.require('UNKNOWN_FAILURE').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+  });
+
+  it('holds a third-party tool contribution to the same rule', () => {
+    expect(() =>
+      validateToolErrorCatalogContribution(
+        {
+          schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
+          definitions: {
+            'XXX.A.B': { ...def, code: 'XXX.A.B' },
+            'YYY.A.B': { ...def, code: 'YYY.A.B' },
+          },
+        },
+        { id: ownerA.id, displayName: 'Tool A' },
+      ),
+    ).toThrow(ErrorDefinitionError);
+  });
+});

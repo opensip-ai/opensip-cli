@@ -1,7 +1,7 @@
 /** Per-generation freshness verification, coalescing, caching, and events. */
 
 import { err, ok, type Result } from '@opensip-cli/core';
-import { graphErrorCatalog } from '@opensip-cli/graph';
+import { graphErrorCatalog } from '@opensip-cli/graph/read';
 
 import { fromGraphReadError, type McpReadError } from './mcp-error.js';
 

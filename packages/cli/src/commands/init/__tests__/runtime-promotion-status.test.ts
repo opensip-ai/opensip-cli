@@ -506,7 +506,7 @@ describe('runtime promotion status projection', () => {
     });
   });
 
-  it.each(['CORE.RUNTIME_COORDINATION.BUSY', 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH'] as const)(
+  it.each(['CORE.RUNTIME_COORDINATION.BUSY', 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH'] as const)(
     'maps an anchored publication race (%s) to busy',
     (code) => {
       const journal = initialJournal();

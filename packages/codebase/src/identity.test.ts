@@ -77,7 +77,7 @@ describe('projectConfigIdentity', () => {
 
     expect(isToolErrorLike(error)).toBe(true);
     if (!isToolErrorLike(error)) return;
-    expect(error.code).toBe('VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
+    expect(error.code).toBe('CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
     expect(error.metadata).toMatchObject({ condition: 'circular-reference' });
     expect(error).not.toBeInstanceOf(RangeError);
   });
@@ -87,7 +87,7 @@ describe('projectConfigIdentity', () => {
 
     expect(isToolErrorLike(error)).toBe(true);
     if (!isToolErrorLike(error)) return;
-    expect(error.code).toBe('VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
+    expect(error.code).toBe('CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
     expect(error.metadata).toMatchObject({ condition: 'bigint-scalar' });
   });
 

@@ -14,7 +14,7 @@ import {
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 const logger: Logger = {
   debug: vi.fn(),
@@ -48,7 +48,7 @@ describe('resolveDatastoreAccess', () => {
       expect.unreachable('expected MODE_MISMATCH');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.HOST.WIRING_INVALID');
+      expect((error as SystemError).code).toBe('CLI.HOST.WIRING_INVALID');
     }
   });
 
@@ -58,7 +58,7 @@ describe('resolveDatastoreAccess', () => {
       expect.unreachable('expected MODE_MISMATCH');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.HOST.WIRING_INVALID');
+      expect((error as SystemError).code).toBe('CLI.HOST.WIRING_INVALID');
     }
   });
 });

@@ -153,9 +153,9 @@ export const runtimeLeaseDefinitions = {
    * Least-authority refusals: the inherited `tool-author` / `invariant` / `runtime` axes are
    * correct here, so registration only removes the family fallback.
    */
-  'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE': {
+  'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+    code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     kind: 'permission',
     operatorAction:
       'This lease handle does not carry authority for the requested operation. Acquire the correct authority instead of widening this one.',
@@ -163,9 +163,9 @@ export const runtimeLeaseDefinitions = {
   },
 
   /** A shared lease cannot be upgraded to exclusive, and exclusive leases cannot nest. */
-  'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE': {
+  'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+    code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
     kind: 'invariant',
     operatorAction:
       'Acquire an exclusive runtime lease up front; a shared lease cannot be upgraded in place.',
@@ -173,27 +173,27 @@ export const runtimeLeaseDefinitions = {
   },
 
   /** Two writer requests were enqueued for one owner token. */
-  'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER': {
+  'CORE.RUNTIME_LEASE.DUPLICATE_WRITER': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
+    code: 'CORE.RUNTIME_LEASE.DUPLICATE_WRITER',
     kind: 'invariant',
     operatorAction: 'Enqueue at most one runtime writer request per owner token.',
     publicMetadataKeys: ['condition'],
   },
 
   /** A shared acquisition named no dimensions, which cannot mean anything. */
-  'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS': {
+  'CORE.RUNTIME_LEASE.EMPTY_ACCESS': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
+    code: 'CORE.RUNTIME_LEASE.EMPTY_ACCESS',
     kind: 'validation',
     operatorAction: 'Name at least one shared dimension when acquiring a runtime access lease.',
     publicMetadataKeys: ['condition'],
   },
 
   /** The supplied owner token does not satisfy the owner-token grammar. */
-  'SYSTEM.RUNTIME_LEASE.INVALID_OWNER': {
+  'CORE.RUNTIME_LEASE.INVALID_OWNER': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
+    code: 'CORE.RUNTIME_LEASE.INVALID_OWNER',
     kind: 'validation',
     operatorAction: 'Supply a runtime lease owner token that matches the documented grammar.',
     publicMetadataKeys: ['condition'],
@@ -204,9 +204,9 @@ export const runtimeLeaseDefinitions = {
    *
    * The exactness guard that keeps one project's runs from releasing another's lease.
    */
-  'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH': {
+  'CORE.RUNTIME_LEASE.OWNER_MISMATCH': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+    code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     kind: 'conflict',
     operatorAction:
       'This runtime lease belongs to another process or project and cannot be modified from here.',
@@ -219,8 +219,8 @@ export const runtimeLeaseDefinitions = {
    * `integrity`, not `invariant`: the caller did nothing wrong — persisted state was
    * removed underneath it, which means another actor or a manual cleanup intervened.
    */
-  'SYSTEM.RUNTIME_LEASE.REQUEST_LOST': {
-    code: 'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
+  'CORE.RUNTIME_LEASE.REQUEST_LOST': {
+    code: 'CORE.RUNTIME_LEASE.REQUEST_LOST',
     source: 'infrastructure',
     defaultResponsibility: 'environment',
     kind: 'integrity',
@@ -241,9 +241,9 @@ export const runtimeLeaseDefinitions = {
    * operating under was taken or expired mid-mutation, so anything it writes now would be
    * unsound. Refusing is the only safe outcome.
    */
-  'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST': {
+  'CORE.RUNTIME_LEASE.AUTHORITY_LOST': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     defaultResponsibility: 'environment',
     kind: 'integrity',
     retry: 'transient',
@@ -259,9 +259,9 @@ export const runtimeLeaseDefinitions = {
    * so an interrupted acquisition reports as the interruption it was, not as a lease fault
    * (ruling D5 — cancellation carries one meaning).
    */
-  'SYSTEM.RUNTIME_LEASE.CANCELLED': {
+  'CORE.RUNTIME_LEASE.CANCELLED': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+    code: 'CORE.RUNTIME_LEASE.CANCELLED',
     defaultResponsibility: 'user',
     kind: 'cancelled',
     exitClass: 'cancelled',
@@ -274,9 +274,9 @@ export const runtimeLeaseDefinitions = {
    * `user` responsibility: lease policy is reachable from project configuration, so this is an
    * edit the user makes — not a bug report.
    */
-  'SYSTEM.RUNTIME_LEASE.INVALID_POLICY': {
+  'CORE.RUNTIME_LEASE.INVALID_POLICY': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
+    code: 'CORE.RUNTIME_LEASE.INVALID_POLICY',
     defaultResponsibility: 'user',
     kind: 'validation',
     exitClass: 'configuration',
@@ -293,9 +293,9 @@ export const runtimeLeaseDefinitions = {
    * exactly why it was still riding the family fallback. Two call sites branch on it to map a
    * mutex wait onto a friendlier per-operation timeout, and both move with it.
    */
-  'TIMEOUT.RUNTIME_COORDINATION.MUTEX': {
+  'CORE.RUNTIME_COORDINATION.MUTEX': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX',
+    code: 'CORE.RUNTIME_COORDINATION.MUTEX',
     operatorAction:
       'Another opensip run holds the coordination mutex. Wait for it to finish and re-run; stop long-lived processes such as `opensip mcp` if it persists.',
   },
@@ -313,33 +313,33 @@ export const runtimeLeaseDefinitions = {
    * an exclusive-lease timeout as retryable promotion contention, while a read timeout is a
    * degraded status read. Metadata is not branchable without parsing.
    */
-  'TIMEOUT.RUNTIME_LEASE.READ': {
+  'CORE.RUNTIME_LEASE.READ': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_LEASE.READ',
+    code: 'CORE.RUNTIME_LEASE.READ',
     operatorAction:
       'Timed out waiting to read runtime state. Another opensip run is holding it; wait and re-run.',
   },
-  'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE': {
+  'CORE.RUNTIME_LEASE.EXCLUSIVE': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE',
+    code: 'CORE.RUNTIME_LEASE.EXCLUSIVE',
     operatorAction:
       'Timed out waiting for the exclusive runtime lease. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.',
   },
-  'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE': {
+  'CORE.RUNTIME_LEASE.ACCESS_COMPOSITE': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE',
+    code: 'CORE.RUNTIME_LEASE.ACCESS_COMPOSITE',
     operatorAction:
       'Timed out assembling the composite runtime access lease. Wait for concurrent runs to finish and retry.',
   },
-  'TIMEOUT.RUNTIME_LEASE.USER_STATE_READ': {
+  'CORE.RUNTIME_LEASE.USER_STATE_READ': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_LEASE.USER_STATE_READ',
+    code: 'CORE.RUNTIME_LEASE.USER_STATE_READ',
     operatorAction:
       'Timed out reading user-state runtime data. Another opensip run is holding it; wait and re-run.',
   },
-  'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE': {
+  'CORE.RUNTIME_LEASE.GLOBAL_MAINTENANCE': {
     ...LEASE_TIMEOUT,
-    code: 'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
+    code: 'CORE.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
     operatorAction:
       'Timed out waiting for global runtime maintenance. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.',
   },
@@ -350,9 +350,9 @@ export const runtimeLeaseDefinitions = {
    * that runtime state is uncertain rather than that the caller did something wrong. The
    * original failure is preserved on `cause`.
    */
-  'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED': {
+  'CORE.RUNTIME_LEASE.RELEASE_FAILED': {
     ...LEASE_CALLER_CONTRACT,
-    code: 'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED',
+    code: 'CORE.RUNTIME_LEASE.RELEASE_FAILED',
     defaultResponsibility: 'environment',
     kind: 'integrity',
     retry: 'transient',

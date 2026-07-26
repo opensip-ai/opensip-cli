@@ -263,7 +263,7 @@ function readEvidenceRecord(
 }
 
 function isAnchoredCreateConflict(error: unknown): boolean {
-  return error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS';
+  return error instanceof SystemError && error.code === 'CORE.RUNTIME_COORDINATION.EXISTS';
 }
 
 function expectedCleanupEvidence(

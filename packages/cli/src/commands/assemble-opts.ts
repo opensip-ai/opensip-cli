@@ -4,7 +4,7 @@ import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
 
 const NO_PREVIOUS_VALUE: unknown = undefined;
 

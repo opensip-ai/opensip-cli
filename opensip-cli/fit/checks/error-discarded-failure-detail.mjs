@@ -11,7 +11,7 @@
  * shipped `@opensip-cli/checks-*` pack):
  *
  * opensip-cli has a first-party failure envelope. `ToolError` and its subclasses
- * carry a stable `code` (`SYSTEM.SCOPE.NOT_ENTERED`, `ENOENT`-derived classes,
+ * carry a stable `code` (`CORE.SCOPE.NOT_ENTERED`, `ENOENT`-derived classes,
  * …); `normalizeFailure` / `prepareErrorPlan` in
  * `packages/core/src/lib/failure-envelope.ts` turn a caught value into a
  * classified, exposure-tagged failure; `fromNativeError` in

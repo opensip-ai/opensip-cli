@@ -27,11 +27,11 @@ import type { HostCommandRuntimePolicy } from './host-runtime-policy.js';
 import type { DatastoreCloseResult } from '@opensip-cli/datastore';
 
 /** Core owns the SYSTEM.RUNTIME_LEASE.* namespace, so this definition comes from core. */
-const LEASE_RELEASE_FAILED = coreErrorCatalog.require('SYSTEM.RUNTIME_LEASE.RELEASE_FAILED');
+const LEASE_RELEASE_FAILED = coreErrorCatalog.require('CORE.RUNTIME_LEASE.RELEASE_FAILED');
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export {
   DEFAULT_HOST_RUNTIME_POLICY,

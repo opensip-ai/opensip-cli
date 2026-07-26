@@ -80,9 +80,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `metadata.condition` carries which of those it was — the detail an agent branches on
      * without needing 12 separate codes to enumerate.
      */
-    'CONFIG.SUITE.INVALID': {
+    'CLI.SUITE.INVALID': {
       ...USER_INPUT,
-      code: 'CONFIG.SUITE.INVALID',
+      code: 'CLI.SUITE.INVALID',
       operatorAction:
         'Correct the named suite step in opensip-cli.config.yml; the message names the offending field and value.',
       publicMetadataKeys: ['condition', 'field', 'value'],
@@ -95,9 +95,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * Separated from `INVALID` because the KIND differs and that changes the advice: the fix
      * is to look up what is actually available (`opensip tools list`), not to correct a value.
      */
-    'CONFIG.SUITE.UNKNOWN_REFERENCE': {
+    'CLI.SUITE.UNKNOWN_REFERENCE': {
       ...USER_INPUT,
-      code: 'CONFIG.SUITE.UNKNOWN_REFERENCE',
+      code: 'CLI.SUITE.UNKNOWN_REFERENCE',
       kind: 'not-found',
       operatorAction:
         'The suite step names something that does not exist or is ambiguous. Run `opensip tools list` and use an exact tool and command name.',
@@ -112,9 +112,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `integrity` kind: refusing is protecting the user's file. Editing a document we cannot
      * fully parse would silently drop the parts we did not understand.
      */
-    'CONFIG.SUITE.EDIT_REFUSED': {
+    'CLI.SUITE.EDIT_REFUSED': {
       ...USER_INPUT,
-      code: 'CONFIG.SUITE.EDIT_REFUSED',
+      code: 'CLI.SUITE.EDIT_REFUSED',
       kind: 'integrity',
       operatorAction:
         'opensip cannot safely edit this config file. Fix the reported problem in opensip-cli.config.yml, or add the suite block by hand.',
@@ -129,9 +129,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * The most common host-side user failure after a missing config file, and the operator
      * action is the whole value of the code: run from inside a project, or pass `--cwd`.
      */
-    'CONFIGURATION.HOST.PROJECT_REQUIRED': {
+    'CLI.HOST.PROJECT_REQUIRED': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.HOST.PROJECT_REQUIRED',
+      code: 'CLI.HOST.PROJECT_REQUIRED',
       kind: 'not-found',
       operatorAction:
         'Run from within an initialized project directory, or pass --cwd pointing at one. `opensip init` creates one.',
@@ -144,9 +144,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * directory, a malformed target set, a bad tool id for data purge, a catalog budget that is
      * not a number.
      */
-    'CONFIGURATION.HOST.OPTION_INVALID': {
+    'CLI.HOST.OPTION_INVALID': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.HOST.OPTION_INVALID',
+      code: 'CLI.HOST.OPTION_INVALID',
       operatorAction:
         'Correct the named option or configuration value and re-run; the message names the field and what was expected.',
       publicMetadataKeys: ['condition', 'field', 'value'],
@@ -158,9 +158,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `conflict`, not `validation`: nothing the user typed is wrong. Either another run holds
      * the lease or this process already spent it, and both are resolved by re-running.
      */
-    'CONFIGURATION.HOST.STARTUP_LEASE': {
+    'CLI.HOST.STARTUP_LEASE': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.HOST.STARTUP_LEASE',
+      code: 'CLI.HOST.STARTUP_LEASE',
       kind: 'conflict',
       retry: 'transient',
       operatorAction:
@@ -177,9 +177,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * emitted un-stamped signals — so `metadata.condition` carries which, and the message says
      * who. `exitClass: 'configuration'` preserves the gate's existing exit 2.
      */
-    'CONFIGURATION.GATE.BASELINE_INVALID': {
+    'CLI.GATE.BASELINE_INVALID': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.GATE.BASELINE_INVALID',
+      code: 'CLI.GATE.BASELINE_INVALID',
       operatorAction:
         'Run the tool with --gate-save to capture a baseline before comparing; if the message reports unstamped signals, report it to the tool author.',
       publicMetadataKeys: ['condition', 'tool'],
@@ -192,9 +192,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * mistake to correct, and `permission` kind is what tells an agent not to retry or
      * work around it.
      */
-    'CONFIGURATION.POLICY.DENIED': {
+    'CLI.POLICY.DENIED': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.POLICY.DENIED',
+      code: 'CLI.POLICY.DENIED',
       defaultResponsibility: 'operator',
       kind: 'permission',
       operatorAction:
@@ -208,9 +208,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `security`: the promotion preflight found the manifest untrustworthy, and proceeding
      * would publish evidence we cannot vouch for.
      */
-    'CONFIGURATION.RUNTIME_PROMOTION.MANIFEST_UNSAFE': {
+    'CLI.RUNTIME_PROMOTION.MANIFEST_UNSAFE': {
       ...USER_INPUT,
-      code: 'CONFIGURATION.RUNTIME_PROMOTION.MANIFEST_UNSAFE',
+      code: 'CLI.RUNTIME_PROMOTION.MANIFEST_UNSAFE',
       defaultResponsibility: 'environment',
       kind: 'security',
       operatorAction:
@@ -226,8 +226,8 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `security` kind — the namespace boundary is what stops one tool impersonating the host
      * or another tool.
      */
-    'PLUGIN.HOST_IDENTITY.RESERVED': {
-      code: 'PLUGIN.HOST_IDENTITY.RESERVED',
+    'CLI.HOST_IDENTITY.RESERVED': {
+      code: 'CLI.HOST_IDENTITY.RESERVED',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'security',
@@ -250,9 +250,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * scope, a command whose runtime scope was never declared, a missing external-tool
      * identity, a command result that came back undefined.
      */
-    'SYSTEM.HOST.WIRING_INVALID': {
+    'CLI.HOST.WIRING_INVALID': {
       ...HOST_WIRING,
-      code: 'SYSTEM.HOST.WIRING_INVALID',
+      code: 'CLI.HOST.WIRING_INVALID',
       operatorAction: 'Capture the run id and report a bug; the CLI host was misdriven.',
       publicMetadataKeys: ['condition'],
     },
@@ -264,9 +264,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * directory, an unreachable handler and a worker that died — conditions about the install,
      * not about the code. `caller-policy` retry because a worker fault is often transient.
      */
-    'SYSTEM.HOST.DISPATCH_FAILED': {
+    'CLI.HOST.DISPATCH_FAILED': {
       ...HOST_WIRING,
-      code: 'SYSTEM.HOST.DISPATCH_FAILED',
+      code: 'CLI.HOST.DISPATCH_FAILED',
       defaultResponsibility: 'environment',
       kind: 'I/O',
       retry: 'caller-policy',
@@ -283,9 +283,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * credible. Failing the command because a report file could not be written would destroy
      * a result the user paid for.
      */
-    'SYSTEM.HOST.ARTIFACT_WRITE_FAILED': {
+    'CLI.HOST.ARTIFACT_WRITE_FAILED': {
       ...HOST_WIRING,
-      code: 'SYSTEM.HOST.ARTIFACT_WRITE_FAILED',
+      code: 'CLI.HOST.ARTIFACT_WRITE_FAILED',
       defaultResponsibility: 'environment',
       kind: 'I/O',
       retry: 'caller-policy',
@@ -303,9 +303,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `resource`: the bound is an anti-DoS work limit on a path that runs before a scope
      * exists, so it must fail closed rather than grow.
      */
-    'SYSTEM.HOST.PROBE_LIMIT': {
+    'CLI.HOST.PROBE_LIMIT': {
       ...HOST_WIRING,
-      code: 'SYSTEM.HOST.PROBE_LIMIT',
+      code: 'CLI.HOST.PROBE_LIMIT',
       defaultResponsibility: 'environment',
       kind: 'resource',
       operatorAction:
@@ -321,9 +321,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * programmatic caller (MCP, an agent) rather than being typed into a config file, so the
      * fix is in the caller's request.
      */
-    'VALIDATION.RUN_READ.INPUT_INVALID': {
+    'CLI.RUN_READ.INPUT_INVALID': {
       ...HOST_WIRING,
-      code: 'VALIDATION.RUN_READ.INPUT_INVALID',
+      code: 'CLI.RUN_READ.INPUT_INVALID',
       kind: 'validation',
       exposure: 'public',
       operatorAction:
@@ -339,9 +339,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * exists. The retired `CONFIGURATION.REPORT.*` literals resolved to nothing, so what is
      * plainly a "no such run" answer arrived as an internal fatal.
      */
-    'CONFIG.REPORT.RUN_UNAVAILABLE': {
+    'CLI.REPORT.RUN_UNAVAILABLE': {
       ...USER_INPUT,
-      code: 'CONFIG.REPORT.RUN_UNAVAILABLE',
+      code: 'CLI.REPORT.RUN_UNAVAILABLE',
       kind: 'not-found',
       operatorAction:
         'Pick a run that exists — `opensip runs list` shows them — and one that recorded the data this report needs.',
@@ -349,9 +349,9 @@ export const hostErrorCatalog = defineErrorCatalog(
     },
 
     /** A run-history read names a run the store does not have. */
-    'CONFIG.RUNS.NOT_FOUND': {
+    'CLI.RUNS.NOT_FOUND': {
       ...USER_INPUT,
-      code: 'CONFIG.RUNS.NOT_FOUND',
+      code: 'CLI.RUNS.NOT_FOUND',
       kind: 'not-found',
       operatorAction: 'Pick a run id that exists; `opensip runs list` shows the recorded runs.',
       publicMetadataKeys: ['runId'],
@@ -363,9 +363,9 @@ export const hostErrorCatalog = defineErrorCatalog(
      * `tool-author` and `runtime`: the snapshot comes from a tool's `collectReportData`, not
      * from anything the user wrote.
      */
-    'VALIDATION.RUN_EVIDENCE.INVALID': {
+    'CLI.RUN_EVIDENCE.INVALID': {
       ...HOST_WIRING,
-      code: 'VALIDATION.RUN_EVIDENCE.INVALID',
+      code: 'CLI.RUN_EVIDENCE.INVALID',
       kind: 'validation',
       exposure: 'public',
       operatorAction:

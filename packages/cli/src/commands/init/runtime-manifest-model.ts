@@ -4,9 +4,7 @@ import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const PROMOTION_UNSAFE = hostErrorCatalog.require(
-  'CONFIGURATION.RUNTIME_PROMOTION.MANIFEST_UNSAFE',
-);
+const PROMOTION_UNSAFE = hostErrorCatalog.require('CLI.RUNTIME_PROMOTION.MANIFEST_UNSAFE');
 
 export const RUNTIME_MANIFEST_MAX_ENTRIES = 100_000;
 export const RUNTIME_MANIFEST_MAX_TOTAL_BYTES = 16 * 1024 * 1024 * 1024;

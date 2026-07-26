@@ -325,7 +325,7 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     );
     expect(child.status).not.toBe(0);
     const output = `${child.stdout}${child.stderr}`;
-    expect(output).toContain('SYSTEM.HOST.WIRING_INVALID');
+    expect(output).toContain('CLI.HOST.WIRING_INVALID');
     expect(output).toContain('The operation failed.');
     expect(output).not.toContain('Worker command path without OPENSIP_CLI_IN_TOOL_WORKER=1');
     expect(runtimeDbSnapshot()).toEqual(before);
@@ -345,7 +345,7 @@ describe('dispatchExternalToolCommand — ADR-0054 out-of-process boundary', () 
     });
     expect(child.status).not.toBe(0);
     const output = `${child.stdout}${child.stderr}`;
-    expect(output).toContain('SYSTEM.HOST.WIRING_INVALID');
+    expect(output).toContain('CLI.HOST.WIRING_INVALID');
     expect(output).toContain('The operation failed.');
     expect(output).not.toContain(
       'OPENSIP_CLI_IN_TOOL_WORKER=1 without an authorized internal worker command path',

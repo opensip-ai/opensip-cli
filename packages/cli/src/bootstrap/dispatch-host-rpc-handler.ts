@@ -72,11 +72,11 @@ const HOST_PLANE_KINDS = new Set<string>(Object.keys(HOST_PLANE_METHODS));
  * definitions so a rename is a compile error, not a silent narrowing.
  */
 const ALLOWED_HOST_RPC_ERROR_CODES = new Set<string>([
-  hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID').code,
-  hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED').code,
-  hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID').code,
-  hostErrorCatalog.require('SYSTEM.HOST.ARTIFACT_WRITE_FAILED').code,
-  hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED').code,
+  hostErrorCatalog.require('CLI.GATE.BASELINE_INVALID').code,
+  hostErrorCatalog.require('CLI.POLICY.DENIED').code,
+  hostErrorCatalog.require('CLI.HOST.OPTION_INVALID').code,
+  hostErrorCatalog.require('CLI.HOST.ARTIFACT_WRITE_FAILED').code,
+  hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED').code,
   'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE',
 ]);
 
@@ -84,7 +84,7 @@ const ALLOWED_HOST_RPC_ERROR_CODES = new Set<string>([
  * Fixed operator-facing text for conditions whose own message would leak host detail.
  *
  * Keyed by `metadata.condition`, not by code: the gate conditions now SHARE
- * `CONFIGURATION.GATE.BASELINE_INVALID` (ruling D9 clustering), so a code-keyed map would
+ * `CLI.GATE.BASELINE_INVALID` (ruling D9 clustering), so a code-keyed map would
  * never match again — a silent loss of the one message this table exists to fix.
  */
 const FIXED_CONDITION_MESSAGES: Readonly<Record<string, string>> = {

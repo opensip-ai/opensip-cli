@@ -26,7 +26,7 @@ import type { WorkerMessage } from '@opensip-cli/core';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const GATE_BASELINE_INVALID = hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID');
+const GATE_BASELINE_INVALID = hostErrorCatalog.require('CLI.GATE.BASELINE_INVALID');
 
 type Outbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
@@ -234,7 +234,7 @@ describe('createWorkerRpcClient — host fault reply', () => {
     const err = (await pending.catch((error: unknown) => error)) as ToolError;
     expect(err).toBeInstanceOf(ConfigurationError);
     // The original subcode round-trips onto the rebuilt instance for diagnostics.
-    expect(err.code).toBe('CONFIGURATION.GATE.BASELINE_INVALID');
+    expect(err.code).toBe('CLI.GATE.BASELINE_INVALID');
     expect(err.stack).toBe('Error: no baseline\n  at host');
   });
 

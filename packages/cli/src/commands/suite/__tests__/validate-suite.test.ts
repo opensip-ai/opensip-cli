@@ -138,7 +138,7 @@ describe('validateSuite', () => {
 
   it('rejects a non-verdict command as a suite step', () => {
     // A valid, resolvable command that simply is not a gate step. validateSuite
-    // aggregates per-step failures into one CONFIG.SUITE.INVALID error (the
+    // aggregates per-step failures into one CLI.SUITE.INVALID error (the
     // per-step NOT_A_RUN_COMMAND code is folded into the message, like live-view).
     expect(() =>
       validateSuite({

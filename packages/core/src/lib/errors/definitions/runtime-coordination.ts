@@ -172,8 +172,8 @@ export const runtimeCoordinationDefinitions = {
    * reachable only from untyped JS callers or a caller bug, never from user configuration.
    * A distinct code lets a caller pre-empt the refusal instead of parsing a message.
    */
-  'VALIDATION.RUNTIME_COORDINATION.INPUT': {
-    code: 'VALIDATION.RUNTIME_COORDINATION.INPUT',
+  'CORE.RUNTIME_COORDINATION.INPUT': {
+    code: 'CORE.RUNTIME_COORDINATION.INPUT',
     source: 'application',
     defaultResponsibility: 'tool-author',
     kind: 'validation',
@@ -196,8 +196,8 @@ export const runtimeCoordinationDefinitions = {
    * it replaces the `SYSTEM_ERROR` family fallback with `conflict`/`transient`, which is
    * what the branching callers were assuming all along.
    */
-  'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH': {
-    code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+  'CORE.RUNTIME_COORDINATION.CAS_MISMATCH': {
+    code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
     source: 'infrastructure',
     defaultResponsibility: 'environment',
     kind: 'conflict',
@@ -218,8 +218,8 @@ export const runtimeCoordinationDefinitions = {
    * Same reasoning as `CAS_MISMATCH`: an expected, branchable outcome that the `SYSTEM_ERROR`
    * fallback described as an internal invariant.
    */
-  'SYSTEM.RUNTIME_COORDINATION.EXISTS': {
-    code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+  'CORE.RUNTIME_COORDINATION.EXISTS': {
+    code: 'CORE.RUNTIME_COORDINATION.EXISTS',
     source: 'infrastructure',
     defaultResponsibility: 'environment',
     kind: 'conflict',
@@ -240,8 +240,8 @@ export const runtimeCoordinationDefinitions = {
    * The ledger records this same condition being thrown three different ways
    * (`UNSAFE`, `INVALID_KEY` in two files); one registered code retires that inconsistency.
    */
-  'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY': {
-    code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+  'CORE.RUNTIME_COORDINATION.INVALID_KEY': {
+    code: 'CORE.RUNTIME_COORDINATION.INVALID_KEY',
     source: 'application',
     defaultResponsibility: 'tool-author',
     kind: 'validation',

@@ -514,10 +514,10 @@ const PROBE_FAILED = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.PROBE_F
 const CORRUPT_RECORD = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.CORRUPT_RECORD');
 const COORDINATION_CONFLICT = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.CONFLICT');
 const COORDINATION_BUSY = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.BUSY');
-const COORDINATION_INPUT = coreErrorCatalog.require('VALIDATION.RUNTIME_COORDINATION.INPUT');
+const COORDINATION_INPUT = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.INPUT');
 const LEASE_CAPACITY = coreErrorCatalog.require('CORE.RUNTIME_LEASE.CAPACITY');
 const RECOVERY_REQUIRED = coreErrorCatalog.require('CORE.RUNTIME_RECOVERY.REQUIRED');
-const COORDINATION_MUTEX_TIMEOUT = coreErrorCatalog.require('TIMEOUT.RUNTIME_COORDINATION.MUTEX');
+const COORDINATION_MUTEX_TIMEOUT = coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.MUTEX');
 
 /**
  * The coordination root is in a state this process refuses to touch.
@@ -648,13 +648,11 @@ function recoveryRequired(message: string): ConfigurationError {
  * new wait kind is a compile error here rather than a silently unregistered code at runtime.
  */
 const LEASE_WAIT_TIMEOUTS: Record<RuntimeLeaseWaitKind, ErrorDefinition> = {
-  'runtime-read': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.READ'),
-  'runtime-exclusive': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.EXCLUSIVE'),
-  'runtime-access-composite': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE'),
-  'user-state-read': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.USER_STATE_READ'),
-  'runtime-global-maintenance': coreErrorCatalog.require(
-    'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
-  ),
+  'runtime-read': coreErrorCatalog.require('CORE.RUNTIME_LEASE.READ'),
+  'runtime-exclusive': coreErrorCatalog.require('CORE.RUNTIME_LEASE.EXCLUSIVE'),
+  'runtime-access-composite': coreErrorCatalog.require('CORE.RUNTIME_LEASE.ACCESS_COMPOSITE'),
+  'user-state-read': coreErrorCatalog.require('CORE.RUNTIME_LEASE.USER_STATE_READ'),
+  'runtime-global-maintenance': coreErrorCatalog.require('CORE.RUNTIME_LEASE.GLOBAL_MAINTENANCE'),
 };
 
 function timeoutError(kind: RuntimeLeaseWaitKind, waitMs: number): TimeoutError {
@@ -671,7 +669,7 @@ function timeoutError(kind: RuntimeLeaseWaitKind, waitMs: number): TimeoutError 
 
 /** @throws {Error} Always rethrows the input error or maps a coordination timeout. */
 function mapCoordinationTimeout(error: unknown, kind: RuntimeLeaseWaitKind, waitMs: number): never {
-  if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION.MUTEX') {
+  if (error instanceof TimeoutError && error.code === 'CORE.RUNTIME_COORDINATION.MUTEX') {
     throw timeoutError(kind, waitMs);
   }
   throw error;
@@ -687,7 +685,7 @@ function boundedPolicyDuration(
   const candidate = value ?? fallback;
   if (!Number.isFinite(candidate) || candidate < 0) {
     throw new SystemError(`Runtime lease ${field} policy is invalid`, {
-      code: 'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
+      code: 'CORE.RUNTIME_LEASE.INVALID_POLICY',
     });
   }
   return Math.min(maximum, Math.max(minimum, Math.floor(candidate)));
@@ -894,7 +892,7 @@ function sameHostOwnerIsStale(
 function validateOwnerToken(ownerToken: string): void {
   if (!OWNER_TOKEN_PATTERN.test(ownerToken)) {
     throw new SystemError('Runtime lease owner token is invalid', {
-      code: 'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
+      code: 'CORE.RUNTIME_LEASE.INVALID_OWNER',
     });
   }
 }
@@ -2287,7 +2285,7 @@ function performAnchoredRecordMutation(
       );
       if (observed.status !== 'present' || observed.sha256 !== input.expectedContentSha256) {
         throw new SystemError('Anchored record changed since the caller observed it', {
-          code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+          code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
         });
       }
     };
@@ -2298,7 +2296,7 @@ function performAnchoredRecordMutation(
       if (input.operation === 'create') {
         if (beforeTarget !== undefined) {
           throw new SystemError('Runtime coordination record already exists', {
-            code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+            code: 'CORE.RUNTIME_COORDINATION.EXISTS',
           });
         }
         const tempBasename = exactTemporaryBasename ?? `.${input.basename}.tmp-${generateUUID()}`;
@@ -2318,7 +2316,7 @@ function performAnchoredRecordMutation(
         } catch (error) {
           if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
             throw new SystemError('Runtime coordination record already exists', {
-              code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+              code: 'CORE.RUNTIME_COORDINATION.EXISTS',
             });
           }
           throw error;
@@ -2554,7 +2552,7 @@ function assertOutsideRuntimeCoordination(parentDir: string, basenameValue: stri
   }
   if (isContainedPath(canonicalTarget, canonicalCoordinationRoot)) {
     throw new SystemError('Generic anchored mutation cannot target runtime coordination records', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
 }
@@ -3176,7 +3174,7 @@ function tryCreateRuntimeMutex(
     if (
       (error as NodeJS.ErrnoException).code === 'ENOENT' ||
       (error as NodeJS.ErrnoException).code === 'EEXIST' ||
-      (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS')
+      (error instanceof SystemError && error.code === 'CORE.RUNTIME_COORDINATION.EXISTS')
     ) {
       return false;
     }
@@ -3257,7 +3255,7 @@ function recoverStaleRuntimeMutex(
     );
   } catch (error) {
     if (error instanceof RuntimeSnapshotChangedError) return false;
-    if (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH') {
+    if (error instanceof SystemError && error.code === 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH') {
       return false;
     }
     throw error;
@@ -3475,7 +3473,7 @@ function reconcileOrphanedMutexTemp(
     if (
       (error as NodeJS.ErrnoException).code === 'ENOENT' ||
       error instanceof RuntimeSnapshotChangedError ||
-      (error instanceof SystemError && error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH')
+      (error instanceof SystemError && error.code === 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH')
     ) {
       return;
     }
@@ -3936,7 +3934,7 @@ function removeObservedReaderRecord(
   } catch (error) {
     if (
       error instanceof SystemError &&
-      (error.code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH' ||
+      (error.code === 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH' ||
         error.code === 'CORE.RUNTIME_COORDINATION.BUSY')
     ) {
       return false;
@@ -4527,7 +4525,7 @@ function assertOwnerRecordsCompatible(
 ): void {
   if (existing.projects.length > 1) {
     throw new SystemError('One runtime lease owner cannot span multiple project keys', {
-      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+      code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     });
   }
   const records = [
@@ -4536,13 +4534,13 @@ function assertOwnerRecordsCompatible(
   ];
   if (records.some((record) => !ownedByRuntimeProcess(record, environment))) {
     throw new SystemError('Runtime lease owner token belongs to another process', {
-      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+      code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     });
   }
   const existingKey = existing.projects[0]?.coordinationKey;
   if (existingKey !== undefined && projectKey !== undefined && existingKey !== projectKey) {
     throw new SystemError('Runtime lease owner token belongs to another project', {
-      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+      code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     });
   }
 }
@@ -4703,12 +4701,12 @@ function validateOwnedWriterUserReentry(check: OwnedWriterReentryCheck): boolean
   } = check;
   if (!ownedByRuntimeProcess(writer, environment)) {
     throw new SystemError('Runtime lease owner token belongs to another process', {
-      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+      code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     });
   }
   if (writer.kind !== 'project' || writer.phase !== 'intent' || wantsProject || !wantsUser) {
     throw new SystemError('Exclusive runtime leases cannot be upgraded or nested', {
-      code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+      code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
     });
   }
   // Init discovers project-local state under this writer before it discovers
@@ -5104,7 +5102,7 @@ function registerParentInheritedSharedDimensions(
 
 function abortedError(): SystemError {
   return new SystemError('Runtime lease acquisition was cancelled', {
-    code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+    code: 'CORE.RUNTIME_LEASE.CANCELLED',
   });
 }
 
@@ -5346,7 +5344,7 @@ async function acquireSharedDimensions(
 }> {
   if (!wantsProject && !wantsUser) {
     throw new SystemError('Runtime access lease requires at least one shared dimension', {
-      code: 'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
+      code: 'CORE.RUNTIME_LEASE.EMPTY_ACCESS',
     });
   }
   const environment = runtimeEnvironment(input);
@@ -6026,7 +6024,7 @@ function enqueueWriter(request: WriterEnqueueRequest): WriterRecord {
   );
   if (state.writers.some((writer) => writer.ownerToken === ownerToken)) {
     throw new SystemError('Duplicate runtime writer request for one owner token', {
-      code: 'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
+      code: 'CORE.RUNTIME_LEASE.DUPLICATE_WRITER',
     });
   }
   const existing = findExistingOwnerReaders(
@@ -6040,7 +6038,7 @@ function enqueueWriter(request: WriterEnqueueRequest): WriterRecord {
   );
   if (existing.projects.length > 0 || existing.user !== undefined) {
     throw new SystemError('Shared runtime leases cannot be upgraded to exclusive', {
-      code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+      code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
     });
   }
   if (state.writers.length >= MAX_WRITER_QUEUE) {
@@ -6102,14 +6100,14 @@ function progressWriter(request: WriterProgressRequest): WriterProgress {
   const index = state.writers.findIndex((writer) => writer.ownerToken === ownerToken);
   if (index < 0) {
     throw new SystemError('Runtime writer request disappeared during acquisition', {
-      code: 'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
+      code: 'CORE.RUNTIME_LEASE.REQUEST_LOST',
     });
   }
   let writer = state.writers[index];
   let heartbeatPublished = false;
   if (!ownedByRuntimeProcess(writer, environment)) {
     throw new SystemError('Runtime writer owner token belongs to another process', {
-      code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+      code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
     });
   }
   const eligible =
@@ -6423,7 +6421,7 @@ async function acquireWriter(
     }
   } catch (error) {
     await cleanupFailedWriter(enqueuedWriter ?? stagedWriter, input, policy, cleanupReservation);
-    if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION.MUTEX') {
+    if (error instanceof TimeoutError && error.code === 'CORE.RUNTIME_COORDINATION.MUTEX') {
       throw timeoutError(options.waitKind, policy.waitMs);
     }
     throw error;
@@ -6629,7 +6627,7 @@ function assertRecoveryMutationAuthority(
     (kind === 'project' && writer.coordinationKey !== coordinationKey)
   ) {
     throw new SystemError('Runtime recovery mutation no longer holds exclusive authority', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     });
   }
 }
@@ -6735,7 +6733,7 @@ function durableIdempotentFixedRecoveryUnlink(
       });
       if (observed.status !== 'present' || observed.sha256 !== expectedContentSha256) {
         throw new SystemError('Anchored record changed since the caller observed it', {
-          code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+          code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
         });
       }
       const identity = targetIdentity(target, RUNTIME_RECOVERY_RECORD_MAX_BYTES, 'private');
@@ -6847,7 +6845,7 @@ export async function readRuntimePromotionJournal(
 ): Promise<AnchoredRecordReadResult> {
   if (lease.posture === 'destructive-discard') {
     throw new SystemError('Destructive journal authority cannot read the recovery body', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -6886,7 +6884,7 @@ export async function readUserUninstallReceipt(
 ): Promise<AnchoredRecordReadResult> {
   if (lease.receiptOnlyDiscard) {
     throw new SystemError('Receipt-only authority cannot read the recovery body', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -6916,7 +6914,7 @@ export async function mutateRuntimePromotionJournal(
 ): Promise<{ readonly strategy: typeof COORDINATION_MUTATION_STRATEGY }> {
   if (lease.posture === 'destructive-discard') {
     throw new SystemError('Destructive journal authority can only discard the fixed record', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -6955,7 +6953,7 @@ export async function mutateUserUninstallReceipt(
 ): Promise<{ readonly strategy: typeof COORDINATION_MUTATION_STRATEGY }> {
   if (lease.receiptOnlyDiscard) {
     throw new SystemError('Receipt-only authority can only discard the fixed receipt', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -6984,7 +6982,7 @@ export async function mutateUserUninstallReceipt(
 export async function discardRuntimePromotionJournal(lease: RuntimeExclusiveLease): Promise<void> {
   if (lease.posture !== 'destructive-discard') {
     throw new SystemError('Promotion-journal discard requires destructive authority', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -7012,7 +7010,7 @@ export async function discardUserUninstallReceipt(
 ): Promise<void> {
   if (!lease.receiptOnlyDiscard) {
     throw new SystemError('User receipt discard requires receipt-only authority', {
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
   }
   const policy = normalizePolicy();
@@ -7527,7 +7525,7 @@ export async function cleanupEmptyRuntimeLeaseKey(
 ): Promise<EmptyRuntimeLeaseKeyCleanup> {
   if (!PROJECT_KEY_PATTERN.test(coordinationKey)) {
     throw new SystemError('Runtime coordination key is invalid', {
-      code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+      code: 'CORE.RUNTIME_COORDINATION.INVALID_KEY',
     });
   }
   const paths = resolveCoordinationPaths();

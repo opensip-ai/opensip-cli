@@ -23,7 +23,7 @@ import type { CheckResult } from '../types/findings.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const CHECK_ERROR = fitnessErrorCatalog.require('SYSTEM.FITNESS.CHECK_ERROR');
+const CHECK_ERROR = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_ERROR');
 
 // =============================================================================
 // TYPES

@@ -16,7 +16,7 @@
  * These therefore follow the convention the first migrated package established:
  * head = failure family (`SYSTEM`, already mapped), domain = the subsystem (`TREE_SITTER`,
  * where underscores are legal), condition last — the same shape as
- * `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE`.
+ * `CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE`.
  */
 
 import { defineErrorCatalog } from '@opensip-cli/core';
@@ -40,8 +40,8 @@ export const treeSitterErrorCatalog = defineErrorCatalog(
      * `public` exposure because the actionable detail is the grammar name, not a path from
      * inside the user's project.
      */
-    'SYSTEM.TREE_SITTER.INIT_FAILED': {
-      code: 'SYSTEM.TREE_SITTER.INIT_FAILED',
+    'TREESITTER.TREE_SITTER.INIT_FAILED': {
+      code: 'TREESITTER.TREE_SITTER.INIT_FAILED',
       source: 'infrastructure',
       defaultResponsibility: 'environment',
       kind: 'I/O',
@@ -63,8 +63,8 @@ export const treeSitterErrorCatalog = defineErrorCatalog(
      * `await` initialisation before parsing — so `tool-author` and `redacted`: no end user
      * can act on it.
      */
-    'SYSTEM.TREE_SITTER.NOT_INITIALIZED': {
-      code: 'SYSTEM.TREE_SITTER.NOT_INITIALIZED',
+    'TREESITTER.TREE_SITTER.NOT_INITIALIZED': {
+      code: 'TREESITTER.TREE_SITTER.NOT_INITIALIZED',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'invariant',

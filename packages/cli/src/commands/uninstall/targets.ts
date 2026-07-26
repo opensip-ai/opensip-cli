@@ -14,7 +14,12 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import { inspectEphemeralRuntimeCandidates, resolveProjectPaths, coreErrorCatalog, createToolError  } from '@opensip-cli/core';
+import {
+  inspectEphemeralRuntimeCandidates,
+  resolveProjectPaths,
+  coreErrorCatalog,
+  createToolError,
+} from '@opensip-cli/core';
 
 import { formatBytes } from '../../format-bytes.js';
 

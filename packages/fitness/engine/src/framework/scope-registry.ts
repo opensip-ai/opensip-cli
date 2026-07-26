@@ -36,7 +36,7 @@ import '../scope-augmentation.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
+const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
 
 /** Construct a fresh check registry for a single `RunScope`. */
 export function createCheckRegistry(): CheckRegistry {

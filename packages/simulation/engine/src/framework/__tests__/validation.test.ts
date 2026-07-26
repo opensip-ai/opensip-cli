@@ -157,7 +157,7 @@ describe('throwValidationErrors', () => {
       // Plan 01 clean break: the code is now REGISTERED rather than a bare literal that only
       // resolved through the family fallback, so the tool-author responsibility axis is
       // machine-readable instead of guessed from the head.
-      expect(ve.code).toBe('VALIDATION.SIMULATION.SCENARIO_INVALID');
+      expect(ve.code).toBe('SIMULATION.SIMULATION.SCENARIO_INVALID');
       expect(ve.definition.defaultResponsibility).toBe('tool-author');
       expect(ve.message).toContain('Invalid chaos scenario configuration');
       expect(ve.message).toContain('id: id is required');

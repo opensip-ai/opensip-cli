@@ -57,7 +57,7 @@ describe('coreErrorCatalog — the demotions Wave 1 exists to fix', () => {
     // UNKNOWN_FAILURE — severity fatal, exposure operator-only, responsibility unknown — and
     // outwardMessage replaced the enumerated search paths with "An unexpected internal
     // failure occurred." The user was told nothing they could act on.
-    const definition = coreErrorCatalog.require('CONFIGURATION.CONFIG.NOT_FOUND');
+    const definition = coreErrorCatalog.require('CORE.CONFIG.NOT_FOUND');
     expect(definition.exposure).toBe('public');
     expect(definition.defaultResponsibility).toBe('user');
     expect(definition.severity).toBe('error');
@@ -74,10 +74,10 @@ describe('coreErrorCatalog — the demotions Wave 1 exists to fix', () => {
     // during host bootstrap, which aborts the whole CLI — reported as an operator-only fatal
     // saying "report a bug".
     for (const code of [
-      'VALIDATION.TOOL_IDENTITY.INVALID_NAME',
-      'VALIDATION.TOOL_IDENTITY.CONFLICT',
-      'VALIDATION.TOOL_IDENTITY.PARENT_MISMATCH',
-      'VALIDATION.TOOL_IDENTITY.REQUIRED',
+      'CORE.TOOL_IDENTITY.INVALID_NAME',
+      'CORE.TOOL_IDENTITY.CONFLICT',
+      'CORE.TOOL_IDENTITY.PARENT_MISMATCH',
+      'CORE.TOOL_IDENTITY.REQUIRED',
     ] as const) {
       const definition = coreErrorCatalog.require(code);
       expect(definition.defaultResponsibility).toBe('tool-author');
@@ -115,7 +115,7 @@ describe('coreErrorCatalog — the demotions Wave 1 exists to fix', () => {
     // verdict. These carry warning severity and a success exit class precisely so surfacing
     // them cannot turn a clean scan into a failed command.
     for (const code of [
-      'PLUGIN.FINGERPRINT_STRATEGY.STAMP_FAILED',
+      'CORE.FINGERPRINT_STRATEGY.STAMP_FAILED',
       'CORE.BASELINE.FINGERPRINT_STRATEGY_FAILED',
       'CORE.SUBPROCESS.GIT_FAILED',
     ] as const) {
@@ -138,20 +138,24 @@ describe('RUNTIME_COORDINATION_FAILURE_CODES', () => {
   it('covers every coordination, lease and recovery code the catalog declares', () => {
     // The whole point is that a future split cannot leave a consumer behind. If a new
     // CORE.RUNTIME_* code is added without listing it here, this fails.
+    // Wait timeouts are owned by the wait paths, so they are deliberately outside this list.
+    // That exclusion reads `kind`, NOT a code prefix: it used to test `startsWith('TIMEOUT.')`,
+    // which silently stopped excluding anything the moment the heads became owner-scoped —
+    // precisely the failure mode that motivated moving semantics out of the code string and
+    // onto the structured axes.
     const declared = coreErrorCatalog.list
+      .filter((d) => d.kind !== 'timeout')
       .map((d) => d.code)
-      // The `TIMEOUT.` head is excluded here for the same reason the list excludes it: lease
-      // wait timeouts are owned by the wait paths, and a consumer that wants them says so.
-      .filter(
-        (code) =>
-          /RUNTIME_(COORDINATION|LEASE|RECOVERY)\./u.test(code) && !code.startsWith('TIMEOUT.'),
-      );
+      .filter((code) => /RUNTIME_(COORDINATION|LEASE|RECOVERY)\./u.test(code));
     const missing = declared.filter((code) => !RUNTIME_COORDINATION_FAILURE_CODES.includes(code));
     expect(missing).toEqual([]);
   });
 
   it('excludes timeouts, which the lock and lease wait paths own', () => {
-    expect(RUNTIME_COORDINATION_FAILURE_CODES.some((c) => c.startsWith('TIMEOUT.'))).toBe(false);
+    const listedKinds = RUNTIME_COORDINATION_FAILURE_CODES.map(
+      (c) => coreErrorCatalog.get(c)?.kind,
+    );
+    expect(listedKinds).not.toContain('timeout');
   });
 });
 

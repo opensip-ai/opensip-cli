@@ -49,9 +49,7 @@ import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /** Registered replacement for the template-built `CONFIG.GRAPH.${reason}` code. */
-const CHANGED_FILES_UNAVAILABLE = coreErrorCatalog.require(
-  'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE',
-);
+const CHANGED_FILES_UNAVAILABLE = coreErrorCatalog.require('CORE.CHANGED_FILES.BASIS_UNAVAILABLE');
 
 const log = createToolLogger('graph:cli');
 const IMPACT_RULE_ID = 'graph.impact.blast-radius';

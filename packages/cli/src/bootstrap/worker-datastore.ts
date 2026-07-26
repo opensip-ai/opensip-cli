@@ -17,7 +17,7 @@ import type { DatastoreThunk } from './scope-access.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 const DENIED_CODE = 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS' as const;
 

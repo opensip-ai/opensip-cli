@@ -20,7 +20,7 @@ import type { AgentGuidanceResult, PreExistingFile } from '@opensip-cli/contract
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 export const AUTHORED_REPLAY_MANIFEST_KIND = 'opensip-init-authored-replay' as const;
 export const AUTHORED_REPLAY_MANIFEST_VERSION = 1 as const;

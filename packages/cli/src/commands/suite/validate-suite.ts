@@ -16,8 +16,8 @@ import type { SuiteDefinition, SuiteStep } from '@opensip-cli/config';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
-const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CONFIG.SUITE.UNKNOWN_REFERENCE');
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
+const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CLI.SUITE.UNKNOWN_REFERENCE');
 
 const RUN_SCOPE_ARG_KEYS = new Set([
   'cwd',

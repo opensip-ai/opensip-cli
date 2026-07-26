@@ -11,9 +11,9 @@ import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const SUITE_EDIT_REFUSED = hostErrorCatalog.require('CONFIG.SUITE.EDIT_REFUSED');
-const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
-const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CONFIG.SUITE.UNKNOWN_REFERENCE');
+const SUITE_EDIT_REFUSED = hostErrorCatalog.require('CLI.SUITE.EDIT_REFUSED');
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
+const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CLI.SUITE.UNKNOWN_REFERENCE');
 
 const MAX_EDITABLE_CONFIG_BYTES = 1_000_000;
 

@@ -36,15 +36,15 @@ import { buildDatastoreLockContext } from './state-lock-policy.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 /**
  * Strict reader: the only way to obtain the per-run scope is `currentScope()`
  * (entered by pre-action-hook or explicit runWithScope in tests). All previous
  * holder fallbacks were removed.
  *
- * @throws {SystemError} (`SYSTEM.SCOPE.NOT_ENTERED`) When accessed before the
+ * @throws {SystemError} (`CORE.SCOPE.NOT_ENTERED`) When accessed before the
  *   pre-action-hook constructed and entered the scope.
  */
 export function readScope(): RunScope {
@@ -54,7 +54,7 @@ export function readScope(): RunScope {
       'CLI scope accessed before pre-action-hook constructed and entered it (enterScope + ALS). ' +
         'All production paths (tool actions, host commands, report/error seams) must run inside ' +
         'an entered RunScope. See host-planes-scope-seams-hygiene plan Phase 3 and currentScope().',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
+      { code: 'CORE.SCOPE.NOT_ENTERED' },
     );
   }
   return bound;
@@ -268,7 +268,7 @@ export function getProjectDatastore(): DataStore {
   try {
     return getOrOpenDatastore();
   } catch (error) {
-    // Branches on code AND condition. `SYSTEM.HOST.WIRING_INVALID` is a CLUSTER (ruling D9):
+    // Branches on code AND condition. `CLI.HOST.WIRING_INVALID` is a CLUSTER (ruling D9):
     // several host-wiring failures share it and are told apart by `metadata.condition`. A
     // consumer that matched only the code would convert every host wiring fault into
     // "run from inside a project", which is wrong for all but this one.

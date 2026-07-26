@@ -28,7 +28,7 @@ import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
  * alive only through `legacyFamilyCode`'s head-guessing. A recipe author fixes all of them the
  * same way in the same file, so the code is one and the offending field travels in metadata.
  */
-const RECIPE_INVALID = simulationErrorCatalog.require('VALIDATION.SIMULATION.RECIPE_INVALID');
+const RECIPE_INVALID = simulationErrorCatalog.require('SIMULATION.SIMULATION.RECIPE_INVALID');
 
 import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
 

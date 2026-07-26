@@ -39,8 +39,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
      * specific field travels in allowlisted `metadata.field`, because a recipe author fixes
      * every one of them the same way and in the same file.
      */
-    'VALIDATION.SIMULATION.RECIPE_INVALID': {
-      code: 'VALIDATION.SIMULATION.RECIPE_INVALID',
+    'SIMULATION.SIMULATION.RECIPE_INVALID': {
+      code: 'SIMULATION.SIMULATION.RECIPE_INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'validation',
@@ -56,8 +56,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
     },
 
     /** A scenario definition is not usable. */
-    'VALIDATION.SIMULATION.SCENARIO_INVALID': {
-      code: 'VALIDATION.SIMULATION.SCENARIO_INVALID',
+    'SIMULATION.SIMULATION.SCENARIO_INVALID': {
+      code: 'SIMULATION.SIMULATION.SCENARIO_INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'validation',
@@ -77,8 +77,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
      * A builder-ordering violation: `withMetrics` must run first. `tool-author` and `runtime`
      * — no user or operator can act on it, and saying otherwise would be a lie.
      */
-    'VALIDATION.SIMULATION.METRICS_REQUIRED': {
-      code: 'VALIDATION.SIMULATION.METRICS_REQUIRED',
+    'SIMULATION.SIMULATION.METRICS_REQUIRED': {
+      code: 'SIMULATION.SIMULATION.METRICS_REQUIRED',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'invariant',
@@ -91,5 +91,4 @@ export const simulationErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
     },
   },
-  { allowLegacyCodes: true },
 );

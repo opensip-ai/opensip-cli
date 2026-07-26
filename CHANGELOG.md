@@ -50,7 +50,7 @@ exit code are deliberately absent.
 | Runtime coordination refuses an unsafe containment state              |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.UNSAFE_STATE` (`security`, `configuration`): a foreign entry or symlinked segment in the coordination root is fixed by the operator. |
 | Runtime coordination record is structurally corrupt                   |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.CORRUPT_RECORD` (`integrity`, `configuration`): remove the named record. Distinct from the containment case above.                   |
 
-Unchanged on purpose: the missing-config failure keeps exit **2** — `CONFIGURATION.CONFIG.NOT_FOUND`
+Unchanged on purpose: the missing-config failure keeps exit **2** — `CORE.CONFIG.NOT_FOUND`
 declares `exitClass: 'configuration'`, reproducing exactly what the `ValidationError` subclass
 ladder returned, so the most common first-run failure in the product did not move.
 
@@ -230,7 +230,7 @@ off 0.7.0 as a coherent set.
   the CLI install tree, keeping `fit --json` output pure under a PTY. The
   monorepo keeps dogfood trust-admitted when present.
 - **node_modules probes fail loud on resource-class errors**: `EMFILE`/`EIO`
-  during pack resolution now throw `SYSTEM.PLUGINS.FS_PROBE_FAILED` instead of
+  during pack resolution now throw `CORE.PLUGINS.FS_PROBE_FAILED` instead of
   silently reading as "package not installed" — under load that silently
   shrank the seeded check surface. Absence (`ENOENT`/`ENOTDIR`) and
   permission-denied ancestors still read as not-installed.

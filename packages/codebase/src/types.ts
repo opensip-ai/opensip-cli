@@ -102,7 +102,7 @@ export interface ProjectInventoryInput {
    * Test/smaller-project overrides can reduce, but never increase, hard limits.
    *
    * An omitted key accepts the built-in maximum. A key that is present but not a positive
-   * finite number is REFUSED with `VALIDATION.CODEBASE.INVENTORY_INPUT_INVALID` — it is
+   * finite number is REFUSED with `CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID` — it is
    * never reinterpreted as the maximum, because silently widening a walk the caller asked
    * to narrow is the failure mode this bound exists to prevent.
    */

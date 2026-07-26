@@ -20,7 +20,7 @@ import { isReservedHostPlaneIdentity } from './host-plane-state.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED');
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED');
 
 function primaryCommandName(tool: Tool): string | undefined {
   const commands = resolveToolCommands(tool);

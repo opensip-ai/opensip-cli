@@ -16,7 +16,7 @@ describe('startup failure presentation', () => {
     [
       'timeout',
       new TimeoutError('runtime lease timed out', {
-        code: 'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE',
+        code: 'CORE.RUNTIME_LEASE.ACCESS_COMPOSITE',
       }),
       EXIT_CODES.RUNTIME_ERROR,
     ],

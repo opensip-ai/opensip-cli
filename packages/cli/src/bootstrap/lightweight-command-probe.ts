@@ -46,7 +46,7 @@ import type { CliCommandsContext } from '../commands/shared.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const PROBE_LIMIT = hostErrorCatalog.require('SYSTEM.HOST.PROBE_LIMIT');
+const PROBE_LIMIT = hostErrorCatalog.require('CLI.HOST.PROBE_LIMIT');
 
 class ContinueToLeasedBootstrap extends Error {
   constructor() {

@@ -186,7 +186,7 @@ function canonicalDirectory(path: string): string {
  * The one discovery outcome that means "keep walking up", as a registered definition rather
  * than a message pattern. Bound once at module load so a typo is a load-time failure.
  */
-const CONFIG_NOT_FOUND = coreErrorCatalog.require('CONFIGURATION.CONFIG.NOT_FOUND');
+const CONFIG_NOT_FOUND = coreErrorCatalog.require('CORE.CONFIG.NOT_FOUND');
 
 /** True for fixed marker names whose filesystem type is itself authoritative. */
 function hasFileSystemMarker(

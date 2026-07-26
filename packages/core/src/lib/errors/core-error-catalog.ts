@@ -107,6 +107,13 @@ export const coreErrorCatalog = defineErrorCatalog(CORE_SYSTEM_ERROR_OWNER, merg
  * `TIMEOUT.*` codes are deliberately absent: timeouts are owned by the lock and lease wait
  * paths, and a consumer that wants them should say so.
  */
+/**
+ * Bounded coordination failures a consumer can treat as one situation.
+ *
+ * Excludes `kind: 'timeout'` definitions — a lease WAIT that ran out is owned by the wait path,
+ * and a caller that wants those asks for them explicitly. The exclusion is by axis, not by code
+ * prefix; the covering test enforces both directions.
+ */
 export const RUNTIME_COORDINATION_FAILURE_CODES: readonly string[] = Object.freeze([
   'CORE.RUNTIME_COORDINATION.BUSY',
   'CORE.RUNTIME_COORDINATION.CONFLICT',
@@ -118,24 +125,24 @@ export const RUNTIME_COORDINATION_FAILURE_CODES: readonly string[] = Object.free
   'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
   'CORE.RUNTIME_RECOVERY.PROBE_FAILED',
   'CORE.RUNTIME_RECOVERY.REQUIRED',
-  'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
-  'SYSTEM.RUNTIME_COORDINATION.EXISTS',
-  'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+  'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
+  'CORE.RUNTIME_COORDINATION.EXISTS',
+  'CORE.RUNTIME_COORDINATION.INVALID_KEY',
   // Caller-contract violations. A consumer deciding "is this a bounded coordination failure"
   // wants these too: from the outside, "the lease refused me" is one situation regardless of
   // whether the cause was contention or a protocol misuse.
-  'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
-  'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
-  'SYSTEM.RUNTIME_LEASE.CANCELLED',
-  'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
-  'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
-  'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
-  'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
-  'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
-  'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
-  'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED',
-  'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
-  'VALIDATION.RUNTIME_COORDINATION.INPUT',
+  'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
+  'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
+  'CORE.RUNTIME_LEASE.CANCELLED',
+  'CORE.RUNTIME_LEASE.DUPLICATE_WRITER',
+  'CORE.RUNTIME_LEASE.EMPTY_ACCESS',
+  'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+  'CORE.RUNTIME_LEASE.INVALID_OWNER',
+  'CORE.RUNTIME_LEASE.INVALID_POLICY',
+  'CORE.RUNTIME_LEASE.OWNER_MISMATCH',
+  'CORE.RUNTIME_LEASE.RELEASE_FAILED',
+  'CORE.RUNTIME_LEASE.REQUEST_LOST',
+  'CORE.RUNTIME_COORDINATION.INPUT',
 ]);
 
 /** True when `code` is one of {@link RUNTIME_COORDINATION_FAILURE_CODES}. */

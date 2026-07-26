@@ -22,7 +22,7 @@ import type { DataStoreLockContext } from '@opensip-cli/datastore';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 const DEFAULT_LOCAL_WAIT_MS = 30_000;
 const DEFAULT_CI_WAIT_MS = 5000;

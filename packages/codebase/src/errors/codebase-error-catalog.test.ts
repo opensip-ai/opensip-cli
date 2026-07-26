@@ -23,18 +23,17 @@ describe('codebaseErrorCatalog', () => {
 
   it('allowlists the branch metadata each cluster carries instead of minting codes', () => {
     expect(
-      codebaseErrorCatalog.require('VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE')
+      codebaseErrorCatalog.require('CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE')
         .publicMetadataKeys,
     ).toEqual(['condition']);
     expect(
-      codebaseErrorCatalog.require('VALIDATION.CODEBASE.INVENTORY_INPUT_INVALID')
-        .publicMetadataKeys,
+      codebaseErrorCatalog.require('CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID').publicMetadataKeys,
     ).toEqual(['condition', 'field']);
   });
 
   it('routes a user-fixable configuration fault and a caller fault to different exits', () => {
     const configIdentity = codebaseErrorCatalog.require(
-      'VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE',
+      'CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE',
     );
     expect(configIdentity).toMatchObject({
       defaultResponsibility: 'user',
@@ -44,7 +43,7 @@ describe('codebaseErrorCatalog', () => {
       retry: 'never',
     });
 
-    const input = codebaseErrorCatalog.require('VALIDATION.CODEBASE.INVENTORY_INPUT_INVALID');
+    const input = codebaseErrorCatalog.require('CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID');
     expect(input).toMatchObject({
       defaultResponsibility: 'tool-author',
       exposure: 'public',

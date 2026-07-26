@@ -119,5 +119,4 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition'],
     },
   },
-  { allowLegacyCodes: true },
 );

@@ -54,7 +54,7 @@ import { deriveSuiteAggregate, runSuite, type RunSuiteInput } from '../orchestra
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const SUITE_INVALID = hostErrorCatalog.require('CONFIG.SUITE.INVALID');
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
 
 const dispatchSpy = vi.hoisted(() => vi.fn());
 const loadCapabilitiesSpy = vi.hoisted(() => vi.fn().mockResolvedValue(0));

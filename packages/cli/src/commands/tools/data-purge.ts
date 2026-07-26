@@ -35,7 +35,7 @@ import type { ToolsDataPurgeResult } from '@opensip-cli/contracts';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 /**
  * Reject empty/whitespace or reserved-prefix purge input before opening any

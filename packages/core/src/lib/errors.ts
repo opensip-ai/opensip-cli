@@ -3,6 +3,7 @@
  * Typed error classes and Result pattern for opensip-cli.
  */
 
+import { currentLogger } from './ambient-logger.js';
 import {
   type ErrorCatalogOwner,
   type ErrorDefinition,
@@ -10,7 +11,6 @@ import {
   normalizeErrorDefinition,
 } from './error-definition.js';
 import { resolveDefinitionForCode } from './errors/resolve-definition.js';
-import { currentLogger } from './run-scope.js';
 
 // =============================================================================
 // ERROR CLASSES
@@ -649,7 +649,7 @@ export class UnknownCapabilityDomainError extends NotFoundError {
  * {@link ValidationError} that carries the structured diagnostic: the
  * `domainId`, the owning tool's `ownerToolId`, and a human-readable
  * `diagnostic` reason. Code defaults to
- * `'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH'`.
+ * `'CORE.CONTRIBUTION.SCHEMA_MISMATCH'`.
  */
 export class CapabilitySchemaMismatchError extends ValidationError {
   /** The domain id whose schema the contribution failed. */
@@ -669,7 +669,7 @@ export class CapabilitySchemaMismatchError extends ValidationError {
   ) {
     super(message, {
       ...options,
-      code: options.code ?? 'CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH',
+      code: options.code ?? 'CORE.CONTRIBUTION.SCHEMA_MISMATCH',
     });
     this.name = 'CapabilitySchemaMismatchError';
     this.domainId = options.domainId;

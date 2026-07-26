@@ -8,8 +8,8 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const RUNS_NOT_FOUND = hostErrorCatalog.require('CONFIG.RUNS.NOT_FOUND');
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const RUNS_NOT_FOUND = hostErrorCatalog.require('CLI.RUNS.NOT_FOUND');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 const FOLLOW_UP_ID = /^[A-Za-z0-9_-]{1,128}$/u;
 

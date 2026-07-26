@@ -1,9 +1,9 @@
 /**
  * enterScope always-on re-entrancy guard (parallel-tool-invocations Phase 2/4).
  *
- * Phase 2 made `enterScope` throw `SYSTEM.SCOPE.REENTRANT` when a *different*
+ * Phase 2 made `enterScope` throw `CORE.SCOPE.REENTRANT` when a *different*
  * scope is already current (`run-scope.ts`). The full three-branch truth table
- * (different → throws with `.code === 'SYSTEM.SCOPE.REENTRANT'`; same → no-op;
+ * (different → throws with `.code === 'CORE.SCOPE.REENTRANT'`; same → no-op;
  * none-current → binds) and the nested-`runWithScope`-never-trips case are
  * already pinned in `run-scope.test.ts` (migrated there from the old
  * silent-replacement assertion). This focused file does NOT re-assert that
@@ -40,7 +40,7 @@ describe('enterScope re-entrancy guard — actionable + fail-safe', () => {
         captured = error as SystemError;
       }
       expect(captured).toBeInstanceOf(SystemError);
-      expect(captured?.code).toBe('SYSTEM.SCOPE.REENTRANT');
+      expect(captured?.code).toBe('CORE.SCOPE.REENTRANT');
       // The message must point the misuser at the fix.
       expect(captured?.message).toContain('runWithScope');
       return Promise.resolve();

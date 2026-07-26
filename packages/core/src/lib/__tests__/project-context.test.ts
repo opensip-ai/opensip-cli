@@ -360,7 +360,7 @@ describe('resolveProjectContext', () => {
         attempt();
         expect.unreachable('an explicit --config miss must throw');
       } catch (error) {
-        expect((error as ToolError).code).toBe('CONFIGURATION.CONFIG.EXPLICIT_PATH_MISSING');
+        expect((error as ToolError).code).toBe('CORE.CONFIG.EXPLICIT_PATH_MISSING');
         // The class changed from ValidationError to a registered ToolError, so pin the axis
         // that decides the exit code: D13 batches exit-code corrections into ONE change with
         // a CHANGELOG table, and this migration must not smuggle one in. `configuration` is

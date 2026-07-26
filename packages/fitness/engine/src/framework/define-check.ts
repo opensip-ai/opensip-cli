@@ -51,7 +51,7 @@ import type { Signal, SignalRepair } from '@opensip-cli/core';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
+const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -149,7 +149,7 @@ async function analyzeSingleFile(
     // analyze-mode check with no visible trace). Surface it at warn, and
     // through the per-run diagnostics bus (the same channel `service.ts`
     // uses for run-lifecycle events) so a `--json` consumer sees it too.
-    if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE') {
+    if (error instanceof SystemError && error.code === 'FIT.FITNESS.FILE_TOO_LARGE') {
       logger.warn('Skipping oversized file', {
         evt: 'fitness.check.file.skip.too_large',
         module: 'fitness:framework',

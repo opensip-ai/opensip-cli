@@ -21,7 +21,7 @@ import { buildDatastoreThunk, getProjectDatastore } from '../scope-access.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 /** A scope whose datastore thunk throws the given error. */
 function scopeThrowing(error: unknown) {
@@ -44,7 +44,7 @@ describe('getProjectDatastore', () => {
       try {
         getProjectDatastore();
       } catch (error) {
-        expect((error as { code?: string }).code).toBe('CONFIGURATION.HOST.PROJECT_REQUIRED');
+        expect((error as { code?: string }).code).toBe('CLI.HOST.PROJECT_REQUIRED');
       }
       return Promise.resolve();
     });

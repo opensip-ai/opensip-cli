@@ -43,13 +43,13 @@ export function rejectUnknownTarget(name: string): never {
 
 export function rejectConcurrentSession(): never {
   throw new SystemError('A fitness session is already in progress.', {
-    code: 'SYSTEM.FITNESS.SESSION_IN_PROGRESS',
+    code: 'FIT.FITNESS.SESSION_IN_PROGRESS',
   });
 }
 
 export function rejectMissingRecipe(name: string): never {
   throw createToolError(
-    fitnessErrorCatalog.require('RESOURCE.NOT_FOUND.RECIPE'),
+    fitnessErrorCatalog.require('FIT.NOT_FOUND.RECIPE'),
     `Recipe '${name}' was not found.`,
   );
 }

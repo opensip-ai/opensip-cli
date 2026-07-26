@@ -10,14 +10,10 @@ import { ValidationError } from '../lib/errors.js';
 
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
-const IDENTITY_DUPLICATE_ALIAS = coreErrorCatalog.require(
-  'VALIDATION.TOOL_IDENTITY.DUPLICATE_ALIAS',
-);
-const IDENTITY_INVALID_NAME = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.INVALID_NAME');
-const IDENTITY_NAME_IN_ALIASES = coreErrorCatalog.require(
-  'VALIDATION.TOOL_IDENTITY.NAME_IN_ALIASES',
-);
-const IDENTITY_REQUIRED = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.REQUIRED');
+const IDENTITY_DUPLICATE_ALIAS = coreErrorCatalog.require('CORE.TOOL_IDENTITY.DUPLICATE_ALIAS');
+const IDENTITY_INVALID_NAME = coreErrorCatalog.require('CORE.TOOL_IDENTITY.INVALID_NAME');
+const IDENTITY_NAME_IN_ALIASES = coreErrorCatalog.require('CORE.TOOL_IDENTITY.NAME_IN_ALIASES');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.REQUIRED');
 
 /** Author-facing tool naming — one declaration, host-derived everywhere else. */
 export interface ToolIdentity {

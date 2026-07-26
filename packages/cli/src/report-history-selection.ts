@@ -10,7 +10,7 @@ import type { StoredRun, StoredRunStep, StoredSession } from '@opensip-cli/contr
 import type { ReportSelectionEvidence } from '@opensip-cli/dashboard';
 import type { DataStore } from '@opensip-cli/datastore';
 
-const REPORT_RUN_UNAVAILABLE = hostErrorCatalog.require('CONFIG.REPORT.RUN_UNAVAILABLE');
+const REPORT_RUN_UNAVAILABLE = hostErrorCatalog.require('CLI.REPORT.RUN_UNAVAILABLE');
 
 export interface ReportHistorySelection {
   readonly recentRuns: readonly StoredRun[];

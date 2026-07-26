@@ -12,7 +12,7 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export interface ExecuteSessionShowOptions {
   readonly replayRegistry?: SessionReplayRegistry;
@@ -46,7 +46,7 @@ export async function executeSessionShow(opts: ExecuteSessionShowOptions): Promi
       'executeSessionShow called before RunScope was entered. ' +
         'All host command paths (including sessions show) must run inside an entered scope ' +
         '(pre-action-hook constructs and enters; see host-planes-scope-seams-hygiene plan Phase 2).',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
+      { code: 'CORE.SCOPE.NOT_ENTERED' },
     );
   }
   const datastore = scope.datastore();

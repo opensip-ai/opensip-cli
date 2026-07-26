@@ -45,7 +45,7 @@ import type { ToolCommandResult, ToolCommandWorkerSpec } from './tool-command-di
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const DISPATCH_FAILED = hostErrorCatalog.require('SYSTEM.HOST.DISPATCH_FAILED');
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 /**
  * Fork the worker, await its slim {@link ToolCommandResult}, and replay it

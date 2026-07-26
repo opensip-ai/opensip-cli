@@ -24,7 +24,7 @@ import type { AgentCatalog, AgentCatalogBuildInput } from '@opensip-cli/contract
 import type { RuntimeCommandInventory } from '@opensip-cli/core';
 
 /** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
-const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('SYSTEM.AGENT_CATALOG.UNPUBLISHABLE');
+const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('CORE.AGENT_CATALOG.UNPUBLISHABLE');
 
 /**
  * Input for the shared, pure {@link assembleAgentCatalog} both transports call

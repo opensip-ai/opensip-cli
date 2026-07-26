@@ -58,7 +58,7 @@
  *     Whether those resolve to a registered code is a data-flow question this
  *     text-level check cannot answer, and guessing would fire on correct code.
  *   • A registered HEAD with an unregistered leaf (`CORE.ERROR_DEFINITION.INVALID`,
- *     `SYSTEM.RUNTIME_LEASE.CANCELLED`). D11 is head-granular on purpose:
+ *     `CORE.RUNTIME_LEASE.CANCELLED`). D11 is head-granular on purpose:
  *     `legacyFamilyCode` genuinely resolves those through their family bucket,
  *     so they are classified — arguably MIS-classified, which is a separate
  *     ruling with a separate check. Widening this check to leaf granularity

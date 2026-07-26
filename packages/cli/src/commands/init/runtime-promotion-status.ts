@@ -261,7 +261,7 @@ function projectStableHeader(input: {
     const code = getErrorCode(read.error);
     if (
       code === 'CORE.RUNTIME_COORDINATION.BUSY' ||
-      code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH'
+      code === 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH'
     ) {
       return { status: 'busy' };
     }

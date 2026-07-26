@@ -25,7 +25,7 @@
  *
  * Errors are typed + structured (§ Steps 2.1.3): an unknown domain is a
  * `NotFoundError` (`CAPABILITY.DOMAIN.UNKNOWN`); a schema mismatch is a
- * `ValidationError` (`CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH`), both
+ * `ValidationError` (`CORE.CONTRIBUTION.SCHEMA_MISMATCH`), both
  * carrying a structured `diagnostic` for the CLI error boundary.
  */
 
@@ -192,7 +192,7 @@ export class CapabilityRegistry {
    *
    * @throws {NotFoundError} (`CAPABILITY.DOMAIN.UNKNOWN`) when no domain
    *   `domainId` is registered.
-   * @throws {ValidationError} (`CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH`)
+   * @throws {ValidationError} (`CORE.CONTRIBUTION.SCHEMA_MISMATCH`)
    *   when the contribution fails the domain's schema check.
    */
   routeContribution(

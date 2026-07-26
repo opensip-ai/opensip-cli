@@ -108,7 +108,7 @@ describe('probe-failure classification (fail-loud, never silent absence)', () =>
   // silent check-pack drop).
   const overlongSegment = 'x'.repeat(300);
 
-  it('hasPackageJson throws SYSTEM.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
+  it('hasPackageJson throws CORE.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
     let caught: unknown;
     try {
       hasPackageJson(join(root, overlongSegment));
@@ -116,10 +116,10 @@ describe('probe-failure classification (fail-loud, never silent absence)', () =>
       caught = error;
     }
     expect(caught).toBeInstanceOf(SystemError);
-    expect((caught as SystemError).code).toBe('SYSTEM.PLUGINS.FS_PROBE_FAILED');
+    expect((caught as SystemError).code).toBe('CORE.PLUGINS.FS_PROBE_FAILED');
   });
 
-  it('safeReaddir throws SYSTEM.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
+  it('safeReaddir throws CORE.PLUGINS.FS_PROBE_FAILED on a resource-class errno', () => {
     let caught: unknown;
     try {
       safeReaddir(join(root, overlongSegment));
@@ -127,7 +127,7 @@ describe('probe-failure classification (fail-loud, never silent absence)', () =>
       caught = error;
     }
     expect(caught).toBeInstanceOf(SystemError);
-    expect((caught as SystemError).code).toBe('SYSTEM.PLUGINS.FS_PROBE_FAILED');
+    expect((caught as SystemError).code).toBe('CORE.PLUGINS.FS_PROBE_FAILED');
   });
 
   it('resolvePackageDir surfaces the probe failure instead of returning undefined', () => {

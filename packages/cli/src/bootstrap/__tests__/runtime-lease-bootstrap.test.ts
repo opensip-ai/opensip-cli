@@ -44,9 +44,9 @@ import type { PreActionRuntime } from '../pre-action-runtime.js';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const OPTION_INVALID = hostErrorCatalog.require('CONFIGURATION.HOST.OPTION_INVALID');
-const PROJECT_REQUIRED = hostErrorCatalog.require('CONFIGURATION.HOST.PROJECT_REQUIRED');
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 function projectSpec(name = 'fit') {
   return defineHostCommand({
@@ -101,7 +101,7 @@ describe('Commander action scope handoff', () => {
     expect(disposedWithScopeCurrent).not.toHaveBeenCalled();
     expect(currentScope()).toBeUndefined();
     expect(() => runner.run(() => Promise.resolve())).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.SCOPE.NOT_ENTERED' }),
+      expect.objectContaining({ code: 'CORE.SCOPE.NOT_ENTERED' }),
     );
     runner.disposeStaged();
     expect(disposedWithScopeCurrent).toHaveBeenCalledWith(true);

@@ -27,7 +27,7 @@ import { makeDispatchHostCtx, type CapturedHostCtx } from './harness/dispatch-ho
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('PLUGIN.HOST_IDENTITY.RESERVED');
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED');
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const RESULT_WORKER = join(HERE, 'fixtures', 'dispatch-result-worker.mjs');

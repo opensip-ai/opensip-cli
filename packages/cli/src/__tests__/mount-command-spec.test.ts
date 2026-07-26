@@ -39,7 +39,7 @@ import type { CommandSpec, Logger, ToolCliContext } from '@opensip-cli/core';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const WIRING_INVALID = hostErrorCatalog.require('SYSTEM.HOST.WIRING_INVALID');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 /** A Commander argParser reducer that accumulates repeated flag values into an array. */
 function accumulateReducer(raw: string, previous: unknown): string[] {

@@ -42,8 +42,8 @@ import type { SignalEnvelope } from '@opensip-cli/contracts';
 
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
-const GATE_BASELINE_INVALID = hostErrorCatalog.require('CONFIGURATION.GATE.BASELINE_INVALID');
-const POLICY_DENIED = hostErrorCatalog.require('CONFIGURATION.POLICY.DENIED');
+const GATE_BASELINE_INVALID = hostErrorCatalog.require('CLI.GATE.BASELINE_INVALID');
+const POLICY_DENIED = hostErrorCatalog.require('CLI.POLICY.DENIED');
 
 /** The four host baseline/ratchet seam implementations, bound to a datastore resolver. */
 export interface BaselineSeams {

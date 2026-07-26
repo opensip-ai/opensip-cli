@@ -96,7 +96,7 @@ export function resolveCoordinationPaths(): CoordinationPaths {
     forProject: (coordinationKey) => {
       if (!/^[a-f0-9]{24}$/u.test(coordinationKey)) {
         throw new SystemError('Runtime coordination key is invalid', {
-          code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+          code: 'CORE.RUNTIME_COORDINATION.INVALID_KEY',
         });
       }
       const projectCoordinationDir = join(projectsDir, coordinationKey);

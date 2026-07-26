@@ -99,7 +99,7 @@ describe('general anchored-record bounds and postures', () => {
             content: '',
             maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
           }),
-        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+        'CORE.RUNTIME_COORDINATION.INPUT',
       ],
       [
         () =>
@@ -109,7 +109,7 @@ describe('general anchored-record bounds and postures', () => {
             basename: 'maximum.bin',
             maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
           }),
-        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+        'CORE.RUNTIME_COORDINATION.INPUT',
       ],
       [
         () =>
@@ -156,7 +156,7 @@ describe('general anchored-record bounds and postures', () => {
           maxEntries: ANCHORED_CREATE_RECOVERY_MAX_ENTRIES + 1,
         },
       }),
-    ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
   });
 
   it('keeps records private inside an owner-controlled 0755 parent', () => {
@@ -215,7 +215,7 @@ describe('general anchored-record bounds and postures', () => {
             basename: 'record.json',
             recordPosture: 'invalid' as never,
           }),
-        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+        'CORE.RUNTIME_COORDINATION.INPUT',
       ],
     ] as const) {
       expect(operation).toThrow(expect.objectContaining({ code }));
@@ -237,7 +237,7 @@ describe('operation-bound anchored create recovery', () => {
       'operation.abc_123-XYZ_',
     ]) {
       expect(() => anchoredRecordTemporaryBasename('record.json', identity)).toThrow(
-        expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }),
+        expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }),
       );
     }
   });

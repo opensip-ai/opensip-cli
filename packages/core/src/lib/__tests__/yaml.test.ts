@@ -97,7 +97,7 @@ describe('readYamlFileOrThrow (audit-round-2 Finding F)', () => {
       throw new Error('expected throw');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.FILE.TOO_LARGE');
+      expect((error as SystemError).code).toBe('CORE.FILE.TOO_LARGE');
     }
   });
 });

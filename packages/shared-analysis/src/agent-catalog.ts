@@ -30,7 +30,7 @@ import type { AgentCatalog, AgentCatalogBuildInput, CommandTier } from '@opensip
 import type { Tool, ToolRegistry } from '@opensip-cli/core';
 
 /** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
-const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('SYSTEM.AGENT_CATALOG.UNPUBLISHABLE');
+const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('CORE.AGENT_CATALOG.UNPUBLISHABLE');
 
 export {
   agentCatalogOverlayKeys,

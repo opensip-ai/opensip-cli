@@ -8,7 +8,11 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["opensip-cli/fit/checks/**/*.mjs", "scripts/github-action/run.mjs"],
+      "entry": [
+        "opensip-cli/fit/checks/**/*.mjs",
+        "opensip-cli/fit/recipes/**/*.mjs",
+        "scripts/github-action/run.mjs"
+      ],
       "ignoreDependencies": [
         "@opensip-cli/checks-cpp",
         "@opensip-cli/checks-dogfood",
@@ -29,7 +33,6 @@
       "entry": [
         "src/__tests__/fixtures/**/*.{ts,js,mjs}",
         "src/bootstrap/__tests__/fixtures/**/*.{ts,js,mjs}",
-        "src/commands/init/agents-md.ts",
         "src/commands/tools/runtime-probe-entry.ts"
       ],
       "ignoreDependencies": [

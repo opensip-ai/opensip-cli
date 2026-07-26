@@ -10,7 +10,7 @@ import { createSignal, isErrorSignal, ValidationError } from '@opensip-cli/core'
 import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
 
 /** Builder-ordering invariant: `withMetrics` must run before assertions are evaluated. */
-const METRICS_REQUIRED = simulationErrorCatalog.require('VALIDATION.SIMULATION.METRICS_REQUIRED');
+const METRICS_REQUIRED = simulationErrorCatalog.require('SIMULATION.SIMULATION.METRICS_REQUIRED');
 
 import { evaluateAssertion } from './assertions.js';
 import { resolveMetric } from './resolve-metric.js';

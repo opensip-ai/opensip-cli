@@ -15,8 +15,8 @@ import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');
-const PATH_REJECTED = fitnessErrorCatalog.require('VALIDATION.FITNESS.PATH_REJECTED');
+const FILE_TOO_LARGE = fitnessErrorCatalog.require('FIT.FITNESS.FILE_TOO_LARGE');
+const PATH_REJECTED = fitnessErrorCatalog.require('FIT.FITNESS.PATH_REJECTED');
 
 /**
  * Prewarm statistics.
