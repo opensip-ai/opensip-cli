@@ -296,7 +296,7 @@ describe('@opensip-cli/graph/read catalog Results', () => {
       expect.objectContaining({
         evt: 'graph.catalog.read.error',
         module: 'graph:catalog-repo',
-        code: 'GRAPH.CATALOG.READ_FAILED',
+        code: 'GRAPH.CATALOG.UNREADABLE',
         err: expect.any(String) as string,
       }),
     );

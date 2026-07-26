@@ -527,7 +527,7 @@ describe('GraphGenerationController', () => {
     expect(setup.logs).toContainEqual({
       event: 'mcp.graph.freshness.failed',
       fields: {
-        reasonCode: 'GRAPH.READ.VERIFY_FAILED',
+        reasonCode: 'GRAPH.CATALOG.UNREADABLE',
         verification: 'failed',
         resolutionMode: 'exact',
         engineMode: 'unknown',
@@ -570,7 +570,7 @@ describe('GraphGenerationController', () => {
     const setup = harness();
     setup.verify.mockResolvedValueOnce(
       err({
-        code: 'GRAPH.READ.VERIFY_FAILED',
+        code: 'GRAPH.CATALOG.UNREADABLE',
         message: 'bounded verify failure',
       }),
     );

@@ -1,6 +1,7 @@
 /** Per-generation freshness verification, coalescing, caching, and events. */
 
 import { err, ok, type Result } from '@opensip-cli/core';
+import { graphErrorCatalog } from '@opensip-cli/graph';
 
 import { fromGraphReadError, type McpReadError } from './mcp-error.js';
 
@@ -10,6 +11,11 @@ import type {
   FreshnessVerification,
   GraphAdapterRegistryReader,
 } from '@opensip-cli/graph/read';
+
+
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');
 
 export const FRESHNESS_BURST_MS = 2000;
 
@@ -98,7 +104,9 @@ export class CatalogFreshnessController {
       });
     } catch {
       result = err({
-        code: 'GRAPH.READ.VERIFY_FAILED',
+        code: CATALOG_UNREADABLE.code,
+        definition: CATALOG_UNREADABLE,
+        metadata: { view: 'verify-failed' },
         message: 'Catalog verification failed due to an infrastructure error',
       });
     }

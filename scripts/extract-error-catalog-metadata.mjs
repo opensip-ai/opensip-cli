@@ -78,6 +78,12 @@ const CATALOG_SOURCES = [
     exportName: 'sessionStoreErrorCatalog',
   },
   {
+    packageName: '@opensip-cli/graph',
+    ownerId: '3873f1c2-02a9-4719-930a-bca74b62b706',
+    file: 'packages/graph/engine/src/errors/graph-error-catalog.ts',
+    exportName: 'graphErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/tree-sitter',
     ownerId: '@opensip-cli/tree-sitter',
     file: 'packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts',

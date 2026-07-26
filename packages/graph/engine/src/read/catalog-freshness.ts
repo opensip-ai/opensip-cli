@@ -21,6 +21,7 @@ import {
   type EngineShardPolicyResolution,
 } from '../cli/orchestrate/engine-shard-policy.js';
 import { compareCodePointStrings } from '../code-point-order.js';
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { isSafeGraphAdapterDescriptor } from '../lang-adapter/descriptor-validation.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 
@@ -37,6 +38,10 @@ import type {
   CatalogShardCacheInput,
   GraphConfig,
 } from '../types.js';
+
+
+/** Registered replacement for the un-catalogued `GRAPH.READ.VERIFY_FAILED` reason code. */
+const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');
 
 const MAX_ADAPTERS = 64;
 const MAX_DISCOVERED_FILES = 1_000_000;
@@ -216,7 +221,7 @@ export async function verifyCatalogInputs(
   } catch {
     return err(
       graphReadError(
-        'GRAPH.READ.VERIFY_FAILED',
+        CATALOG_UNREADABLE.code,
         'Catalog input verification failed due to infrastructure error',
       ),
     );

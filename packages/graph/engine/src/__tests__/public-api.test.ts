@@ -22,6 +22,7 @@ import * as barrel from '../index.js';
 
 /** The complete, intended set of runtime value exports. Keep alphabetised. */
 const EXPECTED_VALUE_EXPORTS = [
+  'graphErrorCatalog',
   'CALL_EDGE_TEXT_MAX',
   'CREATION_EDGE_PREFIX',
   'CREATION_EDGE_TEXT_MAX',

@@ -54,7 +54,7 @@ describe('buildAgainstStableFiles', () => {
         },
       }),
     ).rejects.toMatchObject({
-      code: 'GRAPH.CATALOG.SOURCE_CHANGED_DURING_BUILD',
+      code: 'GRAPH.BUILD.INCOMPLETE',
     });
     expect(attempts).toBe(2);
   });

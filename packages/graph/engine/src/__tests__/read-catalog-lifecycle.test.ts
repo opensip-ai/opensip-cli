@@ -649,7 +649,7 @@ describe('verifyCatalogInputs', () => {
     expect(result).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.VERIFY_FAILED',
+        code: 'GRAPH.CATALOG.UNREADABLE',
         operation: 'catalog-generation',
         message: 'Catalog input verification failed due to infrastructure error',
       },
