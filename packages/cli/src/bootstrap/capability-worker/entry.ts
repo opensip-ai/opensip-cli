@@ -4,9 +4,11 @@ import {
   currentScope,
   defineCommand,
   IpcPayloadTooLargeError,
+  normalizeFailure,
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   startWorkerCancellationControl,
+  toOperatorFailureProjection,
   toWorkerFailureWire,
   WORKER_FAILURE_WIRE_VERSION,
   type CommandSpec,
@@ -81,6 +83,27 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
   });
 }
 
+/**
+ * Emit a bounded operator projection of a worker fault to stderr.
+ *
+ * Best-effort by construction: a diagnostic must never be able to replace the failure it is
+ * describing, so every step is guarded and a failure here is simply silence.
+ */
+function writeWorkerOperatorDetail(error: unknown): void {
+  try {
+    const projection = toOperatorFailureProjection(normalizeFailure(error));
+    // Each part is narrowed to a string before joining: the projection is typed, but a hostile
+    // or cross-version value reaching `join` unchecked would stringify as '[object Object]',
+    // which is worse than the empty diagnostic this exists to replace.
+    const parts: string[] = [projection.code, projection.message, projection.operatorDetail].filter(
+      (part): part is string => typeof part === 'string' && part.length > 0,
+    );
+    process.stderr.write(`${parts.join(' | ').slice(0, 2000)}\n`);
+  } catch {
+    // @swallow-ok A diagnostic must not fail the failure path it exists to explain.
+  }
+}
+
 export async function executeCapabilityWorker(specPath: string): Promise<void> {
   const stopHeartbeat = startWorkerHeartbeat();
   const stopCancellationControl = startWorkerCancellationControl();
@@ -90,6 +113,19 @@ export async function executeCapabilityWorker(specPath: string): Promise<void> {
       value: await runCapabilityWorker(readSpec(specPath)),
     });
   } catch (error) {
+    // Write the OPERATOR projection to this worker's stderr before wiring the failure home.
+    //
+    // The wire carries the MACHINE projection, and for a `redacted` definition that projection
+    // deliberately replaces the message with "The operation failed." — correct for a machine
+    // sink, catastrophic as the only channel. An unclassified worker fault therefore reached
+    // the host with no message, no cause and no operator detail: `capability pack X: The
+    // operation failed.` was the entire diagnostic.
+    //
+    // `stderrTail` is the channel that already exists for this: the supervisor captures it,
+    // bounds it, and attaches it to the error it raises. It was simply never written to. This
+    // does not widen what crosses the IPC boundary (ADR-0146) — stderr is captured by the
+    // parent, not echoed onward, and the operator projection is redacted at construction.
+    writeWorkerOperatorDetail(error);
     const wire = toWorkerFailureWire(error);
     await send({
       kind: 'error',
