@@ -8,7 +8,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import { SystemError, ValidationError } from '@opensip-cli/core';
+import { SystemError, ValidationError, currentLogger } from '@opensip-cli/core';
 import { glob } from 'glob';
 
 import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
@@ -41,6 +41,38 @@ interface PrewarmStats {
 const PREWARM_BATCH_SIZE = 100;
 
 /** In-memory file cache with optional prewarm for fitness check runs. */
+
+/**
+ * A rejected prewarm is COUNTED, not merely skipped.
+ *
+ * Dropping rejections silently made an unreadable tree (EACCES, EMFILE) look exactly like a
+ * fully-warmed cache. The later explicit read does fail loudly, but only for files a check
+ * happens to open, so a partially-warmed cache was otherwise invisible.
+ */
+function countRejected(results: readonly PromiseSettledResult<unknown>[]): number {
+  return results.filter((result) => result.status === 'rejected').length;
+}
+
+/**
+ * Surface an incomplete prewarm without failing it.
+ *
+ * Prewarm is an optimisation, and a check that needs one of these files still fails loudly on
+ * its own read. What must not happen is a partially-warmed cache reporting as complete (D7).
+ */
+function reportPrewarmGaps(rejected: number, loaded: number): void {
+  if (rejected === 0) return;
+  try {
+    currentLogger().warn({
+      evt: 'fitness.file_cache.prewarm_incomplete',
+      rejected,
+      loaded,
+      msg: 'Some files could not be pre-read; checks that need them will read them directly',
+    });
+  } catch {
+    // @swallow-ok a diagnostic must not fail the prewarm it is describing
+  }
+}
+
 export class FileCache {
   private readonly cache = new Map<string, string>();
   private _prewarmed = false;
@@ -75,6 +107,7 @@ export class FileCache {
     // Load file contents in parallel batches
     const files = [...allFiles];
 
+    let prewarmRejected = 0;
     for (let i = 0; i < files.length; i += PREWARM_BATCH_SIZE) {
       const batch = files.slice(i, i + PREWARM_BATCH_SIZE);
       const results = await Promise.allSettled(
@@ -87,6 +120,8 @@ export class FileCache {
           return { filePath, content };
         }),
       );
+
+      prewarmRejected += countRejected(results);
 
       for (const result of results) {
         if (result.status === 'fulfilled' && result.value !== null) {
@@ -114,6 +149,7 @@ export class FileCache {
     this._cleared = false;
     this.scheduleAutoClear();
     const durationMs = Date.now() - start;
+    reportPrewarmGaps(prewarmRejected, this.cache.size);
 
     return {
       filesLoaded: this.cache.size,

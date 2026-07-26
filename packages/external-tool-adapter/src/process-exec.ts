@@ -177,7 +177,13 @@ export function probeBinaryVersion(input: ProbeVersionInput): string | undefined
 export function whichBinary(command: string, platform: NodeJS.Platform): string | undefined {
   const finder = platform === 'win32' ? 'where' : 'which';
   try {
-    const out = execFileSync(finder, [command], { encoding: 'utf8', windowsHide: true });
+    const out = execFileSync(finder, [command], {
+      encoding: 'utf8',
+      windowsHide: true,
+      // Bounded (Plan 01): a PATH lookup answers immediately or the environment is broken.
+      timeout: 5000,
+      maxBuffer: 1_048_576,
+    });
     return String(out)
       .split(/\r?\n/)
       .map((line) => line.trim())

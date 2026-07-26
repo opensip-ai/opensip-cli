@@ -101,6 +101,16 @@ function inventoryNextActions(status: CodebaseFreshness): readonly string[] {
  * published after a non-aborted build; qualified partial/unavailable snapshots
  * remain observable rather than being rewritten as empty success.
  */
+/**
+ * Named no-op for the slot-clearing chain.
+ *
+ * The refresh's real result is awaited by the caller, which reports any failure; this arm
+ * exists so a rejection does not become process-fatal before `finally` clears the slot.
+ */
+function ignoreRefreshRejection(): void {
+  /* intentionally empty — see the doc comment above */
+}
+
 export class LocalCodebaseReadPort implements CodebaseReadPort {
   private readonly projectRoot: string;
   private readonly configIdentity: string;
@@ -149,10 +159,18 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
       settled: false,
     };
     this.inFlight = refresh;
-    void refresh.promise.then(() => {
-      refresh.settled = true;
-      if (this.inFlight === refresh) this.inFlight = undefined;
-    });
+    // A rejection here is process-fatal under Node's default unhandled-rejection policy, and
+    // this chain exists only to clear the in-flight slot — the REAL result is awaited by the
+    // caller, which reports the failure. Clearing the slot must happen either way, or a failed
+    // refresh would wedge every subsequent read behind a promise that never settles again.
+    void refresh.promise
+      // @swallow-ok the caller awaits the real result and reports the failure; this chain
+      // exists only to clear the in-flight slot, which must happen either way.
+      .catch(ignoreRefreshRejection)
+      .finally(() => {
+        refresh.settled = true;
+        if (this.inFlight === refresh) this.inFlight = undefined;
+      });
     return refresh;
   }
 
@@ -179,9 +197,14 @@ export class LocalCodebaseReadPort implements CodebaseReadPort {
       };
       const onAbort = (): void => settle(cancelledResult(), true);
       signal?.addEventListener('abort', onAbort, { once: true });
-      void refresh.promise.then((result) =>
-        settle(signal?.aborted === true ? cancelledResult() : result, signal?.aborted === true),
-      );
+      // Same reasoning: the caller awaits the settled value, so a rejection here must not
+      // become an unhandled rejection. A rejected refresh settles as a cancelled result, which
+      // is the outcome the waiter can act on.
+      void refresh.promise
+        .then((result) =>
+          settle(signal?.aborted === true ? cancelledResult() : result, signal?.aborted === true),
+        )
+        .catch(() => settle(cancelledResult(), true));
     });
   }
 

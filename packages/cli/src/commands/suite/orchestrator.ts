@@ -13,6 +13,7 @@ import {
   type Tool,
   type ToolCliContext,
 } from '@opensip-cli/core';
+import { normalizeFailure, toOperatorFailureProjection } from '@opensip-cli/core';
 
 import { runWithSuiteRunContext, type RunActionHooks } from '../../bootstrap/run-plane.js';
 
@@ -42,6 +43,16 @@ import { validateSuite, type ValidatedSuite } from './validate-suite.js';
 
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { SuiteDefinition } from '@opensip-cli/config';
+
+/** Redacted operator view of a suite-finalization failure (D8: redact at the choke point). */
+function suiteFailure(error: unknown): { code: string; operatorDetail: string | undefined } {
+  const projection = toOperatorFailureProjection(normalizeFailure(error));
+  return {
+    code: typeof projection.code === 'string' ? projection.code : 'UNKNOWN',
+    operatorDetail:
+      typeof projection.operatorDetail === 'string' ? projection.operatorDetail : undefined,
+  };
+}
 
 export { deriveSuiteAggregate } from './orchestration-helpers.js';
 
@@ -376,6 +387,10 @@ async function finalizeSuiteEvidence(
       suiteRunId: input.suiteRunId,
       reason: 'ledger-projection-or-finalization-failed',
       errorName: error instanceof Error ? error.name : 'UnknownError',
+      // Beyond the label: this catch rejects a whole suite's evidence, so an operator needs to
+      // know WHICH failure caused it, not merely that one occurred.
+      code: suiteFailure(error).code,
+      operatorDetail: suiteFailure(error).operatorDetail,
     });
     return;
   }

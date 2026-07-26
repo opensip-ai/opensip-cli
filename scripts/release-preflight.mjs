@@ -4,9 +4,9 @@
 // accepting Turbo cache hits.
 
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { RELEASE_PACKAGE_ORDER } from './release-package-order.mjs';
@@ -21,6 +21,29 @@ function readVersion() {
     throw new TypeError('packages/core/package.json has no string version');
   }
   return pkg.version;
+}
+
+/**
+ * Prove a caller-supplied `--tarball-dir` is safe to RECURSIVELY DELETE.
+ *
+ * The default is an `mkdtemp` directory, but the flag lets a caller name any path, and this
+ * script `rmSync`s it with `recursive: true`. Nothing downstream re-checks it, so an absent
+ * env var or a mistyped CI expression could target a home directory or a repository root.
+ *
+ * Containment, not blocklisting: the path must sit under the OS temp directory or under this
+ * repository, and must not BE either of them.
+ */
+function assertDisposableTarballDir(value) {
+  const resolved = resolve(value);
+  const roots = [realpathSync(tmpdir()), REPO_ROOT];
+  const inside = roots.some((root) => resolved !== root && resolved.startsWith(`${root}${sep}`));
+  if (!inside) {
+    throw new Error(
+      `--tarball-dir must live under the OS temp directory or the repository (got ${resolved}); ` +
+        'this path is recursively deleted, so it must be provably disposable',
+    );
+  }
+  return resolved;
 }
 
 function parseArgs(argv) {
@@ -44,7 +67,7 @@ function parseArgs(argv) {
           `--tarball-dir must be a real path (got ${JSON.stringify(value)}); check the calling env/arg`,
         );
       }
-      out.tarballDir = value;
+      out.tarballDir = assertDisposableTarballDir(value);
     } else {
       throw new Error(`unknown argument: ${arg}`);
     }
@@ -119,6 +142,8 @@ function main() {
   // acceptance is host-specific and heavier, so it is deliberately NOT run here; an OS
   // workflow opts in via `pnpm platform:acceptance` after packing (or against a staged
   // published version). Keep `smoke-pack` (below) as the fast cross-platform release check.
+  // Proven disposable at parse time (see assertDisposableTarballDir): this is a recursive
+  // delete of a caller-supplied path, and nothing else in this file establishes containment.
   rmSync(args.tarballDir, { recursive: true, force: true });
   mkdirSync(args.tarballDir, { recursive: true });
   for (const pkg of RELEASE_PACKAGE_ORDER) {

@@ -4,6 +4,7 @@ import { posix } from 'node:path';
 
 import { buildTestSelectionSnapshotIdentity } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
+import { normalizeFailure } from '@opensip-cli/core';
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
@@ -1315,8 +1316,14 @@ export async function selectStaticTests(
         ),
       );
     }
+    // The message is RETAINED — see the same fix in `impact-view.ts`. `select_tests` is an
+    // agent-facing read, and "Failed to build static test selection" with no cause gives an
+    // agent nothing to decide with.
     return err(
-      selectionError('GRAPH.READ.TEST_SELECTION_FAILED', 'Failed to build static test selection'),
+      selectionError(
+        'GRAPH.READ.TEST_SELECTION_FAILED',
+        `Failed to build static test selection: ${normalizeFailure(error).message}`,
+      ),
     );
   }
 }

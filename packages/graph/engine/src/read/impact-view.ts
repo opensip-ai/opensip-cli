@@ -9,6 +9,7 @@ import {
   type ImpactTrust,
 } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
+import { normalizeFailure } from '@opensip-cli/core';
 import { buildComputeImpactIndex, computeImpactAsync } from '@opensip-cli/shared-analysis';
 
 import { compareCodePointStrings } from '../code-point-order.js';
@@ -146,6 +147,14 @@ export async function buildImpactView(
         ),
       );
     }
-    return err(impactError('GRAPH.READ.IMPACT_FAILED', 'Failed to build graph impact projection'));
+    // The message is RETAINED. Collapsing every unrecognised failure into one fixed sentence
+    // discarded the cause at the one boundary a caller can see, so an EACCES on the catalog and
+    // a genuine projection bug read identically. `normalizeFailure` bounds and redacts it.
+    return err(
+      impactError(
+        'GRAPH.READ.IMPACT_FAILED',
+        `Failed to build graph impact projection: ${normalizeFailure(error).message}`,
+      ),
+    );
   }
 }

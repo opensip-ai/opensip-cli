@@ -70,6 +70,10 @@ export function killTree(child: ChildProcess, signal: NodeJS.Signals | number = 
       const force = signalToTaskkillForce(signal) ? ['/F'] : [];
       execFileSync('taskkill', ['/PID', String(pid), '/T', ...force], {
         stdio: 'ignore',
+        // Bounded (Plan 01): signal delivery is immediate or it is broken. An unbounded
+        // taskkill in the kill path would hang the very teardown meant to reclaim the machine.
+        timeout: 5000,
+        maxBuffer: 1_048_576,
       });
     } catch {
       try {
