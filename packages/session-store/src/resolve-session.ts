@@ -13,6 +13,18 @@ import type { DataStore } from '@opensip-cli/datastore';
  * It is IGNORED for an explicit id: explicit ids resolve globally, and enforcing
  * their scope is the caller's fail-closed responsibility.
  */
+/**
+ * Why a session reference could not be resolved to exactly one stored session.
+ *
+ * Named and exported rather than written inline, so consumers (MCP forwards it to agents) can
+ * name the type they are switching over instead of restating the members.
+ */
+export type SessionResolveReason = 'not-found' | 'wrong-tool' | 'ambiguous-latest';
+
+/**
+ * How a caller names the session it wants: the literal `'latest'`, or a specific id, each
+ * optionally narrowed by tool and by the project directory the run must sit within.
+ */
 export type SessionReference =
   | { readonly ref: 'latest'; readonly tool?: ToolShortId; readonly cwdWithin?: string }
   | { readonly ref: string; readonly tool?: ToolShortId; readonly cwdWithin?: string };
@@ -25,7 +37,7 @@ export type SessionResolveResult =
   | { readonly ok: true; readonly session: StoredSession }
   | {
       readonly ok: false;
-      readonly reason: 'not-found' | 'wrong-tool' | 'ambiguous-latest';
+      readonly reason: SessionResolveReason;
       readonly detail: string;
     };
 

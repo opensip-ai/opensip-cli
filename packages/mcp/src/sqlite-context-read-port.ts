@@ -6,7 +6,7 @@ import { buildTaskContextFileScope } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
 import { readTaskContextRun } from '@opensip-cli/session-store';
 
-import { readError, type McpReadError } from './mcp-error.js';
+import { readError, type McpReadError, type McpReadReason } from './mcp-error.js';
 
 import type { CodebaseReadPort } from './codebase-read-port.js';
 import type {
@@ -222,7 +222,7 @@ function contextReadErrorCode(
     | 'unsupported-version'
     | 'invalid-manifest'
     | 'storage-failed',
-): string {
+): McpReadReason {
   switch (reason) {
     case 'foreign-project': {
       return 'context-run-foreign-project';

@@ -155,8 +155,11 @@ describe('@opensip-cli/graph/read public surface', () => {
   });
 
   it('locks read-facing types without exposing orchestration types', () => {
+    // `code` is the closed `GraphReadReason`, not `string`. Locking it here is the point of
+    // this test: widening it back would silently reopen the reason vocabulary that the
+    // `result-reason-code-scope` ruling closed.
     expectTypeOf<read.GraphReadError>().toEqualTypeOf<{
-      readonly code: string;
+      readonly code: read.GraphReadReason;
       readonly operation: read.GraphReadOperation;
       readonly message: string;
     }>();
@@ -276,7 +279,7 @@ describe('@opensip-cli/graph/read catalog Results', () => {
     expect(identity).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.CATALOG_IDENTITY',
+        code: 'catalog-identity',
         operation: 'catalog-identity',
         message: 'Failed to read graph catalog identity',
       },
@@ -287,7 +290,7 @@ describe('@opensip-cli/graph/read catalog Results', () => {
     expect(generation).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.CATALOG_GENERATION',
+        code: 'catalog-generation',
         operation: 'catalog-generation',
         message: 'Failed to load graph catalog generation',
       },
@@ -299,6 +302,10 @@ describe('@opensip-cli/graph/read catalog Results', () => {
       expect.objectContaining({
         evt: 'graph.catalog.read.error',
         module: 'graph:catalog-repo',
+        // The registered code, NOT the read reason: this is an internal operator log, not the
+        // `@opensip-cli/graph/read` boundary, so it carries the catalogued identity with its
+        // axes. The definition's `publicPresentationKey` is what links it to the
+        // `catalog-unreadable` reason a caller sees on the Result.
         code: 'GRAPH.CATALOG.UNREADABLE',
         err: expect.any(String) as string,
       }),
@@ -377,7 +384,7 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     await expect(read.rebuildCatalog({ cwd: '/project', datastore: store })).resolves.toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.REBUILD_FAILED',
+        code: 'rebuild-failed',
         operation: 'rebuild',
         message: 'Graph rebuild failed due to infrastructure error',
       },
@@ -389,7 +396,7 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     await expect(read.rebuildCatalog({ cwd: '/project' })).resolves.toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.REBUILD_EMPTY',
+        code: 'rebuild-empty',
         operation: 'rebuild',
         message: 'Graph rebuild produced an empty catalog',
       },
@@ -406,7 +413,7 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     expect(outcome).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.REBUILD_FAILED',
+        code: 'rebuild-failed',
         operation: 'rebuild',
         message: 'Graph rebuild failed due to infrastructure error',
       },

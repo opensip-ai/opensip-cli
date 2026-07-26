@@ -17,7 +17,7 @@ import { compareCodePointStrings } from '../code-point-order.js';
 import { makeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 
 import type { GraphReadFacetCoverage } from './query-contracts.js';
-import type { Catalog, GraphReadError } from './types.js';
+import type { Catalog, GraphReadError, GraphReadReason } from './types.js';
 
 export const MAX_IMPACT_VIEW_FILES = 128;
 export const MAX_IMPACT_VIEW_ROWS = 500;
@@ -41,7 +41,7 @@ export interface GraphImpactView extends ImpactComputation {
   readonly coverage: GraphReadFacetCoverage;
 }
 
-function impactError(code: string, message: string): GraphReadError {
+function impactError(code: GraphReadReason, message: string): GraphReadError {
   return { code, operation: 'analysis', message };
 }
 
@@ -66,7 +66,7 @@ function normalizeFiles(files: readonly string[]): Result<readonly string[], Gra
   if (files.length === 0 || files.length > MAX_IMPACT_VIEW_FILES) {
     return err(
       impactError(
-        'GRAPH.READ.IMPACT_FILES_CAP',
+        'impact-files-cap',
         `Impact reads require 1-${String(MAX_IMPACT_VIEW_FILES)} project-relative files`,
       ),
     );
@@ -77,7 +77,7 @@ function normalizeFiles(files: readonly string[]): Result<readonly string[], Gra
     if (candidate === undefined) {
       return err(
         impactError(
-          'GRAPH.READ.IMPACT_FILE_INVALID',
+          'impact-file-invalid',
           'Impact files must be bounded project-relative POSIX paths',
         ),
       );
@@ -137,12 +137,12 @@ export async function buildImpactView(
     });
   } catch (error) {
     if (error instanceof ComputeImpactCancelledError) {
-      return err(impactError('GRAPH.READ.IMPACT_CANCELLED', 'Graph impact read was cancelled'));
+      return err(impactError('impact-cancelled', 'Graph impact read was cancelled'));
     }
     if (error instanceof ComputeImpactIndexGenerationMismatchError) {
       return err(
         impactError(
-          'GRAPH.READ.IMPACT_INDEX_GENERATION_MISMATCH',
+          'impact-index-generation-mismatch',
           'Impact index belongs to a different graph catalog generation',
         ),
       );
@@ -152,7 +152,7 @@ export async function buildImpactView(
     // a genuine projection bug read identically. `normalizeFailure` bounds and redacts it.
     return err(
       impactError(
-        'GRAPH.READ.IMPACT_FAILED',
+        'impact-failed',
         `Failed to build graph impact projection: ${normalizeFailure(error).message}`,
       ),
     );

@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerRefreshGraph } from '../refresh-graph.js';
 
 import type { GraphReadPort, RefreshResult } from '../../graph-read-port.js';
+import type { McpReadReason } from '../../mcp-error.js';
 import type { CallToolResult, McpStdioServer } from '../../server.js';
 import type { Freshness, GraphToolResult } from '../../symbol-dto.js';
 import type { McpToolDeps } from '../types.js';
@@ -107,17 +108,26 @@ function deps(graph: GraphReadPort): McpToolDeps {
     codebase: {
       inventoryStatus: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Codebase reads are not under test.',
+          }),
         ),
       fileContext: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Codebase reads are not under test.',
+          }),
         ),
     },
     context: {
       contextStatus: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Context reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Context reads are not under test.',
+          }),
         ),
     },
     results: {} as McpToolDeps['results'],

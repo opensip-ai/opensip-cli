@@ -12,9 +12,9 @@ import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { currentRules } from '../rules/registry.js';
 
-import type { Catalog, GraphReadError, RebuildCatalogInput } from './types.js';
+import type { Catalog, GraphReadError, RebuildCatalogInput, GraphReadReason } from './types.js';
 
-function rebuildError(code: string, message: string): GraphReadError {
+function rebuildError(code: GraphReadReason, message: string): GraphReadError {
   const truncated = message.length > 160 ? message.slice(0, 157) + '...' : message;
   return { code, operation: 'rebuild', message: truncated };
 }
@@ -31,24 +31,17 @@ export async function rebuildCatalog(
     const result = await runCanonicalRebuild(input);
     if (result.failedShardIds !== undefined && result.failedShardIds.length > 0) {
       return err(
-        rebuildError(
-          'GRAPH.READ.REBUILD_FAILED',
-          'Graph rebuild did not complete every configured shard',
-        ),
+        rebuildError('rebuild-failed', 'Graph rebuild did not complete every configured shard'),
       );
     }
     const catalog = result.catalog;
     if (catalog === null || catalog === undefined) {
-      return err(
-        rebuildError('GRAPH.READ.REBUILD_EMPTY', 'Graph rebuild produced an empty catalog'),
-      );
+      return err(rebuildError('rebuild-empty', 'Graph rebuild produced an empty catalog'));
     }
     if (input.datastore !== undefined) new CatalogRepo(input.datastore).replaceAll(catalog);
     return ok(catalog);
   } catch {
-    return err(
-      rebuildError('GRAPH.READ.REBUILD_FAILED', 'Graph rebuild failed due to infrastructure error'),
-    );
+    return err(rebuildError('rebuild-failed', 'Graph rebuild failed due to infrastructure error'));
   }
 }
 

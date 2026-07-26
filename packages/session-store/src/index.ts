@@ -108,3 +108,6 @@ export {
   sessionStoreErrorCatalog,
   SESSION_STORE_ERROR_OWNER_ID,
 } from './errors/session-store-error-catalog.js';
+
+export type { SessionReplayReason } from './replay-session.js';
+export type { SessionResolveReason } from './resolve-session.js';

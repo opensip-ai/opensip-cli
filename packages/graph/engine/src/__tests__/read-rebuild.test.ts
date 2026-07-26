@@ -50,7 +50,7 @@ describe('rebuildCatalog', () => {
     const empty = await rebuildCatalog({ cwd: '/proj' });
     expect(empty.ok).toBe(false);
     if (empty.ok) return;
-    expect(empty.error.code).toBe('GRAPH.READ.REBUILD_EMPTY');
+    expect(empty.error.code).toBe('rebuild-empty');
 
     const catalog = { builtAt: '2026-07-10T00:00:00.000Z' };
     runGraphMock.mockResolvedValueOnce({ catalog });
@@ -65,14 +65,14 @@ describe('rebuildCatalog', () => {
     const failed = await rebuildCatalog({ cwd: '/proj' });
     expect(failed.ok).toBe(false);
     if (failed.ok) return;
-    expect(failed.error.code).toBe('GRAPH.READ.REBUILD_FAILED');
+    expect(failed.error.code).toBe('rebuild-failed');
     expect(failed.error.message).toContain('shard');
 
     runGraphMock.mockRejectedValueOnce(new Error('disk full'));
     const thrown = await rebuildCatalog({ cwd: '/proj' });
     expect(thrown.ok).toBe(false);
     if (thrown.ok) return;
-    expect(thrown.error.code).toBe('GRAPH.READ.REBUILD_FAILED');
+    expect(thrown.error.code).toBe('rebuild-failed');
     expect(thrown.error.message).toContain('infrastructure');
   });
 

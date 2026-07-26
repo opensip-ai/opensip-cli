@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **18**
-- Definitions: **177**
+- Definitions: **179**
 
 ## Catalogs
 
@@ -25,7 +25,7 @@ generated: true
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 20 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 22 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 3 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 3 |
 | `@opensip-cli/session-store` | `@opensip-cli/session-store` | `packages/session-store/src/errors/session-store-error-catalog.ts` | 5 |
@@ -59,7 +59,9 @@ generated: true
 | `CLI.RUN_READ.INPUT_INVALID` | `opensip-cli` | application | tool-author | validation | never | error | runtime | active | Correct the named run-read argument: run ids are 1-128 word characters, and limits and offsets are non-negative integers. |
 | `CLI.RUNS.NOT_FOUND` | `opensip-cli` | application | user | not-found | never | error | configuration | active | Pick a run id that exists; `opensip runs list` shows the recorded runs. |
 | `CLI.RUNTIME_PROMOTION.MANIFEST_UNSAFE` | `opensip-cli` | application | environment | security | never | error | configuration | active | Runtime evidence could not be promoted safely. Remove the runtime directory named in the message and re-run `opensip init`. |
+| `CLI.SUITE.CAPABILITY_MISMATCH` | `opensip-cli` | application | tool-author | invariant | never | error | runtime | active | The step produced output its declared capability does not allow. Report it to the tool author; the suite definition cannot fix it. |
 | `CLI.SUITE.EDIT_REFUSED` | `opensip-cli` | application | user | integrity | never | error | configuration | active | opensip cannot safely edit this config file. Fix the reported problem in opensip-cli.config.yml, or add the suite block by hand. |
+| `CLI.SUITE.EVIDENCE_MISSING` | `opensip-cli` | application | tool-author | invariant | never | error | runtime | active | The step completed without the evidence or verdict it is required to produce. Re-run with --verbose; if it repeats, report it to the tool author. |
 | `CLI.SUITE.INVALID` | `opensip-cli` | application | user | validation | never | error | configuration | active | Correct the named suite step in opensip-cli.config.yml; the message names the offending field and value. |
 | `CLI.SUITE.UNKNOWN_REFERENCE` | `opensip-cli` | application | user | not-found | never | error | configuration | active | The suite step names something that does not exist or is ambiguous. Run `opensip tools list` and use an exact tool and command name. |
 | `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` | `@opensip-cli/codebase` | application | user | validation | never | error | configuration | active | Remove the circular reference or non-JSON (bigint) value from the project configuration document, then re-run. |

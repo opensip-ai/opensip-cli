@@ -6,7 +6,7 @@ import { makeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 import { toGraphSymbolRef } from './query-contracts.js';
 
 import type { GraphReadFacetCoverage, GraphSymbolRef } from './query-contracts.js';
-import type { Catalog, FeatureTable, GraphReadError, Indexes } from './types.js';
+import type { Catalog, FeatureTable, GraphReadError, Indexes, GraphReadReason } from './types.js';
 
 const MAX_PARAMETERS = 64;
 const MAX_DECORATORS = 32;
@@ -40,7 +40,7 @@ export interface GraphEntityDetail {
   readonly coverage: GraphReadFacetCoverage;
 }
 
-function detailError(code: string, message: string): GraphReadError {
+function detailError(code: GraphReadReason, message: string): GraphReadError {
   return { code, operation: 'analysis', message };
 }
 
@@ -124,18 +124,14 @@ export function projectEntityDetail(
   features?: FeatureTable,
 ): Result<GraphEntityDetail | null, GraphReadError> {
   if (symbolId.length === 0 || symbolId.length > 2048 || /\p{Cc}/u.test(symbolId)) {
-    return err(
-      detailError('GRAPH.READ.ENTITY_ID_INVALID', 'Entity symbol ID is invalid or oversized'),
-    );
+    return err(detailError('entity-id-invalid', 'Entity symbol ID is invalid or oversized'));
   }
   try {
     const occurrence = indexes.byOccId.get(symbolId);
     if (occurrence === undefined) return ok(null);
     const symbol = toGraphSymbolRef(occurrence);
     if (symbol === undefined) {
-      return err(
-        detailError('GRAPH.READ.ENTITY_MALFORMED', 'Entity identity cannot be projected safely'),
-      );
+      return err(detailError('entity-malformed', 'Entity identity cannot be projected safely'));
     }
     const reasons = new Set<string>();
     const rawParameters: readonly unknown[] = Array.isArray(occurrence.params)
@@ -212,6 +208,6 @@ export function projectEntityDetail(
       }),
     });
   } catch {
-    return err(detailError('GRAPH.READ.ENTITY_FAILED', 'Failed to project graph entity detail'));
+    return err(detailError('entity-failed', 'Failed to project graph entity detail'));
   }
 }

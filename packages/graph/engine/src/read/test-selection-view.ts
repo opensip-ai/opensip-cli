@@ -14,7 +14,7 @@ import { GRAPH_SYMBOL_NAME_MAX, toGraphSymbolRef } from './query-contracts.js';
 
 import type { GraphReadFacetCoverage } from './query-contracts.js';
 import type { SourceRoleMatcher } from './source-filter.js';
-import type { Catalog, GraphReadError, Indexes } from './types.js';
+import type { Catalog, GraphReadError, Indexes, GraphReadReason } from './types.js';
 import type { FunctionOccurrence } from '../types.js';
 import type {
   FileFact,
@@ -116,7 +116,7 @@ const CONFIDENCE_RANK: Readonly<Record<Confidence, number>> = {
   low: 3,
 };
 
-function selectionError(code: string, message: string): GraphReadError {
+function selectionError(code: GraphReadReason, message: string): GraphReadError {
   return { code, operation: 'analysis', message };
 }
 
@@ -140,7 +140,7 @@ function normalizeFiles(files: readonly string[]): Result<readonly string[], Gra
   if (files.length === 0 || files.length > MAX_TEST_SELECTION_FILES) {
     return err(
       selectionError(
-        'GRAPH.READ.TEST_SELECTION_FILES_CAP',
+        'test-selection-files-cap',
         `Test selection requires 1-${String(MAX_TEST_SELECTION_FILES)} project-relative files`,
       ),
     );
@@ -151,7 +151,7 @@ function normalizeFiles(files: readonly string[]): Result<readonly string[], Gra
     if (candidate === undefined) {
       return err(
         selectionError(
-          'GRAPH.READ.TEST_SELECTION_FILE_INVALID',
+          'test-selection-file-invalid',
           'Test selection files must be bounded project-relative POSIX paths',
         ),
       );
@@ -1273,7 +1273,7 @@ export async function selectStaticTests(
   ) {
     return err(
       selectionError(
-        'GRAPH.READ.TEST_SELECTION_GRAPH_IDENTITY_INVALID',
+        'test-selection-graph-identity-invalid',
         'Test selection graph identity must be an exact bounded generation identity',
       ),
     );
@@ -1309,19 +1309,14 @@ export async function selectStaticTests(
     );
   } catch (error) {
     if (error instanceof TestSelectionCancelledError) {
-      return err(
-        selectionError(
-          'GRAPH.READ.TEST_SELECTION_CANCELLED',
-          'Static test selection was cancelled',
-        ),
-      );
+      return err(selectionError('test-selection-cancelled', 'Static test selection was cancelled'));
     }
     // The message is RETAINED — see the same fix in `impact-view.ts`. `select_tests` is an
     // agent-facing read, and "Failed to build static test selection" with no cause gives an
     // agent nothing to decide with.
     return err(
       selectionError(
-        'GRAPH.READ.TEST_SELECTION_FAILED',
+        'test-selection-failed',
         `Failed to build static test selection: ${normalizeFailure(error).message}`,
       ),
     );

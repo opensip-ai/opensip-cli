@@ -2,7 +2,12 @@
  * @fileoverview Error code registration check
  */
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import {
+  defineCheck,
+  isTestFile,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-cli/fitness';
 
 import { createCodeMask, findStaticStringLiterals } from '../code-aware-match.js';
 
@@ -187,9 +192,6 @@ function declaresErrorCodes(content: string): boolean {
 export const errorCodeRegistration = defineCheck({
   id: '346b53d8-58a3-4fd5-8340-d7bd42da406a',
   slug: 'error-code-registration',
-  // Stays disabled until its remaining findings are closed; see the Plan 01 wave tasks.
-  // Enabling it against a non-zero backlog would be the false green the plan exists to remove.
-  disabled: true,
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
   contentFilter: 'raw',
 
@@ -240,9 +242,14 @@ export const errorCodeRegistration = defineCheck({
         registeredCodes.add(code);
     }
 
-    // Phase 2: Scan non-registry files for error code usage
+    // Phase 2: Scan non-registry PRODUCTION files for error code usage.
+    //
+    // Tests are skipped deliberately. A test that proves an unrecognised failure PROPAGATES has
+    // to construct one, and the code it invents is arbitrary by design — that is the point of
+    // the fixture. Demanding those be registered would force meaningless entries into the
+    // catalog and make the check unusable on any codebase that tests its error handling.
     for (const filePath of files.paths) {
-      if (!filePath || isRegistry(filePath)) continue;
+      if (!filePath || isRegistry(filePath) || isTestFile(filePath)) continue;
       const content = allContents.get(filePath);
       if (!content) continue;
       const lines = content.split('\n');

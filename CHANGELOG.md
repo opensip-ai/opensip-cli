@@ -52,6 +52,32 @@ exit code are deliberately absent.
 | Runtime-promotion journal is unreadable or names an invalid phase     |      1 |     2 | Now `CLI.INIT.PROMOTION_JOURNAL_INVALID` (`integrity`, `configuration`). The recovery path already BRANCHED on this condition; it previously reported as an unknown internal failure.    |
 | Runtime promotion stopped in a state needing recovery                 |      1 |     2 | Now `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` (`conflict`, `configuration`): the operator re-runs `opensip init` to resume, so this is a configuration failure rather than a runtime fault. |
 
+#### Behaviour changes: MCP error codes are uniform (Plan 01)
+
+Four MCP error codes were emitted in the registered-error-code dialect while every other code
+on that surface was lowercase-kebab. They are now kebab like the rest:
+
+| Before                          | After                |
+| ------------------------------- | -------------------- |
+| `GRAPH.READ.CATALOG_IDENTITY`   | `catalog-identity`   |
+| `GRAPH.READ.CATALOG_GENERATION` | `catalog-generation` |
+| `GRAPH.READ.REBUILD_EMPTY`      | `rebuild-empty`      |
+| `GRAPH.READ.REBUILD_FAILED`     | `rebuild-failed`     |
+
+They were graph's internal `Result` reasons, forwarded onto the wire unchanged. A consumer
+matching on them saw four `SCREAMING_DOT` strings among twenty kebab ones, with nothing to say
+which convention was authoritative. `fromGraphReadError` now maps every graph reason explicitly
+instead of forwarding, so graph's internal vocabulary is no longer part of MCP's public surface.
+
+The `mcp.graph.freshness.failed` log event's `reasonCode` field likewise carries the read reason
+(`catalog-unreadable`) rather than the registered code.
+
+Reason vocabularies are now closed unions rather than `string` — `GraphReadReason`,
+`McpReadReason`, `SessionReplayReason`, `SessionResolveReason` — so a new producer cannot put an
+unreviewed token in front of an agent. `GraphReadError` and `McpReadError` remain plain-data
+DTOs (ADR-0147); where a reason corresponds 1:1 to a registered code, the definition declares
+the link via `publicPresentationKey`.
+
 #### Behaviour changes: error codes are now owner-scoped (Plan 01)
 
 Every error code now begins with a segment naming the package or tool that owns it — `CORE.`,

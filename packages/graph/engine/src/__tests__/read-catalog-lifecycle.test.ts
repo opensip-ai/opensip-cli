@@ -280,7 +280,7 @@ describe('verifyCatalogInputs', () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe('GRAPH.READ.VERIFY_DISCOVERY');
+    if (!result.ok) expect(result.error.code).toBe('verify-discovery');
   });
 
   it('rejects a discovered symlink inside the project that resolves outside it', async () => {
@@ -309,7 +309,7 @@ describe('verifyCatalogInputs', () => {
       languageAdapters: NO_LANGUAGE_ADAPTERS,
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe('GRAPH.READ.VERIFY_DISCOVERY');
+    if (!result.ok) expect(result.error.code).toBe('verify-discovery');
   });
 
   it('classifies added, modified, and deleted files without leaking absolute paths', async () => {
@@ -589,7 +589,7 @@ describe('verifyCatalogInputs', () => {
       languageAdapters: NO_LANGUAGE_ADAPTERS,
     });
     expect(inconsistent.ok).toBe(false);
-    if (!inconsistent.ok) expect(inconsistent.error.code).toBe('GRAPH.READ.VERIFY_REGISTRY');
+    if (!inconsistent.ok) expect(inconsistent.error.code).toBe('verify-registry');
   });
 
   it('rejects C1 controls in adapter cache keys', async () => {
@@ -614,7 +614,7 @@ describe('verifyCatalogInputs', () => {
       languageAdapters: NO_LANGUAGE_ADAPTERS,
     });
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe('GRAPH.READ.VERIFY_CACHE_KEY');
+    if (!result.ok) expect(result.error.code).toBe('verify-cache-key');
   });
 
   it('fails closed when engine-policy discovery throws during verification', async () => {
@@ -649,7 +649,7 @@ describe('verifyCatalogInputs', () => {
     expect(result).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.CATALOG.UNREADABLE',
+        code: 'catalog-unreadable',
         operation: 'catalog-generation',
         message: 'Catalog input verification failed due to infrastructure error',
       },

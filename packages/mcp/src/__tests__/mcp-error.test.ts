@@ -6,18 +6,14 @@ import {
   unexpectedRefreshError,
 } from '../mcp-error.js';
 
-import type { GraphReadError } from '@opensip-cli/graph/read';
+import type { GraphReadReason, GraphReadError } from '@opensip-cli/graph/read';
 
 describe('fromGraphReadError', () => {
   it.each([
-    ['GRAPH.READ.CATALOG_IDENTITY', 'catalog-identity', 'Failed to read graph catalog identity'],
-    [
-      'GRAPH.READ.CATALOG_GENERATION',
-      'catalog-generation',
-      'Failed to load graph catalog generation',
-    ],
-    ['GRAPH.READ.REBUILD_EMPTY', 'rebuild', 'Graph rebuild produced an empty catalog'],
-    ['GRAPH.READ.REBUILD_FAILED', 'rebuild', 'Graph rebuild failed due to an infrastructure error'],
+    ['catalog-identity', 'catalog-identity', 'Failed to read graph catalog identity'],
+    ['catalog-generation', 'catalog-generation', 'Failed to load graph catalog generation'],
+    ['rebuild-empty', 'rebuild', 'Graph rebuild produced an empty catalog'],
+    ['rebuild-failed', 'rebuild', 'Graph rebuild failed due to an infrastructure error'],
   ] as const)('maps %s to its fixed MCP DTO', (code, operation, message) => {
     const source: GraphReadError = {
       code,
@@ -28,8 +24,12 @@ describe('fromGraphReadError', () => {
   });
 
   it('bounds an unknown graph error code instead of trusting its message', () => {
+    // Cast on purpose. `GraphReadReason` is closed, so a reason from a NEWER graph than this
+    // mcp cannot be written literally — but it can still arrive at runtime across the package
+    // boundary, and the `default` arm exists precisely for that. Without the cast this test
+    // could not express the case it is here to prove.
     const mapped = fromGraphReadError({
-      code: 'GRAPH.READ.FUTURE',
+      code: 'a-reason-this-version-does-not-know' as GraphReadReason,
       operation: 'analysis',
       message: 'secret token at /private/project/datastore.sqlite',
     });
@@ -41,39 +41,27 @@ describe('fromGraphReadError', () => {
   });
 
   it.each([
-    ['GRAPH.READ.CURSOR_INVALID', 'cursor-invalid', 'Cursor continuation anchor is invalid.'],
+    ['cursor-invalid', 'cursor-invalid', 'Cursor continuation anchor is invalid.'],
+    ['impact-files-cap', 'input-cap-exceeded', 'The request exceeds a bounded graph-read cap.'],
     [
-      'GRAPH.READ.IMPACT_FILES_CAP',
+      'test-selection-files-cap',
       'input-cap-exceeded',
       'The request exceeds a bounded graph-read cap.',
     ],
+    ['impact-file-invalid', 'invalid-input', 'The graph-read input is invalid.'],
+    ['entity-id-invalid', 'invalid-input', 'The graph-read input is invalid.'],
+    ['test-selection-file-invalid', 'invalid-input', 'The graph-read input is invalid.'],
+    ['impact-cancelled', 'cancelled', 'The graph read was cancelled.'],
+    ['test-selection-cancelled', 'cancelled', 'The graph read was cancelled.'],
+    ['impact-failed', 'impact-read-failed', 'Graph impact could not be projected safely.'],
     [
-      'GRAPH.READ.TEST_SELECTION_FILES_CAP',
-      'input-cap-exceeded',
-      'The request exceeds a bounded graph-read cap.',
-    ],
-    ['GRAPH.READ.IMPACT_FILE_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
-    ['GRAPH.READ.ENTITY_ID_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
-    ['GRAPH.READ.TEST_SELECTION_FILE_INVALID', 'invalid-input', 'The graph-read input is invalid.'],
-    ['GRAPH.READ.IMPACT_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
-    ['GRAPH.READ.TEST_SELECTION_CANCELLED', 'cancelled', 'The graph read was cancelled.'],
-    [
-      'GRAPH.READ.IMPACT_FAILED',
-      'impact-read-failed',
-      'Graph impact could not be projected safely.',
-    ],
-    [
-      'GRAPH.READ.ENTITY_MALFORMED',
+      'entity-malformed',
       'entity-read-failed',
       'Graph entity detail could not be projected safely.',
     ],
+    ['entity-failed', 'entity-read-failed', 'Graph entity detail could not be projected safely.'],
     [
-      'GRAPH.READ.ENTITY_FAILED',
-      'entity-read-failed',
-      'Graph entity detail could not be projected safely.',
-    ],
-    [
-      'GRAPH.READ.TEST_SELECTION_FAILED',
+      'test-selection-failed',
       'test-selection-failed',
       'Static test selection could not be projected.',
     ],

@@ -90,7 +90,7 @@ function buildGraphPort(): GraphReadPort {
   const rebuild = async (): Promise<Result<Catalog, McpReadError>> => {
     const outcome = await runWithScope(scope, () => runGraph({ cwd: dir, datastore: store }));
     if (outcome.catalog === null) {
-      return err({ code: 'refresh-empty', message: 'Graph build produced no catalog.' });
+      return err({ code: 'graph-refresh-failed', message: 'Graph build produced no catalog.' });
     }
     return ok(outcome.catalog);
   };

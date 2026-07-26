@@ -6,6 +6,7 @@ import {
   type CatalogIdentity,
   type FreshnessVerification,
   type GraphAdapterRegistryReader,
+  type GraphReadError,
 } from '@opensip-cli/graph/read';
 
 import {
@@ -48,19 +49,13 @@ export interface GenerationControllerDeps {
   readonly store: DataStore;
   readonly projectRoot: string;
   readonly adapters: GraphAdapterRegistryReader;
-  readonly readIdentity: (
-    store: DataStore,
-  ) => Result<CatalogIdentity | null, { code: string; message: string; operation?: string }>;
-  readonly loadCatalog: (
-    store: DataStore,
-  ) => Result<Catalog | null, { code: string; message: string; operation?: string }>;
+  readonly readIdentity: (store: DataStore) => Result<CatalogIdentity | null, GraphReadError>;
+  readonly loadCatalog: (store: DataStore) => Result<Catalog | null, GraphReadError>;
   readonly verify: (input: {
     projectRoot: string;
     catalog: Catalog;
     adapters: GraphAdapterRegistryReader;
-  }) => Promise<
-    Result<FreshnessVerification, { code: string; message: string; operation?: string }>
-  >;
+  }) => Promise<Result<FreshnessVerification, GraphReadError>>;
   readonly rebuild: () => Promise<Result<Catalog, McpReadError>>;
   readonly log?: (
     evt: string,

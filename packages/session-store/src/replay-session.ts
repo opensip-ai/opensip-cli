@@ -18,7 +18,7 @@
 
 import { applyAgentFilters } from '@opensip-cli/contracts';
 
-import { resolveSession } from './resolve-session.js';
+import { resolveSession, type SessionResolveReason } from './resolve-session.js';
 
 import type { CommandResult, StoredSession, ToolSessionReplay } from '@opensip-cli/contracts';
 import type { ToolSessionRecord, ToolShortId } from '@opensip-cli/core';
@@ -28,6 +28,21 @@ import type { DataStore } from '@opensip-cli/datastore';
  * One tool's session replay, as the host resolves it. May be async (ADR-0054
  * M4-F): a bundled tool replays in-host; an external tool forks a worker.
  */
+/**
+ * Why a stored session could not be replayed (Plan 01 ruling `result-reason-code-scope`).
+ *
+ * Declared and closed rather than `string`: this value is forwarded onto the MCP wire, so an
+ * untyped field let a new producer put an unreviewed token in front of agents with nothing to
+ * catch it. Owned here, by the package that emits it.
+ */
+export type SessionReplayReason =
+  | 'decode-error'
+  | 'replay-unavailable'
+  // Replay resolves first, so every way resolution can fail is also a way replay can fail.
+  // Stated as a union rather than restated members, so the two cannot drift apart.
+  | SessionResolveReason;
+
+/** A tool's own replay of one stored session back into a `CommandResult`. */
 export type SessionReplayFn = (
   stored: ToolSessionRecord,
 ) => ToolSessionReplay<CommandResult> | Promise<ToolSessionReplay<CommandResult>>;
@@ -53,7 +68,7 @@ export interface ResolveAndReplayOptions {
  * adapter routes each to its identical error emission with no drift.
  */
 export type ReplaySessionOutcome =
-  | { readonly ok: false; readonly reason: string; readonly detail: string }
+  | { readonly ok: false; readonly reason: SessionReplayReason; readonly detail: string }
   | {
       readonly ok: true;
       readonly session: StoredSession;

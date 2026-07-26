@@ -529,8 +529,8 @@ describe('graph handlers (async GraphToolResult)', () => {
   });
 
   it('surfaces graph port failures from walk, path, dead-code, and blast tools', async () => {
-    const failure = err({
-      code: 'catalog-missing',
+    const failure: Result<never, McpReadError> = err({
+      code: 'graph-catalog-unavailable',
       message: 'no catalog',
     });
     const port = fakePort({
@@ -653,7 +653,7 @@ describe('graph handlers (async GraphToolResult)', () => {
       deps(
         fakePort({
           architectureSummary: () =>
-            Promise.resolve(err({ code: 'catalog-missing', message: 'none' })),
+            Promise.resolve(err({ code: 'graph-catalog-unavailable', message: 'none' })),
         }),
       ),
     );
@@ -934,14 +934,14 @@ describe('graph handlers (async GraphToolResult)', () => {
   it('maps port errors through errorResult', async () => {
     const graph = fakePort({
       searchSymbols: (): Promise<Result<GraphToolResult<SymbolSearchDto>, McpReadError>> =>
-        Promise.resolve(err({ code: 'boom', message: 'failed' })),
+        Promise.resolve(err({ code: 'graph-read-failed', message: 'failed' })),
     });
     const { handlers, server } = captureServer();
     registerSearchSymbols(server, deps(graph));
     const result = await handlers.get('search_symbols')!({ query: 'x' });
     const parsed = parseResult(result);
     expect(parsed.isError).toBe(true);
-    expect((parsed.body.error as { code: string }).code).toBe('boom');
+    expect((parsed.body.error as { code: string }).code).toBe('graph-read-failed');
   });
 
   it('get_runtime_wiring forwards bounded filters/page/grouping to its injected port', async () => {

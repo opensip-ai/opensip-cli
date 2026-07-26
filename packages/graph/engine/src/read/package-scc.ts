@@ -3,7 +3,6 @@
 import { err, ok, type Result } from '@opensip-cli/core';
 
 import { codePointSortKey, compareCodePointStrings } from '../code-point-order.js';
-import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { stronglyConnectedComponents } from '../pipeline/strongly-connected-components.js';
 
 import { makeFacet, mergeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
@@ -21,7 +20,6 @@ import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');
 
 /** Labelled package edge retained as evidence for a strongly connected component. */
 export interface PackageCycleProofEdge {
@@ -194,7 +192,7 @@ export function buildPackageScc(
     });
   } catch {
     return err({
-      code: QUERY_INVALID.code,
+      code: 'query-invalid',
       operation: 'analysis',
       message: 'Failed to build package SCCs',
     });

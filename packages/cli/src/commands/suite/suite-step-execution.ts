@@ -9,6 +9,7 @@ import {
 } from '@opensip-cli/core';
 
 import { truncateDerivedMessage } from '../../bootstrap/report-failure.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { runCommandSpecAction } from '../run-command-spec-action.js';
 
 import { withProcessExitGuard } from './suite-step-helpers.js';
@@ -16,6 +17,9 @@ import { withProcessExitGuard } from './suite-step-helpers.js';
 import type { createCapturingContext } from './capturing-context.js';
 import type { ValidatedSuite, ValidatedSuiteStep } from './validate-suite.js';
 import type { RunActionHooks } from '../../bootstrap/run-plane.js';
+
+const CAPABILITY_MISMATCH = hostErrorCatalog.require('CLI.SUITE.CAPABILITY_MISMATCH');
+const EVIDENCE_MISSING = hostErrorCatalog.require('CLI.SUITE.EVIDENCE_MISSING');
 
 export interface RunStepInput {
   readonly suite: ValidatedSuite;
@@ -145,7 +149,7 @@ export function assertStepCompletion(input: {
   if (errorMessage === undefined && input.capabilityMismatch) {
     exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
     errorMessage = 'Suite step returned output outside its declared evidence/verdict capability.';
-    errorCode = 'RUN.CAPABILITY.MISMATCH';
+    errorCode = CAPABILITY_MISMATCH.code;
   }
   if (
     errorMessage === undefined &&
@@ -155,12 +159,12 @@ export function assertStepCompletion(input: {
   ) {
     exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
     errorMessage = 'Verdict-producing suite step completed without session or captured evidence.';
-    errorCode = 'RUN.EVIDENCE.MISSING';
+    errorCode = EVIDENCE_MISSING.code;
   }
   if (errorMessage === undefined && input.evidenceStep && input.evidenceCount === 0) {
     exitCode = Math.max(exitCode, EXIT_CODES.RUNTIME_ERROR);
     errorMessage = 'Evidence-producing suite step completed without a captured contribution.';
-    errorCode = 'RUN.EVIDENCE.MISSING';
+    errorCode = EVIDENCE_MISSING.code;
   }
   return {
     exitCode,

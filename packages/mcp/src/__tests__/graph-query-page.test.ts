@@ -347,7 +347,7 @@ describe('assertJsonPayloadSize / jsonResult', () => {
 
   it('applies the same final byte ceiling to structured error results', () => {
     const tool = errorResult({
-      code: 'oversized-error',
+      code: 'response-too-large',
       message: 'x'.repeat(MAX_JSON_RESULT_BYTES),
     });
     const text = tool.content[0]?.type === 'text' ? tool.content[0].text : '';

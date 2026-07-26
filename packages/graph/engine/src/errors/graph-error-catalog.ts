@@ -20,6 +20,17 @@ import { GRAPH_STABLE_ID } from '../identity.js';
 
 import type { ErrorDefinition } from '@opensip-cli/core';
 
+/**
+ * `publicPresentationKey` on three definitions below is the ruling `result-reason-code-scope`
+ * binding: the same condition is reachable BOTH as a thrown, catalogued error and as a
+ * `GraphReadReason` on the non-throwing `@opensip-cli/graph/read` boundary. The key names the
+ * reason its definition corresponds to, so the two spellings are linked in one declared place
+ * instead of by a reader noticing they look similar.
+ *
+ * The link is declared on the definition, not on the reason, because the definition is the side
+ * that has axes to declare. `GraphReadError` stays a plain-data DTO (ADR-0147).
+ */
+
 /** A caller's read request is unusable. Nothing is wrong with the catalog. */
 const READ_REQUEST = {
   source: 'application',
@@ -51,6 +62,7 @@ export const graphErrorCatalog = defineErrorCatalog(
     'GRAPH.READ.CURSOR_INVALID': {
       ...READ_REQUEST,
       code: 'GRAPH.READ.CURSOR_INVALID',
+      publicPresentationKey: 'cursor-invalid',
       operatorAction:
         'Restart the page sequence without a cursor; cursors are only valid for the catalog generation that issued them.',
       publicMetadataKeys: ['view'],
@@ -66,6 +78,7 @@ export const graphErrorCatalog = defineErrorCatalog(
     'GRAPH.READ.QUERY_INVALID': {
       ...READ_REQUEST,
       code: 'GRAPH.READ.QUERY_INVALID',
+      publicPresentationKey: 'query-invalid',
       operatorAction:
         'Correct the named query field; the message states the supported values or bound for it.',
       publicMetadataKeys: ['view', 'field', 'condition'],
@@ -81,6 +94,7 @@ export const graphErrorCatalog = defineErrorCatalog(
      */
     'GRAPH.CATALOG.UNREADABLE': {
       code: 'GRAPH.CATALOG.UNREADABLE',
+      publicPresentationKey: 'catalog-unreadable',
       source: 'infrastructure',
       defaultResponsibility: 'environment',
       kind: 'integrity',

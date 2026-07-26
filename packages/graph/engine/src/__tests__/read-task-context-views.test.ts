@@ -177,7 +177,7 @@ describe('task-context graph read views', () => {
     ).resolves.toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.IMPACT_INDEX_GENERATION_MISMATCH',
+        code: 'impact-index-generation-mismatch',
         operation: 'analysis',
         message: 'Impact index belongs to a different graph catalog generation',
       },
@@ -679,7 +679,7 @@ describe('task-context graph read views', () => {
     expect(result).toEqual({
       ok: false,
       error: {
-        code: 'GRAPH.READ.TEST_SELECTION_GRAPH_IDENTITY_INVALID',
+        code: 'test-selection-graph-identity-invalid',
         operation: 'analysis',
         message: 'Test selection graph identity must be an exact bounded generation identity',
       },
@@ -752,7 +752,7 @@ describe('task-context graph read views', () => {
     expect(result).toMatchObject({
       ok: false,
       error: {
-        code: 'GRAPH.READ.TEST_SELECTION_CANCELLED',
+        code: 'test-selection-cancelled',
       },
     });
   });
@@ -787,7 +787,7 @@ describe('task-context graph read views', () => {
     setImmediate(() => controller.abort());
     await expect(pending).resolves.toMatchObject({
       ok: false,
-      error: { code: 'GRAPH.READ.TEST_SELECTION_CANCELLED' },
+      error: { code: 'test-selection-cancelled' },
     });
   });
 

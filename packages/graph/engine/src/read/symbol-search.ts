@@ -19,7 +19,6 @@ import {
   compareCodePointStrings,
   matchesContinuationIdentity,
 } from '../code-point-order.js';
-import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import {
   boundedIterableGroups,
@@ -42,8 +41,6 @@ import type { Catalog, Indexes } from '../types.js';
 
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const CURSOR_INVALID = graphErrorCatalog.require('GRAPH.READ.CURSOR_INVALID');
-const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');
 
 /** Fallback page size when a caller-supplied `limit` is absent/non-finite —
  * matches the documented identity-search default (20 nodes). */
@@ -77,7 +74,7 @@ export interface SymbolSearchView {
 }
 
 function searchError(message: string): GraphReadError {
-  return { code: QUERY_INVALID.code, operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 /**
@@ -206,7 +203,7 @@ export function searchSymbolOccurrences(
     const afterStableKey = resolveAfterStableKey(indexes, query, matcher);
     if (afterStableKey === null) {
       return err({
-        code: CURSOR_INVALID.code,
+        code: 'cursor-invalid',
         operation: 'analysis',
         message: 'Cursor continuation anchor is not present in this catalog view',
       });

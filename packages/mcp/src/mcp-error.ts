@@ -7,6 +7,7 @@
 import { formatUnknownErrorMessage } from '@opensip-cli/core';
 
 import type { GraphReadError } from '@opensip-cli/graph/read';
+import type { SessionReplayReason } from '@opensip-cli/session-store';
 
 const MAX_ERROR_MESSAGE = 512;
 const DEFAULT_ERROR_MESSAGE = 'Infrastructure error.';
@@ -95,9 +96,84 @@ function scrubErrorText(raw: string, projectRoot: string | undefined): string {
     .trim();
 }
 
+/**
+ * The closed MCP wire vocabulary (Plan 01 ruling `result-reason-code-scope`).
+ *
+ * These strings are the agent-facing contract, so they are enumerated rather than left as
+ * `string`: an untyped reason field is what lets two handlers drift onto near-synonyms with
+ * nothing to catch it. Lowercase-kebab throughout, deliberately unmistakable for a registered
+ * `OWNER.DOMAIN.CONDITION` error code — a consumer must be able to tell at a glance which
+ * contract it is holding, because only one of the two carries axes and an operator action.
+ *
+ * `fromGraphReadError` maps graph's `GraphReadReason` onto this set explicitly. It does not
+ * forward graph reasons through, which would make graph's internal vocabulary part of this
+ * public surface.
+ */
+export type McpReadReason =
+  | 'ambiguous-latest'
+  | 'baseline-delta-unavailable'
+  | 'baseline-error'
+  | 'blast-unavailable'
+  | 'cancelled'
+  | 'catalog-churn'
+  | 'catalog-generation'
+  | 'catalog-identity'
+  | 'catalog-identity-invalid'
+  | 'catalog-identity-mismatch'
+  | 'catalog-sync-failed'
+  | 'catalog-unreadable'
+  | 'context-run-foreign-project'
+  | 'context-run-invalid-manifest'
+  | 'context-run-read-failed'
+  | 'context-run-unsupported-version'
+  | 'context-run-wrong-kind'
+  | 'cursor-invalid'
+  | 'cursor-project-mismatch'
+  | 'cursor-query-mismatch'
+  | 'cursor-stale'
+  | 'decode-error'
+  | 'entity-not-found'
+  | 'entity-read-failed'
+  | 'execution-run-read-failed'
+  | 'failing-verdict-without-signals'
+  | 'graph-catalog-unavailable'
+  | 'graph-query-failed'
+  | 'graph-read-failed'
+  | 'graph-refresh-failed'
+  | 'graph-source-role-failed'
+  | 'impact-read-failed'
+  | 'input-cap-exceeded'
+  | 'invalid-argument'
+  | 'invalid-context-files'
+  | 'invalid-input'
+  | 'invalid-query'
+  | 'inventory-read-failed'
+  | 'legacy-baseline-payload'
+  | 'mcp-mutation-disabled'
+  | 'missing-baseline'
+  | 'missing-envelope'
+  | 'missing-fingerprint'
+  | 'missing-suite-evidence'
+  | 'not-found'
+  | 'rebuild-empty'
+  | 'rebuild-failed'
+  | 'repair-entrypoint-unavailable'
+  | 'repair-output-invalid'
+  | 'repair-output-too-large'
+  | 'repair-spawn-failed'
+  | 'repair-timeout'
+  | 'replay-unavailable'
+  | 'response-too-large'
+  | 'runtime-wiring-failed'
+  | 'step-fault'
+  | 'symbol-not-found'
+  | 'unknown-tool'
+  | 'wrong-tool'
+  | 'test-selection-failed';
+
 export interface McpReadError {
-  /** Machine-readable reason, e.g. `'ambiguous-symbol'`, `'not-found'`. */
-  readonly code: string;
+  /** Machine-readable reason, e.g. `'symbol-not-found'`, `'not-found'`. */
+  readonly code: McpReadReason;
   /** Human-readable detail (already scrubbed/truncated where relevant). */
   readonly message: string;
   /** Optional bounded structured detail (refresh phase, duration, etc.). */
@@ -106,7 +182,7 @@ export interface McpReadError {
 
 /** Build an {@link McpReadError}. */
 export function readError(
-  code: string,
+  code: McpReadReason,
   message: string,
   details?: Readonly<Record<string, string | number | boolean | undefined>>,
 ): McpReadError {
@@ -127,42 +203,42 @@ export function readError(
  */
 export function fromGraphReadError(error: GraphReadError): McpReadError {
   switch (error.code) {
-    case 'GRAPH.READ.CATALOG_IDENTITY': {
-      return readError(error.code, 'Failed to read graph catalog identity');
+    case 'catalog-identity': {
+      return readError('catalog-identity', 'Failed to read graph catalog identity');
     }
-    case 'GRAPH.READ.CATALOG_GENERATION': {
-      return readError(error.code, 'Failed to load graph catalog generation');
+    case 'catalog-generation': {
+      return readError('catalog-generation', 'Failed to load graph catalog generation');
     }
-    case 'GRAPH.READ.REBUILD_EMPTY': {
-      return readError(error.code, 'Graph rebuild produced an empty catalog');
+    case 'rebuild-empty': {
+      return readError('rebuild-empty', 'Graph rebuild produced an empty catalog');
     }
-    case 'GRAPH.READ.REBUILD_FAILED': {
-      return readError(error.code, 'Graph rebuild failed due to an infrastructure error');
+    case 'rebuild-failed': {
+      return readError('rebuild-failed', 'Graph rebuild failed due to an infrastructure error');
     }
-    case 'GRAPH.READ.CURSOR_INVALID': {
+    case 'cursor-invalid': {
       return readError('cursor-invalid', 'Cursor continuation anchor is invalid.');
     }
-    case 'GRAPH.READ.IMPACT_FILES_CAP':
-    case 'GRAPH.READ.TEST_SELECTION_FILES_CAP': {
+    case 'impact-files-cap':
+    case 'test-selection-files-cap': {
       return readError('input-cap-exceeded', 'The request exceeds a bounded graph-read cap.');
     }
-    case 'GRAPH.READ.IMPACT_FILE_INVALID':
-    case 'GRAPH.READ.ENTITY_ID_INVALID':
-    case 'GRAPH.READ.TEST_SELECTION_FILE_INVALID': {
+    case 'impact-file-invalid':
+    case 'entity-id-invalid':
+    case 'test-selection-file-invalid': {
       return readError('invalid-input', 'The graph-read input is invalid.');
     }
-    case 'GRAPH.READ.IMPACT_CANCELLED':
-    case 'GRAPH.READ.TEST_SELECTION_CANCELLED': {
+    case 'impact-cancelled':
+    case 'test-selection-cancelled': {
       return readError('cancelled', 'The graph read was cancelled.');
     }
-    case 'GRAPH.READ.IMPACT_FAILED': {
+    case 'impact-failed': {
       return readError('impact-read-failed', 'Graph impact could not be projected safely.');
     }
-    case 'GRAPH.READ.ENTITY_MALFORMED':
-    case 'GRAPH.READ.ENTITY_FAILED': {
+    case 'entity-malformed':
+    case 'entity-failed': {
       return readError('entity-read-failed', 'Graph entity detail could not be projected safely.');
     }
-    case 'GRAPH.READ.TEST_SELECTION_FAILED': {
+    case 'test-selection-failed': {
       return readError('test-selection-failed', 'Static test selection could not be projected.');
     }
     default: {
@@ -178,4 +254,32 @@ export function unexpectedRefreshError(durationMs?: number): McpReadError {
     outcome: 'failed',
     ...(durationMs === undefined ? {} : { durationMs }),
   });
+}
+
+/**
+ * Map a session-store replay/resolve reason onto the MCP wire.
+ *
+ * Explicit, like {@link fromGraphReadError}, rather than forwarding the upstream reason
+ * through: forwarding makes another package's internal vocabulary part of this public surface,
+ * so a rename there silently becomes a wire break here. The members happen to coincide today —
+ * that is what makes the forwarding version look harmless, and exactly why it is not.
+ */
+export function fromSessionReason(reason: SessionReplayReason, detail: string): McpReadError {
+  switch (reason) {
+    case 'not-found': {
+      return readError('not-found', detail);
+    }
+    case 'wrong-tool': {
+      return readError('wrong-tool', detail);
+    }
+    case 'ambiguous-latest': {
+      return readError('ambiguous-latest', detail);
+    }
+    case 'decode-error': {
+      return readError('decode-error', detail);
+    }
+    case 'replay-unavailable': {
+      return readError('replay-unavailable', detail);
+    }
+  }
 }

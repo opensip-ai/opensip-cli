@@ -20,7 +20,7 @@ import { registerReviewChange } from '../review-change.js';
 import { registerShowExecutionRun } from '../show-execution-run.js';
 import { registerShowRun } from '../show-run.js';
 
-import type { McpReadError } from '../../mcp-error.js';
+import type { McpReadReason, McpReadError } from '../../mcp-error.js';
 import type { RepairApplyVerifyInput, RepairWritePort } from '../../repair-write-port.js';
 import type {
   CompareToBaselineOptions,
@@ -83,12 +83,16 @@ function fakeResults(over: Partial<ResultsReadPort>): ResultsReadPort {
         effectiveLimit: 20,
         truncated: false,
       }),
-    showExecutionRun: () => err({ code: 'x', message: 'x' }),
+    showExecutionRun: () => err({ code: 'test-dependency-unused' as McpReadReason, message: 'x' }),
     listRuns: () => ok([]),
-    showRun: () => Promise.resolve(err({ code: 'x', message: 'x' })),
-    latestFindings: () => Promise.resolve(err({ code: 'x', message: 'x' })),
-    reviewChange: () => Promise.resolve(err({ code: 'x', message: 'x' })),
-    compareToBaseline: () => Promise.resolve(err({ code: 'x', message: 'x' })),
+    showRun: () =>
+      Promise.resolve(err({ code: 'test-dependency-unused' as McpReadReason, message: 'x' })),
+    latestFindings: () =>
+      Promise.resolve(err({ code: 'test-dependency-unused' as McpReadReason, message: 'x' })),
+    reviewChange: () =>
+      Promise.resolve(err({ code: 'test-dependency-unused' as McpReadReason, message: 'x' })),
+    compareToBaseline: () =>
+      Promise.resolve(err({ code: 'test-dependency-unused' as McpReadReason, message: 'x' })),
   };
   return { ...base, ...over };
 }
@@ -121,17 +125,26 @@ function deps(results: ResultsReadPort, validToolIds = new Set(['fit', 'graph'])
     codebase: {
       inventoryStatus: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Codebase reads are not under test.',
+          }),
         ),
       fileContext: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Codebase reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Codebase reads are not under test.',
+          }),
         ),
     },
     context: {
       contextStatus: () =>
         Promise.resolve(
-          err({ code: 'test-dependency-unused', message: 'Context reads are not under test.' }),
+          err({
+            code: 'test-dependency-unused' as McpReadReason,
+            message: 'Context reads are not under test.',
+          }),
         ),
     },
     results,
@@ -374,7 +387,10 @@ describe('repair_apply_verify handler', () => {
     }
     {
       const repairWrite: RepairWritePort = {
-        applyVerify: () => Promise.resolve(err({ code: 'repair-failed', message: 'nope' })),
+        applyVerify: () =>
+          Promise.resolve(
+            err({ code: 'test-dependency-unused' as McpReadReason, message: 'nope' }),
+          ),
       };
       const { server, handlers } = captureServer();
       registerRepairApplyVerify(server, {
@@ -392,7 +408,7 @@ describe('repair_apply_verify handler', () => {
         }),
       );
       expect(out.isError).toBe(true);
-      expect((out.body.error as McpReadError).code).toBe('repair-failed');
+      expect((out.body.error as McpReadError).code).toBe('test-dependency-unused');
     }
   });
 });
@@ -493,7 +509,8 @@ describe('review_change handler', () => {
         catalogStatus: () =>
           Promise.resolve(
             err({
-              code: 'GRAPH.READ.CATALOG_GENERATION',
+              code: 'catalog-generation',
+              operation: 'catalog-generation',
               message: 'Failed to load graph catalog generation',
             }),
           ),
@@ -630,7 +647,10 @@ describe('list_execution_runs handler', () => {
         fakeResults({
           listExecutionRuns: (opts) => {
             seen = opts;
-            return err({ code: 'execution-run-read-failed', message: 'Stored evidence failed.' });
+            return err({
+              code: 'execution-run-read-failed',
+              message: 'Stored evidence failed.',
+            });
           },
         }),
       ),
@@ -674,7 +694,9 @@ describe('show_execution_run handler', () => {
           },
           showRun: () => {
             legacyCalled = true;
-            return Promise.resolve(err({ code: 'unexpected', message: 'unexpected' }));
+            return Promise.resolve(
+              err({ code: 'test-dependency-unused' as McpReadReason, message: 'unexpected' }),
+            );
           },
         }),
       ),
@@ -701,7 +723,10 @@ describe('show_execution_run handler', () => {
         fakeResults({
           showExecutionRun: (opts) => {
             seen = opts;
-            return err({ code: 'not-found', message: 'Execution Run was not found.' });
+            return err({
+              code: 'not-found',
+              message: 'Execution Run was not found.',
+            });
           },
         }),
       ),
@@ -781,7 +806,11 @@ describe('list_runs handler', () => {
     const { server, handlers } = captureServer();
     registerListRuns(
       server,
-      deps(fakeResults({ listRuns: () => err({ code: 'boom', message: 'x' }) })),
+      deps(
+        fakeResults({
+          listRuns: () => err({ code: 'graph-read-failed', message: 'x' }),
+        }),
+      ),
     );
     const out = parseResult(handlers.get('list_runs')!({}) as CallToolResult);
     expect(out.isError).toBe(true);
@@ -890,7 +919,11 @@ describe('get_agent_catalog handler', () => {
     const { server, handlers } = captureServer();
     registerGetAgentCatalog(
       server,
-      deps(fakeResults({ agentCatalog: () => err({ code: 'boom', message: 'x' }) })),
+      deps(
+        fakeResults({
+          agentCatalog: () => err({ code: 'graph-read-failed', message: 'x' }),
+        }),
+      ),
     );
     const out = parseResult(handlers.get('get_agent_catalog')!({}) as CallToolResult);
     expect(out.isError).toBe(true);

@@ -1,7 +1,6 @@
 /** Per-generation freshness verification, coalescing, caching, and events. */
 
 import { err, ok, type Result } from '@opensip-cli/core';
-import { graphErrorCatalog } from '@opensip-cli/graph/read';
 
 import { fromGraphReadError, type McpReadError } from './mcp-error.js';
 
@@ -10,11 +9,9 @@ import type {
   Catalog,
   FreshnessVerification,
   GraphAdapterRegistryReader,
+  GraphReadError,
+  GraphReadReason,
 } from '@opensip-cli/graph/read';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');
 
 export const FRESHNESS_BURST_MS = 2000;
 
@@ -25,9 +22,7 @@ export interface CatalogFreshnessDeps {
     projectRoot: string;
     catalog: Catalog;
     adapters: GraphAdapterRegistryReader;
-  }) => Promise<
-    Result<FreshnessVerification, { code: string; message: string; operation?: string }>
-  >;
+  }) => Promise<Result<FreshnessVerification, GraphReadError>>;
   readonly isCurrentGeneration: (key: string) => boolean;
   readonly log?: (
     evt: string,
@@ -102,10 +97,12 @@ export class CatalogFreshnessController {
         adapters: this.deps.adapters,
       });
     } catch {
+      // A plain-data DTO, not a ToolError: ADR-0147 keeps stack/cause/SQLite paths from
+      // structurally crossing the boundary MCP serves to agents. The registered definition
+      // this reason corresponds to declares the link via `publicPresentationKey`.
       result = err({
-        code: CATALOG_UNREADABLE.code,
-        definition: CATALOG_UNREADABLE,
-        metadata: { view: 'verify-failed' },
+        code: 'catalog-unreadable',
+        operation: 'catalog-generation',
         message: 'Catalog verification failed due to an infrastructure error',
       });
     }
@@ -150,7 +147,7 @@ export class CatalogFreshnessController {
   }
 }
 
-function mapVerifyError(error: { code: string; message: string }): McpReadError {
+function mapVerifyError(error: { code: GraphReadReason; message: string }): McpReadError {
   return fromGraphReadError({
     code: error.code,
     operation: 'catalog-generation',

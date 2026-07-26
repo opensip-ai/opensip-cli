@@ -7,11 +7,11 @@ import { catalogGenerationKey } from '../read/catalog-generation-key.js';
 import { CatalogRepo } from './catalog-repo.js';
 
 import type { ContextCatalogAccessor } from '../read/catalog.js';
-import type { GraphReadError } from '../read/types.js';
+import type { GraphReadError, GraphReadReason } from '../read/types.js';
 import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
-function accessError(code: string, message: string): GraphReadError {
+function accessError(code: GraphReadReason, message: string): GraphReadError {
   return { code, operation: 'catalog-generation', message };
 }
 
@@ -20,7 +20,7 @@ function currentRepo(): Result<CatalogRepo, GraphReadError> {
   if (datastore === undefined) {
     return err(
       accessError(
-        'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED',
+        'context-catalog-datastore-required',
         'Graph context requires an entered project datastore.',
       ),
     );
@@ -30,7 +30,7 @@ function currentRepo(): Result<CatalogRepo, GraphReadError> {
 
 function withCurrentRepo<T>(
   operation: (repo: CatalogRepo) => T,
-  failureCode: string,
+  failureCode: GraphReadReason,
   failureMessage: string,
 ): Result<T, GraphReadError> {
   const repo = currentRepo();
@@ -48,7 +48,7 @@ export function createContextCatalogAccessor(): ContextCatalogAccessor {
     load: () =>
       withCurrentRepo(
         (repo) => repo.loadFullCatalog(),
-        'GRAPH.CONTEXT_CATALOG.LOAD_FAILED',
+        'context-catalog-load-failed',
         'Failed to load the graph context catalog.',
       ),
     generationIdentity: () =>
@@ -57,13 +57,13 @@ export function createContextCatalogAccessor(): ContextCatalogAccessor {
           const identity = repo.readIdentity();
           return identity === null ? null : catalogGenerationKey(identity);
         },
-        'GRAPH.CONTEXT_CATALOG.IDENTITY_FAILED',
+        'context-catalog-identity-failed',
         'Failed to read the graph context catalog identity.',
       ),
     replace: (catalog: Catalog) =>
       withCurrentRepo(
         (repo) => repo.replaceAll(catalog),
-        'GRAPH.CONTEXT_CATALOG.REPLACE_FAILED',
+        'context-catalog-replace-failed',
         'Failed to replace the graph context catalog.',
       ),
   });

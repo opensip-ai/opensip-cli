@@ -89,6 +89,7 @@ export {
 
 export type {
   GraphReadError,
+  GraphReadReason,
   GraphReadOperation,
   CatalogIdentity,
   RebuildCatalogInput,

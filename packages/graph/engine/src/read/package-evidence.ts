@@ -3,7 +3,6 @@
 import { err, ok, type Result } from '@opensip-cli/core';
 
 import { codePointSortKey, compareCodePointStrings } from '../code-point-order.js';
-import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { buildFeatures } from '../pipeline/features.js';
 import {
   occurrenceCallGraphFor,
@@ -48,7 +47,6 @@ import type {
 
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');
 
 export interface PackageEvidenceQuery {
   readonly edgeKind: PackageEdgeKind;
@@ -200,7 +198,7 @@ function addReason(reasons: Set<string>, reason: string): void {
 
 function peError(message: string): GraphReadError {
   return {
-    code: QUERY_INVALID.code,
+    code: 'query-invalid',
     operation: 'analysis',
     message,
   };

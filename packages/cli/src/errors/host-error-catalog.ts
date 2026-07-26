@@ -407,5 +407,40 @@ export const hostErrorCatalog = defineErrorCatalog(
         'Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it.',
       publicMetadataKeys: ['condition'],
     },
+
+    /**
+     * A suite step returned output outside the evidence/verdict capability it declared.
+     *
+     * Host-detected, and it fails the step — so it belongs in the same `errorCode` field that
+     * otherwise carries registered codes lifted from tool failures. It was written
+     * `RUN.CAPABILITY.MISMATCH`, a head no catalog declared, which made a host-detected
+     * contract breach report as an unknown internal failure.
+     */
+    'CLI.SUITE.CAPABILITY_MISMATCH': {
+      ...HOST_WIRING,
+      code: 'CLI.SUITE.CAPABILITY_MISMATCH',
+      kind: 'invariant',
+      exposure: 'public',
+      operatorAction:
+        'The step produced output its declared capability does not allow. Report it to the tool author; the suite definition cannot fix it.',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A step that must produce evidence or a verdict completed with neither.
+     *
+     * Distinct from `CAPABILITY_MISMATCH`: there the step produced the wrong KIND of output,
+     * here it produced none at all, and a suite that reported a pass on it would be a false
+     * green — the exact failure this plan exists to remove.
+     */
+    'CLI.SUITE.EVIDENCE_MISSING': {
+      ...HOST_WIRING,
+      code: 'CLI.SUITE.EVIDENCE_MISSING',
+      kind: 'invariant',
+      exposure: 'public',
+      operatorAction:
+        'The step completed without the evidence or verdict it is required to produce. Re-run with --verbose; if it repeats, report it to the tool author.',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

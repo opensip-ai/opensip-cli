@@ -341,22 +341,35 @@ describe('GraphGenerationController', () => {
     } satisfies Omit<GenerationControllerDeps, 'readIdentity' | 'loadCatalog'>;
     const identityFailure = new GraphGenerationController({
       ...common,
-      readIdentity: () => err({ code: 'IDENTITY_FAILED', message: 'private database path' }),
+      readIdentity: () =>
+        err({
+          code: 'catalog-identity',
+          operation: 'catalog-identity',
+          message: 'private database path',
+        }),
       loadCatalog: () => ok(null),
     });
     const identityResult = await identityFailure.capture();
     expect(identityResult.ok).toBe(false);
-    if (!identityResult.ok) expect(identityResult.error.code).toBe('graph-read-failed');
+    // The arms this test is named for now map to their own wire codes. They previously
+    // collapsed onto `graph-read-failed` only because the fixture used `IDENTITY_FAILED`, a
+    // string that was never a real graph reason and so fell through to the default arm.
+    if (!identityResult.ok) expect(identityResult.error.code).toBe('catalog-identity');
 
     const value = catalog('01');
     const loadFailure = new GraphGenerationController({
       ...common,
       readIdentity: () => ok(identityOf(value)),
-      loadCatalog: () => err({ code: 'LOAD_FAILED', message: 'private database path' }),
+      loadCatalog: () =>
+        err({
+          code: 'catalog-generation',
+          operation: 'catalog-generation',
+          message: 'private database path',
+        }),
     });
     const loadResult = await loadFailure.capture();
     expect(loadResult.ok).toBe(false);
-    if (!loadResult.ok) expect(loadResult.error.code).toBe('graph-read-failed');
+    if (!loadResult.ok) expect(loadResult.error.code).toBe('catalog-generation');
   });
 
   it('retains the prior generation when a changed JSON payload fails structural load', async () => {
@@ -371,7 +384,8 @@ describe('GraphGenerationController', () => {
       loadCatalog: () =>
         changed
           ? err({
-              code: 'GRAPH.READ.CATALOG_GENERATION',
+              code: 'catalog-generation',
+              operation: 'catalog-generation',
               message: 'bounded load failure',
             })
           : ok(first),
@@ -527,7 +541,7 @@ describe('GraphGenerationController', () => {
     expect(setup.logs).toContainEqual({
       event: 'mcp.graph.freshness.failed',
       fields: {
-        reasonCode: 'GRAPH.CATALOG.UNREADABLE',
+        reasonCode: 'catalog-unreadable',
         verification: 'failed',
         resolutionMode: 'exact',
         engineMode: 'unknown',
@@ -570,7 +584,8 @@ describe('GraphGenerationController', () => {
     const setup = harness();
     setup.verify.mockResolvedValueOnce(
       err({
-        code: 'GRAPH.CATALOG.UNREADABLE',
+        code: 'catalog-unreadable',
+        operation: 'catalog-generation',
         message: 'bounded verify failure',
       }),
     );
@@ -596,7 +611,7 @@ describe('GraphGenerationController', () => {
     expect(initial.ok && initial.value).toBeDefined();
     setup.persist(null);
     setup.rebuild.mockResolvedValueOnce(
-      err({ code: 'rebuild-failed', message: 'bounded rebuild failure' }),
+      err({ code: 'rebuild-failed', operation: 'rebuild', message: 'bounded rebuild failure' }),
     );
 
     const refreshed = await setup.controller.refresh(true);

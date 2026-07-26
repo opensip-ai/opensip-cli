@@ -7,8 +7,6 @@
 import { err, ok, type Result } from '@opensip-cli/core';
 import { Minimatch } from 'minimatch';
 
-import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
-
 import { graphPackageOf } from './query-contracts.js';
 
 import type { AuditSourceRolePolicy, GraphSourceFilter } from './query-contracts.js';
@@ -17,7 +15,6 @@ import type { FunctionOccurrence } from '../types.js';
 
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');
 
 /**
  * Max unique normalized project-relative catalog file paths classified against
@@ -80,7 +77,7 @@ export function compileSourceRoleMatcher(
     matchers = policy.testGlobs.map((glob) => new Minimatch(glob, MINIMATCH_OPTIONS));
   } catch {
     return err({
-      code: QUERY_INVALID.code,
+      code: 'query-invalid',
       operation: 'analysis',
       message: 'Failed to compile an audit source-role glob.',
     });
@@ -92,7 +89,7 @@ export function compileSourceRoleMatcher(
     considered.add(filePath);
     if (considered.size > limits.maxFiles) {
       return err({
-        code: QUERY_INVALID.code,
+        code: 'query-invalid',
         operation: 'analysis',
         message: 'Audit source-role classification exceeded the file limit.',
       });

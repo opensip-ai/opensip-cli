@@ -55,7 +55,7 @@ describe('context catalog RunScope accessor', () => {
       const expected = {
         ok: false,
         error: {
-          code: 'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED',
+          code: 'context-catalog-datastore-required',
           operation: 'catalog-generation',
           message: 'Graph context requires an entered project datastore.',
         },

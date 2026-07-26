@@ -14,7 +14,6 @@ import {
   compareCodePointStrings,
   matchesContinuationIdentity,
 } from '../code-point-order.js';
-import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import {
   insertBoundedTopK,
@@ -45,8 +44,6 @@ import type {
 
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
-const CURSOR_INVALID = graphErrorCatalog.require('GRAPH.READ.CURSOR_INVALID');
-const QUERY_INVALID = graphErrorCatalog.require('GRAPH.READ.QUERY_INVALID');
 
 /** Match semantics for declaration search (mirrors symbol search). */
 export type DeclarationSearchMatch = 'substring' | 'exact' | 'qualified';
@@ -138,7 +135,7 @@ export interface ReferencesToView {
 }
 
 function viewError(message: string): GraphReadError {
-  return { code: QUERY_INVALID.code, operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 function occurrenceLike(fact: {
@@ -423,7 +420,7 @@ export function searchDeclarationFacts(
       );
       if (found === undefined) {
         return err({
-          code: CURSOR_INVALID.code,
+          code: 'cursor-invalid',
           operation: 'analysis',
           message: 'Cursor continuation anchor is not present in this catalog view',
         });
@@ -534,7 +531,7 @@ export function referencesToDeclaration(
       );
       if (found === undefined) {
         return err({
-          code: CURSOR_INVALID.code,
+          code: 'cursor-invalid',
           operation: 'analysis',
           message: 'Cursor continuation anchor is not present in this catalog view',
         });

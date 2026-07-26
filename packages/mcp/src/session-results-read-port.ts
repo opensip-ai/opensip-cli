@@ -27,7 +27,7 @@ import {
 } from '@opensip-cli/session-store';
 
 import { listStoredExecutionRuns, showStoredExecutionRun } from './execution-run-read.js';
-import { readError, sanitizeMcpErrorMessage } from './mcp-error.js';
+import { readError, sanitizeMcpErrorMessage, fromSessionReason } from './mcp-error.js';
 import { buildPersistedReviewBrief, type PersistedReviewStep } from './persisted-review-brief.js';
 import {
   baselineComparisonReplay,
@@ -148,7 +148,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(opts.filters?.length ? { filters: opts.filters } : {}),
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
-    if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
+    if (!outcome.ok) return err(fromSessionReason(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
     if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref);
     return ok({
@@ -172,7 +172,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(filters.length > 0 ? { filters } : {}),
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
-    if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
+    if (!outcome.ok) return err(fromSessionReason(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
     if (!this.isSessionInScope(session)) return this.foreignSessionNotFound('latest');
     const findings = replay.envelope.signals.map(toMcpFinding);
@@ -266,7 +266,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       replayFor: this.replayFor,
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
-    if (!outcome.ok) return err(readError(outcome.reason, outcome.detail));
+    if (!outcome.ok) return err(fromSessionReason(outcome.reason, outcome.detail));
     const { session, replay } = outcome;
     if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref ?? 'latest');
 
@@ -306,7 +306,7 @@ export class SessionResultsReadPort implements ResultsReadPort {
       ...(tool === undefined ? {} : { tool }),
       ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
     });
-    if (!resolved.ok) return err(readError(resolved.reason, resolved.detail));
+    if (!resolved.ok) return err(fromSessionReason(resolved.reason, resolved.detail));
     if (!this.isSessionInScope(resolved.session)) {
       return this.foreignSessionNotFound(ref);
     }
