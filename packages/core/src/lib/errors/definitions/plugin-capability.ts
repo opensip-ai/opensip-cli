@@ -246,4 +246,36 @@ export const pluginCapabilityDefinitions = {
     lifecycle: 'active',
     publicMetadataKeys: ['errno', 'condition'],
   },
+  /**
+   * A tool tried to overwrite an existing `RunScope` key.
+   *
+   * The guard tests `key in scope`, not own-property, so prototype members like `dispose` are
+   * protected from shadowing too — a tool cannot capture the scope by redefining a method.
+   */
+  'PLUGIN.SCOPE_CONTRIBUTION.COLLISION': {
+    ...PLUGIN_ADMISSION,
+    code: 'PLUGIN.SCOPE_CONTRIBUTION.COLLISION',
+    kind: 'conflict',
+    operatorAction:
+      'Rename the scope contribution; a tool may not overwrite a key the host or another tool already owns.',
+    publicMetadataKeys: ['key'],
+  },
+
+  /** A tool tried to contribute a scope key the host reserves. */
+  'PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY': {
+    ...PLUGIN_ADMISSION,
+    code: 'PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY',
+    kind: 'security',
+    operatorAction: 'Choose a scope contribution key outside the host-reserved namespace.',
+    publicMetadataKeys: ['key'],
+  },
+
+  /** A tool's scope contribution is not a usable shape. */
+  'PLUGIN.SCOPE_CONTRIBUTION.INVALID': {
+    ...PLUGIN_ADMISSION,
+    code: 'PLUGIN.SCOPE_CONTRIBUTION.INVALID',
+    kind: 'validation',
+    operatorAction: 'Contribute scope values as plain data; see the tool contract for the shape.',
+    publicMetadataKeys: ['key'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

@@ -65,6 +65,7 @@ import {
   USER_UNINSTALL_RECEIPT_FILE,
 } from './paths.js';
 
+import type { ErrorDefinition } from './error-definition.js';
 import type { BigIntStats } from 'node:fs';
 
 const STATE_VERSION = 1;
@@ -637,20 +638,39 @@ function recoveryRequired(message: string): ConfigurationError {
   });
 }
 
+/**
+ * Registered timeout definition per lease wait kind.
+ *
+ * Replaces `code: \`TIMEOUT.${kind.toUpperCase().replaceAll('-', '_')}\`` — a dynamically
+ * minted TWO-segment code, which `CODE_GRAMMAR` rejects, so none of these could ever be
+ * registered and all five inherited the generic `TIMEOUT` axes. An explicit map also means a
+ * new wait kind is a compile error here rather than a silently unregistered code at runtime.
+ */
+const LEASE_WAIT_TIMEOUTS: Record<RuntimeLeaseWaitKind, ErrorDefinition> = {
+  'runtime-read': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.READ'),
+  'runtime-exclusive': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.EXCLUSIVE'),
+  'runtime-access-composite': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE'),
+  'user-state-read': coreErrorCatalog.require('TIMEOUT.RUNTIME_LEASE.USER_STATE_READ'),
+  'runtime-global-maintenance': coreErrorCatalog.require(
+    'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
+  ),
+};
+
 function timeoutError(kind: RuntimeLeaseWaitKind, waitMs: number): TimeoutError {
   const guidance =
     kind === 'runtime-exclusive' || kind === 'runtime-global-maintenance'
       ? ' Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.'
       : '';
+  const definition = LEASE_WAIT_TIMEOUTS[kind];
   return new TimeoutError(
     `Timed out waiting for ${kind} coordination after ${waitMs}ms.${guidance}`,
-    { code: `TIMEOUT.${kind.toUpperCase().replaceAll('-', '_')}` },
+    { code: definition.code, definition, metadata: { waitMs } },
   );
 }
 
 /** @throws {Error} Always rethrows the input error or maps a coordination timeout. */
 function mapCoordinationTimeout(error: unknown, kind: RuntimeLeaseWaitKind, waitMs: number): never {
-  if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION_MUTEX') {
+  if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION.MUTEX') {
     throw timeoutError(kind, waitMs);
   }
   throw error;
@@ -3542,7 +3562,7 @@ function acquireRuntimeMutex(
         });
         throw new TimeoutError(
           `Timed out waiting for runtime coordination mutex after ${waitMs}ms`,
-          { code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' },
+          { code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX' },
         );
       }
       emitMutexEvent(environment, onEvent, {
@@ -3595,7 +3615,7 @@ function acquireRuntimeMutexSync(
     const remainingMs = deadline - environment.monotonicNow();
     if (remainingMs <= 0) {
       throw new TimeoutError('Timed out releasing runtime coordination state', {
-        code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX',
+        code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX',
       });
     }
     const delay = Math.min(policy.pollMs, Math.max(1, remainingMs));
@@ -6401,7 +6421,7 @@ async function acquireWriter(
     }
   } catch (error) {
     await cleanupFailedWriter(enqueuedWriter ?? stagedWriter, input, policy, cleanupReservation);
-    if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION_MUTEX') {
+    if (error instanceof TimeoutError && error.code === 'TIMEOUT.RUNTIME_COORDINATION.MUTEX') {
       throw timeoutError(options.waitKind, policy.waitMs);
     }
     throw error;

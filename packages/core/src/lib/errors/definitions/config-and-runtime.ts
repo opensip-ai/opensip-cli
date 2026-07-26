@@ -214,4 +214,20 @@ export const configAndRuntimeDefinitions = {
       'git could not be run, so changed-file detection is unavailable this run. Check that git is installed and the directory is a repository.',
     publicMetadataKeys: ['condition', 'exitCode'],
   },
+  /**
+   * A file exceeds the bound this reader will load.
+   *
+   * `resource`, not `validation`: the bound is an anti-DoS work limit over untrusted input,
+   * and the actionable fact is the size, not the caller's request.
+   */
+  'SYSTEM.FILE.TOO_LARGE': {
+    ...USER_CONFIGURATION,
+    code: 'SYSTEM.FILE.TOO_LARGE',
+    defaultResponsibility: 'user',
+    kind: 'resource',
+    exitClass: 'configuration',
+    operatorAction:
+      'The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set.',
+    publicMetadataKeys: ['maxBytes'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

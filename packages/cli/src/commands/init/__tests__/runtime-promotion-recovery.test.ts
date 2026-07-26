@@ -390,7 +390,7 @@ const RECOVERY_ENTRY_CASES = [
   {
     name: 'exclusive-lease timeout',
     header: { status: 'valid', operationId: OPERATION_ID, state: 'open' },
-    leaseErrorCode: 'TIMEOUT.RUNTIME_EXCLUSIVE',
+    leaseErrorCode: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE',
     expectedStatus: 'busy',
     expectedReasonCode: 'lease-busy',
   },

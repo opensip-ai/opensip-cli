@@ -124,11 +124,14 @@ export const RUNTIME_COORDINATION_FAILURE_CODES: readonly string[] = Object.free
   // Caller-contract violations. A consumer deciding "is this a bounded coordination failure"
   // wants these too: from the outside, "the lease refused me" is one situation regardless of
   // whether the cause was contention or a protocol misuse.
+  'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
   'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+  'SYSTEM.RUNTIME_LEASE.CANCELLED',
   'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
   'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
   'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
   'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
+  'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
   'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
   'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
   'VALIDATION.RUNTIME_COORDINATION.INPUT',

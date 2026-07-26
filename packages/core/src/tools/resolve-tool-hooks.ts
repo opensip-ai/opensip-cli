@@ -68,7 +68,7 @@ function installValidatedContribution(
     throw new PluginIncompatibleError(
       `tool '${tool.metadata.name || tool.metadata.id}' returned a non-object scope contribution`,
       {
-        code: 'PLUGIN.SCOPE_CONTRIBUTION_INVALID',
+        code: 'PLUGIN.SCOPE_CONTRIBUTION.INVALID',
         diagnostic: 'contributeScope must return a plain object',
       },
     );
@@ -79,7 +79,7 @@ function installValidatedContribution(
       throw new PluginIncompatibleError(
         `tool '${tool.metadata.name || tool.metadata.id}' returned forbidden scope key '${key}'`,
         {
-          code: 'PLUGIN.SCOPE_CONTRIBUTION_FORBIDDEN_KEY',
+          code: 'PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY',
           diagnostic: `forbidden scope key '${key}'`,
         },
       );
@@ -90,7 +90,7 @@ function installValidatedContribution(
       throw new PluginIncompatibleError(
         `tool '${tool.metadata.name || tool.metadata.id}' attempted to overwrite scope key '${key}'`,
         {
-          code: 'PLUGIN.SCOPE_CONTRIBUTION_COLLISION',
+          code: 'PLUGIN.SCOPE_CONTRIBUTION.COLLISION',
           diagnostic: `scope key '${key}' already exists`,
         },
       );

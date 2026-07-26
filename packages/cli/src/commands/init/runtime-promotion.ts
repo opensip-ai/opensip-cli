@@ -119,7 +119,8 @@ function defaultDependencies(
 function isLeaseBusy(error: unknown): boolean {
   if (typeof error !== 'object' || error === null || !('code' in error)) return false;
   return (
-    error.code === 'TIMEOUT.RUNTIME_EXCLUSIVE' || error.code === 'CORE.RUNTIME_COORDINATION.BUSY'
+    error.code === 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' ||
+    error.code === 'CORE.RUNTIME_COORDINATION.BUSY'
   );
 }
 

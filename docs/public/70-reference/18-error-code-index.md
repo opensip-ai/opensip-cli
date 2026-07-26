@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **13**
-- Definitions: **104**
+- Definitions: **117**
 
 ## Catalogs
 
@@ -27,11 +27,11 @@ generated: true
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `@opensip-cli/tree-sitter` | `@opensip-cli/tree-sitter` | `packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts` | 2 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 11 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 20 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/file-lock.ts` | 11 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 18 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/plugin-capability.ts` | 12 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 16 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/plugin-capability.ts` | 15 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 17 |
 
 ## Codes
 
@@ -97,10 +97,14 @@ generated: true
 | `PLUGIN.ERROR_CATALOG.COLLISION` | `@opensip-cli/core` | application | tool-author | conflict | never | error | plugin-incompatible | active | Two tools declare the same error code. Uninstall one, or ask its author to move the code under a namespace the tool owns. |
 | `PLUGIN.ERROR_CATALOG.INVALID` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the tool |
 | `PLUGIN.FINGERPRINT_STRATEGY.STAMP_FAILED` | `@opensip-cli/core` | application | tool-author | invariant | never | warning | success | active | The tool |
+| `PLUGIN.SCOPE_CONTRIBUTION.COLLISION` | `@opensip-cli/core` | application | tool-author | conflict | never | error | plugin-incompatible | active | Rename the scope contribution; a tool may not overwrite a key the host or another tool already owns. |
+| `PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Choose a scope contribution key outside the host-reserved namespace. |
+| `PLUGIN.SCOPE_CONTRIBUTION.INVALID` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Contribute scope values as plain data; see the tool contract for the shape. |
 | `RESOURCE.NOT_FOUND.RECIPE` | `@opensip-cli/fitness` | application | user | not-found | never | error | not-found | active | Run opensip fit recipes to list available recipes. |
 | `SIMULATION.SCENARIO.ABORTED` | `@opensip-cli/simulation` | application | user | cancelled | never | error | cancelled | active | Scenario was cancelled. Re-run if the work is still needed. |
 | `SYSTEM_ERROR` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Retry once; if it persists, capture the run id and report a bug. |
 | `SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The tool that declares this capability domain never wired its registrar. Report it to the tool author with the run id. |
+| `SYSTEM.FILE.TOO_LARGE` | `@opensip-cli/core` | application | user | resource | never | error | configuration | active | The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set. |
 | `SYSTEM.FITNESS.SESSION_IN_PROGRESS` | `@opensip-cli/fitness` | application | tool-author | conflict | never | error | runtime | active | Wait for the active fitness session to finish or abort it. |
 | `SYSTEM.IMPACT.INDEX_GENERATION_MISMATCH` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The impact index does not match the graph catalog generation. Rebuild the graph and retry. |
 | `SYSTEM.PLUGINS.ENTRY_ESCAPES_PACKAGE` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Point the pack |
@@ -109,11 +113,14 @@ generated: true
 | `SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH` | `@opensip-cli/core` | infrastructure | environment | conflict | transient | error | runtime | active | The record changed while it was being updated. Re-read the current state and retry the operation. |
 | `SYSTEM.RUNTIME_COORDINATION.EXISTS` | `@opensip-cli/core` | infrastructure | environment | conflict | never | error | runtime | active | The runtime coordination record already exists. Read the existing record instead of creating it. |
 | `SYSTEM.RUNTIME_COORDINATION.INVALID_KEY` | `@opensip-cli/core` | application | tool-author | validation | never | error | runtime | active | Supply a runtime coordination key that matches the documented key grammar. |
+| `SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST` | `@opensip-cli/core` | application | environment | integrity | transient | error | runtime | active | The exclusive lease was lost while recovery was running. Re-run; the operation made no partial change. |
 | `SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE` | `@opensip-cli/core` | application | tool-author | permission | never | error | runtime | active | This lease handle does not carry authority for the requested operation. Acquire the correct authority instead of widening this one. |
+| `SYSTEM.RUNTIME_LEASE.CANCELLED` | `@opensip-cli/core` | application | user | cancelled | never | error | cancelled | active | Lease acquisition was cancelled. Re-run if the work is still needed. |
 | `SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Enqueue at most one runtime writer request per owner token. |
 | `SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS` | `@opensip-cli/core` | application | tool-author | validation | never | error | runtime | active | Name at least one shared dimension when acquiring a runtime access lease. |
 | `SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Acquire an exclusive runtime lease up front; a shared lease cannot be upgraded in place. |
 | `SYSTEM.RUNTIME_LEASE.INVALID_OWNER` | `@opensip-cli/core` | application | tool-author | validation | never | error | runtime | active | Supply a runtime lease owner token that matches the documented grammar. |
+| `SYSTEM.RUNTIME_LEASE.INVALID_POLICY` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Set the named runtime lease policy value to a positive number of milliseconds within the supported range. |
 | `SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH` | `@opensip-cli/core` | application | tool-author | conflict | never | error | runtime | active | This runtime lease belongs to another process or project and cannot be modified from here. |
 | `SYSTEM.RUNTIME_LEASE.REQUEST_LOST` | `@opensip-cli/core` | infrastructure | environment | integrity | transient | error | runtime | active | The runtime writer request disappeared during acquisition. Re-run; if it repeats, check whether the runtime directory is being cleaned externally. |
 | `SYSTEM.SCOPE.CAPABILITIES_MISSING` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The RunScope was constructed without capabilities. Capture the run id and report a bug. |
@@ -122,6 +129,12 @@ generated: true
 | `SYSTEM.TREE_SITTER.NOT_INITIALIZED` | `@opensip-cli/tree-sitter` | application | tool-author | invariant | never | error | runtime | active | Initialise the tree-sitter runtime before parsing. Capture the run id and report a bug. |
 | `SYSTEM.WORKER.SPAWN_FAILED` | `@opensip-cli/core` | infrastructure | environment | resource | caller-policy | error | runtime | active | A worker process could not be started. Check the reported errno, process limits, and available memory, then retry. |
 | `TIMEOUT` | `@opensip-cli/core` | infrastructure | environment | timeout | caller-policy | error | runtime | active | Increase the deadline or reduce workload; check for hung dependencies. |
+| `TIMEOUT.RUNTIME_COORDINATION.MUTEX` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Another opensip run holds the coordination mutex. Wait for it to finish and re-run; stop long-lived processes such as `opensip mcp` if it persists. |
+| `TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out assembling the composite runtime access lease. Wait for concurrent runs to finish and retry. |
+| `TIMEOUT.RUNTIME_LEASE.EXCLUSIVE` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out waiting for the exclusive runtime lease. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry. |
+| `TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out waiting for global runtime maintenance. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry. |
+| `TIMEOUT.RUNTIME_LEASE.READ` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out waiting to read runtime state. Another opensip run is holding it; wait and re-run. |
+| `TIMEOUT.RUNTIME_LEASE.USER_STATE_READ` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out reading user-state runtime data. Another opensip run is holding it; wait and re-run. |
 | `UNKNOWN_FAILURE` | `@opensip-cli/core` | application | unknown | invariant | never | fatal | fatal | active | Capture the run id and operator detail; do not retry blindly. |
 | `UNKNOWN_LIVE_VIEW` | `@opensip-cli/core` | application | tool-author | not-found | never | error | runtime | active | Use a registered live view key for this tool. |
 | `VALIDATION_ERROR` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Fix the invalid input, flag, or configuration value and retry. |

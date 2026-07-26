@@ -103,7 +103,9 @@ describe('defineErrorCatalog', () => {
       'configuration',
     );
     expect(definitionFromLegacyCode('CONFIG.GRAPH.NOT_A_REPO').exitClass).toBe('configuration');
-    expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_ACCESS_COMPOSITE').exitClass).toBe('runtime');
+    expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE').exitClass).toBe(
+      'runtime',
+    );
     expect(definitionFromLegacyCode('CAPABILITY.DOMAIN.UNKNOWN').exitClass).toBe('not-found');
     expect(definitionFromLegacyCode('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH').exitClass).toBe(
       'configuration',

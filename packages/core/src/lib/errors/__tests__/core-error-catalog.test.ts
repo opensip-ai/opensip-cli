@@ -140,7 +140,12 @@ describe('RUNTIME_COORDINATION_FAILURE_CODES', () => {
     // CORE.RUNTIME_* code is added without listing it here, this fails.
     const declared = coreErrorCatalog.list
       .map((d) => d.code)
-      .filter((code) => /RUNTIME_(COORDINATION|LEASE|RECOVERY)\./u.test(code));
+      // The `TIMEOUT.` head is excluded here for the same reason the list excludes it: lease
+      // wait timeouts are owned by the wait paths, and a consumer that wants them says so.
+      .filter(
+        (code) =>
+          /RUNTIME_(COORDINATION|LEASE|RECOVERY)\./u.test(code) && !code.startsWith('TIMEOUT.'),
+      );
     const missing = declared.filter((code) => !RUNTIME_COORDINATION_FAILURE_CODES.includes(code));
     expect(missing).toEqual([]);
   });

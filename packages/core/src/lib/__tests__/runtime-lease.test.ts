@@ -726,7 +726,7 @@ describe('runtime lease coordination', () => {
 
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: SHORT_POLICY }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
 
     release(reader);
     const writer = track(await writerPromise);
@@ -1749,7 +1749,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { ...POLICY, waitMs: 0, staleMs: 60_000 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(readdirSync(readersDir).filter((entry) => entry.startsWith('reader-'))).toHaveLength(
       128,
     );
@@ -1778,7 +1778,7 @@ describe('runtime lease coordination', () => {
         ownerToken: lease.ownerToken,
         policy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(JSON.parse(readFileSync(recordPath, 'utf8'))).toMatchObject({
       refs: 64,
       references,
@@ -2031,7 +2031,7 @@ describe('runtime lease coordination', () => {
         projectDir: otherProject,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     release(userReader);
     release(projectReader);
     track(await globalPromise);
@@ -2044,7 +2044,7 @@ describe('runtime lease coordination', () => {
       }),
     );
     await expect(acquireUserStateReadLease({ policy: SHORT_POLICY })).rejects.toMatchObject({
-      code: 'TIMEOUT.USER_STATE_READ',
+      code: 'TIMEOUT.RUNTIME_LEASE.USER_STATE_READ',
     });
     await expect(
       acquireRuntimeAccessLease({
@@ -2053,7 +2053,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'TIMEOUT.RUNTIME_ACCESS_COMPOSITE',
+      code: 'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE',
     });
     release(global);
 
@@ -2063,7 +2063,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'TIMEOUT.RUNTIME_GLOBAL_MAINTENANCE',
+      code: 'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
     });
     release(user);
   });
@@ -2195,7 +2195,7 @@ describe('runtime lease coordination', () => {
       coordinator.acquireGlobalRuntimeMaintenanceLease({
         policy: { waitMs: 0, staleMs: 60_000, heartbeatMs: 10, pollMs: 1 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_GLOBAL_MAINTENANCE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE' });
 
     expect([...inspectionsByPid.values()].reduce((sum, count) => sum + count, 0)).toBe(8);
     // One shared cached observation plus seven fresh destructive proofs.
@@ -2314,7 +2314,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'deterministic-writer-0001',
         policy: { waitMs: 10, staleMs: 50, heartbeatMs: 1000, pollMs: 3 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
 
     expect(now).toBe(1010);
     expect(transitions).toContain('lease.acquire.wait');
@@ -2653,7 +2653,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { ...SHORT_POLICY, pollMs: 10 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
 
     expect(publishedSuccessor).toBe(true);
     expect(JSON.parse(readFileSync(readerPath, 'utf8'))).toEqual(successor);
@@ -2886,7 +2886,7 @@ describe('runtime lease coordination', () => {
             projectDir: project,
             policy: { ...SHORT_POLICY, pollMs: 10 },
           }),
-        ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+        ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
         expect(existsSync(paths.globalMutexFile)).toBe(true);
         rmSync(paths.globalMutexFile);
       }
@@ -2940,7 +2940,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { waitMs: 100, staleMs: 120, heartbeatMs: 30, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
 
     expect(incumbentInspections).toBe(1);
     expect(contenderInspections).toBe(1);
@@ -2986,7 +2986,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(join(readersDir, 'reader-stale-remote-host-0001.json'))).toBe(true);
 
     now = 5100;
@@ -3159,7 +3159,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'mixed-policy-writer-0001',
         policy: contenderPolicy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(remotePath)).toBe(true);
 
     const observedFrom = monotonic;
@@ -3207,7 +3207,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'clock-skew-writer-0001',
         policy: { waitMs: 50, staleMs: 30, heartbeatMs: 10, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(remotePath)).toBe(true);
   });
 
@@ -3241,7 +3241,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3273,7 +3273,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3367,7 +3367,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3409,7 +3409,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'foreign-mutex-reader-0001',
         policy: contenderPolicy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(existsSync(paths.globalMutexFile)).toBe(true);
 
     const observedFrom = monotonic;
@@ -3455,7 +3455,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { waitMs: 20, staleMs: 30, heartbeatMs: 10, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(monotonic).toBe(20);
     expect(wallNow).toBeLessThan(10_000);
   });
@@ -3528,7 +3528,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(completed).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(lstatSync(paths.globalMutexFile, { bigint: true }).nlink).toBe(1n);
@@ -3769,7 +3769,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.READ' });
     expect(published).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(lstatSync(paths.globalMutexFile, { bigint: true }).nlink).toBe(1n);
@@ -3906,7 +3906,7 @@ describe('runtime lease coordination', () => {
           projectDir: project,
           policy: { ...POLICY, waitMs: 50 },
         }),
-      ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+      ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE' });
 
       child.stdin.write('RELEASE\n');
       await waitForChildOutput(child, 'DONE\n');
@@ -5194,7 +5194,7 @@ describe('anchored coordination mutation and cleanup', () => {
     try {
       await waitForChildOutput(child, 'READY\n');
       expect(() => writer.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX' }),
       );
       await waitForChildOutput(child, 'DONE\n');
       await waitUntil(() => events.includes('lease.release'));
@@ -5253,10 +5253,10 @@ describe('anchored coordination mutation and cleanup', () => {
     try {
       await waitForChildOutput(child, 'READY\n');
       expect(() => first.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX' }),
       );
       expect(() => second.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX' }),
       );
       await waitForChildOutput(child, 'DONE\n');
       await waitUntil(async () => {

@@ -35,7 +35,7 @@ human-readable render output through both interpreters:
      (`envelope.verdict.passed`) via the shared `viewRunSummary`.
   2. **Per-unit table remains detailed**: graph's verbose/detail output includes
      the shared per-rule signal table (`Unit | Status | Errors | Warnings |
-     Duration`), while non-verbose graph output does not.
+Duration`), while non-verbose graph output does not.
   3. **Resolution caveat moved**: from a `graph-done` muted line to
      `RunPresentation.banners`, rendered as a muted line above the summary/detail
      body. (The banner text is also the full production `resolutionBannerText`

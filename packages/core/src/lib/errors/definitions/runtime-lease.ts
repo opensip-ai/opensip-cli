@@ -28,6 +28,26 @@ const LEASE_CALLER_CONTRACT = {
   lifecycle: 'active',
 } as const satisfies Omit<ErrorDefinition, 'owner' | 'code' | 'kind' | 'operatorAction'>;
 
+/**
+ * Shared axes for every lease/coordination wait timeout.
+ *
+ * `environment` + `transient`: a lease timeout is never the caller's mistake and is almost
+ * always resolved by waiting, which is the opposite of what the generic `TIMEOUT` definition's
+ * "increase the deadline or reduce workload" told operators to do.
+ */
+const LEASE_TIMEOUT = {
+  source: 'infrastructure',
+  defaultResponsibility: 'environment',
+  kind: 'timeout',
+  retry: 'transient',
+  severity: 'error',
+  exposure: 'public',
+  exitClass: 'runtime',
+  stability: 'public',
+  lifecycle: 'active',
+  publicMetadataKeys: ['waitMs'],
+} as const satisfies Omit<ErrorDefinition, 'owner' | 'code' | 'operatorAction'>;
+
 export const runtimeLeaseDefinitions = {
   /**
    * A bounded runtime registry is full: references per owner, project keys, the writer
@@ -213,5 +233,114 @@ export const runtimeLeaseDefinitions = {
     stability: 'public',
     lifecycle: 'active',
     publicMetadataKeys: ['condition'],
+  },
+  /**
+   * A recovery mutation discovered it no longer holds exclusive authority.
+   *
+   * `integrity`: the caller did nothing wrong and the input is fine — the lease it was
+   * operating under was taken or expired mid-mutation, so anything it writes now would be
+   * unsound. Refusing is the only safe outcome.
+   */
+  'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST': {
+    ...LEASE_CALLER_CONTRACT,
+    code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+    defaultResponsibility: 'environment',
+    kind: 'integrity',
+    retry: 'transient',
+    operatorAction:
+      'The exclusive lease was lost while recovery was running. Re-run; the operation made no partial change.',
+    publicMetadataKeys: ['condition'],
+  },
+
+  /**
+   * Lease acquisition was cancelled.
+   *
+   * Distinct from every other lease failure: nothing is wrong. `cancelled` kind and exit class
+   * so an interrupted acquisition reports as the interruption it was, not as a lease fault
+   * (ruling D5 — cancellation carries one meaning).
+   */
+  'SYSTEM.RUNTIME_LEASE.CANCELLED': {
+    ...LEASE_CALLER_CONTRACT,
+    code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+    defaultResponsibility: 'user',
+    kind: 'cancelled',
+    exitClass: 'cancelled',
+    operatorAction: 'Lease acquisition was cancelled. Re-run if the work is still needed.',
+  },
+
+  /**
+   * A lease policy value is unusable.
+   *
+   * `user` responsibility: lease policy is reachable from project configuration, so this is an
+   * edit the user makes — not a bug report.
+   */
+  'SYSTEM.RUNTIME_LEASE.INVALID_POLICY': {
+    ...LEASE_CALLER_CONTRACT,
+    code: 'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
+    defaultResponsibility: 'user',
+    kind: 'validation',
+    exitClass: 'configuration',
+    operatorAction:
+      'Set the named runtime lease policy value to a positive number of milliseconds within the supported range.',
+    publicMetadataKeys: ['field'],
+  },
+
+  /**
+   * Waiting for the coordination mutex exceeded its budget.
+   *
+   * RENAMED from `TIMEOUT.RUNTIME_COORDINATION_MUTEX`, which is two segments and therefore
+   * unrepresentable under `CODE_GRAMMAR` — it could never have been registered, which is
+   * exactly why it was still riding the family fallback. Two call sites branch on it to map a
+   * mutex wait onto a friendlier per-operation timeout, and both move with it.
+   */
+  'TIMEOUT.RUNTIME_COORDINATION.MUTEX': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_COORDINATION.MUTEX',
+    operatorAction:
+      'Another opensip run holds the coordination mutex. Wait for it to finish and re-run; stop long-lived processes such as `opensip mcp` if it persists.',
+  },
+
+  /**
+   * One registered timeout per lease wait kind.
+   *
+   * These were minted dynamically as `TIMEOUT.${kind.toUpperCase()}` — two-segment codes that
+   * the grammar rejects, so none of them could ever be registered and every one inherited the
+   * generic `TIMEOUT` axes ("increase the deadline"), which is the wrong advice: the real
+   * cause is always another run holding the lease.
+   *
+   * They stay DISTINCT rather than collapsing into one code with the kind in metadata (the
+   * usual D9 move) because consumers genuinely branch on which lease timed out — `init` treats
+   * an exclusive-lease timeout as retryable promotion contention, while a read timeout is a
+   * degraded status read. Metadata is not branchable without parsing.
+   */
+  'TIMEOUT.RUNTIME_LEASE.READ': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_LEASE.READ',
+    operatorAction:
+      'Timed out waiting to read runtime state. Another opensip run is holding it; wait and re-run.',
+  },
+  'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_LEASE.EXCLUSIVE',
+    operatorAction:
+      'Timed out waiting for the exclusive runtime lease. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.',
+  },
+  'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_LEASE.ACCESS_COMPOSITE',
+    operatorAction:
+      'Timed out assembling the composite runtime access lease. Wait for concurrent runs to finish and retry.',
+  },
+  'TIMEOUT.RUNTIME_LEASE.USER_STATE_READ': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_LEASE.USER_STATE_READ',
+    operatorAction:
+      'Timed out reading user-state runtime data. Another opensip run is holding it; wait and re-run.',
+  },
+  'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE': {
+    ...LEASE_TIMEOUT,
+    code: 'TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
+    operatorAction:
+      'Timed out waiting for global runtime maintenance. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry.',
   },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;

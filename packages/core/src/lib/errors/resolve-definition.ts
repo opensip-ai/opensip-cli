@@ -20,22 +20,45 @@
  * Teaching it about the catalog directly would be a cycle. This module imports both and is
  * imported by the consumers, so the graph stays acyclic without a mutable registration slot —
  * this repository does not do module-level mutable state.
+ *
+ * WHY IT ALSO CONSULTS THE PER-RUN REGISTRY
+ * Core's catalog is not the whole registry. Substrate packages (`@opensip-cli/codebase`,
+ * `@opensip-cli/tree-sitter`) and every loaded Tool own codes too, and those are only knowable
+ * per invocation — which is exactly what `RunScope` is for. Without this, a substrate- or
+ * tool-registered code hits the same silent demotion core's codes used to: it looks migrated
+ * and behaves unknown. Reaching the registry through `currentScope()` is the sanctioned way to
+ * read per-run state; there is deliberately no process-global catalog map.
  */
 
 import { definitionFromLegacyCode, type ErrorDefinition } from '../error-definition.js';
+import { currentScope } from '../scope-storage.js';
 
 import { coreErrorCatalog } from './core-error-catalog.js';
 
 /**
+ * Look the code up in the per-invocation aggregate (substrates + loaded tools).
+ *
+ * Every failure is defensive: this runs while something has ALREADY gone wrong, so a missing
+ * scope, an un-populated registry, or a registry that throws on a colliding catalog must all
+ * degrade to "not found" rather than replace the original failure with a different one.
+ */
+function fromRunRegistry(code: string): ErrorDefinition | undefined {
+  try {
+    return currentScope()?.tools?.getErrorCatalogIndex().byCode.get(code);
+  } catch {
+    return undefined;
+  }
+}
+
+/**
  * Resolve a code string to its definition.
  *
- * Registered codes win; everything else keeps the documented legacy behaviour, including the
- * family fallback and the terminal `UNKNOWN_FAILURE`. The function stays TOTAL: a hostile or
- * unknown code must never throw here (ruling D11), because this runs while something has
- * already failed.
+ * Registered codes win — core's first, then the per-run registry. Everything else keeps the
+ * documented legacy behaviour and the terminal `UNKNOWN_FAILURE`. The function stays TOTAL: a
+ * hostile or unknown code must never throw here (ruling D11).
  */
 export function resolveDefinitionForCode(code: string): ErrorDefinition {
-  const registered = coreErrorCatalog.get(code);
+  const registered = coreErrorCatalog.get(code) ?? fromRunRegistry(code);
   if (registered !== undefined) return registered;
   return definitionFromLegacyCode(code);
 }

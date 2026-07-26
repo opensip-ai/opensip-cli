@@ -92,7 +92,7 @@ function samePromotionProjection(
  */
 function isBoundedCoordinationFailure(error: unknown): boolean {
   const code = getErrorCode(error);
-  return isRuntimeCoordinationFailureCode(code) || code === 'TIMEOUT.RUNTIME_READ';
+  return isRuntimeCoordinationFailureCode(code) || code === 'TIMEOUT.RUNTIME_LEASE.READ';
 }
 
 async function inspectCoordination(
