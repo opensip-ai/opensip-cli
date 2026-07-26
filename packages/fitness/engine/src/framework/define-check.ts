@@ -19,6 +19,8 @@ import {
   currentScope,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import {
   getAnalysisMode,
   isAnalyzeConfig,
@@ -46,6 +48,11 @@ import type { Check } from './check-types.js';
 import type { ExecutionContext, RunOptions } from './execution-context.js';
 import type { CheckResult } from '../types/findings.js';
 import type { Signal, SignalRepair } from '@opensip-cli/core';
+
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -537,7 +544,9 @@ async function executeUnifiedCheck(
   /* v8 ignore start -- exhaustive check: all UnifiedCheckConfig variants are handled above; this throw fires only if someone introduces a new variant without updating this switch */
   const _exhaustiveCheck: never = config;
   throw new SystemError(`Unknown analysis mode: ${JSON.stringify(_exhaustiveCheck)}`, {
-    code: 'SYSTEM.FITNESS.UNKNOWN_MODE',
+    code: ENGINE_STATE.code,
+    definition: ENGINE_STATE,
+    metadata: { condition: 'unknown-mode' },
   });
   /* v8 ignore stop */
 }

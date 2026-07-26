@@ -10,6 +10,7 @@ import * as fs from 'node:fs/promises';
 
 import { SystemError, currentLogger, currentScope } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { applyGlobalExcludes } from '../targets/index.js';
 
 import { DEFAULT_EXCLUSION_PATTERNS } from './constants.js';
@@ -18,6 +19,13 @@ import { extractSnippet } from './result-builder.js';
 
 import type { ResolvedScope } from './check-config.js';
 import type { FileCache } from './file-cache.js';
+
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const CHECK_ABORTED = fitnessErrorCatalog.require('SYSTEM.FITNESS.CHECK_ABORTED');
+const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
+const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');
 
 /**
  * Check identifier (UUID format).
@@ -34,7 +42,8 @@ export class CheckAbortedError extends SystemError {
 
   constructor(checkId: string, message?: string) {
     super(message ?? `Check ${checkId} was aborted`, {
-      code: 'SYSTEM.FITNESS.CHECK_ABORTED',
+      code: CHECK_ABORTED.code,
+      definition: CHECK_ABORTED,
     });
     this.checkId = checkId;
     Object.setPrototypeOf(this, CheckAbortedError.prototype);
@@ -211,7 +220,11 @@ export function createExecutionContext(
         `check must run inside a RunScope carrying scope.fitness.fileCache (the CLI ` +
         `pre-action-hook installs it via the fitness tool's contributeScope), or be ` +
         `passed an explicit options.fileCache.`,
-      { code: 'SYSTEM.FITNESS.NO_FILE_CACHE' },
+      {
+        code: ENGINE_STATE.code,
+        definition: ENGINE_STATE,
+        metadata: { condition: 'no-file-cache' },
+      },
     );
   }
   return {
@@ -236,7 +249,7 @@ export function createExecutionContext(
           if (fileStats.size > 10_000_000) {
             throw new SystemError(
               `File too large (${fileStats.size} bytes, max 10MB): ${filePath}`,
-              { code: 'SYSTEM.FITNESS.FILE_TOO_LARGE' },
+              { code: FILE_TOO_LARGE.code, definition: FILE_TOO_LARGE },
             );
           }
         } catch (error) {
@@ -249,7 +262,8 @@ export function createExecutionContext(
       }
       if (content.length > 10_000_000) {
         throw new SystemError(`File too large (${content.length} bytes, max 10MB): ${filePath}`, {
-          code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
+          code: FILE_TOO_LARGE.code,
+          definition: FILE_TOO_LARGE,
         });
       }
       return content;

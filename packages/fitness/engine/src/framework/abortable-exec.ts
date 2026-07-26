@@ -11,6 +11,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 
 import { SystemError } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const EXEC_FAILED = fitnessErrorCatalog.require('SYSTEM.FITNESS.EXEC_FAILED');
+
 /**
  * Options for abortable command execution
  */
@@ -43,7 +49,7 @@ class ExecError extends SystemError {
     public readonly exitCode: number | null,
     public readonly aborted: boolean,
   ) {
-    super(message, { code: 'SYSTEM.FITNESS.EXEC_FAILED' });
+    super(message, { code: EXEC_FAILED.code, definition: EXEC_FAILED });
     this.name = 'ExecError';
   }
 }
@@ -93,7 +99,9 @@ export function execAbortable(
       if (command.length === 0) {
         reject(
           new SystemError('Command array must not be empty', {
-            code: 'SYSTEM.FITNESS.EXEC_EMPTY_COMMAND',
+            code: EXEC_FAILED.code,
+            definition: EXEC_FAILED,
+            metadata: { condition: 'empty-command' },
           }),
         );
         return;

@@ -14,6 +14,11 @@
 
 import { ValidationError as CoreValidationError } from '@opensip-cli/core';
 
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
+
+/** Registered replacement for the un-catalogued `VALIDATION.SCENARIO.INVALID_CONFIG` literal. */
+const SCENARIO_INVALID = simulationErrorCatalog.require('VALIDATION.SIMULATION.SCENARIO_INVALID');
+
 import type { ScenarioKind } from '../types/kind-types.js';
 import type { Target } from './execution/target.js';
 import type { Workload } from '../types/workload.js';
@@ -163,7 +168,8 @@ export function throwValidationErrors(
   if (errors.length === 0) return;
   const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n');
   throw new CoreValidationError(`Invalid ${kind} scenario configuration:\n${messages}`, {
-    code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
+    code: SCENARIO_INVALID.code,
+    definition: SCENARIO_INVALID,
     metadata: { errors: [...errors], kind },
   });
 }

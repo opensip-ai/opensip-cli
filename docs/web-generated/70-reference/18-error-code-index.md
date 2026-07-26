@@ -13,15 +13,15 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **13**
-- Definitions: **117**
+- Definitions: **126**
 
 ## Catalogs
 
 | Package | Owner id | Source file | Count |
 |---|---|---|---:|
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
-| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 3 |
-| `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 1 |
+| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 9 |
+| `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 3 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
@@ -105,6 +105,11 @@ generated: true
 | `SYSTEM_ERROR` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Retry once; if it persists, capture the run id and report a bug. |
 | `SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The tool that declares this capability domain never wired its registrar. Report it to the tool author with the run id. |
 | `SYSTEM.FILE.TOO_LARGE` | `@opensip-cli/core` | application | user | resource | never | error | configuration | active | The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set. |
+| `SYSTEM.FITNESS.CHECK_ABORTED` | `@opensip-cli/fitness` | application | user | cancelled | never | warning | cancelled | active | The check was cancelled. Re-run if the work is still needed. |
+| `SYSTEM.FITNESS.CHECK_ERROR` | `@opensip-cli/fitness` | application | tool-author | invariant | never | warning | success | active | A check failed to run; its findings are missing from this report. Report it to the check author. |
+| `SYSTEM.FITNESS.ENGINE_STATE_INVALID` | `@opensip-cli/fitness` | application | tool-author | invariant | never | error | runtime | active | Capture the run id and report a bug; the fitness engine was misdriven. |
+| `SYSTEM.FITNESS.EXEC_FAILED` | `@opensip-cli/fitness` | external | environment | I/O | caller-policy | error | runtime | active | The external command could not be executed. Check that it is installed and on PATH, then retry. |
+| `SYSTEM.FITNESS.FILE_TOO_LARGE` | `@opensip-cli/fitness` | application | user | resource | never | warning | success | active | The named file is larger than opensip will analyze and was skipped. Exclude it from the target set, or split it. |
 | `SYSTEM.FITNESS.SESSION_IN_PROGRESS` | `@opensip-cli/fitness` | application | tool-author | conflict | never | error | runtime | active | Wait for the active fitness session to finish or abort it. |
 | `SYSTEM.IMPACT.INDEX_GENERATION_MISMATCH` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The impact index does not match the graph catalog generation. Rebuild the graph and retry. |
 | `SYSTEM.PLUGINS.ENTRY_ESCAPES_PACKAGE` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Point the pack |
@@ -147,7 +152,11 @@ generated: true
 | `VALIDATION.COMMAND_SPEC.MISSING_NAME` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Give the command spec a non-empty `name`. |
 | `VALIDATION.COMMAND_SPEC.NOT_AN_OBJECT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Pass a plain object to defineCommand. |
 | `VALIDATION.EXECUTION.INVALID_MODE` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Set the workflow execution mode to one of the documented values. |
+| `VALIDATION.FITNESS.PATH_REJECTED` | `@opensip-cli/fitness` | application | tool-author | security | never | error | runtime | active | Analyze only paths from the resolved target set; a path outside it, or a directory, is refused. |
 | `VALIDATION.RUNTIME_COORDINATION.INPUT` | `@opensip-cli/core` | application | tool-author | validation | never | error | runtime | active | Correct the named runtime coordination input and retry; this is a caller contract violation, not a project state problem. |
+| `VALIDATION.SIMULATION.METRICS_REQUIRED` | `@opensip-cli/simulation` | application | tool-author | invariant | never | error | runtime | active | Call withMetrics(...) before evaluating scenario assertions. |
+| `VALIDATION.SIMULATION.RECIPE_INVALID` | `@opensip-cli/simulation` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the named field on the simulation recipe; see the simulation recipe reference for the required shape. |
+| `VALIDATION.SIMULATION.SCENARIO_INVALID` | `@opensip-cli/simulation` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the scenario configuration; see the scenario reference. |
 | `VALIDATION.TASK_CONTEXT.MANIFEST_INVALID` | `@opensip-cli/core` | application | environment | validation | never | error | runtime | active | The stored task-context manifest is not readable by this version. Re-run the tool that produced it to regenerate the evidence. |
 | `VALIDATION.TOOL_IDENTITY.CONFLICT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Two installed tools claim the same name or alias. Uninstall one, or ask its author to rename it. |
 | `VALIDATION.TOOL_IDENTITY.INVALID_NAME` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Rename the tool identity value to kebab-case (lowercase letters, digits, and single hyphens). |

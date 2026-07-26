@@ -11,6 +11,13 @@ import * as path from 'node:path';
 import { SystemError, ValidationError } from '@opensip-cli/core';
 import { glob } from 'glob';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');
+const PATH_REJECTED = fitnessErrorCatalog.require('VALIDATION.FITNESS.PATH_REJECTED');
+
 /**
  * Prewarm statistics.
  */
@@ -136,7 +143,9 @@ export class FileCache {
     const stats = await fs.stat(absolutePath);
     if (stats.isDirectory()) {
       throw new ValidationError(`Cannot read directory as file: ${absolutePath}`, {
-        code: 'VALIDATION.FITNESS.DIRECTORY_AS_FILE',
+        code: PATH_REJECTED.code,
+        definition: PATH_REJECTED,
+        metadata: { condition: 'directory-as-file' },
       });
     }
     const content = await fs.readFile(absolutePath, 'utf8');
@@ -146,7 +155,8 @@ export class FileCache {
       // >10 MiB of content to a check. Throw here so even direct cache.get
       // callers (and any future direct users of fileCache) are protected.
       throw new SystemError(`File too large (${content.length} bytes, max 10MB): ${absolutePath}`, {
-        code: 'SYSTEM.FITNESS.FILE_TOO_LARGE',
+        code: FILE_TOO_LARGE.code,
+        definition: FILE_TOO_LARGE,
       });
     }
 

@@ -22,6 +22,7 @@
 
 import { SystemError, currentScope } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { FitnessRecipeRegistry } from '../recipes/registry.js';
 
 import { MemoryProfiler } from './memory-profiler.js';
@@ -32,6 +33,10 @@ import type { FitnessLoadState, FitnessSubscope } from '../scope-augmentation.js
 // Side-effect import: ensures the `ScopeContribution.fitness` augmentation is
 // loaded so `scope.fitness` is the correctly-typed slot at every read site.
 import '../scope-augmentation.js';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
 
 /** Construct a fresh check registry for a single `RunScope`. */
 export function createCheckRegistry(): CheckRegistry {
@@ -71,7 +76,7 @@ function currentFitnessSubscope(): FitnessSubscope {
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + fitnessTool.contributeScope or construct ' +
         'the registries directly).',
-      { code: 'SYSTEM.SCOPE.FITNESS_SUBSCOPE_MISSING' },
+      { code: ENGINE_STATE.code, definition: ENGINE_STATE, metadata: { condition: 'no-subscope' } },
     );
   }
   if (!scope.fitness) {
@@ -80,7 +85,7 @@ function currentFitnessSubscope(): FitnessSubscope {
         'registered and its contributeScope hook must run before check/recipe reads. ' +
         '(production: bootstrap registers fitnessTool; tests: call ' +
         'fitnessTool.contributeScope() after makeTestScope.)',
-      { code: 'SYSTEM.SCOPE.FITNESS_SUBSCOPE_MISSING' },
+      { code: ENGINE_STATE.code, definition: ENGINE_STATE, metadata: { condition: 'no-subscope' } },
     );
   }
   return scope.fitness;

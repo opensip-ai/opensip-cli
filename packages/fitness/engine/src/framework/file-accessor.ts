@@ -9,8 +9,16 @@ import * as fs from 'node:fs/promises';
 
 import { ValidationError, applyContentFilter, mapWithConcurrency } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import type { FileAccessor } from './check-config.js';
 import type { FileCache } from './file-cache.js';
+
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');
+const PATH_REJECTED = fitnessErrorCatalog.require('VALIDATION.FITNESS.PATH_REJECTED');
 
 // =============================================================================
 // LRU CACHE
@@ -120,7 +128,11 @@ class FileAccessorImpl implements FileAccessor {
       throw new ValidationError(
         `File path not in matched set: ${filePath}. ` +
           `Only paths from the 'paths' property can be read.`,
-        { code: 'VALIDATION.FITNESS.PATH_NOT_IN_SET' },
+        {
+          code: PATH_REJECTED.code,
+          definition: PATH_REJECTED,
+          metadata: { condition: 'not-in-target-set' },
+        },
       );
     }
 
@@ -139,7 +151,7 @@ class FileAccessorImpl implements FileAccessor {
       if (fileStats.size > 10_000_000) {
         throw new ValidationError(
           `File too large (${fileStats.size} bytes, max 10MB): ${filePath}`,
-          { code: 'VALIDATION.FITNESS.FILE_TOO_LARGE' },
+          { code: FILE_TOO_LARGE.code, definition: FILE_TOO_LARGE },
         );
       }
       content = await fs.readFile(filePath, 'utf8');

@@ -51,6 +51,10 @@ import type {
   FitnessRecipeSession,
 } from './service-types.js';
 
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');
+
 const MODULE_FITNESS_RECIPES = 'fitness:recipes';
 
 /**
@@ -98,7 +102,9 @@ export class FitnessRecipeService {
   private get session(): FitnessRecipeSession {
     if (!this.activeSession) {
       throw new SystemError('No active session', {
-        code: 'SYSTEM.FITNESS.NO_SESSION',
+        code: ENGINE_STATE.code,
+        definition: ENGINE_STATE,
+        metadata: { condition: 'no-session' },
       });
     }
     return this.activeSession;
