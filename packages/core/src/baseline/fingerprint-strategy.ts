@@ -19,7 +19,19 @@
  * kernel-safe.
  */
 
+import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { ValidationError } from '../lib/errors.js';
+
+// Registered tool-authoring rejections. The previous literals were legacy-grammar dotted
+// subcodes with no catalog entry: they only inherited VALIDATION_ERROR axes through the family
+// fallback, so the `tool-author` responsibility — the one fact that tells a reader who has to
+// fix it — was not machine-readable at all.
+const STRATEGY_INVALID_ID = coreErrorCatalog.require(
+  'CORE.BASELINE.FINGERPRINT_STRATEGY_INVALID_ID',
+);
+const STRATEGY_INVALID_VERSION = coreErrorCatalog.require(
+  'CORE.BASELINE.FINGERPRINT_STRATEGY_INVALID_VERSION',
+);
 
 import type { Signal } from '../types/signal.js';
 
@@ -60,12 +72,14 @@ export function defineFingerprintStrategy(
   const id = input.id.trim();
   if (id.length === 0) {
     throw new ValidationError('Fingerprint strategy id must be a non-empty string', {
-      code: 'VALIDATION.FINGERPRINT_STRATEGY.INVALID_ID',
+      code: STRATEGY_INVALID_ID.code,
+      definition: STRATEGY_INVALID_ID,
     });
   }
   if (!Number.isInteger(input.version) || input.version < 1) {
     throw new ValidationError('Fingerprint strategy version must be a positive integer', {
-      code: 'VALIDATION.FINGERPRINT_STRATEGY.INVALID_VERSION',
+      code: STRATEGY_INVALID_VERSION.code,
+      definition: STRATEGY_INVALID_VERSION,
     });
   }
   return Object.freeze({
