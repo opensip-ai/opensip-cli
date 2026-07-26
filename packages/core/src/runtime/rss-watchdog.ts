@@ -18,7 +18,12 @@ export function readChildRssBytes(pid: number): number | undefined {
       const out = execFileSync(
         'wmic',
         ['process', 'where', `ProcessId=${String(pid)}`, 'get', 'WorkingSetSize', '/value'],
-        { encoding: 'utf8' },
+        {
+          encoding: 'utf8',
+          // Bounded (Plan 01): a watchdog probe must never outlive the interval it runs on.
+          timeout: 5000,
+          maxBuffer: 4 * 1024 * 1024,
+        },
       );
       const match = /WorkingSetSize=(\d+)/.exec(out);
       if (match === null) return undefined;
@@ -31,6 +36,9 @@ export function readChildRssBytes(pid: number): number | undefined {
 
   try {
     const out = execFileSync('ps', ['-o', 'rss=', '-p', String(pid)], {
+      // Bounded (Plan 01): a watchdog probe must never outlive the interval it runs on.
+      timeout: 5000,
+      maxBuffer: 4 * 1024 * 1024,
       encoding: 'utf8',
     }).trim();
     const kb = Number.parseInt(out, 10);

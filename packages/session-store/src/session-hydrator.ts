@@ -12,7 +12,6 @@ import { type sessions } from './schema/sessions.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const UNKNOWN_TOOL = sessionStoreErrorCatalog.require('SESSION.READ.UNKNOWN_TOOL');
 

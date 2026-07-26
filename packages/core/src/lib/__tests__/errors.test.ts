@@ -437,7 +437,7 @@ describe('legacy option-bag warning (Plan 01 Task 1.3)', () => {
     resetLegacyOptionBagWarnings();
   });
 
-  it('warns once per code and key-set, not once per construction', () => {
+  it('warns once per code and key-set, not once per construction', async () => {
     // These constructions sit on hot paths — a per-file walk can raise thousands — and an
     // unbounded warn stream is indistinguishable from noise, which is how a migration signal
     // gets ignored rather than acted on.
@@ -447,13 +447,15 @@ describe('legacy option-bag warning (Plan 01 Task 1.3)', () => {
       tools: new ToolRegistry(),
       logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger,
     });
-    const built = runWithScope(scope, () =>
-      Array.from(
-        { length: 5 },
-        () =>
+    const built: ToolError[] = [];
+    await runWithScope(scope, () => {
+      for (let i = 0; i < 5; i++) {
+        built.push(
           new ToolError('x', 'SYSTEM_ERROR', { operation: 'resolve', loader: 'project-config' }),
-      ),
-    );
+        );
+      }
+      return Promise.resolve();
+    });
     expect(built).toHaveLength(5);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0]?.[0]).toMatchObject({
@@ -469,18 +471,19 @@ describe('legacy option-bag warning (Plan 01 Task 1.3)', () => {
     expect(error.legacyCompatibility?.operation).toBe('resolve');
   });
 
-  it('does not warn when only documented options are used', () => {
+  it('does not warn when only documented options are used', async () => {
     const warn = vi.fn();
     const scope = new RunScope({
       languages: new LanguageRegistry(),
       tools: new ToolRegistry(),
       logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger,
     });
-    const built = runWithScope(
-      scope,
-      () => new ToolError('x', 'SYSTEM_ERROR', { metadata: { a: 1 }, stderrTail: 'tail' }),
-    );
-    expect(built.legacyCompatibility).toBeUndefined();
+    let built: ToolError | undefined;
+    await runWithScope(scope, () => {
+      built = new ToolError('x', 'SYSTEM_ERROR', { metadata: { a: 1 }, stderrTail: 'tail' });
+      return Promise.resolve();
+    });
+    expect(built?.legacyCompatibility).toBeUndefined();
     expect(warn).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,7 @@
 import { compareCodePoint } from '@opensip-cli/contracts';
-import { ValidationError, coreErrorCatalog  } from '@opensip-cli/core';
+import { ValidationError, coreErrorCatalog } from '@opensip-cli/core';
 
 import type { CommandSpec, Tool, ToolRegistry } from '@opensip-cli/core';
-
 
 /** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
 const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('SYSTEM.AGENT_CATALOG.UNPUBLISHABLE');

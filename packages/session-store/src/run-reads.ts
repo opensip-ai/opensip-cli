@@ -23,7 +23,6 @@ import { isSessionCwdWithin } from './session-cwd-scope.js';
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const UNSAFE_LEGACY = sessionStoreErrorCatalog.require('SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE');
 

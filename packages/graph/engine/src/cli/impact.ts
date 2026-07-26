@@ -48,7 +48,6 @@ import { contributionFromGraphPayload } from './graph-session-contribution.js';
 import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
-
 /** Registered replacement for the template-built `CONFIG.GRAPH.${reason}` code. */
 const CHANGED_FILES_UNAVAILABLE = coreErrorCatalog.require(
   'CONFIGURATION.CHANGED_FILES.BASIS_UNAVAILABLE',

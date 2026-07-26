@@ -10,6 +10,9 @@ function repairError(code: string, message: string): RepairError {
 
 function git(args: readonly string[], cwd: string): string {
   return execFileSync('git', ['-C', cwd, ...args], {
+    // Bounded (Plan 01): a git call blocked on an index lock must not hang the repair path.
+    timeout: 30_000,
+    maxBuffer: 16 * 1024 * 1024,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'pipe'],
   });

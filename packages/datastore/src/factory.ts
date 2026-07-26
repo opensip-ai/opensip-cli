@@ -19,7 +19,6 @@ import type {
   DrizzleDataStore,
 } from './data-store.js';
 
-
 // Plan 01: registered replacements for literals that only resolved through head-guessing.
 const OPEN_MISSING_PATH = datastoreErrorCatalog.require('DATASTORE.OPEN.MISSING_PATH');
 

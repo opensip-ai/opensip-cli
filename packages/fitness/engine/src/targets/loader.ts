@@ -33,7 +33,6 @@ import type {
   TargetsConfig,
 } from './types.js';
 
-
 // Plan 01: the `ERRORS.` head was mapped by nothing, so a config typo reported as an
 // operator-only internal fatal. One registered user-facing code, branch in metadata.
 const FIT_SCOPE_INVALID = fitnessErrorCatalog.require('CONFIG.FIT_SCOPE.INVALID');

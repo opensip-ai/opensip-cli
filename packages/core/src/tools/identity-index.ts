@@ -11,7 +11,6 @@ import { resolveToolHooks } from './resolve-tool-hooks.js';
 import type { ToolIdentity } from './identity.js';
 import type { ToolRegistry } from './registry.js';
 
-
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
 const IDENTITY_CONFLICT = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.CONFLICT');

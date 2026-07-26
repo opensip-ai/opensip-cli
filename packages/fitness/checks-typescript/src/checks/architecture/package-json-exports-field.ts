@@ -53,6 +53,7 @@ export const packageJsonExportsField = defineCheck({
         parsed = JSON.parse(content) as Record<string, unknown>;
         /* v8 ignore next 1 -- defensive catch: parse failures already handled */
       } catch {
+        // @swallow-ok a malformed package.json is another check’s subject; this one reports on the exports field of files it could parse
         continue;
       }
 

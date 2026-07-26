@@ -6,7 +6,6 @@ import { sessions } from './schema/sessions.js';
 
 import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const READ_BOUND = sessionStoreErrorCatalog.require('SESSION.READ.BOUND_INVALID');
 

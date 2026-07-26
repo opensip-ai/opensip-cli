@@ -21,6 +21,9 @@ function descendantPids(pid: number): readonly number[] {
   if (isWindows()) return [];
   try {
     const out = execFileSync('pgrep', ['-P', String(pid)], {
+      // Bounded (Plan 01): a process-table read that has not answered in five seconds will not.
+      timeout: 5000,
+      maxBuffer: 4 * 1024 * 1024,
       encoding: 'utf8',
     });
     const children = out

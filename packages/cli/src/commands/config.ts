@@ -147,6 +147,7 @@ export function executeConfigSchema(input: ConfigSchemaInput): ConfigSchemaResul
       try {
         stat = statSync(resolved);
       } catch {
+        // @swallow-ok absence probe — a missing --out path is the normal case, and any other stat failure resurfaces from the mkdirSync below with its own errno
         stat = undefined;
       }
       if (stat?.isDirectory()) {

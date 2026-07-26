@@ -5,7 +5,6 @@ import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './d
 import { datastoreErrorCatalog } from './errors/datastore-error-catalog.js';
 import { policyAuditEvents } from './schema/policy-audit.js';
 
-
 // Plan 01: registered replacements for literals that only resolved through head-guessing.
 const READ_BOUND_INVALID = datastoreErrorCatalog.require('DATASTORE.READ.BOUND_INVALID');
 const RECORD_TOO_LARGE = datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE');

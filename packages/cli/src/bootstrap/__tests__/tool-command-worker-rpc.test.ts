@@ -226,8 +226,6 @@ describe('createWorkerRpcClient — host fault reply', () => {
       error: {
         message: "No baseline found for 'gitleaks'",
         code: GATE_BASELINE_INVALID.code,
-        definition: GATE_BASELINE_INVALID,
-        metadata: { condition: 'baseline-missing' },
         stack: 'Error: no baseline\n  at host',
         toolErrorCode: 'CONFIGURATION_ERROR',
       },

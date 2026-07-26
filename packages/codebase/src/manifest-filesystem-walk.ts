@@ -140,6 +140,7 @@ async function classifyUnknownEntry(
       return { kind: 'manifest', name: entry.name };
     }
   } catch {
+    // @swallow-ok the flags ARE the surfaced degradation — `readFailed` and `capped` become inventory coverage reason codes, so the caller sees the walk was incomplete
     context.state.readFailed = true;
     context.state.capped = true;
   }

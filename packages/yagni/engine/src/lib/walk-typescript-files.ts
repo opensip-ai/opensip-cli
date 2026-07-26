@@ -28,6 +28,7 @@ export function walkTypeScriptFiles(
     try {
       entries = readdirSync(dir, { withFileTypes: true });
     } catch {
+      // @swallow-ok absence probe during a source walk — an unreadable directory contributes no files, and yagni is an advisory audit that must not fail a run over one
       continue;
     }
     for (const entry of entries) {

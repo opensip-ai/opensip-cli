@@ -3,7 +3,6 @@ import { ValidationError } from '@opensip-cli/core';
 import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { isResolvableStoredRunId } from './run-write-shapes.js';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const READ_BOUND = sessionStoreErrorCatalog.require('SESSION.READ.BOUND_INVALID');
 const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');

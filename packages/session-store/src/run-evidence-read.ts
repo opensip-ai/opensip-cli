@@ -31,7 +31,6 @@ import type {
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleHandle } from '@opensip-cli/datastore/internal';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const UNREADABLE = sessionStoreErrorCatalog.require('SESSION.EVIDENCE.UNREADABLE');
 

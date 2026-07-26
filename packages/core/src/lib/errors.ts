@@ -768,6 +768,7 @@ export function formatUnknownErrorMessage(error: unknown): string {
       message = error === null ? 'null' : 'undefined';
     }
   } catch {
+    // @swallow-ok this IS the last-resort stringifier; a diagnostic that throws while describing a failure must degrade to a sentinel rather than replace the original failure
     message = '<unstringifiable>';
   }
   return redactCredentialText(message).slice(0, MAX_METADATA_STRING);

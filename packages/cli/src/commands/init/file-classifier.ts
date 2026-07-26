@@ -160,6 +160,7 @@ export function classifyFilesFromRenderedScaffolds(
       try {
         st = lstatSync(full);
       } catch {
+        // @swallow-ok absence probe while classifying a scaffold tree — an entry that vanished between readdir and lstat is simply not classified, and no decision depends on why
         continue;
       }
       if (

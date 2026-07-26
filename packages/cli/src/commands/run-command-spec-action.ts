@@ -168,6 +168,7 @@ function hasProvenDelegatedChild<TCtx extends CommandMountContext>(input: {
       delegatedAt !== undefined &&
       new RunRepo(datastore).hasImplicitRunForCommand(correlationRunId, tool, command, delegatedAt);
   } catch {
+    // @swallow-ok fail-closed: an unprovable implicit-run link must read as unproven, and this is a correlation nicety that must never fail the command
     proven = false;
   }
   if (proven) {

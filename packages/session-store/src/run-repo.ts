@@ -28,7 +28,6 @@ import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
 
-
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 

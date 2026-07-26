@@ -2,13 +2,16 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver, externalToolErrorCatalog  } from '@opensip-cli/external-tool-adapter';
+import {
+  defineExternalToolAdapter,
+  parseFirstSemver,
+  externalToolErrorCatalog,
+} from '@opensip-cli/external-tool-adapter';
 
 import { parsePipAuditJson } from './parse-pip-audit-json.js';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
-
 
 // Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
 const CONFIG_REQUIRED = externalToolErrorCatalog.require('EXTERNAL.SCANNER.CONFIG_REQUIRED');

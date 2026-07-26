@@ -8,7 +8,6 @@
 import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { ValidationError } from '../lib/errors.js';
 
-
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
 const IDENTITY_DUPLICATE_ALIAS = coreErrorCatalog.require(

@@ -392,6 +392,7 @@ function findSourceFiles(repoRoot: string): readonly string[] {
       try {
         isDir = statSync(sub).isDirectory();
       } catch {
+        // @swallow-ok absence probe while discovering packages — an entry that cannot be stat-ed is not a package directory for sharding purposes
         continue;
       }
       if (isDir) {

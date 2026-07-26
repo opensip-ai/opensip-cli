@@ -28,7 +28,6 @@ import type { ToolSessionReplayContribution } from './tool-sessions.js';
 import type { ToolCliContext, Tool, ToolExtensionPoints, ToolMetadata } from './types.js';
 import type { PluginLayout } from '../plugins/types.js';
 
-
 // Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
 // mapped — every one of these reported as an operator-only internal fatal.
 const IDENTITY_ALIAS_DRIFT = coreErrorCatalog.require('VALIDATION.TOOL_IDENTITY.ALIAS_DRIFT');

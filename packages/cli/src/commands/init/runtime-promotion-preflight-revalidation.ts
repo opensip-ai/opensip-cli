@@ -337,6 +337,7 @@ export function assertRuntimePromotionSourceRetirementUnchanged(
       ),
     );
   } catch {
+    // @swallow-ok fail-closed: any inspection failure must read as CHANGED, because proceeding on an unproven manifest is the unsafe direction
     manifestUnchanged = false;
   }
   if (

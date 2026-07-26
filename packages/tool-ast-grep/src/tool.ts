@@ -6,12 +6,12 @@ import {
   buildScannerExclude,
   defineExternalToolAdapter,
   parseFirstSemver,
-  parseStdoutSarif, externalToolErrorCatalog 
+  parseStdoutSarif,
+  externalToolErrorCatalog,
 } from '@opensip-cli/external-tool-adapter';
 
 import type { Signal, Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
-
 
 // Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
 const CONFIG_REQUIRED = externalToolErrorCatalog.require('EXTERNAL.SCANNER.CONFIG_REQUIRED');

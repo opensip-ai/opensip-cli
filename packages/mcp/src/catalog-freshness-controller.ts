@@ -12,7 +12,6 @@ import type {
   GraphAdapterRegistryReader,
 } from '@opensip-cli/graph/read';
 
-
 // Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
 // UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');

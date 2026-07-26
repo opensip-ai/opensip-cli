@@ -7292,6 +7292,7 @@ export async function inspectRuntimeLeaseState(
           const after = captureInspectionIdentities(paths, coordinationKey);
           changed = before.some((identity, index) => identity !== after[index]);
         } catch {
+          // @swallow-ok fail-closed: an inspection that cannot complete must read as CHANGED, so the caller retries rather than acting on a stale identity
           changed = true;
         }
       }
