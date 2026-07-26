@@ -83,6 +83,12 @@ function reportDiscoveryProbeFailure(dir: string, error: unknown): void {
   }
 }
 
+/**
+ * Enumerate the plugins present under `layout` for `projectDir`.
+ *
+ * Total by design: an unreadable directory yields no plugins for that layout and is reported
+ * through the discovery-probe diagnostic rather than failing the run.
+ */
 export function discoverPlugins(layout: PluginLayout, projectDir?: string): DiscoveredPlugin[] {
   if (!projectDir) return [];
 

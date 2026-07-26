@@ -69,6 +69,7 @@ const mergedDefinitions = {
  * much as across owners — `defineErrorCatalog` cannot catch this one, because by the time it
  * runs the spread has already discarded the loser. Runs at module load, so a duplicate is a
  * failed import rather than a wrong definition served for the rest of the process.
+ * @throws {ErrorDefinitionError} When two definition modules declare the same code.
  */
 function assertNoDuplicateCodes(): void {
   const seen = new Set<string>();

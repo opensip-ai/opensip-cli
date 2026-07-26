@@ -171,6 +171,7 @@ function collectProjectTargets(projectDir: string): Target[] {
 /**
  * Enumerate every top-level entry under opensip-cli/ EXCEPT .runtime/.
  * Enumeration is for display; the invariant is "not .runtime/".
+ * @throws {SystemError} When the user source directory cannot be enumerated.
  */
 function collectUserContentTargets(userSourceDir: string): Target[] {
   const out: Target[] = [];

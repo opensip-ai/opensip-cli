@@ -39,7 +39,7 @@ import type { InventoryLimits, ProjectInventory, ProjectInventoryInput } from '.
 import type { ProjectInventorySnapshot } from '@opensip-cli/contracts';
 import type { BoundedTargetResolver, ToolError } from '@opensip-cli/core';
 
-const INPUT_INVALID = codebaseErrorCatalog.require('CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID');
+const INPUT_INVALID = codebaseErrorCatalog.require('CODEBASE.INVENTORY.INPUT_INVALID');
 
 /** Build the coded refusal for one unusable caller input. */
 function inputInvalid(field: string, condition: string, expected: string): ToolError {
@@ -57,7 +57,7 @@ function inputInvalid(field: string, condition: string, expected: string): ToolE
  * to narrow, and mapping it to the minimum invents a policy nobody asked for. Refusing at
  * the API boundary destroys no verdict because no scan has started (ruling D7).
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID` when `value` is present
+ * @throws {ToolError} `CODEBASE.INVENTORY.INPUT_INVALID` when `value` is present
  * and is not a positive finite number.
  */
 function boundedLimit(value: number | undefined, hardMaximum: number, field: string): number {
@@ -109,7 +109,7 @@ interface InventoryCancellation {
  * `AbortSignal.any` cannot compose it, and silently continuing would leave a run the
  * caller asked to make cancellable permanently uncancellable.
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID` when `deadlineMs` is
+ * @throws {ToolError} `CODEBASE.INVENTORY.INPUT_INVALID` when `deadlineMs` is
  * present and is not a positive finite number, or `signal` is not an `AbortSignal`.
  */
 function resolveCancellation(input: ProjectInventoryInput): InventoryCancellation {
@@ -160,7 +160,7 @@ function boundedTargetCapability(
  * verdict carrying bounded reason codes. The only refusals are malformed caller inputs,
  * which are rejected before any scan begins.
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID` when a supplied
+ * @throws {ToolError} `CODEBASE.INVENTORY.INPUT_INVALID` when a supplied
  * `limits` entry or `deadlineMs` is not a positive finite number, or `signal` is not an
  * `AbortSignal`.
  */

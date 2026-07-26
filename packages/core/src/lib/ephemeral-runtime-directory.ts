@@ -220,6 +220,10 @@ function classifyCacheErrno(error: unknown, hop: CacheHop): unknown {
   return createToolError(definition, message, { cause: error, metadata: { hop, errno } });
 }
 
+/**
+ * Resolve — and when `create`, materialize — the ephemeral runtime root.
+ * @throws {ToolError} When the root cannot be prepared, or its ownership/permission posture is refused.
+ */
 function prepareEphemeralRoot(create: boolean): UserPaths | undefined {
   const paths = resolveUserPaths();
   const homeDir = dirname(paths.userHomeDir);

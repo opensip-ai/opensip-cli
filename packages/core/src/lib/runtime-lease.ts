@@ -5214,6 +5214,10 @@ function ensureDeferredPublicationCleanupScheduler(): void {
   deferredPublicationCleanupTimer.unref?.();
 }
 
+/**
+ * Claim the deferred-publication cleanup slot for `key`.
+ * @throws {SystemError} When another writer already holds the slot for this key.
+ */
 function reserveDeferredPublicationCleanup(key: string): DeferredPublicationCleanupReservation {
   if (
     deferredPublicationCleanups.size >= MAX_DEFERRED_PUBLICATION_CLEANUPS ||

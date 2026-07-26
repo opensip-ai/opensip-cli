@@ -39,8 +39,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
      * specific field travels in allowlisted `metadata.field`, because a recipe author fixes
      * every one of them the same way and in the same file.
      */
-    'SIMULATION.SIMULATION.RECIPE_INVALID': {
-      code: 'SIMULATION.SIMULATION.RECIPE_INVALID',
+    'SIMULATION.RECIPE.INVALID': {
+      code: 'SIMULATION.RECIPE.INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'validation',
@@ -56,8 +56,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
     },
 
     /** A scenario definition is not usable. */
-    'SIMULATION.SIMULATION.SCENARIO_INVALID': {
-      code: 'SIMULATION.SIMULATION.SCENARIO_INVALID',
+    'SIMULATION.SCENARIO.INVALID': {
+      code: 'SIMULATION.SCENARIO.INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'validation',
@@ -77,8 +77,8 @@ export const simulationErrorCatalog = defineErrorCatalog(
      * A builder-ordering violation: `withMetrics` must run first. `tool-author` and `runtime`
      * — no user or operator can act on it, and saying otherwise would be a lie.
      */
-    'SIMULATION.SIMULATION.METRICS_REQUIRED': {
-      code: 'SIMULATION.SIMULATION.METRICS_REQUIRED',
+    'SIMULATION.METRICS.REQUIRED': {
+      code: 'SIMULATION.METRICS.REQUIRED',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'invariant',

@@ -121,9 +121,11 @@ function inspectNormalizedWorkspacePattern(
       braceExpandMax: MAX_WORKSPACE_BRACE_EXPANSIONS + 1,
     }),
   );
-  // @swallow-ok: an unexpandable pattern is reported by the caller as
-  // `workspace-pattern-invalid`, exactly like a pattern that expands into unsafe paths.
-  if (!expanded.ok) return undefined;
+  if (!expanded.ok) {
+    // @swallow-ok an unexpandable pattern is reported by the caller as
+    // `workspace-pattern-invalid`, exactly like a pattern that expands into unsafe paths.
+    return undefined;
+  }
   const expandedAlternatives = expanded.value;
   if (
     expandedAlternatives.length > MAX_WORKSPACE_BRACE_EXPANSIONS ||

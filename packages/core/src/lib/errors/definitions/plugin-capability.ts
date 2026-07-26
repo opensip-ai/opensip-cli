@@ -299,9 +299,9 @@ export const pluginCapabilityDefinitions = {
    * `metadata.condition` says which. `redacted`: the message quotes the author's selector, and
    * no end user can act on it.
    */
-  'CORE.CORE.SELECTOR_INVALID': {
+  'CORE.SELECTOR.INVALID': {
     ...HOST_WIRING_INVARIANT,
-    code: 'CORE.CORE.SELECTOR_INVALID',
+    code: 'CORE.SELECTOR.INVALID',
     operatorAction:
       'Correct the recipe selector: use a known arm type, and supply a `match` matcher for arms that require one.',
     publicMetadataKeys: ['condition', 'arm'],

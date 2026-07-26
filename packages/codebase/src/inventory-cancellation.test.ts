@@ -171,7 +171,7 @@ describe('buildProjectInventory input refusal', () => {
     await expect(
       buildProjectInventory({ projectRoot: root, configIdentity: 'cfg', limits }),
     ).rejects.toMatchObject({
-      code: 'CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID',
+      code: 'CODEBASE.INVENTORY.INPUT_INVALID',
       metadata: { condition: 'not-positive-finite', field },
     });
   });
@@ -198,7 +198,7 @@ describe('buildProjectInventory input refusal', () => {
     await expect(
       buildProjectInventory({ projectRoot: root, configIdentity: 'cfg', signal: notASignal }),
     ).rejects.toMatchObject({
-      code: 'CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID',
+      code: 'CODEBASE.INVENTORY.INPUT_INVALID',
       metadata: { condition: 'not-an-abort-signal', field: 'signal' },
     });
   });

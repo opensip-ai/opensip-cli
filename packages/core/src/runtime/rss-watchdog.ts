@@ -9,6 +9,14 @@ import { execFileSync, type ChildProcess } from 'node:child_process';
 
 import { killTree } from './kill-tree.js';
 
+/**
+ * Deadline for one memory probe.
+ *
+ * A watchdog probe must never outlive the interval it runs on, or the watchdog becomes the
+ * thing consuming the resources it is meant to be watching.
+ */
+const RSS_PROBE_TIMEOUT_MS = 5000;
+
 /** Read child RSS in bytes, or undefined when the sample is unavailable. */
 export function readChildRssBytes(pid: number): number | undefined {
   if (!Number.isFinite(pid) || pid <= 0) return undefined;
@@ -21,7 +29,7 @@ export function readChildRssBytes(pid: number): number | undefined {
         {
           encoding: 'utf8',
           // Bounded (Plan 01): a watchdog probe must never outlive the interval it runs on.
-          timeout: 5000,
+          timeout: RSS_PROBE_TIMEOUT_MS,
           maxBuffer: 4 * 1024 * 1024,
         },
       );
@@ -37,7 +45,7 @@ export function readChildRssBytes(pid: number): number | undefined {
   try {
     const out = execFileSync('ps', ['-o', 'rss=', '-p', String(pid)], {
       // Bounded (Plan 01): a watchdog probe must never outlive the interval it runs on.
-      timeout: 5000,
+      timeout: RSS_PROBE_TIMEOUT_MS,
       maxBuffer: 4 * 1024 * 1024,
       encoding: 'utf8',
     }).trim();

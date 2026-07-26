@@ -16,7 +16,7 @@
  * These therefore follow the convention the first migrated package established:
  * head = failure family (`SYSTEM`, already mapped), domain = the subsystem (`TREE_SITTER`,
  * where underscores are legal), condition last — the same shape as
- * `CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE`.
+ * `CODEBASE.CONFIG.IDENTITY_UNENCODABLE`.
  */
 
 import { defineErrorCatalog } from '@opensip-cli/core';

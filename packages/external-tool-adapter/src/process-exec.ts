@@ -22,6 +22,9 @@ import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.j
 
 import type { BinaryResolveDeps } from './binary-resolver.js';
 
+/** Deadline for a PATH lookup: it answers immediately or the environment is broken. */
+const PATH_LOOKUP_TIMEOUT_MS = 5000;
+
 /**
  * Plan 00: coded spawn failure (binary missing vs other errno) with safe metadata.
  */
@@ -181,7 +184,7 @@ export function whichBinary(command: string, platform: NodeJS.Platform): string 
       encoding: 'utf8',
       windowsHide: true,
       // Bounded (Plan 01): a PATH lookup answers immediately or the environment is broken.
-      timeout: 5000,
+      timeout: PATH_LOOKUP_TIMEOUT_MS,
       maxBuffer: 1_048_576,
     });
     return String(out)

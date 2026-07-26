@@ -52,6 +52,9 @@ export function isErrorDefinitionErrorLike(value: unknown): value is ErrorDefini
   try {
     return (value as Record<symbol, unknown>)[ERROR_DEFINITION_ERROR_BRAND] === true;
   } catch {
+    // @swallow-ok this IS the predicate: a value whose property access throws is, definitively,
+    // not one of ours. `false` is the answer, not a swallowed failure — and logging here would
+    // let a hostile object emit output merely by being type-tested.
     return false;
   }
 }

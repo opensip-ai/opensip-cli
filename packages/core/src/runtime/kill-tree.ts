@@ -8,6 +8,15 @@
 
 import { execFileSync, type ChildProcess } from 'node:child_process';
 
+/**
+ * Deadline for the process-table and signal calls in this module.
+ *
+ * These are not work, they are questions about the OS: a `pgrep` that has not answered in five
+ * seconds is not going to, and signal delivery is immediate or broken. An unbounded call here
+ * would hang the very teardown meant to reclaim the machine.
+ */
+const PROCESS_CONTROL_TIMEOUT_MS = 5000;
+
 function isWindows(): boolean {
   return process.platform === 'win32';
 }
@@ -22,7 +31,7 @@ function descendantPids(pid: number): readonly number[] {
   try {
     const out = execFileSync('pgrep', ['-P', String(pid)], {
       // Bounded (Plan 01): a process-table read that has not answered in five seconds will not.
-      timeout: 5000,
+      timeout: PROCESS_CONTROL_TIMEOUT_MS,
       maxBuffer: 4 * 1024 * 1024,
       encoding: 'utf8',
     });
@@ -72,7 +81,7 @@ export function killTree(child: ChildProcess, signal: NodeJS.Signals | number = 
         stdio: 'ignore',
         // Bounded (Plan 01): signal delivery is immediate or it is broken. An unbounded
         // taskkill in the kill path would hang the very teardown meant to reclaim the machine.
-        timeout: 5000,
+        timeout: PROCESS_CONTROL_TIMEOUT_MS,
         maxBuffer: 1_048_576,
       });
     } catch {

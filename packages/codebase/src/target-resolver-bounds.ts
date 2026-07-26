@@ -374,7 +374,12 @@ export async function invokeBoundedTargetResolution(
   signal?: AbortSignal,
 ): Promise<BoundedTargetResolution | undefined> {
   const invoked = await invokeBoundedCapability(invoke, reasons, reasonCodes, signal);
-  if (!invoked.ok) return undefined;
+  if (!invoked.ok) {
+    // @swallow-ok the failure is already surfaced: `invokeBoundedCapability` records it into
+    // `reasons`/`reasonCodes`, which become the resolution's coverage reasons. Returning the
+    // error again here would double-report one condition.
+    return undefined;
+  }
   const validated = validateBoundedTargetResolution(invoked.value, maximumFiles);
   const aborted = signal?.aborted === true;
   if (aborted) reasons.add(INVENTORY_CANCELLED_REASON);
@@ -399,7 +404,10 @@ export async function invokeBoundedTargetMembershipResolution(input: {
     input.reasonCodes,
     input.signal,
   );
-  if (!invoked.ok) return undefined;
+  if (!invoked.ok) {
+    // @swallow-ok same as above — the reason accumulator already carries it.
+    return undefined;
+  }
   const validated = validateBoundedTargetMembershipResolution(
     invoked.value,
     input.maximumFiles,

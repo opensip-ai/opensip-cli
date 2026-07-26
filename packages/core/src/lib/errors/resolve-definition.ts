@@ -65,6 +65,9 @@ function fromRunRegistry(code: string): ErrorDefinition | undefined {
       ?.tools?.getErrorCatalogIndex()
       .byCode.get(code);
   } catch {
+    // @swallow-ok "not found" is the correct answer here, and it must stay silent: this runs
+    // while a failure is ALREADY being resolved, so logging would re-enter the same path that
+    // is currently failing and replace the original failure with a diagnostic one.
     return undefined;
   }
 }

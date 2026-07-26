@@ -23,7 +23,7 @@ function appendFrames(stack: CanonicalFrame[], frames: readonly CanonicalFrame[]
  * The one definition every unencodable-document condition carries (ruling D9). The
  * specific branch travels in the allowlisted `metadata.condition` key, not in the code.
  */
-const UNENCODABLE = codebaseErrorCatalog.require('CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE');
+const UNENCODABLE = codebaseErrorCatalog.require('CODEBASE.CONFIG.IDENTITY_UNENCODABLE');
 
 /** Build the coded refusal for one unencodable-document condition. */
 function unencodable(condition: 'bigint-scalar' | 'circular-reference', detail: string): ToolError {
@@ -35,7 +35,7 @@ function unencodable(condition: 'bigint-scalar' | 'circular-reference', detail: 
 /**
  * Append one JSON-compatible scalar to the canonical digest stream.
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the supplied
+ * @throws {ToolError} `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` when the supplied
  * scalar is a bigint, which JSON cannot encode.
  */
 function appendScalar(
@@ -109,7 +109,7 @@ function objectFrames(value: object): readonly CanonicalFrame[] {
 /**
  * Hash one value with deterministic JSON object-key ordering.
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the value
+ * @throws {ToolError} `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` when the value
  * contains a bigint or circular object reference.
  */
 function canonicalJsonDigest(value: unknown): string {
@@ -141,7 +141,7 @@ function canonicalJsonDigest(value: unknown): string {
 /**
  * Stable bounded identity of one already-captured, host-validated config document.
  *
- * @throws {ToolError} `CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` when the document
+ * @throws {ToolError} `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` when the document
  * contains a bigint or circular object reference.
  */
 export function projectConfigIdentity(

@@ -112,7 +112,7 @@ export interface ResolveSelectorOptions<
 
 // Registered replacement for the two un-catalogued `SYSTEM.CORE.*` selector literals; the
 // specific condition travels in metadata rather than in a second code (D9).
-const SELECTOR_INVALID = coreErrorCatalog.require('CORE.CORE.SELECTOR_INVALID');
+const SELECTOR_INVALID = coreErrorCatalog.require('CORE.SELECTOR.INVALID');
 
 function requireMatcher(match: Matcher | undefined, arm: string): Matcher {
   if (match === undefined) {

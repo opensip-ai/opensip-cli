@@ -44,8 +44,8 @@ export const codebaseErrorCatalog = defineErrorCatalog(
      * `metadata.condition` is `bigint-scalar` or `circular-reference` (D9: one code for
      * the cluster, the branch travels in allowlisted metadata).
      */
-    'CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE': {
-      code: 'CODEBASE.CODEBASE.CONFIG_IDENTITY_UNENCODABLE',
+    'CODEBASE.CONFIG.IDENTITY_UNENCODABLE': {
+      code: 'CODEBASE.CONFIG.IDENTITY_UNENCODABLE',
       source: 'application',
       defaultResponsibility: 'user',
       kind: 'validation',
@@ -78,8 +78,8 @@ export const codebaseErrorCatalog = defineErrorCatalog(
      * `metadata.field` names the input; `metadata.condition` names why it was rejected —
      * one code for the (tool-author x validation) cluster, branches in metadata (D9).
      */
-    'CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID': {
-      code: 'CODEBASE.CODEBASE.INVENTORY_INPUT_INVALID',
+    'CODEBASE.INVENTORY.INPUT_INVALID': {
+      code: 'CODEBASE.INVENTORY.INPUT_INVALID',
       source: 'application',
       defaultResponsibility: 'tool-author',
       kind: 'validation',

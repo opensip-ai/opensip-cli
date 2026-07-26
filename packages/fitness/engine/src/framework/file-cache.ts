@@ -73,6 +73,12 @@ function reportPrewarmGaps(rejected: number, loaded: number): void {
   }
 }
 
+/**
+ * Per-run content cache for files a check reads.
+ *
+ * Bounded and run-scoped: it exists so that N checks over the same file perform one read, not N.
+ * Prewarm gaps are reported rather than silently yielding an empty cache.
+ */
 export class FileCache {
   private readonly cache = new Map<string, string>();
   private _prewarmed = false;
