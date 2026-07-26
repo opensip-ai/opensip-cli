@@ -17,6 +17,7 @@
  */
 
 export { ConfigurationError } from '@opensip-cli/core';
+export { configErrorCatalog, CONFIG_ERROR_OWNER_ID } from './errors/config-error-catalog.js';
 
 export { composeConfigSchema, validateConfigDocument } from './composer.js';
 export { decorateToolConfigDeclarationsWithGateKeys } from './gate-keys.js';

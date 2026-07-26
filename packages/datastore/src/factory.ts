@@ -9,6 +9,7 @@ import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import { openMemoryBackend } from './backends/memory.js';
 import { openSqliteBackend } from './backends/sqlite.js';
 import { DataStoreMigrationError, DataStoreVersionError } from './data-store.js';
+import { datastoreErrorCatalog } from './errors/datastore-error-catalog.js';
 import { isDbNewerThanCli, readSupportedDbVersion } from './schema-version.js';
 
 import type {
@@ -17,6 +18,10 @@ import type {
   DatastoreCloseResult,
   DrizzleDataStore,
 } from './data-store.js';
+
+
+// Plan 01: registered replacements for literals that only resolved through head-guessing.
+const OPEN_MISSING_PATH = datastoreErrorCatalog.require('DATASTORE.OPEN.MISSING_PATH');
 
 function defaultMigrationsFolder(): string {
   return join(fileURLToPath(new URL('.', import.meta.url)), '..', 'migrations');
@@ -214,7 +219,9 @@ function migrateFailureMessage(opts: DataStoreOpenOptions): string {
 function requireSqlitePath(opts: DataStoreOpenOptions): string {
   if (!opts.path) {
     throw new ConfigurationError('DataStoreFactory.open: SQLite backend requires a `path` option', {
-      code: 'CONFIGURATION.DATASTORE.MISSING_PATH',
+      code: OPEN_MISSING_PATH.code,
+      definition: OPEN_MISSING_PATH,
+      metadata: { field: 'path' },
     });
   }
   return opts.path;

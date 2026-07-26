@@ -117,7 +117,7 @@ describe('config migration', () => {
     expect(() => migrateConfigFile({ configPath: asDir })).toThrow(
       expect.objectContaining({
         name: 'ConfigurationError',
-        code: 'CONFIG.MIGRATION.NOT_A_FILE',
+        code: 'CONFIG.MIGRATION.UNREADABLE',
       }),
     );
   });

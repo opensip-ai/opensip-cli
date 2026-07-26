@@ -12,8 +12,8 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **14**
-- Definitions: **149**
+- Catalog sources: **16**
+- Definitions: **155**
 
 ## Catalogs
 
@@ -26,6 +26,8 @@ generated: true
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 15 |
+| `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 3 |
+| `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 3 |
 | `@opensip-cli/tree-sitter` | `@opensip-cli/tree-sitter` | `packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts` | 2 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 21 |
@@ -39,6 +41,9 @@ generated: true
 | Code | Package | Source | Responsibility | Kind | Retry | Severity | Exit | Lifecycle | Operator action |
 |---|---|---|---|---|---|---|---|---|---|
 | `CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Export the capability contribution in the documented shape (an array for list-valued contributions). |
+| `CONFIG.MIGRATION.UNMIGRATABLE_DOCUMENT` | `@opensip-cli/config` | application | user | integrity | never | error | configuration | active | Fix the reported problem in opensip-cli.config.yml — it must be valid YAML with a mapping at the top level — then re-run. |
+| `CONFIG.MIGRATION.UNREADABLE` | `@opensip-cli/config` | application | user | not-found | never | error | configuration | active | Check the --config path: the file must exist, be a regular file, and be readable by this user. |
+| `CONFIG.MIGRATION.VERSION_UNSUPPORTED` | `@opensip-cli/config` | application | user | compatibility | never | error | configuration | active | Upgrade opensip-cli to a version that understands this config schema, or request a target version this CLI supports. |
 | `CONFIG.SUITE.EDIT_REFUSED` | `opensip-cli` | application | user | integrity | never | error | configuration | active | opensip cannot safely edit this config file. Fix the reported problem in opensip-cli.config.yml, or add the suite block by hand. |
 | `CONFIG.SUITE.INVALID` | `opensip-cli` | application | user | validation | never | error | configuration | active | Correct the named suite step in opensip-cli.config.yml; the message names the offending field and value. |
 | `CONFIG.SUITE.UNKNOWN_REFERENCE` | `opensip-cli` | application | user | not-found | never | error | configuration | active | The suite step names something that does not exist or is ambiguous. Run `opensip tools list` and use an exact tool and command name. |
@@ -96,6 +101,10 @@ generated: true
 | `CORE.SYSTEM.DEADLINE_EXCEEDED` | `@opensip-cli/core` | infrastructure | environment | timeout | never | error | runtime | active | Increase the outer deadline or reduce the operation workload. |
 | `CORE.SYSTEM.PERMISSION` | `@opensip-cli/core` | infrastructure | environment | permission | never | error | runtime | active | Check filesystem permissions for the affected path. |
 | `CORE.SYSTEM.RESOURCE` | `@opensip-cli/core` | infrastructure | environment | resource | caller-policy | error | runtime | active | Free resources (disk, file descriptors, or memory) and retry. |
+| `CORE.SYSTEM.UNKNOWN_FAILURE` | `@opensip-cli/core` | application | unknown | invariant | never | fatal | fatal | active | Capture the run id and operator detail; do not retry blindly. |
+| `DATASTORE.OPEN.MISSING_PATH` | `@opensip-cli/datastore` | application | tool-author | validation | never | error | runtime | active | Pass a `path` when opening the SQLite backend, or use the in-memory backend which needs none. |
+| `DATASTORE.READ.BOUND_INVALID` | `@opensip-cli/datastore` | application | tool-author | validation | never | error | runtime | active | Pass a positive integer limit; omit it to accept the built-in default. |
+| `DATASTORE.WRITE.RECORD_TOO_LARGE` | `@opensip-cli/datastore` | application | tool-author | resource | never | error | runtime | active | Reduce the size of the named field or payload before persisting it; the datastore bound protects shared storage. |
 | `EXTERNAL.SCANNER.BINARY_MISSING` | `@opensip-cli/external-tool-adapter` | external | operator | not-found | never | error | configuration | active | Install the scanner binary, add it to PATH, or set the tool binary path config/env pin. |
 | `EXTERNAL.SCANNER.KILLED_BY_SIGNAL` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | The scanner was killed by an external signal (OOM killer, kill -9, container stop). Check system memory and process limits, then retry. |
 | `EXTERNAL.SCANNER.SPAWN_FAILED` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check binary permissions and OS errno; retry after fixing the environment. |
@@ -158,7 +167,6 @@ generated: true
 | `TIMEOUT.RUNTIME_LEASE.GLOBAL_MAINTENANCE` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out waiting for global runtime maintenance. Stop or reconnect long-lived OpenSIP processes (including `opensip mcp`) and retry. |
 | `TIMEOUT.RUNTIME_LEASE.READ` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out waiting to read runtime state. Another opensip run is holding it; wait and re-run. |
 | `TIMEOUT.RUNTIME_LEASE.USER_STATE_READ` | `@opensip-cli/core` | infrastructure | environment | timeout | transient | error | runtime | active | Timed out reading user-state runtime data. Another opensip run is holding it; wait and re-run. |
-| `UNKNOWN_FAILURE` | `@opensip-cli/core` | application | unknown | invariant | never | fatal | fatal | active | Capture the run id and operator detail; do not retry blindly. |
 | `UNKNOWN_LIVE_VIEW` | `@opensip-cli/core` | application | tool-author | not-found | never | error | runtime | active | Use a registered live view key for this tool. |
 | `VALIDATION_ERROR` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Fix the invalid input, flag, or configuration value and retry. |
 | `VALIDATION.CODEBASE.CONFIG_IDENTITY_UNENCODABLE` | `@opensip-cli/codebase` | application | user | validation | never | error | configuration | active | Remove the circular reference or non-JSON (bigint) value from the project configuration document, then re-run. |

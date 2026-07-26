@@ -60,6 +60,18 @@ const CATALOG_SOURCES = [
     exportName: 'hostErrorCatalog',
   },
   {
+    packageName: '@opensip-cli/config',
+    ownerId: '@opensip-cli/config',
+    file: 'packages/config/src/errors/config-error-catalog.ts',
+    exportName: 'configErrorCatalog',
+  },
+  {
+    packageName: '@opensip-cli/datastore',
+    ownerId: '@opensip-cli/datastore',
+    file: 'packages/datastore/src/errors/datastore-error-catalog.ts',
+    exportName: 'datastoreErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/tree-sitter',
     ownerId: '@opensip-cli/tree-sitter',
     file: 'packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts',
@@ -162,7 +174,13 @@ function extractDefinitions(sourceText, packageName, ownerId, file) {
     const fields = { code };
     for (const name of spreads) Object.assign(fields, bases[name] ?? {});
     Object.assign(fields, readAxes(body));
-    fields.code = code;
+    // The definition's own `code:` field WINS over the object key. They are usually the same,
+    // but `coreSystemErrorCatalog` keys its terminal entry `UNKNOWN_FAILURE` while the code is
+    // `CORE.SYSTEM.UNKNOWN_FAILURE` — so keying on the object property published the wrong code
+    // in `docs/public/70-reference/18-error-code-index.md` and made the registration ratchet
+    // report a registered code as missing.
+    const declared = /\bcode:\s*['"]([A-Z][A-Z0-9_.]+)['"]/u.exec(body);
+    fields.code = declared ? declared[1] : code;
     if (!fields.operatorAction) continue;
     definitions.push({
       code: fields.code,
