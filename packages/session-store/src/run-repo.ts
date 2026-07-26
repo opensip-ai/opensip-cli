@@ -4,6 +4,7 @@ import { ValidationError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { and, asc, count, desc, eq, gte, inArray, or, sql } from 'drizzle-orm';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import {
   countRunRows,
   EMPTY_RUN_RETENTION_RESULT,
@@ -26,6 +27,10 @@ import type { RunRetentionBatchResult } from './run-retention.js';
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 
 export { MAX_RUN_RETENTION_BATCH_SIZE, type RunRetentionBatchResult } from './run-retention.js';
 export {
@@ -152,7 +157,9 @@ export class RunRepo {
   ): boolean {
     if (steps.some((step) => step.runId !== run.id)) {
       throw new ValidationError(`Run ${run.id} has a step with a mismatched runId.`, {
-        code: 'VALIDATION.RUN_STEP.RUN_ID_MISMATCH',
+        code: WRITE_INVALID.code,
+        definition: WRITE_INVALID,
+        metadata: { field: 'step-run-id-mismatch' },
       });
     }
     const preparedRun = prepareRunWrite(run);

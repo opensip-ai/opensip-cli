@@ -1,6 +1,7 @@
 import { SystemError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import {
   deepFreeze,
   DEFAULT_PARENT_RUN_LIST_LIMIT,
@@ -21,6 +22,10 @@ import { isSessionCwdWithin } from './session-cwd-scope.js';
 
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const UNSAFE_LEGACY = sessionStoreErrorCatalog.require('SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE');
 
 export {
   resolveParentRunEvidence,
@@ -102,13 +107,17 @@ export function listParentRuns(
     const cwdWithin = options.cwdWithin;
     if (readUnresolvableRunIdFromTx(tx, cwdWithin) !== null) {
       throw new SystemError('Stored parent Run history contains an unsupported legacy Run ID.', {
-        code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID',
+        code: UNSAFE_LEGACY.code,
+        definition: UNSAFE_LEGACY,
+        metadata: { field: 'legacy-id' },
       });
     }
     const rows = readRunsPageFromTx(tx, 0, effectiveLimit + 1, cwdWithin);
     if (cwdWithin !== undefined && rows.some((run) => !isSessionCwdWithin(run.cwd, cwdWithin))) {
       throw new SystemError('Stored parent Run history contains an unsupported legacy cwd.', {
-        code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_CWD',
+        code: UNSAFE_LEGACY.code,
+        definition: UNSAFE_LEGACY,
+        metadata: { field: 'legacy-cwd' },
       });
     }
     return deepFreeze({

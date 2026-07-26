@@ -72,6 +72,12 @@ const CATALOG_SOURCES = [
     exportName: 'datastoreErrorCatalog',
   },
   {
+    packageName: '@opensip-cli/session-store',
+    ownerId: '@opensip-cli/session-store',
+    file: 'packages/session-store/src/errors/session-store-error-catalog.ts',
+    exportName: 'sessionStoreErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/tree-sitter',
     ownerId: '@opensip-cli/tree-sitter',
     file: 'packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts',

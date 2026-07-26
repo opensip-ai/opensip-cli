@@ -7,9 +7,14 @@ import {
   type ToolRunOutcome,
 } from '@opensip-cli/core';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { type sessions } from './schema/sessions.js';
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const UNKNOWN_TOOL = sessionStoreErrorCatalog.require('SESSION.READ.UNKNOWN_TOOL');
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -41,7 +46,7 @@ export function buildSession(
   if (!isToolShortId(row.tool)) {
     throw new SystemError(
       `Session ${row.id} has an invalid tool value: ${JSON.stringify(row.tool)}`,
-      { code: 'SYSTEM.DATA.UNKNOWN_TOOL' },
+      { code: UNKNOWN_TOOL.code, definition: UNKNOWN_TOOL, metadata: { field: 'tool' } },
     );
   }
 

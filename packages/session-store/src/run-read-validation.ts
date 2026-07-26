@@ -1,6 +1,12 @@
 import { ValidationError } from '@opensip-cli/core';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { isResolvableStoredRunId } from './run-write-shapes.js';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const READ_BOUND = sessionStoreErrorCatalog.require('SESSION.READ.BOUND_INVALID');
+const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 
 /** Default newest-first parent-Run page size. */
 export const DEFAULT_PARENT_RUN_LIST_LIMIT = 20;
@@ -18,7 +24,7 @@ export function requireRunId(value: unknown): string {
   if (!isResolvableStoredRunId(value)) {
     throw new ValidationError(
       'Parent Run ID must contain 1-128 letters, numbers, underscores, or hyphens.',
-      { code: 'VALIDATION.RUN_READ.RUN_ID_INVALID' },
+      { code: WRITE_INVALID.code, definition: WRITE_INVALID, metadata: { field: 'run-id' } },
     );
   }
   return value;
@@ -31,7 +37,9 @@ export function requireOffset(value: number): number {
     throw new ValidationError(
       `Parent Run step offset must be a non-negative integer no greater than ${String(maximum)}.`,
       {
-        code: 'VALIDATION.RUN_READ.OFFSET_INVALID',
+        code: READ_BOUND.code,
+        definition: READ_BOUND,
+        metadata: { field: 'offset' },
       },
     );
   }

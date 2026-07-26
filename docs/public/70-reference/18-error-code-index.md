@@ -12,8 +12,8 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **16**
-- Definitions: **155**
+- Catalog sources: **17**
+- Definitions: **160**
 
 ## Catalogs
 
@@ -28,6 +28,7 @@ generated: true
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 15 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 3 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 3 |
+| `@opensip-cli/session-store` | `@opensip-cli/session-store` | `packages/session-store/src/errors/session-store-error-catalog.ts` | 5 |
 | `@opensip-cli/tree-sitter` | `@opensip-cli/tree-sitter` | `packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts` | 2 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 21 |
@@ -121,6 +122,11 @@ generated: true
 | `PLUGIN.SCOPE_CONTRIBUTION.FORBIDDEN_KEY` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Choose a scope contribution key outside the host-reserved namespace. |
 | `PLUGIN.SCOPE_CONTRIBUTION.INVALID` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Contribute scope values as plain data; see the tool contract for the shape. |
 | `RESOURCE.NOT_FOUND.RECIPE` | `@opensip-cli/fitness` | application | user | not-found | never | error | not-found | active | Run opensip fit recipes to list available recipes. |
+| `SESSION.EVIDENCE.UNREADABLE` | `@opensip-cli/session-store` | infrastructure | environment | integrity | never | error | runtime | active | Stored evidence for this run could not be read. Re-run the tool to regenerate it, or purge the affected sessions. |
+| `SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE` | `@opensip-cli/session-store` | infrastructure | environment | security | never | error | runtime | active | A stored record predates current safety rules and was refused. Purge the affected sessions; they cannot be migrated in place. |
+| `SESSION.READ.BOUND_INVALID` | `@opensip-cli/session-store` | application | tool-author | validation | never | error | runtime | active | Pass a non-negative integer for the named bound; omit it to accept the built-in default. |
+| `SESSION.READ.UNKNOWN_TOOL` | `@opensip-cli/session-store` | application | tool-author | not-found | never | error | runtime | active | Use a tool name that has recorded sessions; `opensip tools list` shows them. |
+| `SESSION.WRITE.RECORD_INVALID` | `@opensip-cli/session-store` | application | tool-author | validation | never | error | runtime | active | Correct the named field on the run, step or session record before persisting it. |
 | `SIMULATION.SCENARIO.ABORTED` | `@opensip-cli/simulation` | application | user | cancelled | never | error | cancelled | active | Scenario was cancelled. Re-run if the work is still needed. |
 | `SYSTEM_ERROR` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Retry once; if it persists, capture the run id and report a bug. |
 | `SYSTEM.CAPABILITY.REGISTRAR_NOT_WIRED` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The tool that declares this capability domain never wired its registrar. Report it to the tool author with the run id. |

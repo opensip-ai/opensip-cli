@@ -1,9 +1,14 @@
 import { logger, ValidationError } from '@opensip-cli/core';
 import { asc, count, eq, inArray, lt } from 'drizzle-orm';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { sessions } from './schema/sessions.js';
 
 import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const READ_BOUND = sessionStoreErrorCatalog.require('SESSION.READ.BOUND_INVALID');
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -186,7 +191,11 @@ function validateBatchSize(batchSize: number): number {
   ) {
     throw new ValidationError(
       `Invalid Session maintenance batch size '${String(batchSize)}'. Must be a positive integer no greater than ${MAX_SESSION_MAINTENANCE_BATCH_SIZE}.`,
-      { code: 'VALIDATION.SESSION.MAINTENANCE_BATCH_SIZE_INVALID' },
+      {
+        code: READ_BOUND.code,
+        definition: READ_BOUND,
+        metadata: { field: 'maintenance-batch-size' },
+      },
     );
   }
   return batchSize;
@@ -195,13 +204,17 @@ function validateBatchSize(batchSize: number): number {
 function validateCutoff(before: Date): number {
   if (!(before instanceof Date)) {
     throw new ValidationError('Invalid Session purge cutoff.', {
-      code: 'VALIDATION.SESSION.PURGE_CUTOFF_INVALID',
+      code: READ_BOUND.code,
+      definition: READ_BOUND,
+      metadata: { field: 'purge-cutoff' },
     });
   }
   const cutoff = before.getTime();
   if (!Number.isFinite(cutoff)) {
     throw new ValidationError('Invalid Session purge cutoff.', {
-      code: 'VALIDATION.SESSION.PURGE_CUTOFF_INVALID',
+      code: READ_BOUND.code,
+      definition: READ_BOUND,
+      metadata: { field: 'purge-cutoff' },
     });
   }
   return cutoff;

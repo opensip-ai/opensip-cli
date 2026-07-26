@@ -6,6 +6,7 @@ import {
   logger,
 } from '@opensip-cli/core';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { sessions, sessionToolPayload } from './schema/sessions.js';
 import { writeHostMetricsRowOrThrow } from './session-repo-host-metrics.js';
 import {
@@ -17,6 +18,10 @@ import {
 
 import type { StoredSession, StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
+
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -40,7 +45,9 @@ export interface PreparedSessionWrite {
 export function prepareSessionWrite(session: StoredSession): PreparedSessionWrite {
   if (!sessionRowShapeIsValid(session)) {
     throw new ValidationError('Invalid required Session row shape.', {
-      code: 'VALIDATION.SESSION.INVALID_SHAPE',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'session-shape' },
     });
   }
   const startedMs = new Date(session.startedAt).getTime();
@@ -48,7 +55,11 @@ export function prepareSessionWrite(session: StoredSession): PreparedSessionWrit
   if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
     throw new ValidationError(
       `Invalid session timing for session ${session.id} (tool=${session.tool}): startedAt=${JSON.stringify(session.startedAt)} completedAt=${JSON.stringify(session.completedAt)}`,
-      { code: 'VALIDATION.SESSION.INVALID_TIMESTAMP' },
+      {
+        code: WRITE_INVALID.code,
+        definition: WRITE_INVALID,
+        metadata: { field: 'session-timestamp' },
+      },
     );
   }
 

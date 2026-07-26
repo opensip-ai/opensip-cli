@@ -1,6 +1,10 @@
 import { SystemError } from '@opensip-cli/core';
 
 import { canonicalParsedJson } from './canonical-json.js';
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const UNREADABLE = sessionStoreErrorCatalog.require('SESSION.EVIDENCE.UNREADABLE');
 
 /**
  * Return canonical JSON bytes contributed by one array item, including its
@@ -35,7 +39,9 @@ function canonicalJson(value: unknown): string {
   const ordinary = JSON.stringify(value);
   if (ordinary === undefined) {
     throw new SystemError('Stored parent Run evidence is not JSON serializable.', {
-      code: 'SYSTEM.RUN_READ.EVIDENCE_NOT_SERIALIZABLE',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { field: 'evidence-not-serializable' },
     });
   }
   return canonicalParsedJson(JSON.parse(ordinary) as unknown);
