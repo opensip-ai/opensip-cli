@@ -2,10 +2,14 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import { defineExternalToolAdapter, parseFirstSemver, externalToolErrorCatalog  } from '@opensip-cli/external-tool-adapter';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
+
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const CONFIG_REQUIRED = externalToolErrorCatalog.require('EXTERNAL.SCANNER.CONFIG_REQUIRED');
 
 export const SPOTBUGS_IDENTITY: ToolIdentity = { name: 'spotbugs' };
 export const SPOTBUGS_STABLE_ID = '47a950e0-f631-4d80-aa35-02968ef97747';
@@ -127,7 +131,11 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   if (targets.length === 0) {
     throw new ConfigurationError(
       'spotbugs requires compiled Java classes (for example target/classes or build/classes/java/main).',
-      { code: 'ADAPTER.CONFIG.MISSING_BUILD_OUTPUT' },
+      {
+        code: CONFIG_REQUIRED.code,
+        definition: CONFIG_REQUIRED,
+        metadata: { field: 'build-output' },
+      },
     );
   }
   return [

@@ -22,6 +22,8 @@ import {
 } from '@opensip-cli/core';
 import { z } from 'zod';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import { TargetRegistry } from './target-registry.js';
 
 import type {
@@ -30,6 +32,11 @@ import type {
   TargetConventionsConfig,
   TargetsConfig,
 } from './types.js';
+
+
+// Plan 01: the `ERRORS.` head was mapped by nothing, so a config typo reported as an
+// operator-only internal fatal. One registered user-facing code, branch in metadata.
+const FIT_SCOPE_INVALID = fitnessErrorCatalog.require('CONFIG.FIT_SCOPE.INVALID');
 
 const YAML_FILENAME = PROJECT_CONFIG_FILENAME;
 const DEFAULT_EXCLUDES: readonly string[] = ['**/node_modules/**', '**/dist/**'];
@@ -125,7 +132,11 @@ function buildFromParsed(
                 .getAll()
                 .map((t) => t.config.name)
                 .join(', ')}`,
-            { code: 'ERRORS.TARGETS.UNKNOWN_TARGET' },
+            {
+              code: FIT_SCOPE_INVALID.code,
+              definition: FIT_SCOPE_INVALID,
+              metadata: { field: 'targets', condition: 'unknown-target' },
+            },
           );
         }
       }
@@ -164,7 +175,11 @@ function rejectUnsafeConventionPathsInFitnessConfig(
         `${sourceLabel}: targets.${targetName}.conventions.${issue.field} contains unsafe glob ` +
           `'${issue.pattern}'. Convention paths must be project-relative and must not contain ` +
           `'..' path segments.`,
-        { code: 'ERRORS.TARGETS.VALIDATION_FAILED' },
+        {
+          code: FIT_SCOPE_INVALID.code,
+          definition: FIT_SCOPE_INVALID,
+          metadata: { field: 'targets', condition: 'validation-failed' },
+        },
       );
     }
   }
@@ -191,7 +206,9 @@ function projectTargetsConfig(
   if (!result.success) {
     const issues = result.error.issues.map((i) => `  ${i.path.join('.')}: ${i.message}`).join('\n');
     throw new ValidationError(`${sourceLabel} validation failed:\n${issues}`, {
-      code: 'ERRORS.TARGETS.VALIDATION_FAILED',
+      code: FIT_SCOPE_INVALID.code,
+      definition: FIT_SCOPE_INVALID,
+      metadata: { field: 'targets', condition: 'validation-failed' },
     });
   }
 
@@ -252,7 +269,11 @@ export function loadTargetsConfig(
     throw new ValidationError(
       `${YAML_FILENAME}: current RunScope has no validated configDocument; ` +
         'refusing a second config-file read from a scoped targets load.',
-      { code: 'ERRORS.TARGETS.SCOPE_CONFIG_MISSING' },
+      {
+        code: FIT_SCOPE_INVALID.code,
+        definition: FIT_SCOPE_INVALID,
+        metadata: { field: 'targets', condition: 'scope-config-missing' },
+      },
     );
   }
   const yamlPath = resolveProjectConfigPath(rootDir, explicitPath);

@@ -20,7 +20,6 @@ import { extractSnippet } from './result-builder.js';
 import type { ResolvedScope } from './check-config.js';
 import type { FileCache } from './file-cache.js';
 
-
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
 const CHECK_ABORTED = fitnessErrorCatalog.require('SYSTEM.FITNESS.CHECK_ABORTED');

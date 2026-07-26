@@ -14,7 +14,6 @@ import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import type { FileAccessor } from './check-config.js';
 import type { FileCache } from './file-cache.js';
 
-
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
 const FILE_TOO_LARGE = fitnessErrorCatalog.require('SYSTEM.FITNESS.FILE_TOO_LARGE');

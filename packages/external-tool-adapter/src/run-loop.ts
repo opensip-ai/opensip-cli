@@ -33,6 +33,7 @@ import {
 
 import { ADAPTER_DIAG_EVT, emitAdapterDecision } from './adapter-diagnostics.js';
 import { resolveBinary, defaultBinaryEnvVar } from './binary-resolver.js';
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
 import { DEFAULT_EXIT_MODEL, interpretExit } from './exit-model.js';
 import { defaultBinaryDeps, probeBinaryVersion, runScannerProcess } from './process-exec.js';
 import { stampProvenanceAll } from './provenance.js';
@@ -60,6 +61,11 @@ import type { ExternalAdapterProgressBridge } from './progress.js';
 import type { ScanCompletion } from './scan-emit.js';
 import type { AdapterProvenance, BinarySpec, ExternalCommandSpec } from './types.js';
 import type { FingerprintStrategy, ToolCliContext } from '@opensip-cli/core';
+
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const BINARY_MISSING = externalToolErrorCatalog.require('EXTERNAL.SCANNER.BINARY_MISSING');
+const SCAN_UNAVAILABLE = externalToolErrorCatalog.require('EXTERNAL.SCANNER.SCAN_UNAVAILABLE');
 
 /** Default scanner process budget. */
 const DEFAULT_TIMEOUT_MS = 300_000;
@@ -165,7 +171,7 @@ export async function runScanLoop(
   if (!resolution.found) {
     throw new ConfigurationError(
       `${tool}: ${resolution.reason}. Run 'opensip ${tool} doctor' for setup help.`,
-      { code: 'ADAPTER.BINARY.NOT_FOUND' },
+      { code: BINARY_MISSING.code, definition: BINARY_MISSING },
     );
   }
 
@@ -239,7 +245,9 @@ export async function runScanLoop(
       data: { reason: 'timeout', timeoutMs: deps.timeoutMs },
     });
     throw new TimeoutError(`${tool} scan timed out after ${String(deps.timeoutMs)}ms`, {
-      code: 'ADAPTER.SCAN.TIMEOUT',
+      code: SCAN_UNAVAILABLE.code,
+      definition: SCAN_UNAVAILABLE,
+      metadata: { field: 'timeout' },
       stderrTail: redactCredentials(proc.stderr.slice(-STDERR_TAIL)),
     });
   }

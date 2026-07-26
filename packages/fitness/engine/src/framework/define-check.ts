@@ -49,7 +49,6 @@ import type { ExecutionContext, RunOptions } from './execution-context.js';
 import type { CheckResult } from '../types/findings.js';
 import type { Signal, SignalRepair } from '@opensip-cli/core';
 
-
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
 const ENGINE_STATE = fitnessErrorCatalog.require('SYSTEM.FITNESS.ENGINE_STATE_INVALID');

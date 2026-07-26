@@ -55,6 +55,76 @@ export const externalToolErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['command', 'signal'],
     },
+
+    /**
+     * An adapter's own declaration is unusable: no commands, or a command with no parser.
+     *
+     * `tool-author` and `plugin-incompatible` — the adapter author wrote this, and it is caught
+     * at definition time, before any scanner runs. One code for both (D9): same author, same
+     * file, same fix, with `metadata.field` naming which part.
+     */
+    'EXTERNAL.ADAPTER.SPEC_INVALID': {
+      code: 'EXTERNAL.ADAPTER.SPEC_INVALID',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'plugin-incompatible',
+      operatorAction:
+        'Declare at least one command on the external tool adapter, and give every command a parser.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['field'],
+    },
+
+    /**
+     * A scanner adapter needs configuration the project has not supplied — a config file, a
+     * dependency source, or a build output directory.
+     *
+     * `user` and `configuration`: unlike the spec errors above, this is resolved by editing the
+     * project, and the message names what to add. One code across all the scanner adapters
+     * (D9), with `metadata.field` naming the missing input.
+     */
+    'EXTERNAL.SCANNER.CONFIG_REQUIRED': {
+      code: 'EXTERNAL.SCANNER.CONFIG_REQUIRED',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction:
+        'Provide the input the scanner needs (its config file, dependency manifest, or build output) and re-run.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['field', 'scanner'],
+    },
+
+    /**
+     * A scan could not start or could not finish: no project context, or the scanner exceeded
+     * its deadline.
+     *
+     * `environment` and `caller-policy` retry — a timeout is about the machine and the workload,
+     * and the caller owns whether to retry with a longer budget.
+     */
+    'EXTERNAL.SCANNER.SCAN_UNAVAILABLE': {
+      code: 'EXTERNAL.SCANNER.SCAN_UNAVAILABLE',
+      source: 'external',
+      defaultResponsibility: 'environment',
+      kind: 'timeout',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'The scan could not complete. Run from inside a project, or raise the scanner timeout for large workloads.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'scanner'],
+    },
   },
   { allowLegacyCodes: true },
 );

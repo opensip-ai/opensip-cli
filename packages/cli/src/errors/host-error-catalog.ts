@@ -330,5 +330,47 @@ export const hostErrorCatalog = defineErrorCatalog(
         'Correct the named run-read argument: run ids are 1-128 word characters, and limits and offsets are non-negative integers.',
       publicMetadataKeys: ['field', 'condition'],
     },
+
+    /**
+     * A `report` run selector names something the store does not have: an unknown run, or a run
+     * with no change-impact data to render.
+     *
+     * `user` / `not-found`: the user typed or pasted a run id, and the fix is to pick one that
+     * exists. The retired `CONFIGURATION.REPORT.*` literals resolved to nothing, so what is
+     * plainly a "no such run" answer arrived as an internal fatal.
+     */
+    'CONFIG.REPORT.RUN_UNAVAILABLE': {
+      ...USER_INPUT,
+      code: 'CONFIG.REPORT.RUN_UNAVAILABLE',
+      kind: 'not-found',
+      operatorAction:
+        'Pick a run that exists — `opensip runs list` shows them — and one that recorded the data this report needs.',
+      publicMetadataKeys: ['condition', 'runId'],
+    },
+
+    /** A run-history read names a run the store does not have. */
+    'CONFIG.RUNS.NOT_FOUND': {
+      ...USER_INPUT,
+      code: 'CONFIG.RUNS.NOT_FOUND',
+      kind: 'not-found',
+      operatorAction: 'Pick a run id that exists; `opensip runs list` shows the recorded runs.',
+      publicMetadataKeys: ['runId'],
+    },
+
+    /**
+     * An evidence snapshot a tool contributed is not a usable shape.
+     *
+     * `tool-author` and `runtime`: the snapshot comes from a tool's `collectReportData`, not
+     * from anything the user wrote.
+     */
+    'VALIDATION.RUN_EVIDENCE.INVALID': {
+      ...HOST_WIRING,
+      code: 'VALIDATION.RUN_EVIDENCE.INVALID',
+      kind: 'validation',
+      exposure: 'public',
+      operatorAction:
+        'The tool contributed an evidence snapshot the host cannot store. Report it to the tool author with the run id.',
+      publicMetadataKeys: ['field'],
+    },
   },
 );

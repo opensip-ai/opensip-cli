@@ -6,11 +6,15 @@ import {
   buildScannerExclude,
   defineExternalToolAdapter,
   parseFirstSemver,
-  parseStdoutSarif,
+  parseStdoutSarif, externalToolErrorCatalog 
 } from '@opensip-cli/external-tool-adapter';
 
 import type { Signal, Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
+
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const CONFIG_REQUIRED = externalToolErrorCatalog.require('EXTERNAL.SCANNER.CONFIG_REQUIRED');
 
 export const AST_GREP_IDENTITY: ToolIdentity = {
   name: 'ast-grep',
@@ -27,7 +31,7 @@ function requiredConfig(projectRoot: string): string {
   }
   throw new ConfigurationError(
     'ast-grep requires an sgconfig.yml, sgconfig.yaml, .ast-grep.yml, or .ast-grep.yaml file.',
-    { code: 'ADAPTER.CONFIG.MISSING' },
+    { code: CONFIG_REQUIRED.code, definition: CONFIG_REQUIRED, metadata: { field: 'config-file' } },
   );
 }
 

@@ -192,6 +192,34 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['condition'],
     },
+
+    /**
+     * A `targets:` or `signalers:` block in `opensip-cli.config.yml` is unusable, or a check
+     * names a target the config does not define.
+     *
+     * The `ERRORS.` head these carried was mapped by nothing, so the most common
+     * config-authoring mistake in the product reported as an operator-only internal fatal
+     * saying "report a bug" — for a typo the user could have fixed in ten seconds. `user` /
+     * `configuration` / `public` is the whole point of registering it.
+     *
+     * One code (D9): every member is fixed in the same file, and `metadata.field` names the
+     * block and `metadata.condition` whether it was missing, unknown, or invalid.
+     */
+    'CONFIG.FIT_SCOPE.INVALID': {
+      code: 'CONFIG.FIT_SCOPE.INVALID',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction:
+        'Correct the named targets or signalers block in opensip-cli.config.yml; `opensip fit list` shows the targets a check can reference.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['field', 'condition'],
+    },
   },
   { allowLegacyCodes: true },
 );

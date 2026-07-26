@@ -15,9 +15,16 @@ import {
   logger,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import { SignalersConfigSchema } from './schema.js';
 
 import type { SignalersConfig } from './types.js';
+
+
+// Plan 01: the `ERRORS.` head was mapped by nothing, so a config typo reported as an
+// operator-only internal fatal. One registered user-facing code, branch in metadata.
+const FIT_SCOPE_INVALID = fitnessErrorCatalog.require('CONFIG.FIT_SCOPE.INVALID');
 
 /**
  * Recursively freeze every nested object so the `DeepReadonly` claim
@@ -74,7 +81,9 @@ function projectSignalersConfig(parsed: unknown, sourceLabel: string): Signalers
       operation: 'load',
       loader: 'signalers',
       filePath: sourceLabel,
-      code: 'ERRORS.SIGNALERS.VALIDATION_FAILED',
+      code: FIT_SCOPE_INVALID.code,
+      definition: FIT_SCOPE_INVALID,
+      metadata: { field: 'signalers', condition: 'validation-failed' },
     });
   }
 
@@ -135,7 +144,9 @@ export function loadSignalersConfig(rootDir: string, explicitPath?: string): Sig
       {
         operation: 'load',
         loader: 'signalers',
-        code: 'ERRORS.SIGNALERS.SCOPE_CONFIG_MISSING',
+        code: FIT_SCOPE_INVALID.code,
+        definition: FIT_SCOPE_INVALID,
+        metadata: { field: 'signalers', condition: 'scope-config-missing' },
       },
     );
   }

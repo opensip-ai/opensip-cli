@@ -2,12 +2,16 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { ConfigurationError, readPackageVersion } from '@opensip-cli/core';
-import { defineExternalToolAdapter, parseFirstSemver } from '@opensip-cli/external-tool-adapter';
+import { defineExternalToolAdapter, parseFirstSemver, externalToolErrorCatalog  } from '@opensip-cli/external-tool-adapter';
 
 import { parsePipAuditJson } from './parse-pip-audit-json.js';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
+
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const CONFIG_REQUIRED = externalToolErrorCatalog.require('EXTERNAL.SCANNER.CONFIG_REQUIRED');
 
 export const PIP_AUDIT_IDENTITY: ToolIdentity = { name: 'pip-audit' };
 export const PIP_AUDIT_STABLE_ID = '898272b0-385c-4905-beb9-383de034bfd9';
@@ -55,7 +59,11 @@ export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
   } else {
     throw new ConfigurationError(
       'pip-audit requires a requirements file (requirements.txt) or a Python project manifest (pyproject.toml).',
-      { code: 'ADAPTER.CONFIG.MISSING_DEPENDENCY_SOURCE' },
+      {
+        code: CONFIG_REQUIRED.code,
+        definition: CONFIG_REQUIRED,
+        metadata: { field: 'dependency-source' },
+      },
     );
   }
   return [

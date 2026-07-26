@@ -141,3 +141,4 @@ export type { AdapterVersionReport } from './version-command.js';
 // ── Acceptance harness ──────────────────────────────────────────────────────
 export { normalizedSignalShape, runAcceptanceCase } from './acceptance-harness.js';
 export type { AcceptanceFixture, AcceptanceResult, SignalShape } from './acceptance-harness.js';
+export { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';

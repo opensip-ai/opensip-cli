@@ -11,9 +11,14 @@
 import { ConfigurationError, resolveProjectPaths } from '@opensip-cli/core';
 
 import { resolveScannerArtifactPath } from './artifact-path.js';
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
 
 import type { AdapterRunContext, ResolvedBinary } from './types.js';
 import type { ToolCliContext } from '@opensip-cli/core';
+
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const SCAN_UNAVAILABLE = externalToolErrorCatalog.require('EXTERNAL.SCANNER.SCAN_UNAVAILABLE');
 
 export interface BuildRunContextInput {
   readonly cli: ToolCliContext;
@@ -33,7 +38,11 @@ export function buildAdapterRunContext(input: BuildRunContextInput): AdapterRunC
     throw new ConfigurationError(
       `Cannot run '${input.tool}': no opensip-cli project found here. ` +
         `Run 'opensip ${input.tool}' from inside an opensip-cli project (a directory with opensip-cli.config.yml).`,
-      { code: 'ADAPTER.SCAN.NO_PROJECT' },
+      {
+        code: SCAN_UNAVAILABLE.code,
+        definition: SCAN_UNAVAILABLE,
+        metadata: { field: 'no-project' },
+      },
     );
   }
   const projectPaths = resolveProjectPaths(project.projectRoot);

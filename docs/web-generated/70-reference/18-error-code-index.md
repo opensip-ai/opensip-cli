@@ -13,19 +13,19 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **17**
-- Definitions: **160**
+- Definitions: **167**
 
 ## Catalogs
 
 | Package | Owner id | Source file | Count |
 |---|---|---|---:|
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
-| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 9 |
+| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 10 |
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
-| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 3 |
+| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 6 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 15 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/host-error-catalog.ts` | 18 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 3 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 3 |
 | `@opensip-cli/session-store` | `@opensip-cli/session-store` | `packages/session-store/src/errors/session-store-error-catalog.ts` | 5 |
@@ -42,9 +42,12 @@ generated: true
 | Code | Package | Source | Responsibility | Kind | Retry | Severity | Exit | Lifecycle | Operator action |
 |---|---|---|---|---|---|---|---|---|---|
 | `CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Export the capability contribution in the documented shape (an array for list-valued contributions). |
+| `CONFIG.FIT_SCOPE.INVALID` | `@opensip-cli/fitness` | application | user | validation | never | error | configuration | active | Correct the named targets or signalers block in opensip-cli.config.yml; `opensip fit list` shows the targets a check can reference. |
 | `CONFIG.MIGRATION.UNMIGRATABLE_DOCUMENT` | `@opensip-cli/config` | application | user | integrity | never | error | configuration | active | Fix the reported problem in opensip-cli.config.yml — it must be valid YAML with a mapping at the top level — then re-run. |
 | `CONFIG.MIGRATION.UNREADABLE` | `@opensip-cli/config` | application | user | not-found | never | error | configuration | active | Check the --config path: the file must exist, be a regular file, and be readable by this user. |
 | `CONFIG.MIGRATION.VERSION_UNSUPPORTED` | `@opensip-cli/config` | application | user | compatibility | never | error | configuration | active | Upgrade opensip-cli to a version that understands this config schema, or request a target version this CLI supports. |
+| `CONFIG.REPORT.RUN_UNAVAILABLE` | `opensip-cli` | application | user | not-found | never | error | configuration | active | Pick a run that exists — `opensip runs list` shows them — and one that recorded the data this report needs. |
+| `CONFIG.RUNS.NOT_FOUND` | `opensip-cli` | application | user | not-found | never | error | configuration | active | Pick a run id that exists; `opensip runs list` shows the recorded runs. |
 | `CONFIG.SUITE.EDIT_REFUSED` | `opensip-cli` | application | user | integrity | never | error | configuration | active | opensip cannot safely edit this config file. Fix the reported problem in opensip-cli.config.yml, or add the suite block by hand. |
 | `CONFIG.SUITE.INVALID` | `opensip-cli` | application | user | validation | never | error | configuration | active | Correct the named suite step in opensip-cli.config.yml; the message names the offending field and value. |
 | `CONFIG.SUITE.UNKNOWN_REFERENCE` | `opensip-cli` | application | user | not-found | never | error | configuration | active | The suite step names something that does not exist or is ambiguous. Run `opensip tools list` and use an exact tool and command name. |
@@ -106,8 +109,11 @@ generated: true
 | `DATASTORE.OPEN.MISSING_PATH` | `@opensip-cli/datastore` | application | tool-author | validation | never | error | runtime | active | Pass a `path` when opening the SQLite backend, or use the in-memory backend which needs none. |
 | `DATASTORE.READ.BOUND_INVALID` | `@opensip-cli/datastore` | application | tool-author | validation | never | error | runtime | active | Pass a positive integer limit; omit it to accept the built-in default. |
 | `DATASTORE.WRITE.RECORD_TOO_LARGE` | `@opensip-cli/datastore` | application | tool-author | resource | never | error | runtime | active | Reduce the size of the named field or payload before persisting it; the datastore bound protects shared storage. |
+| `EXTERNAL.ADAPTER.SPEC_INVALID` | `@opensip-cli/external-tool-adapter` | application | tool-author | validation | never | error | plugin-incompatible | active | Declare at least one command on the external tool adapter, and give every command a parser. |
 | `EXTERNAL.SCANNER.BINARY_MISSING` | `@opensip-cli/external-tool-adapter` | external | operator | not-found | never | error | configuration | active | Install the scanner binary, add it to PATH, or set the tool binary path config/env pin. |
+| `EXTERNAL.SCANNER.CONFIG_REQUIRED` | `@opensip-cli/external-tool-adapter` | application | user | not-found | never | error | configuration | active | Provide the input the scanner needs (its config file, dependency manifest, or build output) and re-run. |
 | `EXTERNAL.SCANNER.KILLED_BY_SIGNAL` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | The scanner was killed by an external signal (OOM killer, kill -9, container stop). Check system memory and process limits, then retry. |
+| `EXTERNAL.SCANNER.SCAN_UNAVAILABLE` | `@opensip-cli/external-tool-adapter` | external | environment | timeout | caller-policy | error | runtime | active | The scan could not complete. Run from inside a project, or raise the scanner timeout for large workloads. |
 | `EXTERNAL.SCANNER.SPAWN_FAILED` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check binary permissions and OS errno; retry after fixing the environment. |
 | `MCP.STDIO.PROTOCOL` | `@opensip-cli/mcp` | application | tool-author | compatibility | never | error | runtime | active | Fix the JSON-RPC request shape and reconnect the MCP client. |
 | `MCP.STDIO.SHUTDOWN` | `@opensip-cli/mcp` | application | user | cancelled | never | error | cancelled | active | MCP server shut down. Restart opensip mcp if more queries are needed. |
@@ -185,6 +191,7 @@ generated: true
 | `VALIDATION.COMMAND_SPEC.NOT_AN_OBJECT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Pass a plain object to defineCommand. |
 | `VALIDATION.EXECUTION.INVALID_MODE` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Set the workflow execution mode to one of the documented values. |
 | `VALIDATION.FITNESS.PATH_REJECTED` | `@opensip-cli/fitness` | application | tool-author | security | never | error | runtime | active | Analyze only paths from the resolved target set; a path outside it, or a directory, is refused. |
+| `VALIDATION.RUN_EVIDENCE.INVALID` | `opensip-cli` | application | tool-author | validation | never | error | runtime | active | The tool contributed an evidence snapshot the host cannot store. Report it to the tool author with the run id. |
 | `VALIDATION.RUN_READ.INPUT_INVALID` | `opensip-cli` | application | tool-author | validation | never | error | runtime | active | Correct the named run-read argument: run ids are 1-128 word characters, and limits and offsets are non-negative integers. |
 | `VALIDATION.RUNTIME_COORDINATION.INPUT` | `@opensip-cli/core` | application | tool-author | validation | never | error | runtime | active | Correct the named runtime coordination input and retry; this is a caller contract violation, not a project state problem. |
 | `VALIDATION.SIMULATION.METRICS_REQUIRED` | `@opensip-cli/simulation` | application | tool-author | invariant | never | error | runtime | active | Call withMetrics(...) before evaluating scenario assertions. |
