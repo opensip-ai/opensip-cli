@@ -9,7 +9,7 @@ describe('startup failure presentation', () => {
     [
       'configuration',
       new ConfigurationError('recovery required', {
-        code: 'CONFIGURATION.RECOVERY_REQUIRED',
+        code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
       }),
       EXIT_CODES.CONFIGURATION_ERROR,
     ],

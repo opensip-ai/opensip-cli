@@ -18,7 +18,7 @@ export const RECOVERY_STATE_AMBIGUOUS = 'state-ambiguous' as const;
 function isLeaseBusy(error: unknown): boolean {
   return (
     hasErrorCode(error, 'TIMEOUT.RUNTIME_EXCLUSIVE') ||
-    hasErrorCode(error, 'SYSTEM.RUNTIME_COORDINATION.BUSY')
+    hasErrorCode(error, 'CORE.RUNTIME_COORDINATION.BUSY')
   );
 }
 

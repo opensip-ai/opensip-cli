@@ -13,6 +13,7 @@ import {
   definitionFromLegacyCode,
   FAILURE_PROJECTION_SCHEMA_VERSION,
 } from './error-definition.js';
+import { resolveDefinitionForCode } from './errors/resolve-definition.js';
 import {
   normalizeToolErrorDefinition,
   redactCredentialText,
@@ -75,7 +76,7 @@ export function fromToolError(
       'definition',
       () => normalizeToolErrorDefinition(error.definition),
       undefined,
-    ) ?? definitionFromLegacyCode(code);
+    ) ?? resolveDefinitionForCode(code);
   const metadataInput = readField(error, 'metadata', () => error.metadata, {});
   const metadata = sanitizeErrorMetadata(metadataInput);
   const message = readField(

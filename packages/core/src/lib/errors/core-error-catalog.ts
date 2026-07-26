@@ -93,3 +93,48 @@ assertNoDuplicateCodes();
 
 /** Every code core owns beyond the legacy adapter catalog. */
 export const coreErrorCatalog = defineErrorCatalog(CORE_SYSTEM_ERROR_OWNER, mergedDefinitions);
+
+/**
+ * Every code the runtime-coordination substrate raises for a bounded, expected failure.
+ *
+ * WHY THIS IS EXPORTED
+ * Consumers used to hard-code the literals (`packages/cli/src/commands/runtime-status-coordination.ts`,
+ * `pre-action-hook.ts`, the init promotion commands). When Plan 01 split the two legacy codes
+ * into seven honest ones, every one of those comparisons silently stopped matching — a dead
+ * branch that no test failed on, because the tests hard-coded the same literals. Naming the
+ * family here makes the next split a compile-time concern instead of a silent behaviour change.
+ *
+ * `TIMEOUT.*` codes are deliberately absent: timeouts are owned by the lock and lease wait
+ * paths, and a consumer that wants them should say so.
+ */
+export const RUNTIME_COORDINATION_FAILURE_CODES: readonly string[] = Object.freeze([
+  'CORE.RUNTIME_COORDINATION.BUSY',
+  'CORE.RUNTIME_COORDINATION.CONFLICT',
+  'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
+  'CORE.RUNTIME_COORDINATION.PROBE_FAILED',
+  'CORE.RUNTIME_COORDINATION.RECLAIM_SKIPPED',
+  'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
+  'CORE.RUNTIME_LEASE.CAPACITY',
+  'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
+  'CORE.RUNTIME_RECOVERY.PROBE_FAILED',
+  'CORE.RUNTIME_RECOVERY.REQUIRED',
+  'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+  'SYSTEM.RUNTIME_COORDINATION.EXISTS',
+  'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+  // Caller-contract violations. A consumer deciding "is this a bounded coordination failure"
+  // wants these too: from the outside, "the lease refused me" is one situation regardless of
+  // whether the cause was contention or a protocol misuse.
+  'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+  'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER',
+  'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
+  'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE',
+  'SYSTEM.RUNTIME_LEASE.INVALID_OWNER',
+  'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH',
+  'SYSTEM.RUNTIME_LEASE.REQUEST_LOST',
+  'VALIDATION.RUNTIME_COORDINATION.INPUT',
+]);
+
+/** True when `code` is one of {@link RUNTIME_COORDINATION_FAILURE_CODES}. */
+export function isRuntimeCoordinationFailureCode(code: string | undefined): boolean {
+  return code !== undefined && RUNTIME_COORDINATION_FAILURE_CODES.includes(code);
+}

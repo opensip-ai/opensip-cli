@@ -7,11 +7,10 @@ import {
   type ErrorCatalogOwner,
   type ErrorDefinition,
   coreSystemErrorCatalog,
-  definitionFromLegacyCode,
   normalizeErrorDefinition,
 } from './error-definition.js';
+import { resolveDefinitionForCode } from './errors/resolve-definition.js';
 import { currentLogger } from './run-scope.js';
-
 
 // =============================================================================
 // ERROR CLASSES
@@ -332,7 +331,7 @@ function definitionMatchesCode(code: string, definition: ErrorDefinition): boole
   // (for example CONFIGURATION.GATE.* -> CONFIGURATION_ERROR). No other
   // code/definition mismatch is valid: accepting one would let a forged
   // cross-copy brand pair a public code with unrelated retry/exposure axes.
-  return definitionFromLegacyCode(code).code === definition.code;
+  return resolveDefinitionForCode(code).code === definition.code;
 }
 
 function resolveToolErrorConstruction(
@@ -409,7 +408,7 @@ export class ToolError extends Error {
       construction.definition !== undefined &&
       definitionMatchesCode(this.code, construction.definition)
         ? construction.definition
-        : definitionFromLegacyCode(this.code);
+        : resolveDefinitionForCode(this.code);
     this.failureClass =
       typeof options?.failureClass === 'string' ? options.failureClass.slice(0, 128) : undefined;
     // Redacted like `metadata`, not merely truncated. A child process's stderr tail is the

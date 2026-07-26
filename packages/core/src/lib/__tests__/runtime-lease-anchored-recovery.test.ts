@@ -83,36 +83,48 @@ describe('general anchored-record bounds and postures', () => {
       }),
     ).toMatchObject({ status: 'present', content });
 
-    for (const operation of [
-      () =>
-        mutateAnchoredRecord({
-          trustedAnchorDir: anchor,
-          parentDir: anchor,
-          basename: 'invalid-bound.bin',
-          operation: 'create',
-          content: '',
-          maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
-        }),
-      () =>
-        readAnchoredRecord({
-          trustedAnchorDir: anchor,
-          parentDir: anchor,
-          basename: 'maximum.bin',
-          maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
-        }),
-      () =>
-        mutateAnchoredRecord({
-          trustedAnchorDir: anchor,
-          parentDir: anchor,
-          basename: 'oversize.bin',
-          operation: 'create',
-          content: `${content}x`,
-          maxBytes: ANCHORED_RECORD_MAX_BYTES,
-        }),
-    ]) {
-      expect(operation).toThrow(
-        expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
-      );
+    // Each scenario now carries its OWN code. Under the single legacy
+    // SYSTEM.RUNTIME_COORDINATION.UNSAFE literal these were indistinguishable, which is the
+    // defect this task fixes: "you asked for a bound larger than the hard maximum" is a
+    // caller mistake, while "your content is larger than the bound" is exhaustion — and only
+    // one of the two is worth changing the call for.
+    for (const [operation, code] of [
+      [
+        () =>
+          mutateAnchoredRecord({
+            trustedAnchorDir: anchor,
+            parentDir: anchor,
+            basename: 'invalid-bound.bin',
+            operation: 'create',
+            content: '',
+            maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
+          }),
+        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+      ],
+      [
+        () =>
+          readAnchoredRecord({
+            trustedAnchorDir: anchor,
+            parentDir: anchor,
+            basename: 'maximum.bin',
+            maxBytes: ANCHORED_RECORD_MAX_BYTES + 1,
+          }),
+        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+      ],
+      [
+        () =>
+          mutateAnchoredRecord({
+            trustedAnchorDir: anchor,
+            parentDir: anchor,
+            basename: 'oversize.bin',
+            operation: 'create',
+            content: `${content}x`,
+            maxBytes: ANCHORED_RECORD_MAX_BYTES,
+          }),
+        'CORE.RUNTIME_LEASE.CAPACITY',
+      ],
+    ] as const) {
+      expect(operation).toThrow(expect.objectContaining({ code }));
     }
     expect(existsSync(join(anchor, 'invalid-bound.bin'))).toBe(false);
     expect(existsSync(join(anchor, 'oversize.bin'))).toBe(false);
@@ -144,7 +156,7 @@ describe('general anchored-record bounds and postures', () => {
           maxEntries: ANCHORED_CREATE_RECOVERY_MAX_ENTRIES + 1,
         },
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+    ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
   });
 
   it('keeps records private inside an owner-controlled 0755 parent', () => {
@@ -176,27 +188,37 @@ describe('general anchored-record bounds and postures', () => {
 
   it('validates parent and record postures before target I/O', () => {
     const missing = join(makeAnchor(), 'missing');
-    for (const operation of [
-      () =>
-        mutateAnchoredRecord({
-          trustedAnchorDir: missing,
-          parentDir: missing,
-          basename: 'record.json',
-          operation: 'create',
-          content: '{}',
-          permissionPosture: 'invalid' as never,
-        }),
-      () =>
-        readAnchoredRecord({
-          trustedAnchorDir: missing,
-          parentDir: missing,
-          basename: 'record.json',
-          recordPosture: 'invalid' as never,
-        }),
-    ]) {
-      expect(operation).toThrow(
-        expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
-      );
+    // Both refuse BEFORE touching the target, which is the invariant under test — and they
+    // now show that the two paths reach that refusal through DIFFERENT guards. The write path
+    // establishes containment first, so with a parent that does not exist it never reaches
+    // the caller's bogus posture value; the read path validates the posture argument up
+    // front. One code for both hid exactly that ordering, which is the thing a caller
+    // debugging "why did my read fail differently from my write" needs to see.
+    for (const [operation, code] of [
+      [
+        () =>
+          mutateAnchoredRecord({
+            trustedAnchorDir: missing,
+            parentDir: missing,
+            basename: 'record.json',
+            operation: 'create',
+            content: '{}',
+            permissionPosture: 'invalid' as never,
+          }),
+        'CORE.RUNTIME_COORDINATION.PROBE_FAILED',
+      ],
+      [
+        () =>
+          readAnchoredRecord({
+            trustedAnchorDir: missing,
+            parentDir: missing,
+            basename: 'record.json',
+            recordPosture: 'invalid' as never,
+          }),
+        'VALIDATION.RUNTIME_COORDINATION.INPUT',
+      ],
+    ] as const) {
+      expect(operation).toThrow(expect.objectContaining({ code }));
     }
   });
 });
@@ -215,7 +237,7 @@ describe('operation-bound anchored create recovery', () => {
       'operation.abc_123-XYZ_',
     ]) {
       expect(() => anchoredRecordTemporaryBasename('record.json', identity)).toThrow(
-        expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
+        expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }),
       );
     }
   });
@@ -328,7 +350,7 @@ describe('operation-bound anchored create recovery', () => {
           createIdentity: CREATE_IDENTITY,
         },
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' }));
     expect(existsSync(target)).toBe(true);
     expect(existsSync(temporary)).toBe(true);
     expect(lstatSync(target).nlink).toBe(2);
@@ -390,14 +412,20 @@ describe('bounded random-UUID linked-create recovery', () => {
           maxEntries: 10,
         },
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_LEASE.CAPACITY' }));
     expect(existsSync(temporary)).toBe(true);
     expect(lstatSync(target).nlink).toBe(2);
   });
 
   it('rejects invalid peer grammar, ambiguous links, and digest mismatch without unlinking', () => {
+    // The three scenarios below all "fail closed without unlinking", which is the invariant,
+    // but they are no longer the same failure: a peer whose basename does not match the UUID
+    // grammar and an ambiguous multi-link state are persisted-record integrity violations,
+    // while a digest that does not match is a content-identity mismatch. Under one code the
+    // difference was invisible, so the expected code is now a parameter.
     const run = (
       build: (anchor: string, basename: string, target: string, content: string) => string[],
+      expectedCode: string,
       expectedDigest: (content: string) => string = sha256,
     ): void => {
       const anchor = makeAnchor();
@@ -415,7 +443,7 @@ describe('bounded random-UUID linked-create recovery', () => {
             expectedContentSha256: expectedDigest(content),
           },
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: expectedCode }));
       expect(existsSync(target)).toBe(true);
       for (const peer of peers) expect(existsSync(peer)).toBe(true);
     };
@@ -425,7 +453,7 @@ describe('bounded random-UUID linked-create recovery', () => {
       writePrivate(invalid, content);
       linkSync(invalid, target);
       return [invalid];
-    });
+    }, 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD');
     run((anchor, basename, target, content) => {
       const first = join(anchor, uuidTemporary(basename, '00000000-0000-4000-8000-000000000003'));
       const second = join(anchor, uuidTemporary(basename, '00000000-0000-4000-8000-000000000004'));
@@ -433,7 +461,7 @@ describe('bounded random-UUID linked-create recovery', () => {
       linkSync(first, target);
       linkSync(first, second);
       return [first, second];
-    });
+    }, 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD');
     run(
       (anchor, basename, target, content) => {
         const temporary = join(
@@ -444,6 +472,7 @@ describe('bounded random-UUID linked-create recovery', () => {
         linkSync(temporary, target);
         return [temporary];
       },
+      'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       () => sha256('{"different":true}'),
     );
   });

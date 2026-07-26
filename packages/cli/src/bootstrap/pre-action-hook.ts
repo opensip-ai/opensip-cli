@@ -148,7 +148,7 @@ function cloneParsedOptions(opts: Record<string, unknown>): Record<string, unkno
  * @throws {unknown} Rethrows `error` as-is for every other error.
  */
 function recoveryGuidance(error: unknown): never {
-  if (error instanceof ConfigurationError && error.code === 'CONFIGURATION.RECOVERY_REQUIRED') {
+  if (error instanceof ConfigurationError && error.code === 'CORE.RUNTIME_RECOVERY.REQUIRED') {
     throw new ConfigurationError(
       `${error.message} Run 'opensip status' to inspect recovery state, then run 'opensip init' to resume or reconcile it.`,
       { code: error.code, cause: error },

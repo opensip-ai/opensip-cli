@@ -48,7 +48,6 @@ import {
 } from './bootstrap/index.js';
 import { installInterruptAbortCoordinator } from './bootstrap/interrupt-abort.js';
 import { installLastResortFailureNet } from './bootstrap/last-resort-failure-net.js';
-import { HOST_SUBSTRATE_ERROR_CATALOGS } from './bootstrap/substrate-error-catalogs.js';
 import { runLightweightCommandProbe } from './bootstrap/lightweight-command-probe.js';
 import { PolicyAuditCollector } from './bootstrap/policy-audit.js';
 import { rejectHostCommandCollisions } from './bootstrap/reject-host-command-collisions.js';
@@ -57,6 +56,7 @@ import {
   acquireStartupRuntimeLease,
   type StartupRuntimeLeaseHandoff,
 } from './bootstrap/startup-runtime-lease.js';
+import { HOST_SUBSTRATE_ERROR_CATALOGS } from './bootstrap/substrate-error-catalogs.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import {

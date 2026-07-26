@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-25
+last_verified: 2026-07-26
 release: v0.8.4
 title: "Error code index"
 audience: [contributors, operators, agents]

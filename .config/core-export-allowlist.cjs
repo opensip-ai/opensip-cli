@@ -578,6 +578,8 @@ const EXPORT_ALLOWLIST = {
   composeAbortSignals: 'run-kernel',
   coreSystemErrorCatalog: 'run-kernel',
   coreErrorCatalog: 'run-kernel',
+  RUNTIME_COORDINATION_FAILURE_CODES: 'run-kernel',
+  isRuntimeCoordinationFailureCode: 'run-kernel',
   SubstrateErrorCatalogContribution: 'run-kernel',
   createCancelledError: 'run-kernel',
   createDeadlineError: 'run-kernel',

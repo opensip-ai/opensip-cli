@@ -5,7 +5,9 @@ import {
   coreSystemErrorCatalog,
   definitionFromLegacyCode,
 } from '../../error-definition.js';
-import { coreErrorCatalog } from '../core-error-catalog.js';
+import { ToolError } from '../../errors.js';
+import { coreErrorCatalog, RUNTIME_COORDINATION_FAILURE_CODES } from '../core-error-catalog.js';
+import { resolveDefinitionForCode } from '../resolve-definition.js';
 
 describe('coreErrorCatalog', () => {
   it('publishes under core’s existing owner identity, not the package name', () => {
@@ -121,5 +123,72 @@ describe('coreErrorCatalog — the demotions Wave 1 exists to fix', () => {
       expect(definition.severity).toBe('warning');
       expect(definition.exitClass).toBe('success');
     }
+  });
+});
+
+describe('RUNTIME_COORDINATION_FAILURE_CODES', () => {
+  it('names only codes that actually exist', () => {
+    // A stale entry here is worse than no list: a consumer would test against a code nothing
+    // can ever raise and quietly stop handling the case.
+    for (const code of RUNTIME_COORDINATION_FAILURE_CODES) {
+      expect(coreErrorCatalog.get(code), code).toBeDefined();
+    }
+  });
+
+  it('covers every coordination, lease and recovery code the catalog declares', () => {
+    // The whole point is that a future split cannot leave a consumer behind. If a new
+    // CORE.RUNTIME_* code is added without listing it here, this fails.
+    const declared = coreErrorCatalog.list
+      .map((d) => d.code)
+      .filter((code) => /RUNTIME_(COORDINATION|LEASE|RECOVERY)\./u.test(code));
+    const missing = declared.filter((code) => !RUNTIME_COORDINATION_FAILURE_CODES.includes(code));
+    expect(missing).toEqual([]);
+  });
+
+  it('excludes timeouts, which the lock and lease wait paths own', () => {
+    expect(RUNTIME_COORDINATION_FAILURE_CODES.some((c) => c.startsWith('TIMEOUT.'))).toBe(false);
+  });
+});
+
+describe('resolveDefinitionForCode (Plan 01 Wave 1)', () => {
+  it('resolves a registered CORE.* code instead of demoting it', () => {
+    // THE BUG THIS FIXES: `definitionFromLegacyCode` only ever consulted the legacy catalog,
+    // so a code that Wave 1 registered — with the head `CORE`, which `legacyFamilyCode` does
+    // not map — resolved to UNKNOWN_FAILURE. Registering a code without teaching the resolver
+    // about it manufactures a NEW instance of the exact demotion this plan removes, and does
+    // it silently: the call site reads as correct. Caught by a CLI exit-code test.
+    expect(definitionFromLegacyCode('CORE.RUNTIME_RECOVERY.REQUIRED').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+    const resolved = resolveDefinitionForCode('CORE.RUNTIME_RECOVERY.REQUIRED');
+    expect(resolved.code).toBe('CORE.RUNTIME_RECOVERY.REQUIRED');
+    expect(resolved.exitClass).toBe('configuration');
+  });
+
+  it('gives a ToolError built from a bare registered code the right exit class', () => {
+    // The end-to-end shape of the same defect: exit 1 where the condition means 2.
+    const error = new ToolError('recovery required', 'CORE.RUNTIME_RECOVERY.REQUIRED');
+    expect(error.definition.exitClass).toBe('configuration');
+  });
+
+  it('keeps the legacy family fallback and stays total', () => {
+    // Registered codes win; everything else keeps documented behaviour, and a hostile code
+    // must never throw here (D11) because this runs when something has already failed.
+    expect(resolveDefinitionForCode('CONFIGURATION.ANYTHING.ELSE').code).toBe(
+      'CONFIGURATION_ERROR',
+    );
+    expect(resolveDefinitionForCode('WHOLLY.UNKNOWN.HEAD').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+    expect(() => resolveDefinitionForCode('')).not.toThrow();
+  });
+
+  it('resolves every code the catalog declares', () => {
+    // A registered code that does not resolve is invisible debt: it looks migrated and
+    // behaves demoted.
+    const unresolved = coreErrorCatalog.list
+      .map((d) => d.code)
+      .filter((code) => resolveDefinitionForCode(code).code !== code);
+    expect(unresolved).toEqual([]);
   });
 });

@@ -375,7 +375,7 @@ describe('runtime lease coordination', () => {
     await createScaffold();
     const writer = track(await acquireGlobalRuntimeMaintenanceLease({ policy: POLICY }));
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CONFLICT',
     });
     release(writer);
 
@@ -386,7 +386,7 @@ describe('runtime lease coordination', () => {
       state: 'closed',
     });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CONFLICT',
     });
   });
 
@@ -443,7 +443,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     expect(existsSync(projectPaths.readersDir)).toBe(false);
   });
@@ -460,7 +460,7 @@ describe('runtime lease coordination', () => {
     });
     if (process.platform !== 'win32') chmodSync(malformedReader, 0o600);
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
     });
     rmSync(malformedReader);
 
@@ -473,7 +473,7 @@ describe('runtime lease coordination', () => {
       privateWrite(path, readerFixture('project', ownerToken, sequence));
     }
     await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     for (const path of boundedReaders) rmSync(path);
 
@@ -491,14 +491,14 @@ describe('runtime lease coordination', () => {
     const invalidProjectKey = join(paths.projectsDir, 'invalid-key');
     mkdirSync(invalidProjectKey, { mode: 0o700 });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'VALIDATION.RUNTIME_COORDINATION.INPUT',
     });
     rmSync(invalidProjectKey, { recursive: true });
 
     const unexpectedRootEntry = join(paths.coordinationDir, 'unexpected-root-entry');
     privateWrite(unexpectedRootEntry, { unsafe: true });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
   });
 
@@ -599,7 +599,7 @@ describe('runtime lease coordination', () => {
         privateWrite(statePath, state);
       }
       await expect(inspectRuntimeLeaseState(project), name).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       });
     }
   });
@@ -847,7 +847,7 @@ describe('runtime lease coordination', () => {
     });
 
     expect(() => writer.release()).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
+      expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }),
     );
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toMatchObject({
       writers: [{ pid: 424_242 }],
@@ -1026,7 +1026,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     expect(
       existsSync(
@@ -1140,7 +1140,7 @@ describe('runtime lease coordination', () => {
         });
       if (identityPosture === 'unproven-host') {
         await expect(acquireChild()).rejects.toMatchObject({
-          code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+          code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
         });
       } else {
         const child = track(await acquireChild());
@@ -1199,7 +1199,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(ambiguousParent);
 
@@ -1214,7 +1214,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(additionalUserParent);
 
@@ -1232,7 +1232,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(projectOnlyParent);
 
@@ -1268,7 +1268,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(userOnlyParent);
 
@@ -1313,7 +1313,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
 
     const staleView = syntheticCoordinator({
@@ -1601,7 +1601,7 @@ describe('runtime lease coordination', () => {
       hostIdentityProven: false,
     });
     expect(() => projectReader.release()).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
+      expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }),
     );
     expect(JSON.parse(readFileSync(readerPath, 'utf8'))).toMatchObject({ pid: 424_242 });
 
@@ -1631,7 +1631,7 @@ describe('runtime lease coordination', () => {
     privateWrite(userReaderPath, {});
     expect(() => composite.release()).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       }),
     );
     expect(JSON.parse(readFileSync(projectReaderPath, 'utf8'))).toMatchObject({
@@ -1640,7 +1640,7 @@ describe('runtime lease coordination', () => {
 
     expect(() => composite.release()).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       }),
     );
     expect(JSON.parse(readFileSync(projectReaderPath, 'utf8'))).toMatchObject({
@@ -1824,7 +1824,7 @@ describe('runtime lease coordination', () => {
         projectDir: otherProject,
         policy: { ...POLICY, waitMs: 0, staleMs: 60_000 },
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.CAPACITY' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.CAPACITY' });
     expect(existsSync(paths.forProject(nextKey).projectCoordinationDir)).toBe(false);
     expect(readdirSync(paths.projectsDir)).toHaveLength(256);
   });
@@ -2100,7 +2100,7 @@ describe('runtime lease coordination', () => {
           policy: { ...POLICY, waitMs: 10_000 },
         }),
       ).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_LEASE.CAPACITY',
+        code: 'CORE.RUNTIME_LEASE.CAPACITY',
       });
       const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
         writers: { command: string }[];
@@ -2140,7 +2140,7 @@ describe('runtime lease coordination', () => {
           projectDir: project,
           policy: SHORT_POLICY,
         }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.CAPACITY' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.CAPACITY' });
     } finally {
       for (const controller of controllers) controller.abort();
       await Promise.allSettled(queued);
@@ -3940,7 +3940,7 @@ describe('recovery barriers', () => {
         projectDir: project,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     rmSync(promotionPath());
     await expect(
       acquireRuntimeExclusiveLease({
@@ -3948,7 +3948,7 @@ describe('recovery barriers', () => {
         posture: 'destructive-discard',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     privateWrite(paths.userUninstallReceiptFile, {
       kind: 'user-uninstall',
@@ -3957,7 +3957,7 @@ describe('recovery barriers', () => {
       state: 'closed',
     });
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     privateWrite(paths.userUninstallReceiptFile, {
       kind: 'user-uninstall',
@@ -3970,7 +3970,7 @@ describe('recovery barriers', () => {
         projectDir: project,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     rmSync(paths.userUninstallReceiptFile);
     await expect(
       acquireGlobalRuntimeMaintenanceLease({
@@ -3978,7 +3978,7 @@ describe('recovery barriers', () => {
         recoveryOperationId: 'posture-user',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('mutates the fixed promotion journal only under live writer authority', async () => {
@@ -4001,19 +4001,19 @@ describe('recovery barriers', () => {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' });
     await expect(
       mutateRuntimePromotionJournal(writer, {
         operation: 'create',
         content: '{',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' });
     await expect(
       mutateRuntimePromotionJournal(writer, {
         operation: 'unlink',
         expectedContentSha256: 'invalid',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' });
     await expect(discardRuntimePromotionJournal(writer)).rejects.toMatchObject({
       code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
@@ -4152,7 +4152,7 @@ describe('recovery barriers', () => {
     });
     if (process.platform !== 'win32') chmodSync(promotionPath(), 0o600);
     await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     rmSync(promotionPath());
 
@@ -4161,7 +4161,7 @@ describe('recovery barriers', () => {
       privateWrite(outside, { secret: true });
       symlinkSync(outside, promotionPath());
       await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
       });
       rmSync(promotionPath());
     }
@@ -4191,7 +4191,7 @@ describe('recovery barriers', () => {
         content: oversize,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     expect(existsSync(promotionPath())).toBe(false);
     release(writer);
@@ -4233,7 +4233,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     expect(readFileSync(join(movedParent, RUNTIME_PROMOTION_JOURNAL_FILE), 'utf8')).toBe(content);
     expect(existsSync(promotionPath())).toBe(false);
@@ -4360,7 +4360,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: SHORT_POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     const discard = track(
       await acquireRuntimeExclusiveLease({
@@ -4410,7 +4410,7 @@ describe('recovery barriers', () => {
       reason: 'oversize',
     });
     await expect(acquireUserStateReadLease({ policy: SHORT_POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
 
     const discard = track(
@@ -4460,7 +4460,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     privateWrite(promotionPath(), {
       kind: 'init-promotion',
@@ -4479,7 +4479,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('requires matching Init recovery but lets confirmed destructive discard drain any journal', async () => {
@@ -4499,7 +4499,7 @@ describe('recovery barriers', () => {
         recoveryOperationId: 'wrong',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     const recovery = track(
       await acquireRuntimeExclusiveLease({
         projectDir: project,
@@ -4583,7 +4583,7 @@ describe('recovery barriers', () => {
       state: 'open',
     });
     await expect(acquireUserStateReadLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     const recovery = track(
       await acquireGlobalRuntimeMaintenanceLease({
@@ -4617,7 +4617,7 @@ describe('recovery barriers', () => {
       state: 'closed',
     });
     await expect(discardUserUninstallReceipt(discard)).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     release(discard);
 
@@ -4627,7 +4627,7 @@ describe('recovery barriers', () => {
         posture: 'receipt-only-discard',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('combines malformed-receipt discard with automatic foreign-owner expiry', async () => {
@@ -4709,7 +4709,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
   });
 
@@ -4723,7 +4723,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
   });
 
@@ -4740,11 +4740,11 @@ describe('recovery barriers', () => {
 
       expect(() => inspectRuntimePromotionRecoveryHeader(project)).toThrow(
         expect.objectContaining({
-          code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+          code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
         }),
       );
       await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       });
     },
   );
@@ -4825,7 +4825,7 @@ describe('recovery barriers', () => {
       status: 'absent',
     });
     await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
     });
     expect({
       entries: readdirSync(paths.coordinationDir).sort(),
@@ -4847,7 +4847,7 @@ describe('anchored coordination mutation and cleanup', () => {
           parentDir: join(anchor, 'missing-parent'),
           basename: 'missing.json',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.PROBE_FAILED' }));
       expect(() =>
         readAnchoredRecord({
           trustedAnchorDir: anchor,
@@ -4855,7 +4855,7 @@ describe('anchored coordination mutation and cleanup', () => {
           basename: 'missing.json',
           maxBytes: Number.NaN,
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }
@@ -4878,14 +4878,14 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.PROBE_FAILED' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
           operation: 'replace',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
       expect(
         mutateAnchoredRecord({
           ...baseMutation,
@@ -4899,7 +4899,7 @@ describe('anchored coordination mutation and cleanup', () => {
           content: '{}',
           expectedContentSha256: 'invalid',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
@@ -4907,14 +4907,14 @@ describe('anchored coordination mutation and cleanup', () => {
           content: '{}',
           expectedContentSha256: digest,
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
           operation: 'unlink',
           createIdentity: '12345678-1234-4234-8234-123456789012',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4923,7 +4923,7 @@ describe('anchored coordination mutation and cleanup', () => {
             expectedContentSha256: 'invalid',
           },
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4932,7 +4932,7 @@ describe('anchored coordination mutation and cleanup', () => {
             expectedContentSha256: digest,
           },
         } as unknown as Parameters<typeof readAnchoredRecord>[0]),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4942,7 +4942,7 @@ describe('anchored coordination mutation and cleanup', () => {
             maxEntries: 0,
           },
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(
         readAnchoredRecord({
           ...baseMutation,
@@ -4958,16 +4958,16 @@ describe('anchored coordination mutation and cleanup', () => {
           ...baseMutation,
           permissionPosture: 'invalid',
         } as unknown as Parameters<typeof readAnchoredRecord>[0]),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
           basename: '../record.json',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         anchoredRecordTemporaryBasename('é'.repeat(110), '12345678-1234-4234-8234-123456789012'),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'VALIDATION.RUNTIME_COORDINATION.INPUT' }));
       expect(existsSync(join(anchor, 'record.json'))).toBe(false);
     } finally {
       rmSync(anchor, { recursive: true, force: true });
@@ -5370,7 +5370,7 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
       expect(existsSync(join(parent, 'record.json'))).toBe(false);
       expect(existsSync(join(replacedParent, 'record.json'))).toBe(false);
     } finally {
@@ -5463,7 +5463,10 @@ describe('anchored coordination mutation and cleanup', () => {
           }),
         ).toThrow(
           expect.objectContaining({
-            code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+            // Parent replaced mid-mutation: a containment finding, so `security` rather than
+            // the record-integrity code — the directory under us was swapped, the record is
+            // not what is wrong.
+            code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
           }),
         );
         expect(readFileSync(join(parent, 'record.json'), 'utf8')).toBe(
@@ -5557,7 +5560,7 @@ describe('anchored coordination mutation and cleanup', () => {
         maxBytes: 4096,
         linkedTargetCanBeBusy: true,
       } as Parameters<typeof mutateAnchoredRecord>[0]),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' }));
     expect(existsSync(target)).toBe(true);
     expect(existsSync(peer)).toBe(true);
     rmSync(anchor, { recursive: true, force: true });
@@ -5568,7 +5571,7 @@ describe('anchored coordination mutation and cleanup', () => {
     symlinkSync(project, paths.coordinationDir);
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
     rmSync(paths.coordinationDir);
 
     const anchor = mkdtempSync(join(tmpdir(), 'opensip-anchor-symlink-'));
@@ -5589,7 +5592,7 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: 'x',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }
@@ -5605,7 +5608,7 @@ describe('anchored coordination mutation and cleanup', () => {
       symlinkSync(project, projectPaths.projectCoordinationDir);
       await expect(
         acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
 
       rmSync(projectPaths.projectCoordinationDir);
       mkdirSync(projectPaths.projectCoordinationDir, { mode: 0o700 });
@@ -5613,7 +5616,7 @@ describe('anchored coordination mutation and cleanup', () => {
       symlinkSync(project, paths.globalMutexFile);
       await expect(
         acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
     },
   );
 
@@ -5623,7 +5626,7 @@ describe('anchored coordination mutation and cleanup', () => {
     const paths = resolveCoordinationPaths();
     chmodSync(paths.coordinationDir, 0o755);
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     chmodSync(paths.coordinationDir, 0o700);
 
@@ -5650,7 +5653,7 @@ describe('anchored coordination mutation and cleanup', () => {
           maxBytes: 4096,
           permissionPosture: 'private',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }

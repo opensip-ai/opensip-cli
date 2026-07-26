@@ -95,6 +95,10 @@ describe('defineErrorCatalog', () => {
     expect(definitionFromLegacyCode('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS').exitClass).toBe(
       'plugin-incompatible',
     );
+    // Deliberately still the LEGACY literal: this asserts the `CONFIGURATION` head's family
+    // fallback, so it must use a code that is NOT registered. Plan 01 moved the production
+    // site to CORE.RUNTIME_RECOVERY.REQUIRED; the fallback it left behind still has to work,
+    // because third-party tools may ship codes under a mapped head forever.
     expect(definitionFromLegacyCode('CONFIGURATION.RECOVERY_REQUIRED').exitClass).toBe(
       'configuration',
     );

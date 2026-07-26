@@ -344,6 +344,10 @@ describe('definition-backed subcodes keep family exit classes', () => {
   });
 
   it('does not demote ConfigurationError recovery subcodes to UNKNOWN_FAILURE', () => {
+    // The UNREGISTERED legacy literal on purpose — the point is the family fallback, which is
+    // what keeps a third-party code under a mapped head from becoming an operator-only fatal.
+    // The production recovery site moved to CORE.RUNTIME_RECOVERY.REQUIRED in Plan 01 and is
+    // covered by its own catalog test; this one guards the path that has no catalog entry.
     const err = new ConfigurationError('recovery required', {
       code: 'CONFIGURATION.RECOVERY_REQUIRED',
     });
