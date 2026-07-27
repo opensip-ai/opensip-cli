@@ -105,7 +105,7 @@ export const hostWiringDefinitions = {
     exposure: 'public',
     operatorAction:
       'The command could not be dispatched. Reinstall the tool package and retry; if it persists, capture the run id and report a bug.',
-    publicMetadataKeys: ['condition', 'tool'],
+    publicMetadataKeys: ['condition', 'tool', 'packageName', 'domainId', 'failureClass'],
   },
 
   /**
@@ -143,5 +143,47 @@ export const hostWiringDefinitions = {
     operatorAction:
       'A host startup probe exceeded its safety bound. Capture the run id and report a bug.',
     publicMetadataKeys: ['condition'],
+  },
+
+  /**
+   * A capability pack declared an isolation domain the owning tool has no bridge for.
+   *
+   * Raised INSIDE the worker and marshalled to the parent, so it needs machine identity to
+   * survive the wire: as a bare `Error` it reached the supervisor as an untyped message and
+   * the parent could not tell a wiring fault from the pack's own failure.
+   *
+   * `compatibility` and `tool-author`: the pack and the tool disagree about what exists.
+   * Nothing an operator configures changes it.
+   */
+  'CLI.CAPABILITY_WORKER.NO_ISOLATION_BRIDGE': {
+    ...HOST_WIRING,
+    code: 'CLI.CAPABILITY_WORKER.NO_ISOLATION_BRIDGE',
+    kind: 'compatibility',
+    exposure: 'public',
+    operatorAction:
+      'The capability pack targets an isolation domain its owning tool does not provide. Report it to the pack author with the domain id.',
+    publicMetadataKeys: ['domainId', 'ownerToolId'],
+  },
+
+  /**
+   * The advisory in-worker guard blocked a resource the pack's manifest did not declare.
+   *
+   * Thrown from monkey-patched `fs`/`net`/`child_process`/`fetch` into arbitrary pack and
+   * dependency code, which may catch it and carry on — so it MUST carry machine identity.
+   * As a bare `Error` there was no way, from the outside, to tell a swallowed denial from
+   * normal operation.
+   *
+   * `security` and advisory both: admission is the enforced boundary (ADR-0128), this guard
+   * is defence in depth, and the message says so.
+   */
+  'CLI.CAPABILITY_WORKER.RESOURCE_DENIED': {
+    ...HOST_WIRING,
+    code: 'CLI.CAPABILITY_WORKER.RESOURCE_DENIED',
+    defaultResponsibility: 'tool-author',
+    kind: 'security',
+    exposure: 'public',
+    operatorAction:
+      'The capability pack reached for a resource it did not declare. Add it to the pack manifest, or report it to the pack author.',
+    publicMetadataKeys: ['resource'],
   },
 } as const;

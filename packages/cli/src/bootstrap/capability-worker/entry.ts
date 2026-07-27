@@ -8,6 +8,7 @@ import {
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   startWorkerCancellationControl,
+  SystemError,
   toOperatorFailureProjection,
   toWorkerFailureWire,
   WORKER_FAILURE_WIRE_VERSION,
@@ -16,10 +17,13 @@ import {
 } from '@opensip-cli/core';
 
 import { type CliCommandsContext } from '../../commands/shared.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import { installCapabilityWorkerGuards } from './guards.js';
 
 import type { CapabilityWorkerErrorPayload, CapabilityWorkerSpec } from './types.js';
+
+const NO_ISOLATION_BRIDGE = hostErrorCatalog.require('CLI.CAPABILITY_WORKER.NO_ISOLATION_BRIDGE');
 
 type CapabilityWorkerMessage = WorkerMessage<never, unknown>;
 
@@ -70,8 +74,13 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
       );
   const bridge = tool?.extensionPoints?.capabilityIsolationBridges?.[spec.domainId];
   if (bridge === undefined) {
-    throw new Error(
+    throw new SystemError(
       `capability worker: no isolation bridge for domain '${spec.domainId}' on tool '${spec.ownerToolId}'`,
+      {
+        code: NO_ISOLATION_BRIDGE.code,
+        definition: NO_ISOLATION_BRIDGE,
+        metadata: { domainId: spec.domainId, ownerToolId: spec.ownerToolId },
+      },
     );
   }
   return await bridge.runInWorker({

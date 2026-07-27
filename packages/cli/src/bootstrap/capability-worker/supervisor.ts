@@ -11,6 +11,8 @@ import {
   SystemError,
   toolErrorFromWorkerFailureWire,
   type WorkerMessage,
+  coreSystemErrorCatalog,
+  type ErrorDefinition,
 } from '@opensip-cli/core';
 
 import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
@@ -22,6 +24,8 @@ import type { CapabilityWorkerSpec } from './types.js';
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
 const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
+const WORKER_CANCELLED = coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED');
+const WORKER_DEADLINE_EXCEEDED = coreSystemErrorCatalog.require('CORE.SYSTEM.DEADLINE_EXCEEDED');
 
 export const CAPABILITY_WORKER_SUBCOMMAND = '__capability-pack-worker';
 const DEFAULT_CAPABILITY_WORKER_TIMEOUT_MS = 120_000;
@@ -119,6 +123,7 @@ function forkAndAwait(args: {
                 ? `capability worker failed: ${failureClass}`
                 : `capability worker failed: ${failureClass} (${detail})`,
               handle.getStderrTail(),
+              failureClass,
             ),
           );
         },
@@ -198,19 +203,41 @@ function requestKind(request: unknown): string {
   return 'unknown';
 }
 
+/**
+ * `forkAndSettle`'s failure taxonomy → the definition that describes it.
+ *
+ * These used to collapse into one dispatch code, so a worker the USER cancelled, a worker that
+ * blew its deadline, and a worker killed for RSS all reported identically and exited the same
+ * way. ADR-0183 requires cancelled and timed-out to stay distinguishable; `rss_exceeded` and
+ * spawn faults keep the dispatch code with `metadata.failureClass` naming which.
+ */
+function definitionForFailureClass(failureClass: string | undefined): ErrorDefinition {
+  if (failureClass === 'cancelled') return WORKER_CANCELLED;
+  if (failureClass === 'timeout') return WORKER_DEADLINE_EXCEEDED;
+  return DISPATCH_FAILED;
+}
+
 function workerError(
   spec: CapabilityWorkerSpec,
   message: string,
   stderrTail?: string,
+  failureClass?: string,
 ): SystemError {
+  const definition = definitionForFailureClass(failureClass);
   return new SystemError(`capability pack ${spec.pkg.name}: ${message}`, {
-    code: DISPATCH_FAILED.code,
-    definition: DISPATCH_FAILED,
-    metadata: { condition: 'capability-worker' },
-    context: {
+    code: definition.code,
+    definition,
+    // `stderrTail` and `failureClass` are first-class `ToolErrorOptions` keys. They used to be
+    // passed inside a `context` bag, which is NOT a recognized key — so the whole thing landed
+    // in `legacyCompatibility`, which is explicitly never treated as safe metadata and is
+    // marked for removal. The operator's triage detail was being parked in a deprecated slot.
+    ...(stderrTail === undefined ? {} : { stderrTail }),
+    ...(failureClass === undefined ? {} : { failureClass }),
+    metadata: {
+      condition: 'capability-worker',
       packageName: spec.pkg.name,
       domainId: spec.domainId,
-      stderrTail,
+      ...(failureClass === undefined ? {} : { failureClass }),
     },
   });
 }
