@@ -21,6 +21,8 @@ describe('normalizeFailure', () => {
 
   it('is total on primitives and hostile objects', () => {
     expect(normalizeFailure(null).known).toBe('unknown');
+    expect(normalizeFailure(undefined).message).toBe('undefined');
+    expect(normalizeFailure('plain failure').message).toContain('plain failure');
     expect(normalizeFailure(42).message).toContain('42');
     const hostile = {
       get message() {
@@ -30,6 +32,20 @@ describe('normalizeFailure', () => {
     const env = normalizeFailure(hostile);
     expect(env.schemaVersion).toBe(1);
     expect(typeof env.message).toBe('string');
+  });
+
+  it('uses the emergency envelope for a revoked proxy', () => {
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    expect(normalizeFailure(revoked.proxy)).toMatchObject({
+      known: 'unknown',
+      message: 'normalize-emergency',
+    });
+  });
+
+  it('honours the shared normalization budget before inspecting a value', () => {
+    const envelope = normalizeFailure('never inspected', {}, new WeakSet(), 0, { remaining: 0 });
+    expect(envelope).toMatchObject({ known: 'unknown', message: 'node-budget-exhausted' });
   });
 
   it('preserves cause chain with bound depth', () => {
@@ -46,6 +62,21 @@ describe('normalizeFailure', () => {
     const env = normalizeFailure(agg);
     expect(env.aggregate?.length).toBe(2);
     expect(env.aggregate?.[0]?.message).toBe('a');
+  });
+
+  it('models explicit sibling context as a top-level aggregate', () => {
+    const envelope = normalizeFailure(new Error('primary'), {
+      siblings: [new Error('secondary')],
+    });
+    expect(envelope.aggregate?.map((member) => member.message)).toEqual(['primary', 'secondary']);
+  });
+
+  it('treats a malformed AggregateError member collection as empty', () => {
+    const aggregate = new AggregateError([], 'malformed aggregate');
+    Object.defineProperty(aggregate, 'errors', { value: 'not-an-array' });
+    const envelope = normalizeFailure(aggregate);
+    expect(envelope.aggregate).toEqual([]);
+    expect(envelope.message).toBe('malformed aggregate');
   });
 
   it('separates public vs operator projections', () => {
@@ -141,6 +172,33 @@ describe('normalizeFailure', () => {
     const env = normalizeFailure(a);
     expect(env.schemaVersion).toBe(1);
     expect(env.causes.length).toBeLessThanOrEqual(4);
+  });
+
+  it('detects a ToolError that directly causes itself', () => {
+    const error = new ToolError('self', 'SYSTEM_ERROR');
+    Object.defineProperty(error, 'cause', { value: error });
+    const envelope = normalizeFailure(error);
+    expect(envelope.causes).toContainEqual(
+      expect.objectContaining({ message: 'circular-error', known: 'unknown' }),
+    );
+  });
+
+  it('honours an existing visited set for an unknown object', () => {
+    const value = {};
+    const envelope = normalizeFailure(value, {}, new WeakSet([value]));
+    expect(envelope).toMatchObject({ known: 'unknown', message: 'circular' });
+  });
+
+  it('classifies a plain AbortError-shaped object as cancellation', () => {
+    const envelope = normalizeFailure({
+      name: 'AbortError',
+      message: 'This operation was aborted',
+    });
+    expect(envelope).toMatchObject({
+      known: 'known',
+      code: 'CORE.SYSTEM.CANCELLED',
+      definition: { kind: 'cancelled' },
+    });
   });
 
   it('truncates oversized messages and remains JSON-safe for Map/Set/Date', () => {
