@@ -126,7 +126,9 @@ describe('fit-pack capability namespace provenance', () => {
         expect(resolveChecks({ type: 'explicit', checkIds: namespacedSlugs }, registry)).toEqual(
           namespacedSlugs,
         );
-        expect(resolveChecks({ type: 'explicit', checkIds: [SHARED_SLUG] }, registry)).toEqual([]);
+        expect(() =>
+          resolveChecks({ type: 'explicit', checkIds: [SHARED_SLUG] }, registry),
+        ).toThrow(/ambiguous/);
       });
     } finally {
       scope.dispose();

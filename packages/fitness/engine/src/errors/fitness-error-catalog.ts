@@ -41,7 +41,7 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       operatorAction: 'Run opensip fit list to see available checks.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['check'],
+      publicMetadataKeys: ['check', 'condition'],
     },
     'FIT.FITNESS.SESSION_IN_PROGRESS': {
       code: 'FIT.FITNESS.SESSION_IN_PROGRESS',
@@ -216,7 +216,23 @@ export const fitnessErrorCatalog = defineErrorCatalog(
         'The external command could not be executed. Check that it is installed and on PATH, then retry.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['condition'],
+      publicMetadataKeys: ['condition', 'errno'],
+    },
+
+    /** A command-mode check's optional executable is absent from PATH. */
+    'FIT.EXEC.BINARY_MISSING': {
+      code: 'FIT.EXEC.BINARY_MISSING',
+      source: 'external',
+      defaultResponsibility: 'environment',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction: 'Install the executable required by this optional check and retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['errno'],
     },
 
     /**
@@ -245,6 +261,29 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
       publicMetadataKeys: ['field', 'condition'],
+    },
+
+    /**
+     * A project plugin or check pack could not be admitted or loaded.
+     *
+     * One clustered definition (D9): both branches are external capability components with
+     * the same recovery. `condition` identifies plugin vs check-pack; `component` identifies
+     * the declared source without promoting the loader's free-text detail to public output.
+     */
+    'FIT.LOAD.COMPONENT_FAILED': {
+      code: 'FIT.LOAD.COMPONENT_FAILED',
+      source: 'external',
+      defaultResponsibility: 'environment',
+      kind: 'compatibility',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Verify the fitness plugin or check pack is installed, compatible, and declared correctly.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'component'],
     },
   },
 );

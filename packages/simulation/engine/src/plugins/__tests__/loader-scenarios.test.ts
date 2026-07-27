@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { enterScope, exitScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { currentScenarioRegistry } from '../../framework/registry.js';
@@ -31,6 +31,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
+  exitScope();
 });
 
 function writeScenarioPlugin(body: string): void {
@@ -76,5 +77,21 @@ describe('loadAllSimPlugins — scenario registration', () => {
 
     expect(result.totals.scenarios ?? 0).toBe(0);
     expect(currentScenarioRegistry().size).toBe(0);
+  });
+
+  it('reports a scenario name collision as a plugin load failure', async () => {
+    writeScenarioPlugin(
+      'const run = async () => ({ kind: "load", scenarioId: "x", passed: true, durationMs: 0, signals: [] });' +
+        ' export const scenarios = [' +
+        '{ id: "plug-one", name: "same-name", kind: "load", tags: [], run },' +
+        '{ id: "plug-two", name: "same-name", kind: "load", tags: [], run }' +
+        '];\n',
+    );
+
+    const result = await loadAllSimPlugins(testDir);
+
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('name collision');
+    expect(result.totals.scenarios ?? 0).toBe(0);
   });
 });

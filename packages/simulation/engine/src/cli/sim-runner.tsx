@@ -82,7 +82,9 @@ export async function renderSimLive(
       produce: async (_emit, helpers) => {
         const specDir = mkdtempSync(join(tmpdir(), 'sim-worker-'));
         const specPath = join(specDir, 'spec.json');
-        writeFileSync(specPath, JSON.stringify(args), 'utf8');
+        // The worker executes analysis only; cloud delivery remains in the host.
+        // Never persist the host credential in the transient worker spec.
+        writeFileSync(specPath, JSON.stringify({ ...args, apiKey: undefined }), 'utf8');
         const correlation = liveEngineCorrelation(currentScope()?.correlation);
         const run = runOffThreadOrInProcess<ProgressEvent, Awaited<ReturnType<typeof executeSim>>>({
           descriptor: {

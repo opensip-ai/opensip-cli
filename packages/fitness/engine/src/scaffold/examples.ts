@@ -137,8 +137,8 @@ function warningSignal(filePath, line) {
 async function analyzeFiles(files, read, signal) {
   const findings = [];
   for (const filePath of files) {
-    if (signal?.aborted) throw new Error('Check aborted');
-    const content = await read(filePath).catch(() => '');
+    signal?.throwIfAborted();
+    const content = await read(filePath);
     const index = content.indexOf('EXAMPLE_TODO');
     if (index < 0) continue;
     findings.push(warningSignal(filePath, content.slice(0, index).split('\\n').length));

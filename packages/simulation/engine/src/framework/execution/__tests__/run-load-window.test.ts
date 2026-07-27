@@ -181,31 +181,64 @@ describe('runLoadWindow', () => {
     expect(r.metrics.totalRequests).toBeLessThan(30);
   });
 
-  it('issues no requests when pre-aborted', async () => {
+  it('propagates a pre-aborted run without issuing requests', async () => {
     const ac = new AbortController();
     ac.abort();
     const ct = countingTarget();
-    const r = await runLoadWindow({ workload: { rps: 50 } }, ctx(ac.signal), {
-      windowMs: 1000,
-      target: ct.target,
-    });
-    expect(r.metrics.totalRequests).toBe(0);
+    await expect(
+      runLoadWindow({ workload: { rps: 50 } }, ctx(ac.signal), {
+        windowMs: 1000,
+        target: ct.target,
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
     expect(ct.calls()).toBe(0);
   });
 
-  it('stops dispatching after a mid-window abort and returns promptly', async () => {
+  it('stops dispatching after a mid-window abort and propagates cancellation', async () => {
     const ac = new AbortController();
     const ct = countingTarget(5);
     setTimeout(() => ac.abort(), 120);
-    const r = await runLoadWindow({ workload: { rps: 100 } }, ctx(ac.signal), {
-      windowMs: 5000,
-      target: ct.target,
-    });
-    // Outcome-based (plan 09 Task 8.7): the abort must have cut the 5s window
-    // short — proven by the dispatched-request count staying far below the
-    // full-window volume (100 rps x 5 s = 500), not by a wall-clock bound
-    // that flakes on loaded CI runners.
-    expect(r.metrics.totalRequests).toBeGreaterThan(0);
-    expect(r.metrics.totalRequests).toBeLessThan(100);
+    await expect(
+      runLoadWindow({ workload: { rps: 100 } }, ctx(ac.signal), {
+        windowMs: 5000,
+        target: ct.target,
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+    expect(ct.calls()).toBeGreaterThan(0);
+    expect(ct.calls()).toBeLessThan(100);
+  });
+
+  it('bounds the terminal drain when a target never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const context = ctx(new AbortController().signal);
+      const warn = vi.spyOn(context.logger, 'warn');
+      const target = vi.fn(() => new Promise<void>(() => undefined));
+      const run = runLoadWindow({ workload: { rps: 10 } }, context, {
+        windowMs: 100,
+        target,
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(5000);
+      const result = await run;
+
+      expect(target).toHaveBeenCalledOnce();
+      expect(result.metrics).toMatchObject({
+        totalRequests: 1,
+        successfulRequests: 0,
+        failedRequests: 1,
+        errorsGenerated: 1,
+      });
+      expect(result.firstFailure).toMatchObject({
+        code: 'CORE.SYSTEM.DEADLINE_EXCEEDED',
+      });
+      expect(warn).toHaveBeenCalledWith('Target requests exceeded the in-flight drain deadline', {
+        abandonedRequests: 1,
+        timeoutMs: 5000,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

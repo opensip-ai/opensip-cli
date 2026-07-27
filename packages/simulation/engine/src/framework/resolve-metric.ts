@@ -55,6 +55,10 @@
  * the looser, more-permissive choice and is the one being tightened.
  */
 
+import { ValidationError } from '@opensip-cli/core';
+
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
+
 import type { ScenarioMetricKey } from './scenario-metric-key.js';
 import type { SimulationMetrics } from '../types/base-types.js';
 
@@ -73,8 +77,9 @@ export type { ScenarioMetricKey } from './scenario-metric-key.js';
  * @param metrics - The collected simulation metrics.
  * @param durationSeconds - Required only for `requests_per_second`. When
  *   missing or non-positive for that key, the function returns `0`.
- * @returns The numeric value. Unknown keys (post-narrowing — should be
- *   prevented at compile time) fall through to `0`.
+ * @returns The numeric value.
+ * @throws {ValidationError} When a runtime-authored scenario supplies an
+ *   unknown metric key.
  */
 export function resolveMetric(
   metric: ScenarioMetricKey,
@@ -130,9 +135,13 @@ export function resolveMetric(
       return metrics.errorsGenerated;
     }
     default: {
-      // Exhaustive — `ScenarioMetricKey` should narrow to never here. This
-      // branch only fires if a caller deliberately bypasses the type check.
-      return 0;
+      // Runtime-authored .mjs plugins do not benefit from the TypeScript union.
+      // A typo must fail closed; returning zero can make a low-error assertion pass.
+      throw new ValidationError(`Unknown simulation metric '${String(metric)}'.`, {
+        code: 'SIMULATION.SCENARIO.INVALID',
+        definition: simulationErrorCatalog.require('SIMULATION.SCENARIO.INVALID'),
+        metadata: { field: 'assertion.metric', condition: 'unknown' },
+      });
     }
   }
 }

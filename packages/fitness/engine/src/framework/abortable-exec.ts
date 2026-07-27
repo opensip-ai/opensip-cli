@@ -16,6 +16,7 @@ import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
 const EXEC_FAILED = fitnessErrorCatalog.require('FIT.FITNESS.EXEC_FAILED');
+const BINARY_MISSING = fitnessErrorCatalog.require('FIT.EXEC.BINARY_MISSING');
 
 /**
  * Options for abortable command execution
@@ -58,16 +59,30 @@ export interface ExecResult {
 /**
  * Error thrown when command execution fails
  */
-class ExecError extends SystemError {
+export class ExecError extends SystemError {
+  readonly errno?: string;
+
   constructor(
     message: string,
     public readonly stdout: string,
     public readonly stderr: string,
     public readonly exitCode: number | null,
     public readonly aborted: boolean,
+    cause?: Error & { readonly code?: unknown },
   ) {
-    super(message, { code: EXEC_FAILED.code, definition: EXEC_FAILED });
+    const errno = typeof cause?.code === 'string' ? cause.code : undefined;
+    const definition = errno === 'ENOENT' ? BINARY_MISSING : EXEC_FAILED;
+    super(message, {
+      code: definition.code,
+      definition,
+      ...(cause === undefined ? {} : { cause }),
+      metadata: {
+        condition: 'spawn-failed',
+        ...(errno === undefined ? {} : { errno }),
+      },
+    });
     this.name = 'ExecError';
+    this.errno = errno;
   }
 }
 
@@ -213,7 +228,14 @@ export function execAbortable(
       signal?.removeEventListener('abort', abortHandler);
       if (timeoutId) clearTimeout(timeoutId);
       reject(
-        new ExecError(`Failed to spawn process: ${err.message}`, stdout, stderr, null, aborted),
+        new ExecError(
+          `Failed to spawn process: ${err.message}`,
+          stdout,
+          stderr,
+          null,
+          aborted,
+          err,
+        ),
       );
     });
   });

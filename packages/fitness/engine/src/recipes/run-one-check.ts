@@ -21,7 +21,7 @@
 
 import { TimeoutError, logger, runWithTimeout, withSpanAsync } from '@opensip-cli/core';
 
-import { CheckAbortedError } from '../framework/execution-context.js';
+import { isCheckCancellation } from '../framework/execution-context.js';
 import { resolveMemoryProfiler } from '../framework/scope-registry.js';
 
 import {
@@ -147,7 +147,7 @@ export async function runOneCheck(
         retry: {
           enabled: opts.retryEnabled,
           maxRetries: opts.maxRetries,
-          shouldNotRetry: (error) => error instanceof CheckAbortedError,
+          shouldNotRetry: isCheckCancellation,
         },
       });
     },
@@ -188,6 +188,7 @@ export async function runOneCheck(
     }
 
     if (outcome.status === 'error') {
+      if (isCheckCancellation(outcome.error)) throw outcome.error;
       logger.info({
         evt: 'fitness.check.error',
         module: MODULE_TAG,

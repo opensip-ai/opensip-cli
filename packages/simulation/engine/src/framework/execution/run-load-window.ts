@@ -14,6 +14,14 @@
  * the `Target`, the framework owns the loop lifecycle).
  */
 
+import {
+  createCancelledError,
+  createDeadlineError,
+  normalizeFailure,
+  toPublicFailureProjection,
+  type FailureEnvelope,
+} from '@opensip-cli/core';
+
 import { resolveConcurrency } from '../../types/workload.js';
 import { createEmptyMetrics } from '../result-builder.js';
 
@@ -44,6 +52,8 @@ export interface RunLoadWindowOptions {
 /** Aggregated outcome of a single load window. */
 export interface LoadWindowResult {
   readonly metrics: SimulationMetrics;
+  /** First normalized target failure, retained as bounded diagnostic evidence. */
+  readonly firstFailure?: FailureEnvelope;
 }
 
 // =============================================================================
@@ -51,6 +61,7 @@ export interface LoadWindowResult {
 // =============================================================================
 
 const TICK_INTERVAL_MS = 100;
+const IN_FLIGHT_DRAIN_TIMEOUT_MS = 5000;
 
 function sleepTick(intervalMs: number, signal: AbortSignal): Promise<void> {
   return new Promise<void>((resolve) => {
@@ -77,6 +88,29 @@ interface DispatchState {
   readonly metrics: SimulationMetrics;
   readonly latencyTracker: LatencyTracker;
   readonly inFlight: Set<Promise<void>>;
+  firstFailure?: FailureEnvelope;
+  acceptResults: boolean;
+}
+
+function recordRejectedRequest(state: DispatchState, error: unknown): void {
+  if (!state.acceptResults) return;
+  const failure = normalizeFailure(error);
+  if (state.context.abortSignal.aborted || failure.definition.kind === 'cancelled') {
+    // Cancelled requests are incomplete measurements, not SLO failures.
+    state.metrics.totalRequests = Math.max(0, state.metrics.totalRequests - 1);
+    return;
+  }
+  state.firstFailure ??= failure;
+  state.metrics.failedRequests++;
+  // `errorsGenerated` currently mirrors every request throw (natural target
+  // failures and fault-injected failures alike). The load window is
+  // fault-agnostic — it does not distinguish client-side fault injections
+  // from ordinary target errors — so `recovery_rate`
+  // (`1 - failedRequests / errorsGenerated`) is only meaningful when a
+  // caller stamps `errorsGenerated` independently as a pure fault-injection
+  // count. Chaos assertions that need that distinction must not rely on
+  // this driver-side increment alone.
+  state.metrics.errorsGenerated++;
 }
 
 /** Issue one request: time it, classify resolve/throw, track it in-flight. */
@@ -90,20 +124,11 @@ function dispatchRequest(state: DispatchState): void {
         signal: context.abortSignal,
         correlationId: context.correlationId,
       });
-      metrics.successfulRequests++;
-    } catch {
-      metrics.failedRequests++;
-      // `errorsGenerated` currently mirrors every request throw (natural target
-      // failures and fault-injected failures alike). The load window is
-      // fault-agnostic — it does not distinguish client-side fault injections
-      // from ordinary target errors — so `recovery_rate`
-      // (`1 - failedRequests / errorsGenerated`) is only meaningful when a
-      // caller stamps `errorsGenerated` independently as a pure fault-injection
-      // count. Chaos assertions that need that distinction must not rely on
-      // this driver-side increment alone.
-      metrics.errorsGenerated++;
+      if (state.acceptResults) metrics.successfulRequests++;
+    } catch (error) {
+      recordRejectedRequest(state, error);
     } finally {
-      latencyTracker.record(Date.now() - t0);
+      if (state.acceptResults) latencyTracker.record(Date.now() - t0);
     }
   })();
   inFlight.add(run);
@@ -121,15 +146,87 @@ async function awaitBelowCap(
   // defense in depth for any direct caller.
   const effectiveCap = Math.max(1, cap);
   while (inFlight.size >= effectiveCap && !signal.aborted) {
-    await Promise.race(inFlight);
+    // @sequential-ok -- intentional backpressure: each await frees one bounded in-flight slot before dispatch continues.
+    await settleOneOrAbort(inFlight, signal);
   }
+}
+
+/** Wait for one request or cancellation without leaking abort listeners. */
+function settleOneOrAbort(inFlight: Set<Promise<void>>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted || inFlight.size === 0) return Promise.resolve();
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (): void => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    signal.addEventListener('abort', finish, { once: true });
+    void Promise.race(inFlight).then(finish, finish);
+  });
+}
+
+type DrainOutcome = 'complete' | 'aborted' | 'deadline-exceeded';
+
+/** Bound the terminal drain even when a supported BYO target ignores cancellation. */
+function drainInFlight(inFlight: Set<Promise<void>>, signal: AbortSignal): Promise<DrainOutcome> {
+  if (inFlight.size === 0) return Promise.resolve('complete');
+  if (signal.aborted) return Promise.resolve('aborted');
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (outcome: DrainOutcome): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener('abort', onAbort);
+      resolve(outcome);
+    };
+    const onAbort = (): void => finish('aborted');
+    const timer = setTimeout(() => finish('deadline-exceeded'), IN_FLIGHT_DRAIN_TIMEOUT_MS);
+    signal.addEventListener('abort', onAbort, { once: true });
+    void Promise.allSettled([...inFlight]).then(
+      () => finish('complete'),
+      () => finish('complete'),
+    );
+  });
+}
+
+/**
+ * Classify a bounded terminal drain and mutate its aggregate counters.
+ *
+ * @throws {Error} When the run was cancelled so cancellation reaches the host boundary.
+ */
+function handleTerminalDrain(drainOutcome: DrainOutcome, state: DispatchState): void {
+  const { context, inFlight, metrics } = state;
+  if (context.abortSignal.aborted || drainOutcome === 'aborted') {
+    const abandoned = inFlight.size;
+    state.acceptResults = false;
+    metrics.totalRequests = Math.max(0, metrics.totalRequests - abandoned);
+    const reason = context.abortSignal.reason as unknown;
+    if (normalizeFailure(reason).definition.kind === 'cancelled') throw reason;
+    throw createCancelledError(`Simulation scenario '${context.scenarioId}' was cancelled.`);
+  }
+  if (drainOutcome !== 'deadline-exceeded') return;
+
+  const abandoned = inFlight.size;
+  state.acceptResults = false;
+  metrics.failedRequests += abandoned;
+  metrics.errorsGenerated += abandoned;
+  state.firstFailure ??= normalizeFailure(
+    createDeadlineError(`Abandoned ${String(abandoned)} target request(s) after drain deadline.`),
+  );
+  context.logger.warn('Target requests exceeded the in-flight drain deadline', {
+    abandonedRequests: abandoned,
+    timeoutMs: IN_FLIGHT_DRAIN_TIMEOUT_MS,
+  });
 }
 
 /**
  * Run a single load-style window against a real `Target`.
  *
  * Per request: time the awaited `target` call, count success on resolve and
- * failure on throw (including aborts), and record the measured latency. The
+ * failure on non-cancellation throws, and record the measured latency. The
  * driver paces toward `workload.rps` with optional ramp-up and never exceeds
  * `resolveConcurrency(workload)` in-flight requests. In-flight requests are
  * drained before the latency snapshot is taken so it reflects the full window.
@@ -151,6 +248,7 @@ export async function runLoadWindow(
     metrics,
     latencyTracker,
     inFlight,
+    acceptResults: true,
   };
   const start = Date.now();
   const rampUpMs = (workload.rampUp ?? 0) * 1000;
@@ -187,8 +285,18 @@ export async function runLoadWindow(
     await sleepTick(TICK_INTERVAL_MS, context.abortSignal);
   }
 
-  // Drain any still-in-flight requests so the latency snapshot covers them.
-  await Promise.allSettled(inFlight);
+  // Drain any still-in-flight requests so the latency snapshot covers them,
+  // but never beyond the bounded terminal budget.
+  const drainOutcome = await drainInFlight(inFlight, context.abortSignal);
+  handleTerminalDrain(drainOutcome, state);
+
+  if (state.firstFailure !== undefined) {
+    const projected = toPublicFailureProjection(state.firstFailure);
+    context.logger.warn('Target request failed during the load window', {
+      code: state.firstFailure.code,
+      ...(typeof projected.message === 'string' ? { message: projected.message } : {}),
+    });
+  }
 
   const snapshot = latencyTracker.getLatencySnapshot();
   metrics.avgLatencyMs = snapshot.avgLatencyMs;
@@ -196,5 +304,8 @@ export async function runLoadWindow(
   metrics.p95LatencyMs = snapshot.p95LatencyMs;
   metrics.p99LatencyMs = snapshot.p99LatencyMs;
 
-  return { metrics };
+  return {
+    metrics,
+    ...(state.firstFailure === undefined ? {} : { firstFailure: state.firstFailure }),
+  };
 }

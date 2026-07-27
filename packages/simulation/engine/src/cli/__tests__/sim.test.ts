@@ -179,7 +179,7 @@ describe('executeSim', () => {
     }
   });
 
-  it('preserves error messages on failed scenarios', async () => {
+  it('redacts unclassified scenario errors at the public unit boundary', async () => {
     currentScenarioRegistry().register({
       id: 'msg',
       name: 'msg',
@@ -190,8 +190,8 @@ describe('executeSim', () => {
     });
     const { result } = await executeSim(args());
     if (result.type === 'run-presentation') {
-      // The scenario's thrown error is carried on its unit (slug === scenarioId).
-      expect(result.envelope.units[0]?.error).toContain('a-specific-message');
+      expect(result.envelope.units[0]?.error).toBe('The operation failed.');
+      expect(result.envelope.units[0]?.error).not.toContain('a-specific-message');
     }
   });
 

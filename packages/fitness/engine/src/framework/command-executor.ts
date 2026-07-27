@@ -7,6 +7,7 @@
 
 import {
   execAbortable,
+  ExecError,
   type AbortableExecOptions,
   type ExecAbortReason,
   type ExecResult,
@@ -54,10 +55,6 @@ function notInstalledResult(bin: string, exitCode: number | null = null): Comman
     notInstalled: true,
     error: `${bin} is not installed. Install it to enable this check.`,
   };
-}
-
-function isMissingBinaryMessage(message: string): boolean {
-  return message.includes('ENOENT') || message.includes('not found');
 }
 
 function unexpectedExitResult(
@@ -136,8 +133,7 @@ export async function executeCommand(
     result = await execAbortable(command, execOptions);
   } catch (error) {
     // ENOENT = tool not installed (spawn fails before the process starts)
-    const message = error instanceof Error ? error.message : String(error);
-    if (isMissingBinaryMessage(message)) {
+    if (error instanceof ExecError && error.errno === 'ENOENT') {
       return notInstalledResult(config.bin);
     }
     throw error;

@@ -11,7 +11,7 @@ import os from 'node:os';
 import { deriveRecipeId } from '@opensip-cli/core';
 
 import type { DirectiveEntry } from '../framework/directive-inventory.js';
-import type { RecipeUnitConfigMap, Signal } from '@opensip-cli/core';
+import type { FailureEnvelope, RecipeUnitConfigMap, Signal } from '@opensip-cli/core';
 
 // =============================================================================
 // CHECK SELECTOR TYPES
@@ -124,6 +124,8 @@ export interface RecipeCheckResult {
   readonly skipped: boolean;
   readonly skipReason?: string;
   readonly error?: string;
+  /** Definition-backed unit failure retained until the envelope boundary. */
+  readonly failure?: FailureEnvelope;
   readonly timedOut?: boolean;
   appliedDirectives?: readonly DirectiveEntry[] | undefined;
   /** Signals after recipe-level filtering, before envelope identity normalization. */

@@ -5,7 +5,12 @@
  * builds check summaries, and determines whether execution should stop.
  */
 
-import { logger, SystemError } from '@opensip-cli/core';
+import {
+  logger,
+  normalizeFailure,
+  SystemError,
+  toPublicFailureProjection,
+} from '@opensip-cli/core';
 
 import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { isFrameworkErrorResult } from '../framework/ignore-processing.js';
@@ -330,17 +335,12 @@ export function processErrorResult(
     durationMs,
     memoryBeforeMB,
     timedOut,
-    timeoutMs,
   } = input;
   const { session, callbacks, recipe } = ctx;
 
-  let errMsg: string;
-  if (timedOut && timeoutMs) {
-    errMsg = `Check ${checkSlug} timed out after ${timeoutMs}ms`;
-  } else {
-    /* v8 ignore next -- callers always pass Error subclasses; the String(error) fallback is defensive */
-    errMsg = error instanceof Error ? error.message : String(error);
-  }
+  const failure = normalizeFailure(error);
+  const projectedMessage = toPublicFailureProjection(failure).message;
+  const errMsg = typeof projectedMessage === 'string' ? projectedMessage : 'The check failed.';
 
   const memoryProfile = resolveMemoryProfiler().recordCheckComplete(
     checkId,
@@ -360,6 +360,7 @@ export function processErrorResult(
     durationMs,
     skipped: false,
     error: errMsg,
+    failure,
     timedOut,
     effectiveSignals: [],
   };

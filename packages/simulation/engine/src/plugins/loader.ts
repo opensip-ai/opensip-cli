@@ -40,32 +40,22 @@ export const SIM_PLUGIN_LAYOUT: PluginLayout = {
   userSubdirs: ['scenarios', 'recipes'],
 };
 
-/** Register one recipe; returns true if newly registered. Duplicate
- *  recipes throw — caught here and reported as not-newly-registered,
- *  matching the prior behavior of silently skipping duplicates. */
+/** Register one recipe; validation and collisions propagate to the loader boundary. */
 function tryRegisterRecipe(recipe: SimulationRecipe): boolean {
-  try {
-    currentSimulationRecipeRegistry().register(recipe, {
-      allowOverwrite: false,
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  currentSimulationRecipeRegistry().register(recipe, {
+    allowOverwrite: false,
+  });
+  return true;
 }
 
 /** Register one scenario; returns true if newly registered. Duplicate
  *  scenarios (same id) silently skip via the registry's
  *  `duplicatePolicy: 'silent-skip'`. A name-collision with a different
- *  id throws — surfaced to the caller as `false`. */
+ *  id throws and propagates to the loader boundary. */
 function tryRegisterScenario(scenario: RunnableScenario): boolean {
   const registry = currentScenarioRegistry();
   const before = registry.size;
-  try {
-    registry.register(scenario);
-  } catch {
-    return false;
-  }
+  registry.register(scenario);
   return registry.size > before;
 }
 

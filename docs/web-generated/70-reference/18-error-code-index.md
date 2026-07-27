@@ -12,16 +12,17 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **21**
-- Definitions: **211**
+- Catalog sources: **22**
+- Definitions: **216**
 
 ## Catalogs
 
 | Package | Owner id | Source file | Count |
 |---|---|---|---:|
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
-| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 11 |
-| `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
+| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 13 |
+| `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 5 |
+| `@opensip-cli/yagni` | `3aba9195-2297-4f20-99d5-906945092dfc` | `packages/yagni/engine/src/errors/yagni-error-catalog.ts` | 2 |
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 3 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
@@ -194,6 +195,7 @@ generated: true
 | `EXTERNAL.SCANNER.SCAN_UNAVAILABLE` | `@opensip-cli/external-tool-adapter` | external | environment | timeout | caller-policy | error | runtime | active | The scan could not complete. Run from inside a project, or raise the scanner timeout for large workloads. |
 | `EXTERNAL.SCANNER.SPAWN_FAILED` | `@opensip-cli/external-tool-adapter` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check binary permissions and OS errno; retry after fixing the environment. |
 | `FIT.CHECK.UNKNOWN` | `@opensip-cli/fitness` | application | user | validation | never | error | configuration | active | Run opensip fit list to see available checks. |
+| `FIT.EXEC.BINARY_MISSING` | `@opensip-cli/fitness` | external | environment | not-found | never | warning | success | active | Install the executable required by this optional check and retry. |
 | `FIT.FIT_SCOPE.INVALID` | `@opensip-cli/fitness` | application | user | validation | never | error | configuration | active | Correct the named targets or signalers block in opensip-cli.config.yml; `opensip fit list` shows the targets a check can reference. |
 | `FIT.FITNESS.CHECK_ABORTED` | `@opensip-cli/fitness` | application | user | cancelled | never | warning | cancelled | active | The check was cancelled. Re-run if the work is still needed. |
 | `FIT.FITNESS.CHECK_DEADLINE_EXCEEDED` | `@opensip-cli/fitness` | application | user | timeout | transient | error | runtime | active | The check |
@@ -203,6 +205,7 @@ generated: true
 | `FIT.FITNESS.FILE_TOO_LARGE` | `@opensip-cli/fitness` | application | user | resource | never | warning | success | active | The named file is larger than opensip will analyze and was skipped. Exclude it from the target set, or split it. |
 | `FIT.FITNESS.PATH_REJECTED` | `@opensip-cli/fitness` | application | tool-author | security | never | error | runtime | active | Analyze only paths from the resolved target set; a path outside it, or a directory, is refused. |
 | `FIT.FITNESS.SESSION_IN_PROGRESS` | `@opensip-cli/fitness` | application | tool-author | conflict | never | error | runtime | active | Wait for the active fitness session to finish or abort it. |
+| `FIT.LOAD.COMPONENT_FAILED` | `@opensip-cli/fitness` | external | environment | compatibility | caller-policy | error | runtime | active | Verify the fitness plugin or check pack is installed, compatible, and declared correctly. |
 | `FIT.NOT_FOUND.RECIPE` | `@opensip-cli/fitness` | application | user | not-found | never | error | not-found | active | Run opensip fit recipes to list available recipes. |
 | `GRAPH.ADAPTER.DISCOVERY_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the discovery condition and OS errno, repair the source-tree filesystem problem, then retry the graph build. |
 | `GRAPH.ADAPTER.MANIFEST_INVALID` | `@opensip-cli/graph` | application | user | validation | never | warning | success | active | Correct the language manifest or exclude the affected package, then rebuild the graph. |
@@ -246,6 +249,7 @@ generated: true
 | `SESSION.READ.BOUND_INVALID` | `@opensip-cli/session-store` | application | tool-author | validation | never | error | runtime | active | Pass a non-negative integer for the named bound; omit it to accept the built-in default. |
 | `SESSION.READ.UNKNOWN_TOOL` | `@opensip-cli/session-store` | application | tool-author | not-found | never | error | runtime | active | Use a tool name that has recorded sessions; `opensip tools list` shows them. |
 | `SESSION.WRITE.RECORD_INVALID` | `@opensip-cli/session-store` | application | tool-author | validation | never | error | runtime | active | Correct the named field on the run, step or session record before persisting it. |
+| `SIMULATION.CAPABILITY.SCENARIO_NOT_FOUND` | `@opensip-cli/simulation` | external | tool-author | not-found | never | error | plugin-incompatible | active | Correct the capability pack contribution so its advertised scenario id is exported. |
 | `SIMULATION.METRICS.REQUIRED` | `@opensip-cli/simulation` | application | tool-author | invariant | never | error | runtime | active | Call withMetrics(...) before evaluating scenario assertions. |
 | `SIMULATION.RECIPE.INVALID` | `@opensip-cli/simulation` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the named field on the simulation recipe; see the simulation recipe reference for the required shape. |
 | `SIMULATION.SCENARIO.ABORTED` | `@opensip-cli/simulation` | application | user | cancelled | never | error | cancelled | active | Scenario was cancelled. Re-run if the work is still needed. |
@@ -256,6 +260,8 @@ generated: true
 | `TREESITTER.TREE_SITTER.NOT_INITIALIZED` | `@opensip-cli/tree-sitter` | application | tool-author | invariant | never | error | runtime | active | Initialise the tree-sitter runtime before parsing. Capture the run id and report a bug. |
 | `UNKNOWN_LIVE_VIEW` | `@opensip-cli/core` | application | tool-author | not-found | never | error | runtime | active | Use a registered live view key for this tool. |
 | `VALIDATION_ERROR` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Fix the invalid input, flag, or configuration value and retry. |
+| `YAGNI.DETECTOR.EXECUTION_FAILED` | `@opensip-cli/yagni` | application | tool-author | invariant | never | error | runtime | active | Capture the run id and report the failing detector to its author. |
+| `YAGNI.DETECTOR.NOT_FOUND` | `@opensip-cli/yagni` | application | user | not-found | never | error | not-found | active | Use a detector slug listed by the YAGNI command help. |
 
 ## See also
 

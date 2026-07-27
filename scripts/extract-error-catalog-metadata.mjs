@@ -34,6 +34,12 @@ const CATALOG_SOURCES = [
     exportName: 'simulationErrorCatalog',
   },
   {
+    packageName: '@opensip-cli/yagni',
+    ownerId: '3aba9195-2297-4f20-99d5-906945092dfc',
+    file: 'packages/yagni/engine/src/errors/yagni-error-catalog.ts',
+    exportName: 'yagniErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/external-tool-adapter',
     ownerId: 'external-tool-adapter',
     file: 'packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts',

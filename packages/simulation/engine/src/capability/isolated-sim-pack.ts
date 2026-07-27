@@ -1,11 +1,13 @@
 import {
   capabilityCoContributionValues,
+  createToolError,
   importCapabilityPackageModule,
   readCapabilityArrayExport,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
 
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
 import { ScenarioAbortedError } from '../framework/execution/scenario-aborted-error.js';
 
 import type { RunnableScenario } from '../framework/runnable-scenario.js';
@@ -143,7 +145,11 @@ async function runWorkerScenario(
   const scenarios = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isScenario);
   const scenario = scenarios.find((candidate) => candidate.id === request.scenarioId);
   if (scenario === undefined) {
-    throw new Error(`capability pack ${args.pkg.name} has no scenario '${request.scenarioId}'`);
+    throw createToolError(
+      simulationErrorCatalog.require('SIMULATION.CAPABILITY.SCENARIO_NOT_FOUND'),
+      `Capability pack ${args.pkg.name} has no scenario '${request.scenarioId}'.`,
+      { metadata: { packageName: args.pkg.name, scenarioId: request.scenarioId } },
+    );
   }
   const abortController = new AbortController();
   try {

@@ -40,6 +40,17 @@ export interface CheckResolutionOptions {
   disabledChecks?: readonly string[];
 }
 
+/** @throws {ConfigurationError} When a named recipe references a check that is not registered. */
+function rejectMissingNamedRecipeCheck(recipe: FitnessRecipe, missing: readonly string[]): void {
+  if (missing.length === 0 || recipe.name === 'cli-adhoc') return;
+  const requested = missing[0] ?? '(unknown)';
+  throw new ConfigurationError(`Recipe '${recipe.name}' references unknown check '${requested}'.`, {
+    code: 'FIT.CHECK.UNKNOWN',
+    definition: fitnessErrorCatalog.require('FIT.CHECK.UNKNOWN'),
+    metadata: { check: requested, condition: 'unknown-reference' },
+  });
+}
+
 /**
  * Resolve checks from a recipe selector and filter out disabled checks.
  * Force-included slugs from `recipe.includeDisabled` bypass the disabled filter.
@@ -64,6 +75,7 @@ export function resolveAndFilterChecks(
         missing,
         recipeName: recipe.name,
       });
+      rejectMissingNamedRecipeCheck(recipe, missing);
     }
   }
 

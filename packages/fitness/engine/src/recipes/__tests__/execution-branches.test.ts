@@ -127,8 +127,8 @@ describe('parallel execution — stopOnFirstFailure', () => {
   });
 });
 
-describe('FitnessRecipeService — warns', () => {
-  it('logs a warning when explicit recipe references list unknown slugs', async () => {
+describe('FitnessRecipeService — recipe references', () => {
+  it('rejects a named recipe that references unknown slugs', async () => {
     const checkRegistry = new CheckRegistry();
     checkRegistry.register(
       defineCheck({
@@ -148,14 +148,13 @@ describe('FitnessRecipeService — warns', () => {
       prewarmCache: false,
     });
 
-    // Recipe references a check the registry doesn't know about — service
-    // logs a warning but the run still succeeds with the valid checks.
-    const result = await svc.start(
-      makeRecipe({
-        checks: { type: 'explicit', checkIds: ['exists', 'never-registered'] },
-      }),
-    );
-    expect(result.summary.totalChecks).toBe(1);
+    await expect(
+      svc.start(
+        makeRecipe({
+          checks: { type: 'explicit', checkIds: ['exists', 'never-registered'] },
+        }),
+      ),
+    ).rejects.toThrow(/unknown check 'never-registered'/);
   });
 
   it('logs a warning when disabledChecks references unknown slugs', async () => {

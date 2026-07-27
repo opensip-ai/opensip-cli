@@ -31,8 +31,14 @@ function envelope(runFaulted: boolean): SignalEnvelope {
 }
 
 describe('applyAdvisoryExitCode', () => {
-  it('forces success when advisory policy is active', () => {
+  it('preserves a configuration failure when advisory policy is active', () => {
     const cli = cliWithExit(EXIT_CODES.CONFIGURATION_ERROR);
+    applyAdvisoryExitCode(cli, { failOnErrors: 0, failOnWarnings: 0 }, envelope(false));
+    expect(cli._state.code).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+  });
+
+  it('clears a findings-only runtime exit when advisory policy is active', () => {
+    const cli = cliWithExit(EXIT_CODES.RUNTIME_ERROR);
     applyAdvisoryExitCode(cli, { failOnErrors: 0, failOnWarnings: 0 }, envelope(false));
     expect(cli._state.code).toBe(EXIT_CODES.SUCCESS);
   });
@@ -47,6 +53,12 @@ describe('applyAdvisoryExitCode', () => {
     const cli = cliWithExit(EXIT_CODES.REPORT_FAILED);
     applyAdvisoryExitCode(cli, { failOnErrors: 0, failOnWarnings: 0 }, envelope(false));
     expect(cli._state.code).toBe(EXIT_CODES.REPORT_FAILED);
+  });
+
+  it('preserves cancellation', () => {
+    const cli = cliWithExit(EXIT_CODES.CANCELLED);
+    applyAdvisoryExitCode(cli, { failOnErrors: 0, failOnWarnings: 0 }, envelope(false));
+    expect(cli._state.code).toBe(EXIT_CODES.CANCELLED);
   });
 
   it('does not override when gate policy is enabled', () => {

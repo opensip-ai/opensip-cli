@@ -25,7 +25,17 @@ export function applyAdvisoryExitCode(
   if (envelope.verdict.faulted === true) return;
 
   const current = cli.getExitCode?.();
-  if (current === EXIT_CODES.REPORT_FAILED) return;
+  // The interrupt coordinator writes process.exitCode directly, so the tool
+  // context may still look unset. Advisory posture may erase findings-only
+  // runtime exit 1; it must never erase cancellation or other command failures.
+  if (current === EXIT_CODES.CANCELLED || process.exitCode === EXIT_CODES.CANCELLED) return;
+  if (
+    current !== undefined &&
+    current !== EXIT_CODES.SUCCESS &&
+    current !== EXIT_CODES.RUNTIME_ERROR
+  ) {
+    return;
+  }
 
   cli.setExitCode(EXIT_CODES.SUCCESS);
 }

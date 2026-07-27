@@ -68,7 +68,24 @@ export const simulationErrorCatalog = defineErrorCatalog(
       operatorAction: 'Correct the scenario configuration; see the scenario reference.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['field'],
+      publicMetadataKeys: ['field', 'condition'],
+    },
+
+    /** A worker request named a scenario the selected capability pack did not export. */
+    'SIMULATION.CAPABILITY.SCENARIO_NOT_FOUND': {
+      code: 'SIMULATION.CAPABILITY.SCENARIO_NOT_FOUND',
+      source: 'external',
+      defaultResponsibility: 'tool-author',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'plugin-incompatible',
+      operatorAction:
+        'Correct the capability pack contribution so its advertised scenario id is exported.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['packageName', 'scenarioId'],
     },
 
     /**

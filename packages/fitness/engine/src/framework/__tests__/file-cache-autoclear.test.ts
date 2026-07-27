@@ -1,18 +1,14 @@
 /**
- * Auto-clear timer disposal / leak test (parallel-tool-invocations Phase 4).
+ * File-cache lifecycle disposal test (Plan 01 resiliency migration).
  *
- * `FileCache.prewarm()` arms an unref'd 10-minute `setTimeout`
- * (`file-cache.ts:scheduleAutoClear`) as a backstop against a missed lifecycle
- * `clear()`. Many short-lived scopes would each leak such a timer until GC.
- * Phase 1 made fitness register a disposer on `RunScope` that calls the cache's
- * `clear()` (which `clearTimeout`s the auto-clear timer at `file-cache.ts:181-184`).
+ * FileCache is owned by RunScope and cleared by its disposer. It deliberately
+ * carries no wall-clock auto-clear timer: a long-running fit must not lose its
+ * prewarmed universe ten minutes into a live run.
  *
  * These tests pin that contract:
- *   - `clear()` cancels the armed auto-clear timer (timer count drops to zero);
- *   - disposing a scope whose fitness cache was prewarmed clears the cache AND
- *     leaves no pending auto-clear timer;
- *   - a soak of N create+prewarm+dispose cycles leaves zero dangling timers
- *     (no per-scope timer leak).
+ *   - prewarm arms no timer;
+ *   - disposing a scope clears the cache;
+ *   - a soak of N create+prewarm+dispose cycles leaves zero dangling timers.
  *
  * Uses Vitest fake timers so `vi.getTimerCount()` observes the armed/cancelled
  * `setTimeout` deterministically (the 10-minute real delay is never waited on).
@@ -39,7 +35,7 @@ function makePrewarmDir(): string {
   return dir;
 }
 
-describe('FileCache auto-clear timer disposal', () => {
+describe('FileCache scope-owned disposal', () => {
   beforeEach(() => {
     // Fake timers so getTimerCount() observes the unref'd setTimeout. fs promises
     // used by prewarm resolve via the (un-faked) microtask/IO queue, so awaiting
@@ -51,24 +47,22 @@ describe('FileCache auto-clear timer disposal', () => {
     vi.useRealTimers();
   });
 
-  it('prewarm arms a timer; clear() cancels it (getTimerCount drops to zero)', async () => {
+  it('prewarm does not arm a wall-clock cache eviction timer', async () => {
     const dir = makePrewarmDir();
     const cache = new FileCache();
     try {
       expect(vi.getTimerCount()).toBe(0);
 
       await cache.prewarm(dir, ['**/*.ts']);
-      // The unref'd auto-clear setTimeout is now armed.
-      expect(vi.getTimerCount()).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
       expect(cache.stats.size).toBeGreaterThan(0);
 
-      // clear() is the disposer path — it must clearTimeout the auto-clear timer.
+      // clear() is the explicit disposer path.
       cache.clear();
       expect(vi.getTimerCount()).toBe(0);
       expect(cache.stats.size).toBe(0);
 
-      // Advancing past the 10-minute mark must NOT fire a cancelled timer
-      // (no second clear side effect; the count is already zero).
+      // Advancing past the former ten-minute mark cannot clear a live cache.
       vi.advanceTimersByTime(11 * 60 * 1000);
       expect(vi.getTimerCount()).toBe(0);
     } finally {
@@ -76,7 +70,7 @@ describe('FileCache auto-clear timer disposal', () => {
     }
   });
 
-  it('scope.dispose() clears a prewarmed fitness cache and cancels its auto-clear timer', async () => {
+  it('scope.dispose() clears a prewarmed fitness cache', async () => {
     const dir = makePrewarmDir();
     const scope = new RunScope();
     applyToolContributeScope(scope, fitnessTool);
@@ -86,10 +80,10 @@ describe('FileCache auto-clear timer disposal', () => {
     try {
       await cache.prewarm(dir, ['**/*.ts']);
       expect(cache.stats.size).toBeGreaterThan(0);
-      expect(vi.getTimerCount()).toBe(1);
+      expect(vi.getTimerCount()).toBe(0);
 
-      // dispose() runs the fitness-registered disposer → cache.clear() →
-      // clearTimeout. (Phase 1 task 1.3 path: contributeScope returns the
+      // dispose() runs the fitness-registered disposer → cache.clear().
+      // (Phase 1 task 1.3 path: contributeScope returns the
       // disposer; applyToolContributeScope registers it via scope.onDispose.)
       scope.dispose();
 
@@ -111,8 +105,8 @@ describe('FileCache auto-clear timer disposal', () => {
         if (!cache) throw new Error('expected scope.fitness.fileCache to be installed');
 
         await cache.prewarm(dir, ['**/*.ts']);
-        // While alive, exactly one timer is armed for THIS scope's cache.
-        expect(vi.getTimerCount()).toBe(1);
+        // A live scope owns data, but no timer that could evict it mid-run.
+        expect(vi.getTimerCount()).toBe(0);
 
         scope.dispose();
         // After dispose, no timer survives → next iteration starts from zero.

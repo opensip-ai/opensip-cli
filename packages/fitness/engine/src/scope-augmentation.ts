@@ -32,7 +32,20 @@ import type { FileCache } from './framework/file-cache.js';
 import type { MemoryProfiler } from './framework/memory-profiler.js';
 import type { CheckRegistry } from './framework/registry.js';
 import type { FitnessRecipeRegistry } from './recipes/registry.js';
-import type { CliDiagnostic } from '@opensip-cli/core';
+import type { CliDiagnostic, ToolError } from '@opensip-cli/core';
+
+/** A loader failure normalized at fitness's boundary before it enters run state. */
+export interface FitnessLoadFailure {
+  readonly component: 'plugin' | 'check-pack';
+  /** Stable plugin source or package name used for required/optional policy. */
+  readonly source: string;
+  /** Operator-only loader detail; public projection comes from {@link failure}. */
+  readonly detail: string;
+  /** Bounded, scrubbed detail suitable for a CLI diagnostic. */
+  readonly safeDetail?: string;
+  /** Definition-backed failure retained through load-outcome classification. */
+  readonly failure: ToolError;
+}
 
 /**
  * Per-RunScope `ensureChecksLoaded` lifecycle state — moved off the
@@ -47,9 +60,9 @@ export interface FitnessLoadState {
    *  "loaded" sentinel for the no-project case. */
   loadedFor: string | null;
   /** Plugin load failures from the most recent `ensureChecksLoaded` call. */
-  pluginLoadErrors: readonly string[];
+  pluginLoadErrors: readonly FitnessLoadFailure[];
   /** Fit-pack domain load/routing errors from the most recent load. */
-  checkPackErrors: readonly string[];
+  checkPackErrors: readonly FitnessLoadFailure[];
   /** Non-fatal user-facing warnings collected during the most recent
    *  `ensureChecksLoaded` call. */
   loadWarnings: string[];

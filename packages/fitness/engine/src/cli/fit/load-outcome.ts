@@ -9,7 +9,6 @@
 import { EXIT_CODES, type ErrorResult } from '@opensip-cli/contracts';
 import {
   CLI_DIAGNOSTIC_CODES,
-  classifyModuleError,
   currentScope,
   discoverPlugins,
   readProjectPluginsList,
@@ -20,24 +19,7 @@ import {
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { FIT_PLUGIN_LAYOUT } from '../../plugins/loader.js';
 
-/** Prefix before the colon in `loadAllPlugins` error strings (`source: message`). */
-function pluginErrorSource(error: string): string {
-  const idx = error.indexOf(':');
-  return idx === -1 ? error.trim() : error.slice(0, idx).trim();
-}
-
-/** Package name mentioned in a fit-pack domain load error string. */
-function checkPackErrorPackage(error: string): string | undefined {
-  const trimmed = error.trim();
-  const arrow = /^([^→]+)→/.exec(trimmed);
-  if (arrow !== null) return arrow[1].trim();
-  const configured = /^configured package "([^"]+)"/.exec(trimmed);
-  if (configured !== null) return configured[1]?.trim();
-  const packageWord = /^(?:failed to load )?package\s+((?:@[^/\s]+\/)?[^:\s]+)\b/.exec(trimmed);
-  if (packageWord !== null) return packageWord[1]?.trim();
-  const colon = /^([^:]+):/.exec(trimmed);
-  return colon?.[1]?.trim();
-}
+import type { FitnessLoadFailure } from '../../scope-augmentation.js';
 
 function requiredCheckPackages(_projectDir: string): ReadonlySet<string> {
   const plugins = currentScope()?.configDocument?.plugins;
@@ -122,11 +104,10 @@ function checkPackDiagnostic(
     capabilityDomain: 'fit-pack',
   };
   const displayDetail = checkPackDisplayDetail(packageName, detail);
-  const classified = classifiedLoaderDetail(displayDetail, provenance);
   const required = mode === 'required';
   const message = required
     ? `Required check pack "${packageName}" failed to load.`
-    : `Optional check pack failed to load: ${displayDetail}`;
+    : `Optional check pack "${packageName}" failed to load.`;
   return stampDiagnostic({
     severity: required ? 'error' : 'warning',
     code: CLI_DIAGNOSTIC_CODES.OPENSIP_FIT_CHECK_PACK_LOAD_FAILED,
@@ -142,7 +123,7 @@ function checkPackDiagnostic(
         }
       : {}),
     provenance,
-    detail: classified.detail,
+    detail: displayDetail,
   });
 }
 
@@ -164,14 +145,6 @@ function stampDiagnostic(diagnostic: CliDiagnostic): CliDiagnostic {
   return withLogRef(diagnostic, currentScope()?.runId);
 }
 
-function classifiedLoaderDetail(
-  detail: string,
-  provenance: CliDiagnostic['provenance'],
-): { readonly message: string; readonly detail?: string } {
-  const classified = classifyModuleError(new Error(detail), provenance);
-  return { message: classified.message, detail: classified.detail };
-}
-
 function requiredPluginDiagnostic(source: string, detail: string): CliDiagnostic {
   return pluginDiagnostic(source, detail, 'required');
 }
@@ -186,7 +159,6 @@ function pluginDiagnostic(
     packageName: source,
     discoverySource: mode === 'required' ? 'required-plugin' : 'optional-plugin',
   };
-  const classified = classifiedLoaderDetail(detail, provenance);
   const required = mode === 'required';
   return stampDiagnostic({
     severity: required ? 'error' : 'warning',
@@ -203,7 +175,7 @@ function pluginDiagnostic(
         }
       : {}),
     provenance,
-    detail: classified.detail,
+    detail,
   });
 }
 
@@ -216,14 +188,14 @@ function optionalCheckPackDiagnostic(packageName: string, detail: string): CliDi
 }
 
 function partitionPluginFailures(
-  errors: readonly string[],
+  errors: readonly FitnessLoadFailure[],
   projectDir: string,
 ): { readonly required: CliDiagnostic[]; readonly optional: CliDiagnostic[] } {
   const required: CliDiagnostic[] = [];
   const optional: CliDiagnostic[] = [];
-  for (const err of errors) {
-    const source = pluginErrorSource(err);
-    const detail = err.includes(':') ? err.slice(err.indexOf(':') + 1).trim() : err;
+  for (const failure of errors) {
+    const { source } = failure;
+    const detail = failure.safeDetail ?? failure.failure.message;
     if (isRequiredPluginSource(source, projectDir)) {
       required.push(requiredPluginDiagnostic(source, detail));
     } else {
@@ -234,17 +206,18 @@ function partitionPluginFailures(
 }
 
 function partitionCheckPackFailures(
-  errors: readonly string[],
+  errors: readonly FitnessLoadFailure[],
   requiredPackages: ReadonlySet<string>,
 ): { readonly required: CliDiagnostic[]; readonly optional: CliDiagnostic[] } {
   const required: CliDiagnostic[] = [];
   const optional: CliDiagnostic[] = [];
-  for (const err of errors) {
-    const pkg = checkPackErrorPackage(err);
-    if (pkg !== undefined && requiredPackages.has(pkg)) {
-      required.push(checkPackLoadDiagnostic(pkg, err));
+  for (const failure of errors) {
+    const pkg = failure.source;
+    const detail = failure.safeDetail ?? failure.failure.message;
+    if (requiredPackages.has(pkg)) {
+      required.push(checkPackLoadDiagnostic(pkg, detail));
     } else {
-      optional.push(optionalCheckPackDiagnostic(pkg ?? 'unknown', err));
+      optional.push(optionalCheckPackDiagnostic(pkg, detail));
     }
   }
   return { required, optional };

@@ -162,8 +162,9 @@ export async function analyzeAllToolIdentityManifests(
   for (const filePath of files.paths) {
     if (path.basename(filePath) !== 'package.json') continue;
     let pkg: PackageJson;
+    const content = await files.read(filePath);
     try {
-      pkg = JSON.parse(await files.read(filePath)) as PackageJson;
+      pkg = JSON.parse(content) as PackageJson;
     } catch {
       // @swallow-ok a malformed package.json is another check’s subject; this one reports on identity fields it could parse
       continue;

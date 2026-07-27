@@ -10,6 +10,7 @@ import { buildYagniCommandSpec } from './cli/yagni-command-spec.js';
 import { yagniConfigDeclaration } from './cli/yagni-config-schema.js';
 import { renderYagniLive, type YagniLiveArgs } from './cli/yagni-runner.js';
 import { yagniRunWorkerCommandSpec } from './cli/yagni-worker.js';
+import { yagniErrorCatalog } from './errors/yagni-error-catalog.js';
 import { YAGNI_IDENTITY, YAGNI_LIVE_VIEW_KEY } from './identity.js';
 import { yagniReplayFromSession } from './persistence/session-replay.js';
 
@@ -35,6 +36,7 @@ export const yagniTool: Tool = defineTool({
   },
   commandSpecs: [buildYagniCommandSpec(setUpYagniLiveView), yagniRunWorkerCommandSpec],
   extensionPoints: {
+    errorCatalog: yagniErrorCatalog,
     contractVersions: {
       yagni: YAGNI_CONTRACT_VERSION,
     },

@@ -106,7 +106,7 @@ describe('executeYagni detector progress callbacks (phases live view)', () => {
     expect(outcome.envelope.units[0]).toMatchObject({
       slug: 'yagni:throwing-stub',
       passed: false,
-      error: 'detector exploded',
+      error: 'The operation failed.',
     });
   });
 });

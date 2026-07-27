@@ -145,11 +145,11 @@ describe('resolveChecks', () => {
       expect(resolveChecks(selector, reg)).toEqual(['exists']);
     });
 
-    it('skips ambiguous bare slugs instead of picking the first match', () => {
+    it('rejects ambiguous bare slugs instead of dropping the requested check', () => {
       const reg = createNamespacedRegistry('ns-a', makeCheck('dup'));
       reg.register(makeCheck('dup'), 'ns-b');
       const selector: CheckSelector = { type: 'explicit', checkIds: ['dup'] };
-      expect(resolveChecks(selector, reg)).toEqual([]);
+      expect(() => resolveChecks(selector, reg)).toThrow(/ambiguous/);
     });
   });
 

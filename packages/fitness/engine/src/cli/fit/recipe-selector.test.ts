@@ -1,5 +1,10 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import {
+  enterScope,
+  RunScope,
+  applyToolContributeScope,
+  createCancelledError,
+} from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { CheckRegistry } from '../../framework/registry.js';
@@ -78,6 +83,33 @@ describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
     expect('error' in result && result.error).toMatchObject({
       message: "Unknown check 'ghost-check'.",
       exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+    });
+  });
+
+  it('preserves not-found classification from the recipe service', async () => {
+    const service = new FitnessRecipeService({
+      cwd: '/tmp',
+      checkRegistry: new CheckRegistry(),
+      recipeRegistry: new FitnessRecipeRegistry(),
+      prewarmCache: false,
+    });
+
+    const result = await runRecipeOrAdHoc(service, base, 'ghost-recipe');
+
+    expect('error' in result && result.error).toMatchObject({
+      exitCode: EXIT_CODES.CHECK_NOT_FOUND,
+    });
+  });
+
+  it('preserves cancellation from the recipe service', async () => {
+    const service = {
+      start: () => Promise.reject(createCancelledError('Fitness run cancelled.')),
+    } as unknown as FitnessRecipeService;
+
+    const result = await runRecipeOrAdHoc(service, base, 'default');
+
+    expect('error' in result && result.error).toMatchObject({
+      exitCode: EXIT_CODES.CANCELLED,
     });
   });
 });

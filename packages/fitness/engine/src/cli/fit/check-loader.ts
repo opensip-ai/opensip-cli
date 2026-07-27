@@ -25,14 +25,18 @@ import { fileURLToPath } from 'node:url';
 import { resolveCapabilityPreferences } from '@opensip-cli/config';
 import {
   createToolLogger,
+  createToolError,
+  classifyModuleError,
   capabilityDiscoveryToCliDiagnostic,
   currentScope,
   loadCapabilityDomain,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../../errors/fitness-error-catalog.js';
 import { currentCheckRegistry, currentFitnessLoadState } from '../../framework/scope-registry.js';
 import { loadAllPlugins } from '../../plugins/loader.js';
 
+import type { FitnessLoadFailure } from '../../scope-augmentation.js';
 import type { CapabilityPackageAdmission, SelectedCapabilityPackage } from '@opensip-cli/core';
 
 const log = createToolLogger('fitness:cli');
@@ -56,8 +60,64 @@ export function getLoadWarnings(): readonly string[] {
  * CLI exits 0, masking a compliance failure or a supply-chain compromise.
  */
 // @fitness-ignore-next-line duplicate-utility-functions -- intentionally parallel per-tool scope accessor: fit reads scope.fitness.load, sim reads scope.simulation.load; they cannot consolidate (different registries) and mirror getLoadWarnings.
-export function getPluginLoadErrors(): readonly string[] {
+export function getPluginLoadErrors(): readonly FitnessLoadFailure[] {
   return currentFitnessLoadState().pluginLoadErrors;
+}
+
+const LOAD_COMPONENT_FAILED = fitnessErrorCatalog.require('FIT.LOAD.COMPONENT_FAILED');
+
+export function normalizePluginLoadFailure(message: string): FitnessLoadFailure {
+  const separator = message.indexOf(':');
+  const source = (separator === -1 ? message : message.slice(0, separator)).trim() || 'unknown';
+  const detail = separator === -1 ? message.trim() : message.slice(separator + 1).trim();
+  return normalizedLoadFailure('plugin', source, detail);
+}
+
+function checkPackSource(message: string): string {
+  const trimmed = message.trim();
+  const arrow = /^([^→]+)→/.exec(trimmed);
+  if (arrow !== null) return arrow[1]?.trim() || 'unknown';
+  const configured = /^configured package "([^"]+)"/.exec(trimmed);
+  if (configured !== null) return configured[1]?.trim() || 'unknown';
+  const packageWord = /^(?:failed to load )?package\s+((?:@[^/\s]+\/)?[^:\s]+)\b/.exec(trimmed);
+  if (packageWord !== null) return packageWord[1]?.trim() || 'unknown';
+  const colon = /^([^:]+):/.exec(trimmed);
+  const source = colon?.[1]?.trim();
+  return source === undefined || source === '' ? 'unknown' : source;
+}
+
+export function normalizeCheckPackLoadFailure(message: string): FitnessLoadFailure {
+  return normalizedLoadFailure('check-pack', checkPackSource(message), message.trim());
+}
+
+function normalizedLoadFailure(
+  component: FitnessLoadFailure['component'],
+  source: string,
+  detail: string,
+): FitnessLoadFailure {
+  const failure = createToolError(
+    LOAD_COMPONENT_FAILED,
+    `Fitness ${component} "${source}" failed to load.`,
+    {
+      cause: new Error(detail),
+      metadata: { condition: component, component: source },
+    },
+  );
+  const provenance = {
+    toolId: 'fit',
+    packageName: source,
+    ...(component === 'check-pack'
+      ? { capabilityDomain: 'fit-pack' }
+      : { discoverySource: 'fitness-plugin' }),
+  };
+  const classified = classifyModuleError(new Error(detail), provenance);
+  return {
+    component,
+    source,
+    detail,
+    failure,
+    safeDetail: classified.detail ?? classified.message,
+  };
 }
 
 /** Get the number of enabled checks (available after ensureChecksLoaded). */
@@ -97,14 +157,14 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    and there's no project-local 'lang' plugin discovery path
   //    (the lang adapter set is fixed and shipped with the CLI).
   const pluginResult = await loadAllPlugins('fit', projectDir);
-  load.pluginLoadErrors = pluginResult.errors;
+  load.pluginLoadErrors = pluginResult.errors.map(normalizePluginLoadFailure);
   if (pluginResult.errors.length > 0) {
     // Structured classification happens in finalizeFitLoadOutcome; log only here.
-    for (const err of pluginResult.errors) {
+    for (const failure of load.pluginLoadErrors) {
       log.warn({
         evt: 'cli.plugin.warning',
         module: 'cli:fit',
-        message: err,
+        err: failure.failure,
       });
     }
   }
@@ -118,7 +178,8 @@ export async function ensureChecksLoaded(projectDir?: string): Promise<void> {
   //    on the scope capability registry, so the CLI pre-action hook and this
   //    call don't double-load. Discovery errors (incl. the single-core guard's
   //    foreign-core skips) surface as load warnings.
-  load.checkPackErrors = [...(await loadFitCheckPackages(projectDir ?? cliInstallDir()))];
+  const checkPackErrors = await loadFitCheckPackages(projectDir ?? cliInstallDir());
+  load.checkPackErrors = checkPackErrors.map(normalizeCheckPackLoadFailure);
 
   load.loadedFor = key;
 

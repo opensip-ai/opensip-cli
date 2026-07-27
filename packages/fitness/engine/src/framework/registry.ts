@@ -13,7 +13,15 @@
  * structure not in the base's shape.
  */
 
-import { NotFoundError, Registry, logger, type Registerable } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  NotFoundError,
+  Registry,
+  logger,
+  type Registerable,
+} from '@opensip-cli/core';
+
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 
 import type { Check } from './check-types.js';
 
@@ -33,6 +41,18 @@ export class CheckRegistry {
   });
   /** Reverse index: bare slug → list of namespaced keys */
   private readonly bareSlugIndex = new Map<string, string[]>();
+
+  private ambiguousSlug(slug: string, candidates: readonly string[]): ConfigurationError {
+    return new ConfigurationError(
+      `Check slug '${slug}' is ambiguous (${candidates.length} matches: ${candidates.join(', ')}). ` +
+        'Use a namespaced check slug.',
+      {
+        code: 'FIT.CHECK.UNKNOWN',
+        definition: fitnessErrorCatalog.require('FIT.CHECK.UNKNOWN'),
+        metadata: { check: slug, condition: 'ambiguous' },
+      },
+    );
+  }
 
   register(check: Check, namespace?: string): void {
     const bareSlug = check.config.slug;
@@ -131,6 +151,8 @@ export class CheckRegistry {
    * - Bare slugs resolve via the reverse index; multiple matches return
    *   `undefined` and emit `check.registry.ambiguous` (mirrors {@link resolve}).
    * - Unknown slugs return `undefined`.
+   *
+   * @throws {ConfigurationError} When a bare slug names more than one registered check.
    */
   resolveBareSlug(slug: string): string | undefined {
     if (this.inner.has(slug)) return slug;
@@ -144,14 +166,7 @@ export class CheckRegistry {
     if (!candidates || candidates.length === 0) return undefined;
 
     if (candidates.length > 1) {
-      logger.warn({
-        evt: 'check.registry.ambiguous',
-        module: 'fitness:checks',
-        bareSlug,
-        candidates,
-        msg: `Ambiguous bare slug '${bareSlug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
-      });
-      return undefined;
+      throw this.ambiguousSlug(bareSlug, candidates);
     }
 
     return candidates[0];
@@ -182,17 +197,17 @@ export class CheckRegistry {
     if (!candidates || candidates.length === 0) return undefined;
 
     if (candidates.length > 1) {
-      // Hard failure on ambiguity — prevents non-deterministic "which check won?"
-      // behaviour across pack load order or plugin discovery. Callers that want
-      // the full list can use listByBareSlug().
+      // Non-throwing introspection (`find` / `has` / display lookup) reports no
+      // unique result. Recipe resolution uses resolveBareSlug above, which
+      // raises the user-facing configuration failure instead of dropping it.
       logger.warn({
         evt: 'check.registry.ambiguous',
         module: 'fitness:checks',
         bareSlug: slug,
         candidates,
-        msg: `Ambiguous bare slug '${slug}' matches ${candidates.length} checks (namespaced); refusing bare lookup`,
+        msg: `Ambiguous bare slug '${slug}' has no unique introspection result`,
       });
-      return undefined; // get() will turn this into a NotFoundError with the slug
+      return undefined;
     }
 
     return this.inner.getById(candidates[0])?.check;
