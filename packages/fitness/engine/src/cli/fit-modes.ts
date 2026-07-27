@@ -58,13 +58,22 @@ function fitSessionContribution(
   runOutcome?: ToolRunOutcome,
 ): ToolSessionContribution {
   const passed = envelope.verdict.passed;
+  // A faulted run is recorded as a FAULT, not merely a failure.
+  //
+  // This read `deriveRunOutcome({ passed })` and never consulted `verdict.faulted`. Because a
+  // faulted run always has `passed: false`, every fault persisted as `'failed'` — so the
+  // session history showed a run whose check could not COMPLETE as identical to one that
+  // completed and found problems, and did so beside a 100% score. Sessions are the durable
+  // evidence surface `report` and MCP replay, so the distinction was lost exactly where it
+  // outlives the terminal.
+  const explicit = runOutcome ?? (envelope.verdict.faulted ? 'error' : undefined);
   return {
     tool: 'fit',
     cwd: args.cwd,
     recipe: envelope.recipe,
     score: envelope.verdict.score,
     passed,
-    runOutcome: deriveRunOutcome({ passed, explicit: runOutcome }),
+    runOutcome: deriveRunOutcome({ passed, ...(explicit === undefined ? {} : { explicit }) }),
     payload: buildFitnessSessionPayload(envelope),
   };
 }
