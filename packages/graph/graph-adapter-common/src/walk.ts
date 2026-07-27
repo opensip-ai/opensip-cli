@@ -19,9 +19,9 @@
  *                                     language and is passed in.
  */
 
-import { relative } from 'node:path';
+import { sep } from 'node:path';
 
-import { isToolErrorLike, withSpan } from '@opensip-cli/core';
+import { isToolErrorLike, projectRelativePath, scrubText, withSpan } from '@opensip-cli/core';
 import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
 
@@ -140,19 +140,21 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
         throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
         const file = input.project.files.get(path);
         if (!file) continue;
+        const fileSinks = createWalkSinks();
         try {
           walkFile(
             path,
             file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
             input.projectDirAbs,
-            sinks,
+            fileSinks,
           );
           throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
+          commitWalkSinks(sinks, fileSinks);
         } catch (error) {
           if (isToolErrorLike(error)) throw error;
           parseErrors.push({
-            filePath: relative(input.projectDirAbs, path),
-            message: error instanceof Error ? error.message : String(error),
+            filePath: safeProjectRelativePath(input.projectDirAbs, path),
+            message: walkErrorMessage(error, input.projectDirAbs, path),
           });
         }
       }
@@ -165,6 +167,35 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
       'graph.walk.file_count': sortedPaths.length,
     },
   );
+}
+
+function createWalkSinks(): WalkSinks {
+  return {
+    occurrences: Object.create(null) as Record<string, FunctionOccurrence[]>,
+    callSites: [],
+    dependencySites: [],
+  };
+}
+
+function commitWalkSinks(target: WalkSinks, source: WalkSinks): void {
+  for (const occurrences of Object.values(source.occurrences)) {
+    for (const occurrence of occurrences) record(target.occurrences, occurrence);
+  }
+  target.callSites.push(...source.callSites);
+  target.dependencySites.push(...source.dependencySites);
+}
+
+function walkErrorMessage(error: unknown, projectDirAbs: string, path: string): string {
+  if (error instanceof RangeError) {
+    return 'walker recursion capacity exceeded; no evidence retained for this file';
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const filePath = safeProjectRelativePath(projectDirAbs, path);
+  return scrubText(message.replaceAll(path, filePath).replaceAll(projectDirAbs, '[project]'), 1000);
+}
+
+function safeProjectRelativePath(projectDirAbs: string, path: string): string {
+  return projectRelativePath(path.split(sep).join('/'), projectDirAbs.split(sep).join('/'));
 }
 
 // ── module-init synthesis ─────────────────────────────────────────

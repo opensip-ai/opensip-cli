@@ -12,9 +12,9 @@
  * loads at module top level), so `parseProject` stays synchronous.
  */
 
-import { relative } from 'node:path';
+import { sep } from 'node:path';
 
-import { isToolErrorLike, logger } from '@opensip-cli/core';
+import { isToolErrorLike, logger, projectRelativePath, scrubText } from '@opensip-cli/core';
 import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
@@ -44,7 +44,7 @@ export function createParseProjectFromAdapter(
       }
       if (result.parsed.tree.rootNode.hasError) {
         parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
+          filePath: safeProjectRelativePath(input, path),
           message: 'tree-sitter reported syntax errors; partial tree retained',
         });
       }
@@ -112,5 +112,14 @@ function parseOneFile(
 }
 
 function parseError(input: ParseInput, path: string, message: string): ParseError {
-  return { filePath: relative(input.projectDirAbs, path), message };
+  const filePath = safeProjectRelativePath(input, path);
+  const safeMessage = scrubText(
+    message.replaceAll(path, filePath).replaceAll(input.projectDirAbs, '[project]'),
+    1000,
+  );
+  return { filePath, message: safeMessage };
+}
+
+function safeProjectRelativePath(input: ParseInput, path: string): string {
+  return projectRelativePath(path.split(sep).join('/'), input.projectDirAbs.split(sep).join('/'));
 }
