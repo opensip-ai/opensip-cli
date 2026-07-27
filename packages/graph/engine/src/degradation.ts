@@ -10,7 +10,8 @@ export const GRAPH_PARTIAL_COVERAGE_SLUG = 'graph:catalog-partial-coverage';
 export const GRAPH_PARTIAL_COVERAGE = graphErrorCatalog.require('GRAPH.CATALOG.PARTIAL_COVERAGE');
 
 /** Closed D9 condition vocabulary for graph coverage degradation. */
-export type GraphDegradationCondition = 'catalog-coverage-partial' | 'parse-errors';
+export type GraphDegradationCondition =
+  'catalog-coverage-partial' | 'parse-errors' | 'shard-failures';
 
 /** Plain-data coverage evidence that survives graph's worker boundaries. */
 export interface GraphRunDegradation {
@@ -30,6 +31,15 @@ export function catalogGraphDegradations(
   return [{ condition: 'catalog-coverage-partial', count: 1 }];
 }
 
+/** Convert surviving-shard build evidence into one bounded D9 marker. */
+export function shardGraphDegradations(
+  failedShardIds: readonly string[],
+): readonly GraphRunDegradation[] {
+  return failedShardIds.length === 0
+    ? []
+    : [{ condition: 'shard-failures', count: failedShardIds.length }];
+}
+
 /** Merge repeated conditions (for example, independent multi-path builds). */
 export function mergeGraphDegradations(
   values: readonly (readonly GraphRunDegradation[])[],
@@ -47,6 +57,9 @@ export function mergeGraphDegradations(
 export function graphDegradationMessage(value: GraphRunDegradation): string {
   if (value.condition === 'parse-errors') {
     return `${String(value.count)} file(s) failed to parse — their functions are missing from the graph; the run log names each file.`;
+  }
+  if (value.condition === 'shard-failures') {
+    return `${String(value.count)} graph shard(s) failed; the catalog contains only surviving shard evidence.`;
   }
   return 'Graph catalog coverage is partial; one or more discovered inputs are absent.';
 }

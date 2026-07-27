@@ -44,6 +44,8 @@ const READ_REQUEST = {
   lifecycle: 'active',
 } as const satisfies Omit<ErrorDefinition, 'owner' | 'code' | 'operatorAction'>;
 
+const CALLER_POLICY_RETRY = 'caller-policy' as const;
+
 export const graphErrorCatalog = defineErrorCatalog(
   {
     id: GRAPH_STABLE_ID,
@@ -98,7 +100,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       source: 'infrastructure',
       defaultResponsibility: 'environment',
       kind: 'integrity',
-      retry: 'caller-policy',
+      retry: CALLER_POLICY_RETRY,
       severity: 'error',
       exposure: 'public',
       exitClass: 'runtime',
@@ -147,7 +149,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       source: 'application',
       defaultResponsibility: 'environment',
       kind: 'integrity',
-      retry: 'caller-policy',
+      retry: CALLER_POLICY_RETRY,
       severity: 'warning',
       exposure: 'public',
       exitClass: 'success',
@@ -156,6 +158,30 @@ export const graphErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
       publicMetadataKeys: ['condition', 'count'],
+    },
+
+    /**
+     * A shard-dependent operation has no trustworthy complete result.
+     *
+     * Ordinary graph runs do not throw this merely because one shard failed:
+     * surviving fragments produce a D7 degradation marker. This hard boundary
+     * is reserved for zero usable fragments and proof commands that explicitly
+     * require complete evidence.
+     */
+    'GRAPH.SHARD.FAILURES': {
+      code: 'GRAPH.SHARD.FAILURES',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the named shard and its bounded stderr detail in the run log, then retry the graph build.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'count', 'errorCode', 'shard'],
     },
 
     /**
@@ -172,7 +198,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       source: 'infrastructure',
       defaultResponsibility: 'environment',
       kind: 'I/O',
-      retry: 'caller-policy',
+      retry: CALLER_POLICY_RETRY,
       severity: 'error',
       exposure: 'redacted',
       exitClass: 'runtime',
@@ -190,7 +216,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       source: 'infrastructure',
       defaultResponsibility: 'environment',
       kind: 'timeout',
-      retry: 'caller-policy',
+      retry: CALLER_POLICY_RETRY,
       severity: 'error',
       exposure: 'public',
       exitClass: 'runtime',

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   assertShardedBuildComplete,
+  assertShardedBuildUsable,
   requireCompleteShardedCatalog,
 } from '../shard-completeness.js';
 import { boundedShardFailureEvidence } from '../shard-runner.js';
@@ -18,7 +19,7 @@ describe('assertShardedBuildComplete', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'GRAPH.BUILD.INCOMPLETE',
+        code: 'GRAPH.SHARD.FAILURES',
         message: expect.stringContaining('fitness/checks-dogfood, graph/engine'),
       }),
     );
@@ -41,7 +42,7 @@ describe('assertShardedBuildComplete', () => {
     };
 
     expect(() => requireCompleteShardedCatalog(partial)).toThrow(
-      expect.objectContaining({ code: 'GRAPH.BUILD.INCOMPLETE' }),
+      expect.objectContaining({ code: 'GRAPH.SHARD.FAILURES' }),
     );
   });
 
@@ -65,12 +66,57 @@ describe('assertShardedBuildComplete', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'GRAPH.BUILD.INCOMPLETE',
+        code: 'GRAPH.SHARD.FAILURES',
         failureClass: 'exit_nonzero',
         stderrTail: expect.stringContaining('worker root cause'),
         message: expect.stringContaining(
           'graph/graph-java (exit_nonzero, exit 1, signal SIGKILL, code GRAPH.CATALOG.UNREADABLE)',
         ),
+      }),
+    );
+  });
+
+  it('accepts partial evidence for an ordinary run when at least one shard survived', () => {
+    expect(() =>
+      assertShardedBuildUsable({
+        failedShardIds: ['fail:a'],
+        successfulShardCount: 1,
+      }),
+    ).not.toThrow();
+  });
+
+  it('hard-fails when no shard produced usable evidence', () => {
+    expect(() =>
+      assertShardedBuildUsable({
+        failedShardIds: ['fail:a', 'fail:b'],
+        successfulShardCount: 0,
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'GRAPH.SHARD.FAILURES',
+        metadata: expect.objectContaining({
+          condition: 'no-usable-shards',
+          count: 2,
+        }),
+      }),
+    );
+  });
+
+  it('keeps the scrubbed stderr tail out of the public error message', () => {
+    const failure = boundedShardFailureEvidence({
+      shardId: 'fail:a',
+      exitCode: 1,
+      stderr: 'sensitive worker detail',
+    });
+    expect(() =>
+      assertShardedBuildComplete({
+        failedShardIds: [failure.shardId],
+        shardFailures: [failure],
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        stderrTail: 'sensitive worker detail',
+        message: expect.not.stringContaining('sensitive worker detail'),
       }),
     );
   });

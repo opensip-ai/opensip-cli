@@ -289,6 +289,32 @@ describe('runShardedGraph', () => {
     ]);
     expect(Object.keys(out.catalog.functions)).toEqual(['pkg_a']);
     expect(out.signals).toEqual([]);
+    expect(out.catalog.buildCoverage?.status).toBe('partial');
+  });
+
+  it('rejects zero usable shard fragments before an empty catalog can be persisted', async () => {
+    const datastore: DataStore = DataStoreFactory.open({ backend: 'memory' });
+    const repo = new CatalogRepo(datastore);
+    try {
+      await expect(
+        runShardedGraph({
+          shards: [shard('fail:a'), shard('fail:b')],
+          projectRoot: dir,
+          cliScript,
+          adapter,
+          resolutionMode: 'exact',
+          useCache: true,
+          catalogRepo: repo,
+          rules: [],
+        }),
+      ).rejects.toMatchObject({
+        code: 'GRAPH.SHARD.FAILURES',
+        metadata: expect.objectContaining({ condition: 'no-usable-shards', count: 2 }),
+      });
+      expect(repo.loadFullCatalog()).toBeNull();
+    } finally {
+      datastore.close();
+    }
   });
 
   it('persists fragments and reports cacheHit when every shard is reused from cache', async () => {

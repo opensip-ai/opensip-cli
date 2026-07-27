@@ -1,6 +1,7 @@
 import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { shardGraphDegradations } from '../degradation.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { currentRules } from '../rules/registry.js';
@@ -11,7 +12,6 @@ import {
   resolveDefaultEngineShards,
   type EngineShardPolicyResolution,
 } from './orchestrate/engine-shard-policy.js';
-import { assertShardedBuildComplete } from './orchestrate/shard-completeness.js';
 import { loadGraphConfig, runShardedGraph } from './orchestrate.js';
 import { resolveAdaptersForRun } from './resolve-adapters.js';
 
@@ -133,7 +133,6 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     ...(ctx.onProgress === undefined ? {} : { onProgress: ctx.onProgress }),
     ...(opts.language === undefined ? {} : { language: opts.language }),
   });
-  assertShardedBuildComplete(sharded);
   return {
     catalog: sharded.catalog,
     indexes: sharded.indexes,
@@ -142,6 +141,7 @@ async function runShardedBuild(ctx: ShardedBuildContext): Promise<RunGraphResult
     cacheHit: sharded.cacheHit,
     features: sharded.features,
     shardStats: sharded.shardStats,
+    degradations: shardGraphDegradations(sharded.failedShardIds),
   };
 }
 
@@ -224,13 +224,13 @@ export async function runShardedLiveBuild(
     emitFeatures: DASHBOARD_FEATURE_COLUMNS,
     onProgress,
   });
-  assertShardedBuildComplete(result);
   return buildLiveGraphOutput(
     {
       catalog: result.catalog,
       indexes: result.indexes,
       signals: result.signals,
       cacheHit: result.cacheHit,
+      degradations: shardGraphDegradations(result.failedShardIds),
     },
     args.cwd,
   );
