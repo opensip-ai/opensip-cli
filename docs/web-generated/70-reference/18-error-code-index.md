@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-27
-release: v0.8.4
+release: v0.8.5
 title: "Error code index"
 audience: [contributors, operators, agents]
 purpose: "Generated registry of registered OpenSIP error codes with axes and operator actions."
