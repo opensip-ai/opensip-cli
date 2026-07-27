@@ -56,6 +56,7 @@ const MCP_SETUP_TOOL_NAMES = [
 interface FakeConnectionOptions {
   readonly catalog?: Readonly<Record<string, unknown>>;
   readonly catalogResult?: unknown;
+  readonly closeError?: Error;
   readonly connectError?: Error;
   readonly listedNames?: readonly string[];
   readonly serverVersion?: { readonly name: string; readonly version: string };
@@ -140,7 +141,9 @@ function fakeConnection(root: string, options: FakeConnectionOptions = {}): Fake
   }[] = [];
   const toolResults = [...(options.toolResults ?? [])];
   const stderr = new PassThrough();
-  const close = vi.fn(() => Promise.resolve());
+  const close = vi.fn(() =>
+    options.closeError === undefined ? Promise.resolve() : Promise.reject(options.closeError),
+  );
   const connection: McpConnection = {
     callTool: (input) => {
       calls.push(input);
@@ -178,6 +181,7 @@ async function connectFake(
     readonly maxResponseBytes?: number;
     readonly maxStderrBytes?: number;
     readonly maxToolCalls?: number;
+    readonly removeOwnedHome?: (path: string) => void;
     readonly targetStabilityCheck?: () => void;
   } = {},
 ): Promise<{
@@ -458,6 +462,53 @@ describe('McpArmSession handshake', () => {
     expect(harness.close).toHaveBeenCalledOnce();
   });
 
+  it('preserves connect and rollback failures when installed-target verification also fails', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root, {
+      closeError: new Error('process tree did not terminate'),
+      connectError: new Error('server offline'),
+    });
+    let checks = 0;
+    let ownedHome: string | undefined;
+    let observed: unknown;
+
+    try {
+      await McpArmSession.connect({
+        cliDistResolver: () => '/built/opensip.js',
+        connectionFactory: (options) => {
+          ownedHome = options.env.HOME;
+          return harness.connection;
+        },
+        removeOwnedHome: (path) => {
+          throw new Error(`cleanup busy at ${path}`);
+        },
+        targetStabilityCheck: () => {
+          checks += 1;
+          if (checks > 1) {
+            throw new HarnessPrerequisiteError('The installed CLI snapshot changed.');
+          }
+        },
+        workspaceRoot: root,
+      });
+    } catch (error) {
+      observed = error;
+    } finally {
+      if (ownedHome !== undefined) rmSync(ownedHome, { force: true, recursive: true });
+    }
+
+    expect(observed).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((observed as Error).message).toMatch(/installed CLI snapshot changed/u);
+    expect((observed as Error).message).toMatch(/connect: server offline/u);
+    expect((observed as Error).message).toMatch(
+      /connection-close: process tree did not terminate/u,
+    );
+    expect((observed as Error).message).toMatch(
+      /owned-home-remove: cleanup busy at \[redacted-path\]/u,
+    );
+    expect(harness.close).toHaveBeenCalledOnce();
+    expect(checks).toBe(2);
+  });
+
   it('owns and cleans a unique default HOME even when connection construction fails', async () => {
     const root = temporaryRoot();
     let ownedHome: string | undefined;
@@ -487,6 +538,43 @@ describe('McpArmSession handshake', () => {
     expect(existsSync(ownedHome)).toBe(true);
     await session.close();
     expect(existsSync(ownedHome)).toBe(false);
+  });
+
+  it('preserves close, stability, and owned-HOME cleanup failures together', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root, {
+      closeError: new Error('stdio containment failed'),
+    });
+    let checks = 0;
+    const { captured, session } = await connectFake(root, harness, {
+      removeOwnedHome: (path) => {
+        throw new Error(`cleanup denied at ${path}`);
+      },
+      targetStabilityCheck: () => {
+        checks += 1;
+        if (checks > 1) {
+          throw new HarnessPrerequisiteError('The installed CLI snapshot changed during close.');
+        }
+      },
+    });
+    const ownedHome = captured.env.HOME;
+    let observed: unknown;
+
+    try {
+      await session.close();
+    } catch (error) {
+      observed = error;
+    } finally {
+      if (ownedHome !== undefined) rmSync(ownedHome, { force: true, recursive: true });
+    }
+
+    expect(observed).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((observed as Error).message).toMatch(/snapshot changed during close/u);
+    expect((observed as Error).message).toMatch(/connection-close: stdio containment failed/u);
+    expect((observed as Error).message).toMatch(
+      /owned-home-remove: cleanup denied at \[redacted-path\]/u,
+    );
+    expect(checks).toBe(2);
   });
 });
 
