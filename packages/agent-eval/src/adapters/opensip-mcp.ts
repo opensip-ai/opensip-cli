@@ -2,9 +2,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-// @fitness-ignore-next-line missing-type-exports -- MCP SDK publishes types.js through its declared "./*" export; the workspace-only check cannot discover external package manifests.
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-
 import { makeStepRecord } from '../model/record.js';
 import { buildDeterministicEnv } from '../runner/env.js';
 import { safeErrorDetail } from '../runner/error-detail.js';
@@ -35,7 +32,7 @@ import { decodeToolResult, inspectToolEnvelope } from './opensip-mcp-protocol.js
 import type { McpSetupProvenance, StepRecord, ToolInvoker } from '../model/record.js';
 import type { ProofClosureAssessment, ResolvedStrategyStep, RunLeg } from '../model/task.js';
 
-const MCP_REQUEST_TIMEOUT_CODE = Number(ErrorCode.RequestTimeout);
+const MCP_REQUEST_TIMEOUT_CODE = -32_001;
 
 export { EXPECTED_MCP_SURFACE_EPOCH, REQUIRED_MCP_TOOL_NAMES } from './opensip-mcp-handshake.js';
 export type {
@@ -68,6 +65,16 @@ export interface McpArmSessionOptions {
 
 function stepLeg(step: ResolvedStrategyStep): RunLeg {
   return step.leg ?? 'main';
+}
+
+/** Recognize the SDK timeout across duplicate physical SDK copies. */
+function isMcpRequestTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'McpError' &&
+    'code' in error &&
+    error.code === MCP_REQUEST_TIMEOUT_CODE
+  );
 }
 
 type McpSessionFailureCondition =
@@ -337,7 +344,7 @@ export class McpArmSession {
         this.requestTimeoutMs,
       );
     } catch (error) {
-      const timedOut = error instanceof McpError && error.code === MCP_REQUEST_TIMEOUT_CODE;
+      const timedOut = isMcpRequestTimeoutError(error);
       const detail = safeErrorDetail(error, this.sensitivePaths) || 'unknown failure';
       return makeStepRecord({
         failure: {

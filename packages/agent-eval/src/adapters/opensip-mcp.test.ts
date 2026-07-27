@@ -3,8 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
-// @fitness-ignore-next-line missing-type-exports -- MCP SDK publishes types.js through its declared "./*" export; the workspace-only check cannot discover external package manifests.
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HarnessPrerequisiteError } from '../runner/spawn.js';
@@ -54,6 +52,12 @@ const MCP_SETUP_TOOL_NAMES = [
   'get_architecture',
   'get_context_status',
 ] as const;
+
+function mcpRequestTimeoutError(): Error & { readonly code: number } {
+  const error = new Error('MCP error -32001: Request timed out');
+  error.name = 'McpError';
+  return Object.assign(error, { code: -32_001 });
+}
 
 interface FakeConnectionOptions {
   readonly catalog?: Readonly<Record<string, unknown>>;
@@ -1164,7 +1168,7 @@ describe('McpArmSession tool record mapping', () => {
   it.each([
     {
       code: 'mcp-request-timeout',
-      error: new McpError(ErrorCode.RequestTimeout, 'Request timed out'),
+      error: mcpRequestTimeoutError(),
       message: /request timed out.*Request timed out/u,
       title: 'request timeout',
     },
