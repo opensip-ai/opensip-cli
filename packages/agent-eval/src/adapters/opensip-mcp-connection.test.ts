@@ -9,6 +9,7 @@ import { buildCliTarget, cleanupCliTarget } from '../runner/spawn.js';
 
 import {
   BoundedStdioClientTransport,
+  UnexpectedMcpTerminalError,
   cumulativeMcpStdoutByteLimit,
   defaultConnectionFactory,
   mcpRawFrameByteLimit,
@@ -474,7 +475,9 @@ describe('BoundedStdioClientTransport', () => {
     await expect(message).resolves.toMatchObject({ id: 1, result: {} });
     const observedError = await error;
     expect(observedError.message).toMatch(/exit 23/u);
+    expect(observedError).toBeInstanceOf(UnexpectedMcpTerminalError);
     await expect(transport.close()).rejects.toThrow(/exit 23/u);
+    expect(transport.protocolError()).toBeInstanceOf(UnexpectedMcpTerminalError);
   });
 
   it('preserves the McpConnection seam over the SDK public transport contract', async () => {
