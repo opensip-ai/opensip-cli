@@ -77,6 +77,7 @@ export type CatalogEngineMode = 'exact' | 'sharded';
 export type GraphDegradationCondition =
   | 'catalog-coverage-partial'
   | 'go-module-manifest'
+  | 'go-module-manifest-invalid'
   | 'parse-errors'
   | 'rust-cargo-manifest'
   | 'shard-failures'
@@ -85,6 +86,7 @@ export type GraphDegradationCondition =
 
 /** Registered definition codes that can present graph degradation evidence. */
 export type GraphDegradationErrorCode =
+  | 'GRAPH.ADAPTER.MANIFEST_INVALID'
   | 'GRAPH.ADAPTER.MANIFEST_UNREADABLE'
   | 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED'
   | 'GRAPH.CATALOG.PARTIAL_COVERAGE';

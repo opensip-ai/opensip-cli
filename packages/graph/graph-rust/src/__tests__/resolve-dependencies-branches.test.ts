@@ -53,6 +53,7 @@ function findModuleInit(catalog: Catalog, filePath: string): FunctionOccurrence 
 function runAdapter(): {
   catalog: Catalog;
   dependenciesByOwner: ReadonlyMap<string, readonly DependencyEdge[]> | undefined;
+  degradations: ReturnType<typeof rustGraphAdapter.resolveCallSites>['degradations'];
 } {
   const discovery = rustGraphAdapter.discoverFiles({ cwd: fixtureRoot, diagnosticIntent: 'quiet' });
   const parsed = rustGraphAdapter.parseProject({
@@ -82,7 +83,11 @@ function runAdapter(): {
     projectDirAbs: discovery.projectDirAbs,
     resolutionMode: 'exact',
   });
-  return { catalog, dependenciesByOwner: resolved.dependenciesByOwner };
+  return {
+    catalog,
+    dependenciesByOwner: resolved.dependenciesByOwner,
+    degradations: resolved.degradations,
+  };
 }
 
 const CARGO_TOML = `[package]\nname = "myproj"\nversion = "0.1.0"\nedition = "2021"\n`;
@@ -143,6 +148,25 @@ describe('Rust depends-on — `super::` from the crate root clamps at `crate`', 
 });
 
 describe('Rust depends-on — Cargo.toml parsing edge cases', () => {
+  it('keeps a missing Cargo.toml benign', () => {
+    writeFile('src/lib.rs', `use crate::missing::Thing;\nfn _u(_: Thing) {}\n`);
+
+    expect(runAdapter().degradations).toEqual([]);
+  });
+
+  it('surfaces an unreadable Cargo.toml as degraded', () => {
+    mkdirSync(join(fixtureRoot, 'Cargo.toml'));
+    writeFile('src/lib.rs', `use crate::missing::Thing;\nfn _u(_: Thing) {}\n`);
+
+    expect(runAdapter().degradations).toEqual([
+      {
+        errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+        condition: 'rust-cargo-manifest',
+        count: 1,
+      },
+    ]);
+  });
+
   it('ignores comment lines, blank lines, and a `name` outside [package]', () => {
     // The leading `name = "decoy"` sits OUTSIDE any `[package]` table
     // and must be ignored; the real name comes from inside [package].

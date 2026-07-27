@@ -296,6 +296,23 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'count'],
     },
 
+    /** A readable language manifest omitted data required for dependency resolution. */
+    'GRAPH.ADAPTER.MANIFEST_INVALID': {
+      code: 'GRAPH.ADAPTER.MANIFEST_INVALID',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Correct the language manifest or exclude the affected package, then rebuild the graph.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'count'],
+    },
+
     /**
      * A language adapter could not enumerate the source tree for reasons that do not already
      * have a Core native-error classification.

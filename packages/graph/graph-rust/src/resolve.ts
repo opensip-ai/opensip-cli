@@ -121,14 +121,19 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
   // `crate::` / `super::` / `self::` path prefixes and Cargo's
   // `src/lib.rs` / `src/main.rs` / `src/foo.rs` / `src/foo/mod.rs`
   // module layout conventions.
-  const dependenciesByOwner =
+  const dependencyResolution =
     input.dependencySites && input.dependencySites.length > 0
       ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs, input.signal)
       : undefined;
 
-  return dependenciesByOwner === undefined
+  return dependencyResolution === undefined
     ? { edgesByOwner, stats: finalStats }
-    : { edgesByOwner, dependenciesByOwner, stats: finalStats };
+    : {
+        edgesByOwner,
+        dependenciesByOwner: dependencyResolution.edgesByOwner,
+        degradations: dependencyResolution.degradations,
+        stats: finalStats,
+      };
 }
 
 function buildIndex(

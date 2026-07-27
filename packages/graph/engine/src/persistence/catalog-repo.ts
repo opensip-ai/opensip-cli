@@ -483,6 +483,9 @@ function isSafeGraphDegradation(value: unknown): boolean {
     case 'GRAPH.ADAPTER.MANIFEST_UNREADABLE': {
       return value.condition === 'go-module-manifest' || value.condition === 'rust-cargo-manifest';
     }
+    case 'GRAPH.ADAPTER.MANIFEST_INVALID': {
+      return value.condition === 'go-module-manifest-invalid';
+    }
     default: {
       return false;
     }

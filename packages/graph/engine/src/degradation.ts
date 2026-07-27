@@ -86,6 +86,9 @@ export function graphDegradationMessage(value: GraphRunDegradation): string {
   if (value.condition === 'go-module-manifest' || value.condition === 'rust-cargo-manifest') {
     return `${String(value.count)} language manifest(s) could not be read; affected dependency edges are absent.`;
   }
+  if (value.condition === 'go-module-manifest-invalid') {
+    return `${String(value.count)} Go module manifest(s) omitted a valid module directive; affected dependency edges are absent.`;
+  }
   return 'Graph catalog coverage is partial; one or more discovered inputs are absent.';
 }
 
