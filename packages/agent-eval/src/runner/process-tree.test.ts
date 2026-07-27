@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   processTreeIsAlive,
+  processTreeSummary,
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
@@ -100,6 +101,7 @@ describe('retained POSIX process trees', () => {
         },
       }),
     ).toBe(false);
+    expect(processTreeSummary(tree).issues).toEqual([]);
     expect(
       processTreeIsAlive(tree, {
         killProcess: () => {
@@ -109,6 +111,13 @@ describe('retained POSIX process trees', () => {
         },
       }),
     ).toBe(true);
+    expect(processTreeSummary(tree).issues).toEqual([
+      {
+        condition: 'root-group-probe',
+        count: 1,
+        detail: 'EPERM: denied',
+      },
+    ]);
   });
 
   it('retains root-group cleanup but marks failed descendant sampling as unavailable', () => {
@@ -122,8 +131,76 @@ describe('retained POSIX process trees', () => {
     const killProcess = vi.fn();
 
     expect(processTreeTrackingReliable(tree)).toBe(false);
+    expect(processTreeSummary(tree).issues).toEqual([
+      {
+        condition: 'sample-snapshot',
+        count: 1,
+        detail: 'Error: process inventory unavailable',
+      },
+    ]);
     signalProcessTree(tree, 'SIGTERM', { killProcess });
     expect(killProcess).toHaveBeenCalledWith(-4242, 'SIGTERM');
+  });
+
+  it('aggregates denied cleanup signals by condition', () => {
+    const root = {
+      commandFingerprint: 'a'.repeat(64),
+      parentPid: 1,
+      pid: 100,
+      processGroupId: 100,
+      posixSession: 100,
+      startedAt: 'root-start',
+    };
+    const child = {
+      commandFingerprint: 'b'.repeat(64),
+      parentPid: 100,
+      pid: 200,
+      processGroupId: 200,
+      posixSession: 200,
+      startedAt: 'child-start',
+    };
+    const retainedRootKill = vi.fn(() => {
+      const error = new Error('root handle denied') as NodeJS.ErrnoException;
+      error.code = 'EPERM';
+      throw error;
+    });
+    const tree = retainPosixProcessTree(
+      { exitCode: null, kill: retainedRootKill, pid: 100, signalCode: null },
+      'linux',
+      { snapshotProcesses: () => [root, child] },
+    );
+    retainedTrees.push(tree);
+    const killProcess = vi.fn(() => {
+      const error = new Error('signal denied') as NodeJS.ErrnoException;
+      error.code = 'EPERM';
+      throw error;
+    });
+
+    signalProcessTree(tree, 'SIGKILL', { killProcess });
+    signalProcessTree(tree, 'SIGKILL', { killProcess });
+
+    expect(processTreeSummary(tree).issues).toEqual([
+      {
+        condition: 'descendant-group-signal',
+        count: 2,
+        detail: 'EPERM: signal denied',
+      },
+      {
+        condition: 'descendant-process-signal',
+        count: 2,
+        detail: 'EPERM: signal denied',
+      },
+      {
+        condition: 'root-group-signal',
+        count: 2,
+        detail: 'EPERM: signal denied',
+      },
+      {
+        condition: 'root-handle-signal',
+        count: 2,
+        detail: 'EPERM: root handle denied',
+      },
+    ]);
   });
 
   it('bounds output-driven sampling by the tracking interval', () => {

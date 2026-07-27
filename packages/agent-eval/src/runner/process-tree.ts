@@ -1,6 +1,10 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 
+import { compareCodePoints } from '../model/value-helpers.js';
+
+import { safeErrorDetail } from './error-detail.js';
+
 import type { ChildProcess } from 'node:child_process';
 
 const MAX_PROCESS_ROWS = 100_000;
@@ -150,11 +154,49 @@ function sameProcessIdentity(
 }
 
 /** Bounded decision-evidence summary for post-run containment diagnostics. */
+export type ProcessTreeIssueCondition =
+  | 'alive-record'
+  | 'alive-snapshot'
+  | 'descendant-group-signal'
+  | 'descendant-process-signal'
+  | 'root-group-probe'
+  | 'root-group-signal'
+  | 'root-handle-signal'
+  | 'sample-record'
+  | 'sample-snapshot';
+
+export interface ProcessTreeIssue {
+  readonly condition: ProcessTreeIssueCondition;
+  readonly count: number;
+  readonly detail: string;
+}
+
 export interface ProcessTreeSummary {
+  readonly issues: readonly ProcessTreeIssue[];
   readonly reliable: boolean;
   readonly rootObserved: boolean;
   readonly samples: number;
   readonly tracked: number;
+}
+
+interface MutableProcessTreeIssue {
+  count: number;
+  readonly detail: string;
+}
+
+function errnoCode(error: unknown): string | undefined {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return typeof code === 'string' && code.length > 0 ? code : undefined;
+}
+
+function expectedProcessGone(error: unknown): boolean {
+  return errnoCode(error) === 'ESRCH';
+}
+
+function processTreeFailureDetail(error: unknown): string {
+  const prefix = errnoCode(error) ?? (error instanceof Error ? error.name : 'UnknownFailure');
+  const detail = safeErrorDetail(error) || 'unknown failure';
+  return safeErrorDetail(new Error(`${prefix}: ${detail}`));
 }
 
 class DescendantTracker {
@@ -166,6 +208,7 @@ class DescendantTracker {
   private rootObservedAlive = false;
   private rootIdentity: PosixProcessIdentity | undefined;
   private timer: NodeJS.Timeout | undefined;
+  private readonly issues = new Map<ProcessTreeIssueCondition, MutableProcessTreeIssue>();
   private readonly tracked = new Map<number, TrackedProcess>();
 
   public constructor(
@@ -199,6 +242,11 @@ class DescendantTracker {
    */
   public summary(): ProcessTreeSummary {
     return {
+      issues: [...this.issues.entries()]
+        .sort(([left], [right]) => compareCodePoints(left, right))
+        .map(([condition, issue]) =>
+          Object.freeze({ condition, count: issue.count, detail: issue.detail }),
+        ),
       reliable: !this.failed,
       rootObserved: this.everObservedRoot,
       samples: this.successfulSamples,
@@ -208,11 +256,19 @@ class DescendantTracker {
 
   public sample(): void {
     if (this.failed) return;
+    let snapshot: readonly PosixProcessIdentity[];
     try {
-      this.recordDescendants(this.snapshotProcesses());
-    } catch {
-      this.failed = true;
-      this.rootObservedAlive = false;
+      snapshot = this.snapshotProcesses();
+    } catch (error) {
+      this.retainObservationFailure('sample-snapshot', error);
+      return;
+    } finally {
+      this.lastSampleCompletedAt = this.monotonicNow();
+    }
+    try {
+      this.recordDescendants(snapshot);
+    } catch (error) {
+      this.retainObservationFailure('sample-record', error);
     } finally {
       this.lastSampleCompletedAt = this.monotonicNow();
     }
@@ -233,16 +289,14 @@ class DescendantTracker {
     let snapshot: readonly PosixProcessIdentity[];
     try {
       snapshot = this.snapshotProcesses();
-    } catch {
-      this.failed = true;
-      this.rootObservedAlive = false;
+    } catch (error) {
+      this.retainObservationFailure('alive-snapshot', error);
       return [];
     }
     try {
       this.recordDescendants(snapshot);
-    } catch {
-      this.failed = true;
-      this.rootObservedAlive = false;
+    } catch (error) {
+      this.retainObservationFailure('alive-record', error);
     }
     const byPid = new Map(snapshot.map((identity) => [identity.pid, identity]));
     return [...this.tracked.values()].filter((tracked) => {
@@ -268,18 +322,40 @@ class DescendantTracker {
     for (const groupId of detachedGroups) {
       try {
         killProcess(-groupId, signal);
-      } catch {
-        // Individual identities below remain authoritative.
+      } catch (error) {
+        // Individual identities below remain authoritative. ESRCH is the
+        // expected race where the group exited after the inventory snapshot.
+        this.retainSignalFailure('descendant-group-signal', error);
       }
     }
     for (const identity of alive) {
       try {
         killProcess(identity.pid, signal);
-      } catch {
-        // The descendant may have exited between inventory and signalling.
+      } catch (error) {
+        // ESRCH means the descendant exited between inventory and signalling.
+        this.retainSignalFailure('descendant-process-signal', error);
       }
     }
     return alive;
+  }
+
+  public retainSignalFailure(condition: ProcessTreeIssueCondition, error: unknown): void {
+    if (!expectedProcessGone(error)) this.retainIssue(condition, error);
+  }
+
+  private retainIssue(condition: ProcessTreeIssueCondition, error: unknown): void {
+    const retained = this.issues.get(condition);
+    if (retained === undefined) {
+      this.issues.set(condition, { count: 1, detail: processTreeFailureDetail(error) });
+      return;
+    }
+    retained.count = Math.min(Number.MAX_SAFE_INTEGER, retained.count + 1);
+  }
+
+  private retainObservationFailure(condition: ProcessTreeIssueCondition, error: unknown): void {
+    this.retainIssue(condition, error);
+    this.failed = true;
+    this.rootObservedAlive = false;
   }
 
   private recordDescendants(snapshot: readonly PosixProcessIdentity[]): void {
@@ -489,7 +565,9 @@ export function processTreeIsAlive(
     (dependencies.killProcess ?? process.kill)(-tree.processGroupId, 0);
     return true;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException | undefined)?.code === 'EPERM') return true;
+    if (expectedProcessGone(error)) return tree.tracker.alive().length > 0;
+    tree.tracker.retainSignalFailure('root-group-probe', error);
+    if (errnoCode(error) === 'EPERM') return true;
   }
   return tree.tracker.alive().length > 0;
 }
@@ -509,12 +587,17 @@ export function signalProcessTree(
   if (!rootGroupIsRetained) return;
   try {
     killProcess(-tree.processGroupId, signal);
-  } catch {
+  } catch (error) {
+    tree.tracker.retainSignalFailure('root-group-signal', error);
     if (tree.child.exitCode === null && tree.child.signalCode === null) {
       try {
-        tree.child.kill(signal);
-      } catch {
-        // The active root may have exited between the state check and signal.
+        if (!tree.child.kill(signal)) {
+          const rejectedSignal = new Error('The retained root handle rejected the signal.');
+          tree.tracker.retainSignalFailure('root-handle-signal', rejectedSignal);
+        }
+      } catch (childSignalError) {
+        // ESRCH means the active root exited between the state check and signal.
+        tree.tracker.retainSignalFailure('root-handle-signal', childSignalError);
       }
     }
   }
