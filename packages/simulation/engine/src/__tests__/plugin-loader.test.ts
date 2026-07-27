@@ -2,18 +2,26 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { enterScope, exitScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadAllSimPlugins } from '../plugins/loader.js';
 
+import { makeSimTestScope } from './test-utils/with-sim-scope.js';
+
 let testDir: string;
+let scope: ReturnType<typeof makeSimTestScope>;
 
 beforeEach(() => {
+  scope = makeSimTestScope();
+  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'sim-plugin-loader-'));
 });
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
+  exitScope();
+  scope.dispose();
 });
 
 describe('loadAllSimPlugins', () => {
@@ -68,14 +76,35 @@ describe('loadAllSimPlugins', () => {
     mkdirSync(scenariosDir, { recursive: true });
     writeFileSync(
       join(scenariosDir, 'a.mjs'),
-      'export const recipes = [{}, { id: "ok", name: "ok-recipe" }];\n',
+      'export const recipes = [{}, {' +
+        ' id: "ok", name: "ok-recipe", displayName: "OK", description: "OK",' +
+        ' scenarios: { type: "all", exclude: [] }, execution: { mode: "sequential" }' +
+        '}];\n',
     );
 
     const result = await loadAllSimPlugins(testDir);
     expect(result.plugins.length).toBe(1);
-    // One valid recipe should register (or be deduped if a previous test
-    // already registered one with the same id — the loader silently
-    // ignores duplicates, so we accept 0 or 1).
-    expect(result.totals.recipes === 0 || result.totals.recipes === 1).toBe(true);
+    expect(result.totals.recipes).toBe(1);
+    expect(result.errors).toEqual([]);
+  });
+
+  it('reports a recipe collision as a plugin load failure', async () => {
+    const scenariosDir = join(testDir, 'opensip-cli', 'sim', 'scenarios');
+    mkdirSync(scenariosDir, { recursive: true });
+    writeFileSync(
+      join(scenariosDir, 'a.mjs'),
+      'const base = {' +
+        ' displayName: "Collision", description: "Collision",' +
+        ' scenarios: { type: "all", exclude: [] }, execution: { mode: "sequential" }' +
+        '}; export const recipes = [' +
+        '{ ...base, id: "collision-one", name: "same-name" },' +
+        '{ ...base, id: "collision-two", name: "same-name" }' +
+        '];\n',
+    );
+
+    const result = await loadAllSimPlugins(testDir);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toMatch(/already registered|collision/i);
+    expect(result.totals.recipes ?? 0).toBe(0);
   });
 });

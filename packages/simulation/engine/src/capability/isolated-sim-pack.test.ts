@@ -114,7 +114,7 @@ describe('isolatedSimPackBridge', () => {
       isolatedSimPackBridge.runInWorker(
         workerContext({ kind: 'simulation.run', scenarioId: 'missing' }),
       ),
-    ).rejects.toThrow("capability pack @acme/sim-pack has no scenario 'missing'");
+    ).rejects.toThrow("Capability pack @acme/sim-pack has no scenario 'missing'.");
     await expect(
       isolatedSimPackBridge.runInWorker(workerContext({ kind: 'unknown' })),
     ).rejects.toThrow('unknown simulation capability worker request');

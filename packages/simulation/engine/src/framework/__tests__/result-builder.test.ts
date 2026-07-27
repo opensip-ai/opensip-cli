@@ -145,16 +145,15 @@ describe('ScenarioResultBuilder', () => {
       expect(out.passed).toBe(true);
     });
 
-    it('returns 0 for an unknown metric key (type-bypassed)', () => {
-      const out = ScenarioResultBuilder.create('s1')
-        .withMetrics(baseMetrics())
-        // `custom` is typed to ScenarioMetricKey; bypass it to exercise the
-        // resolver's defensive default branch for a key it doesn't recognise.
-        .evaluateAssertions([
-          ASSERTIONS.custom('nonexistent_metric' as ScenarioMetricKey, 'lt', 100),
-        ])
-        .build();
-      expect(out.passed).toBe(true); // unknown → 0; 0 < 100
+    it('fails closed for an unknown metric key (type-bypassed)', () => {
+      expect(() =>
+        ScenarioResultBuilder.create('s1')
+          .withMetrics(baseMetrics())
+          // Runtime-authored .mjs scenarios can bypass the compile-time union.
+          .evaluateAssertions([
+            ASSERTIONS.custom('nonexistent_metric' as ScenarioMetricKey, 'lt', 100),
+          ]),
+      ).toThrow("Unknown simulation metric 'nonexistent_metric'");
     });
   });
 });

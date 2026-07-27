@@ -33,6 +33,7 @@ import {
   currentScope,
   loadCapabilityDomain,
   resolveVerdictPolicy,
+  toPublicFailureProjection,
 } from '@opensip-cli/core';
 
 import { currentScenarioRegistry, currentSimulationLoadState } from '../framework/registry.js';
@@ -143,6 +144,12 @@ function scenarioPassed(scenario: SimulationScenarioResult, signals: readonly Si
   return scenario.passed && !hasErrorSignal;
 }
 
+function scenarioError(scenario: SimulationScenarioResult): string | undefined {
+  if (scenario.failure === undefined) return scenario.error;
+  const projected = toPublicFailureProjection(scenario.failure);
+  return typeof projected.message === 'string' ? projected.message : 'The scenario failed.';
+}
+
 /**
  * Collapse the recipe's per-scenario results into the envelope's two
  * orthogonal carriers (ADR-0011):
@@ -167,6 +174,7 @@ function assembleEnvelopeInputs(scenarios: readonly SimulationScenarioResult[]):
 
   for (const scenario of scenarios) {
     const scenarioSignals = scenario.result?.signals ?? [];
+    const error = scenarioError(scenario);
     // Remap source → scenarioId so per-scenario grouping is exact (the
     // unit slug IS the scenarioId, per the migrated-tool contract).
     for (const signal of scenarioSignals) {
@@ -178,7 +186,7 @@ function assembleEnvelopeInputs(scenarios: readonly SimulationScenarioResult[]):
       slug: scenario.scenarioId,
       passed: scenarioPassed(scenario, scenarioSignals),
       durationMs: scenario.durationMs,
-      ...(scenario.error === undefined ? {} : { error: scenario.error }),
+      ...(error === undefined ? {} : { error }),
     });
   }
 

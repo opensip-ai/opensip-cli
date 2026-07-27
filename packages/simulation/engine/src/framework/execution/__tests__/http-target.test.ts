@@ -31,8 +31,12 @@ describe('httpTarget', () => {
     await expect(httpTarget({ url: 'https://x.test' })(ctx)).rejects.toThrow(/503/);
   });
 
-  it('forwards method, headers, body, and the abort signal', async () => {
-    const f = vi.fn(respond('ok', 200));
+  it('forwards method, headers, and body with a composed abort signal', async () => {
+    let observedInit: RequestInit | undefined;
+    const f = vi.fn((_input: unknown, init?: RequestInit) => {
+      observedInit = init;
+      return Promise.resolve(new Response('ok', { status: 200 }));
+    });
     vi.stubGlobal('fetch', f);
     await httpTarget({
       url: 'https://x.test',
@@ -46,10 +50,19 @@ describe('httpTarget', () => {
         method: 'POST',
         headers: { a: 'b' },
         body: 'p',
-        signal: ctx.signal,
+        signal: expect.any(AbortSignal),
       }),
     );
+    expect(observedInit?.signal).not.toBe(ctx.signal);
+    expect(observedInit?.signal?.aborted).toBe(false);
   });
+
+  it.each([0, -1, 1.5, Number.POSITIVE_INFINITY])(
+    'rejects invalid timeoutMs %s at construction',
+    (timeoutMs) => {
+      expect(() => httpTarget({ url: 'https://x.test', timeoutMs })).toThrow(/timeoutMs/);
+    },
+  );
 
   it('honours a custom okStatus predicate', async () => {
     vi.stubGlobal('fetch', vi.fn(respond('nope', 404)));

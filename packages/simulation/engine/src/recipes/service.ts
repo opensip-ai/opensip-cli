@@ -14,10 +14,16 @@
  */
 
 import {
+  createCancelledError,
+  createDeadlineError,
+  currentScope,
   logger,
+  normalizeFailure,
   resolveSelector as resolveSelectorCore,
   runWithTimeout,
   scheduleUnits,
+  toPublicFailureProjection,
+  type FailureEnvelope,
   type ResolveSelectorOptions,
 } from '@opensip-cli/core';
 
@@ -35,6 +41,8 @@ export interface SimulationScenarioResult {
   readonly passed: boolean;
   readonly durationMs: number;
   readonly error?: string;
+  /** Definition-backed failure retained until the UnitResult boundary. */
+  readonly failure?: FailureEnvelope;
   readonly result?: ScenarioExecutorResult;
 }
 
@@ -183,13 +191,15 @@ function resolveSelector(selector: ScenarioSelector): readonly RunnableScenario[
 // =============================================================================
 
 /**
- * Sentinel timeout (the max `setTimeout` delay, ~24.8 days) used when a recipe
- * declares no `execution.timeout` — preserving sim's historical "no timeout"
- * behaviour while routing through the same substrate. A DECLARED timeout is
- * enforced and aborts a runaway scenario (the §4.3 fix; previously the field was
- * silently ignored).
+ * Bounded default for recipes that omit `execution.timeout`. A hung target must
+ * never park a CLI run for the maximum Node timer duration.
  */
-const NO_TIMEOUT_MS = 2_147_483_647;
+const DEFAULT_SCENARIO_TIMEOUT_MS = 30_000;
+
+function publicFailureMessage(failure: FailureEnvelope): string {
+  const message = toPublicFailureProjection(failure).message;
+  return typeof message === 'string' ? message : 'The scenario failed.';
+}
 
 /** Effective concurrency: a positive bound below the set size, else run all at once. */
 function effectiveMaxParallel(recipe: SimulationRecipe, count: number): number {
@@ -203,6 +213,8 @@ function effectiveMaxParallel(recipe: SimulationRecipe, count: number): number {
  * cancellation still reaches an in-flight scenario. Maps the classified outcome to
  * a `SimulationScenarioResult` — a timed-out scenario fails (it did not pass),
  * exactly as a thrown error does.
+ *
+ * @throws {Error} When host or recipe cancellation interrupts the scenario.
  */
 async function runScenarioUnit(
   scenario: RunnableScenario,
@@ -232,12 +244,18 @@ async function runScenarioUnit(
     return { ...base, passed: outcome.result.passed, result: outcome.result };
   }
 
-  let message: string;
-  if (outcome.status === 'timeout') {
-    message = `Scenario timed out after ${outcome.timeoutMs}ms`;
-  } else {
-    message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+  if (
+    outcome.status === 'error' &&
+    normalizeFailure(outcome.error).definition.kind === 'cancelled'
+  ) {
+    throw outcome.error;
   }
+  const failure = normalizeFailure(
+    outcome.status === 'timeout'
+      ? createDeadlineError(`Scenario timed out after ${outcome.timeoutMs}ms`)
+      : outcome.error,
+  );
+  const message = publicFailureMessage(failure);
   logger.warn({
     evt: 'simulation.scenario.failed',
     module: 'simulation:recipes',
@@ -245,7 +263,7 @@ async function runScenarioUnit(
     error: message,
     timedOut: outcome.status === 'timeout',
   });
-  return { ...base, passed: false, error: message };
+  return { ...base, passed: false, error: message, failure };
 }
 
 /**
@@ -253,6 +271,8 @@ async function runScenarioUnit(
  * modes). `maxParallel`/`stopOnFirstFailure` now mean the same thing they do in
  * fitness — parallel mode honours `stopOnFirstFailure` (it previously ignored it).
  * Results are written by array index so order is preserved across both modes.
+ *
+ * @throws {Error} When cancellation prevents the selected scenario set from completing.
  */
 async function runScenarios(
   scenarios: readonly RunnableScenario[],
@@ -260,7 +280,7 @@ async function runScenarios(
   abortSignal?: AbortSignal,
   onComplete?: () => void,
 ): Promise<readonly SimulationScenarioResult[]> {
-  const timeoutMs = recipe.execution.timeout ?? NO_TIMEOUT_MS;
+  const timeoutMs = recipe.execution.timeout ?? DEFAULT_SCENARIO_TIMEOUT_MS;
   const results: (SimulationScenarioResult | undefined)[] = [];
 
   await scheduleUnits<RunnableScenario>({
@@ -280,6 +300,14 @@ async function runScenarios(
       };
     },
   });
+
+  const hostSignal = currentScope()?.abortSignal;
+  const cancelledSignal = abortSignal?.aborted === true ? abortSignal : hostSignal;
+  if (cancelledSignal?.aborted === true) {
+    const reason = cancelledSignal.reason as unknown;
+    if (normalizeFailure(reason).definition.kind === 'cancelled') throw reason;
+    throw createCancelledError('Simulation recipe cancelled before all scenarios completed.');
+  }
 
   return results.filter((r): r is SimulationScenarioResult => r !== undefined);
 }

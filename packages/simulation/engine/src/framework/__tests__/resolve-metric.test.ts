@@ -130,10 +130,10 @@ describe('resolveMetric symmetry', () => {
     expect(resolveMetric('total_requests', m)).toBe(100);
   });
 
-  it('falls through to 0 for a key outside the supported set (type-bypass guard)', () => {
+  it('fails closed for a key outside the supported set (type-bypass guard)', () => {
     const m = baseMetrics();
-    // A caller that deliberately bypasses the compile-time narrowing hits the
-    // exhaustive default arm, which returns 0.
-    expect(resolveMetric('not-a-real-metric' as ScenarioMetricKey, m)).toBe(0);
+    expect(() => resolveMetric('not-a-real-metric' as ScenarioMetricKey, m)).toThrow(
+      "Unknown simulation metric 'not-a-real-metric'",
+    );
   });
 });

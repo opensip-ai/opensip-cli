@@ -191,12 +191,9 @@ describe('SimulationRecipeService — host OS-interrupt', () => {
           execution: { mode: 'sequential', timeout: 5000 },
         });
 
-        const result = await new SimulationRecipeService().runRecipe(recipe);
-
-        expect(result.totalScenarios).toBe(1);
-        expect(result.failedScenarios).toBe(1);
-        expect(result.scenarios[0]?.passed).toBe(false);
-        expect(result.scenarios[0]?.error ?? '').not.toContain('timed out');
+        await expect(new SimulationRecipeService().runRecipe(recipe)).rejects.toMatchObject({
+          name: 'AbortError',
+        });
       });
     } finally {
       hostScope.dispose();
@@ -623,7 +620,8 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
     expect(result.passedScenarios).toBe(1);
     const failing = result.scenarios.find((s) => s.scenarioId === 'failing');
     expect(failing?.passed).toBe(false);
-    expect(failing?.error).toContain('boom');
+    expect(failing?.error).toBe('The operation failed.');
+    expect(failing?.error).not.toContain('boom');
   });
 
   it('runs sequentially when execution.mode === sequential', async () => {
@@ -690,16 +688,15 @@ describe('SimulationRecipeService — execution modes + failure handling', () =>
     const ac = new AbortController();
     ac.abort();
     const service = new SimulationRecipeService({ abortSignal: ac.signal });
-    const result = await service.runRecipe({
-      id: 'URCP_test',
-      name: 'test',
-      displayName: 'Test',
-      description: 'x',
-      scenarios: { type: 'all' },
-      execution: { mode: 'sequential' },
-    });
-
-    // Pre-aborted: nothing runs
-    expect(result.totalScenarios).toBe(0);
+    await expect(
+      service.runRecipe({
+        id: 'URCP_test',
+        name: 'test',
+        displayName: 'Test',
+        description: 'x',
+        scenarios: { type: 'all' },
+        execution: { mode: 'sequential' },
+      }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
   });
 });
