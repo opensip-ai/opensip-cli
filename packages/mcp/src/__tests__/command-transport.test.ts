@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { currentScope, logger, RunScope } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mcpCommandSpec } from '../command.js';
+import { mcpCancelledExitCode, mcpCommandSpec } from '../command.js';
 import { McpStdioServer } from '../server.js';
 
 import type { CallToolResult } from '../server.js';
@@ -72,6 +72,10 @@ describe('mcp command — raw-stream transport contract', () => {
     expect(mcpCommandSpec.output).toBe('raw-stream');
     expect(mcpCommandSpec.rawStreamReason).toBe('mcp-stdio');
     expect(mcpCommandSpec.scope).toBe('project');
+  });
+
+  it('preserves the registered cancelled exit when stdio closes after host abort', () => {
+    expect(mcpCancelledExitCode()).toBe(130);
   });
 
   it('uses the current context-read surface epoch when constructed directly', () => {

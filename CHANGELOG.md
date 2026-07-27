@@ -59,6 +59,7 @@ exit code are deliberately absent.
 | Graph workspace fan-out is cooperatively cancelled                    |      1 |   130 | The parent now stops scheduling units, terminates active children, and preserves the host-owned `CORE.SYSTEM.CANCELLED` definition.                                                      |
 | Graph shard worker cannot read its build specification                |      1 |     3 | The shard worker now preserves the structured not-found definition across its stdout wire and derives the child exit instead of hardcoding runtime exit 1.                               |
 | Graph shard worker is cooperatively cancelled                         |      1 |   130 | Shard-worker failures now use the canonical mapper, so `CORE.SYSTEM.CANCELLED` survives the subprocess boundary.                                                                         |
+| MCP stdio server is cooperatively cancelled                           |      0 |   130 | The command now derives its terminal status from `MCP.STDIO.SHUTDOWN` instead of overwriting the host interrupt coordinator's cancelled exit with success after graceful close.          |
 
 #### Behaviour changes: MCP error codes are uniform (Plan 01)
 

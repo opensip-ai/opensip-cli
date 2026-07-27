@@ -8,7 +8,11 @@
 import { realpathSync } from 'node:fs';
 
 import { RESERVED_SUITE_NAMES } from '@opensip-cli/config';
-import { EXIT_CODES, type FileEvidenceSupport } from '@opensip-cli/contracts';
+import {
+  EXIT_CODES,
+  mapExitClassToExitCode,
+  type FileEvidenceSupport,
+} from '@opensip-cli/contracts';
 import {
   definePrimaryCommand,
   EnvRegistry,
@@ -31,6 +35,7 @@ import {
 } from '@opensip-cli/shared-analysis';
 
 import { capturedConfigIdentity } from './captured-config-identity.js';
+import { mcpErrorCatalog } from './errors/mcp-error-catalog.js';
 import { LiveRuntimeWiringReadPort } from './live-runtime-wiring-read-port.js';
 import { LocalCodebaseReadPort } from './local-codebase-read-port.js';
 import { fromGraphReadError } from './mcp-error.js';
@@ -46,6 +51,13 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 interface McpCommandOptions {
   readonly allowMutations?: boolean;
+}
+
+const MCP_STDIO_SHUTDOWN = mcpErrorCatalog.require('MCP.STDIO.SHUTDOWN');
+
+/** Terminal stdio status derived from the registered cancellation definition. */
+export function mcpCancelledExitCode(): number {
+  return mapExitClassToExitCode(MCP_STDIO_SHUTDOWN.exitClass);
 }
 
 const MCP_MUTATION_ENV_SPECS: readonly EnvVarSpec<unknown>[] = [
@@ -277,7 +289,15 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   });
 
   await server.serve();
-  cli.setExitCode(EXIT_CODES.SUCCESS);
+  const cancelled = scope.abortSignal?.aborted === true;
+  if (cancelled) {
+    logger.info({
+      evt: 'mcp.server.cancelled',
+      module: 'mcp:command',
+      code: MCP_STDIO_SHUTDOWN.code,
+    });
+  }
+  cli.setExitCode(cancelled ? mcpCancelledExitCode() : EXIT_CODES.SUCCESS);
 }
 
 export const mcpCommandSpec = definePrimaryCommand<unknown, ToolCliContext>({
