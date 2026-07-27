@@ -120,4 +120,26 @@ export const initAndPolicyDefinitions = {
       'Init refused to modify the authored project state; nothing further was written. The message names the invariant that failed — inspect that path, or re-run `opensip init` to start a fresh attempt.',
     publicMetadataKeys: ['condition'],
   },
+  /**
+   * The selected runtime-promotion source could not be verified against its authority.
+   *
+   * The class that raises this extended bare `Error`, so it carried no code and normalized to
+   * `SYSTEM_ERROR` — message redacted. That matters more here than in most places: this failure
+   * decides, through its `releaseSafe` flag, whether the process-owned runtime lease may be
+   * released. An operator seeing "The operation failed." had no way to tell a source that could
+   * not be verified from one that left the lease unsafe to release.
+   *
+   * `integrity` and `environment`: the artifacts on disk disagree with the authority that
+   * should describe them, and the operator resolves it by inspecting or re-running, not by
+   * changing an argument.
+   */
+  'CLI.INIT.PROMOTION_SOURCE_UNVERIFIED': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.PROMOTION_SOURCE_UNVERIFIED',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
+    publicMetadataKeys: ['condition', 'releaseSafe'],
+  },
 } as const;
