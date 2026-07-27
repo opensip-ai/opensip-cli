@@ -409,15 +409,15 @@ type DecodedShardWorkerOutput =
   | { readonly kind: 'result'; readonly result: ShardBuildResult }
   | { readonly kind: 'failure'; readonly failure: DecodedShardWorkerFailure };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+function isShardWorkerRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isShardBuildResult(value: unknown, expectedShardId: string): value is ShardBuildResult {
-  if (!isRecord(value)) return false;
+  if (!isShardWorkerRecord(value)) return false;
   return (
     value.shardId === expectedShardId &&
-    isRecord(value.fragment) &&
+    isShardWorkerRecord(value.fragment) &&
     typeof value.fingerprint === 'string' &&
     Array.isArray(value.boundaryCalls) &&
     Array.isArray(value.parseErrors)
@@ -440,13 +440,13 @@ function knownFailureClass(value: unknown): FailureClass | undefined {
 }
 
 function decodeShardWorkerFailure(value: unknown): DecodedShardWorkerFailure | undefined {
-  if (!isRecord(value)) return undefined;
+  if (!isShardWorkerRecord(value)) return undefined;
   const reconstructed = toolErrorFromWorkerFailureWire({
     message: typeof value.message === 'string' ? value.message : 'Shard worker failed.',
     ...(typeof value.code === 'string' ? { code: value.code } : {}),
     ...(typeof value.detailCode === 'string' ? { detailCode: value.detailCode } : {}),
     ...(typeof value.failureClass === 'string' ? { failureClass: value.failureClass } : {}),
-    ...(isRecord(value.failure) ? { failure: value.failure } : {}),
+    ...(isShardWorkerRecord(value.failure) ? { failure: value.failure } : {}),
     ...(typeof value.wireVersion === 'number' ? { failureWireVersion: value.wireVersion } : {}),
   });
   if (reconstructed === undefined) return undefined;
@@ -472,7 +472,7 @@ function decodeShardWorkerOutput(
     return undefined;
   }
   if (isShardBuildResult(value, expectedShardId)) return { kind: 'result', result: value };
-  if (!isRecord(value)) return undefined;
+  if (!isShardWorkerRecord(value)) return undefined;
   if (value.kind === 'result' && isShardBuildResult(value.result, expectedShardId)) {
     return { kind: 'result', result: value.result };
   }
