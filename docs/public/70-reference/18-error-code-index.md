@@ -12,15 +12,15 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **20**
-- Definitions: **182**
+- Catalog sources: **21**
+- Definitions: **185**
 
 ## Catalogs
 
 | Package | Owner id | Source file | Count |
 |---|---|---|---:|
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
-| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 10 |
+| `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 11 |
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
 | `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
@@ -28,6 +28,7 @@ generated: true
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 8 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 5 |
+| `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 5 |
 | `@opensip-cli/session-store` | `@opensip-cli/session-store` | `packages/session-store/src/errors/session-store-error-catalog.ts` | 5 |
@@ -195,6 +196,7 @@ generated: true
 | `FIT.CHECK.UNKNOWN` | `@opensip-cli/fitness` | application | user | validation | never | error | configuration | active | Run opensip fit list to see available checks. |
 | `FIT.FIT_SCOPE.INVALID` | `@opensip-cli/fitness` | application | user | validation | never | error | configuration | active | Correct the named targets or signalers block in opensip-cli.config.yml; `opensip fit list` shows the targets a check can reference. |
 | `FIT.FITNESS.CHECK_ABORTED` | `@opensip-cli/fitness` | application | user | cancelled | never | warning | cancelled | active | The check was cancelled. Re-run if the work is still needed. |
+| `FIT.FITNESS.CHECK_DEADLINE_EXCEEDED` | `@opensip-cli/fitness` | application | user | timeout | transient | error | runtime | active | The check |
 | `FIT.FITNESS.CHECK_ERROR` | `@opensip-cli/fitness` | application | tool-author | invariant | never | warning | success | active | A check failed to run; its findings are missing from this report. Report it to the check author. |
 | `FIT.FITNESS.ENGINE_STATE_INVALID` | `@opensip-cli/fitness` | application | tool-author | invariant | never | error | runtime | active | Capture the run id and report a bug; the fitness engine was misdriven. |
 | `FIT.FITNESS.EXEC_FAILED` | `@opensip-cli/fitness` | external | environment | I/O | caller-policy | error | runtime | active | The external command could not be executed. Check that it is installed and on PATH, then retry. |
@@ -210,6 +212,8 @@ generated: true
 | `MCP.STDIO.SHUTDOWN` | `@opensip-cli/mcp` | application | user | cancelled | never | error | cancelled | active | MCP server shut down. Restart opensip mcp if more queries are needed. |
 | `NETWORK_ERROR` | `@opensip-cli/core` | external | environment | network | transient | error | report-failed | active | Check network connectivity and the remote endpoint. |
 | `NOT_FOUND` | `@opensip-cli/core` | application | user | not-found | never | error | not-found | active | Verify the resource name and list available options. |
+| `OUTPUT.EGRESS.REQUEST_INVALID` | `@opensip-cli/output` | application | tool-author | validation | never | error | runtime | active | Supply a non-empty idempotency key of at most 256 characters for each egress chunk. |
+| `OUTPUT.GATE.FINGERPRINT_INVALID` | `@opensip-cli/output` | application | tool-author | invariant | never | error | runtime | active | The tool emitted signals the gate cannot compare. Report it to the tool author: signals must be stamped with unique fingerprints before the gate seam. |
 | `PLUGIN_INCOMPATIBLE` | `@opensip-cli/core` | application | user | compatibility | never | error | plugin-incompatible | active | Upgrade OpenSIP CLI or the tool, or trust a project-local tool via tools.trusted. |
 | `SESSION.EVIDENCE.UNREADABLE` | `@opensip-cli/session-store` | infrastructure | environment | integrity | never | error | runtime | active | Stored evidence for this run could not be read. Re-run the tool to regenerate it, or purge the affected sessions. |
 | `SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE` | `@opensip-cli/session-store` | infrastructure | environment | security | never | error | runtime | active | A stored record predates current safety rules and was refused. Purge the affected sessions; they cannot be migrated in place. |

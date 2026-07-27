@@ -122,3 +122,28 @@ describe('execAbortable — buffering', () => {
     expect(result.exitCode).toBeDefined();
   });
 });
+
+describe('execAbortable — a timeout is not a cancellation (ADR-0183)', () => {
+  it('reports a user abort as `cancelled`', async () => {
+    const controller = new AbortController();
+    const running = execAbortable(['sleep', '10'], { signal: controller.signal });
+    controller.abort();
+    const result = await running;
+    expect(result.aborted).toBe(true);
+    expect(result.abortReason).toBe('cancelled');
+  });
+
+  it('reports a deadline breach as `deadline-exceeded`', async () => {
+    // Both arms set the same `aborted` boolean before this distinction existed, so a check
+    // whose command ran past its budget reported itself as cancelled and exited 130.
+    const result = await execAbortable(['sleep', '10'], { timeout: 25 });
+    expect(result.aborted).toBe(true);
+    expect(result.abortReason).toBe('deadline-exceeded');
+  });
+
+  it('leaves the reason unset when the command completes on its own', async () => {
+    const result = await execAbortable(['echo', 'done'], { timeout: 10_000 });
+    expect(result.aborted).toBe(false);
+    expect(result.abortReason).toBeUndefined();
+  });
+});

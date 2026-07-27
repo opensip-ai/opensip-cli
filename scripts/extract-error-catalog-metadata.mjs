@@ -63,6 +63,12 @@ const CATALOG_SOURCES = [
     exportName: 'hostErrorCatalog',
   })),
   {
+    packageName: '@opensip-cli/output',
+    ownerId: '@opensip-cli/output',
+    file: 'packages/output/src/errors/output-error-catalog.ts',
+    exportName: 'outputErrorCatalog',
+  },
+  {
     packageName: '@opensip-cli/config',
     ownerId: '@opensip-cli/config',
     file: 'packages/config/src/errors/config-error-catalog.ts',

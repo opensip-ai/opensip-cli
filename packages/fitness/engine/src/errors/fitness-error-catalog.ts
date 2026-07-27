@@ -86,6 +86,32 @@ export const fitnessErrorCatalog = defineErrorCatalog(
     },
 
     /** A check was cancelled — the interruption, not a check defect (ruling D5). */
+    /**
+     * A check's external command outlived its configured timeout.
+     *
+     * Distinct from `CHECK_ABORTED` because ADR-0183 requires cancelled and timed-out to stay
+     * distinguishable, and because the operator does something different: a cancellation is
+     * something they DID, a deadline breach means the check needs a longer budget or the
+     * command is stuck. Both used to raise `CheckAbortedError`, so a timeout reported itself as
+     * "the check was cancelled. Re-run if the work is still needed." — advice that describes
+     * the wrong event and exits `cancelled` (130) rather than a runtime failure.
+     */
+    'FIT.FITNESS.CHECK_DEADLINE_EXCEEDED': {
+      code: 'FIT.FITNESS.CHECK_DEADLINE_EXCEEDED',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'timeout',
+      retry: 'transient',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        "The check's command exceeded its timeout. Raise the check's `timeout` if the work legitimately takes longer, or investigate why the command is not completing.",
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['checkId'],
+    },
+
     'FIT.FITNESS.CHECK_ABORTED': {
       code: 'FIT.FITNESS.CHECK_ABORTED',
       source: 'application',

@@ -29,7 +29,11 @@ import {
   validateCheckConfig,
 } from './check-config.js';
 import { executeCommand } from './command-executor.js';
-import { CheckAbortedError, createExecutionContext } from './execution-context.js';
+import {
+  CheckAbortedError,
+  CheckDeadlineExceededError,
+  createExecutionContext,
+} from './execution-context.js';
 import { createFileAccessor } from './file-accessor.js';
 import { filterFilesByType } from './file-type-filter.js';
 import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js';
@@ -331,6 +335,12 @@ async function executeCommandMode(
 
   /* v8 ignore start -- defensive: command-mode tests cover the non-aborted path; abort during external command execution requires a long-running subprocess that's intentionally not unit-testable */
   if (result.aborted) {
+    // A timeout is NOT a cancellation. Both used to raise `CheckAbortedError`, so a check whose
+    // command ran past its budget reported "the check was cancelled — re-run if the work is
+    // still needed" and exited 130. ADR-0183 requires the two to stay distinguishable.
+    if (result.abortReason === 'deadline-exceeded') {
+      throw new CheckDeadlineExceededError(config.slug, config.timeout);
+    }
     throw new CheckAbortedError(config.slug);
   }
   /* v8 ignore stop */

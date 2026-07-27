@@ -23,6 +23,7 @@ import type { FileCache } from './file-cache.js';
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
 const CHECK_ABORTED = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_ABORTED');
+const CHECK_DEADLINE_EXCEEDED = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_DEADLINE_EXCEEDED');
 const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
 const FILE_TOO_LARGE = fitnessErrorCatalog.require('FIT.FITNESS.FILE_TOO_LARGE');
 
@@ -46,6 +47,33 @@ export class CheckAbortedError extends SystemError {
     });
     this.checkId = checkId;
     Object.setPrototypeOf(this, CheckAbortedError.prototype);
+  }
+}
+
+/**
+ * A check's external command outlived its timeout.
+ *
+ * A sibling of {@link CheckAbortedError} rather than a flag on it, because the engine branches
+ * on `instanceof` in `define-check`, `run-one-check` and retry — a timeout must not take the
+ * cancellation path, which exits 130 and tells the operator to re-run.
+ */
+export class CheckDeadlineExceededError extends SystemError {
+  readonly name = 'CheckDeadlineExceededError' as const;
+  readonly checkId: string;
+
+  constructor(checkId: string, timeoutMs?: number) {
+    super(
+      timeoutMs === undefined
+        ? `Check ${checkId} exceeded its command timeout`
+        : `Check ${checkId} exceeded its ${String(timeoutMs)}ms command timeout`,
+      {
+        code: CHECK_DEADLINE_EXCEEDED.code,
+        definition: CHECK_DEADLINE_EXCEEDED,
+        metadata: { checkId },
+      },
+    );
+    this.checkId = checkId;
+    Object.setPrototypeOf(this, CheckDeadlineExceededError.prototype);
   }
 }
 
