@@ -146,6 +146,16 @@ describe('deepFreeze', () => {
     expect(() => deepFreeze(value)).not.toThrow();
     expect(Object.isFrozen(value)).toBe(true);
   });
+
+  it('is total for primitives, already-frozen values, and hostile proxies', () => {
+    expect(deepFreeze(42)).toBe(42);
+    const frozen = Object.freeze({ value: 1 });
+    expect(deepFreeze(frozen)).toBe(frozen);
+
+    const revoked = Proxy.revocable({}, {});
+    revoked.revoke();
+    expect(() => deepFreeze(revoked.proxy)).not.toThrow();
+  });
 });
 
 describe('error definition axes coverage', () => {
@@ -243,6 +253,108 @@ describe('error definition axes coverage', () => {
     expect(catalog.list.map((d) => d.code).sort()).toEqual(['TEST.A.FIRST', 'TEST.Z.LAST']);
     expect(catalog.get('TEST.A.FIRST')?.code).toBe('TEST.A.FIRST');
     expect(catalog.get('MISSING')).toBeUndefined();
+  });
+
+  it('rejects malformed owner fields before publishing a catalog', () => {
+    expect(() => defineErrorCatalog(Object.create({ id: 'x' }) as never, {})).toThrow(
+      /plain object/,
+    );
+    expect(() => defineErrorCatalog({ id: '', displayName: 'Test' }, {})).toThrow(
+      /bounded strings/,
+    );
+    expect(() =>
+      defineErrorCatalog(
+        { id: 'test', displayName: 'Test', packageName: `@test/${'x'.repeat(215)}` },
+        {},
+      ),
+    ).toThrow(/packageName is too long/);
+  });
+
+  it('copies primitive owner fields through the bounded-string validator', () => {
+    const catalog = defineErrorCatalog({ id: 42, displayName: true, packageName: 7n } as never, {});
+    expect(catalog.owner).toEqual({ id: '42', displayName: 'true', packageName: '7' });
+  });
+
+  it('rejects unsafe definition inspection and oversized catalogs', () => {
+    const descriptorHostile = new Proxy(
+      {},
+      {
+        getOwnPropertyDescriptor() {
+          throw new Error('descriptor trap');
+        },
+      },
+    );
+    expect(() => normalizeErrorDefinition(descriptorHostile, owner)).toThrow(
+      /could not be inspected/,
+    );
+
+    const keyHostile = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error('key trap');
+        },
+      },
+    );
+    expect(() => defineErrorCatalog(owner, keyHostile as never)).toThrow(/could not be inspected/);
+
+    const oversized = Object.fromEntries(
+      Array.from({ length: 501 }, (_, index) => [`TEST.CAP.${index}`, {}]),
+    );
+    expect(() => defineErrorCatalog(owner, oversized as never)).toThrow(/exceeds 500 definitions/);
+  });
+
+  it('rejects hostile metadata-key arrays and invalid axes', () => {
+    const hostileKeys = new Proxy([], {
+      getOwnPropertyDescriptor() {
+        throw new Error('descriptor trap');
+      },
+    });
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.BAD.KEYS', publicMetadataKeys: hostileKeys },
+        owner,
+      ),
+    ).toThrow(/publicMetadataKeys could not be inspected/);
+    expect(() =>
+      normalizeErrorDefinition({ ...base, code: 'TEST.BAD.AXIS', source: 'mystery' }, owner),
+    ).toThrow(/source has invalid value/);
+
+    const hostileItem = new Proxy(['safe'], {
+      getOwnPropertyDescriptor(target, key) {
+        if (key === '0') throw new Error('item descriptor trap');
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+    });
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.BAD.ITEM', publicMetadataKeys: hostileItem },
+        owner,
+      ),
+    ).toThrow(/0 could not be inspected/);
+  });
+
+  it('enforces bounded code shapes and unknown catalog keys', () => {
+    expect(() => assertErrorCodeShape('')).toThrow(/bounded non-empty/);
+    expect(() => assertErrorCodeShape('A'.repeat(129))).toThrow(/bounded non-empty/);
+    expect(assertErrorCodeShape('VALIDATION_ERROR', { allowLegacy: true })).toBe(
+      'VALIDATION_ERROR',
+    );
+
+    const catalog = defineErrorCatalog(owner, {
+      'TEST.KEY.KNOWN': { ...base, code: 'TEST.KEY.KNOWN' },
+    });
+    expect(() => catalog.require('TEST.KEY.MISSING' as never)).toThrow(/unknown catalog key/);
+  });
+
+  it('rejects missing or non-primitive string fields and non-object definition maps', () => {
+    expect(() => normalizeErrorDefinition({ ...base, code: undefined }, owner)).toThrow(
+      /bounded non-empty/,
+    );
+    expect(() => defineErrorCatalog({ id: {} as never, displayName: 'Test' }, {})).toThrow(
+      /must be a string/,
+    );
+    expect(() => defineErrorCatalog(owner, [] as never)).toThrow(/plain object/);
   });
 });
 

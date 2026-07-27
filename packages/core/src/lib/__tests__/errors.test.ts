@@ -16,6 +16,7 @@ import {
   canonicalToolErrorCode,
   toolErrorFromCanonicalCode,
   createToolError,
+  formatUnknownErrorMessage,
   isToolErrorLike,
   normalizeToolErrorDefinition,
   sanitizeErrorMetadata,
@@ -91,6 +92,64 @@ describe('ToolError', () => {
     expect(sanitizeErrorMetadata(hostile)).toEqual({ boom: '[Accessor]' });
   });
 
+  it('bounds recursive metadata and degrades hostile containers by shape', () => {
+    const circularObject: { self?: unknown } = {};
+    circularObject.self = circularObject;
+    const circularArray: unknown[] = [];
+    circularArray.push(circularArray);
+
+    let deepArray: unknown[] = [];
+    for (let depth = 0; depth < 6; depth += 1) deepArray = [deepArray];
+
+    const hostileObject = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw new Error('descriptor trap');
+        },
+      },
+    );
+    const hostileArray = new Proxy([], {
+      ownKeys() {
+        throw new Error('descriptor trap');
+      },
+    });
+
+    const sanitized = sanitizeErrorMetadata({
+      circularObject,
+      circularArray,
+      deepArray,
+      hostileObject,
+      hostileArray,
+      primitives: [null, Number.POSITIVE_INFINITY, true, 42n, undefined, Symbol('x'), () => 1],
+    });
+
+    expect(sanitized.circularObject).toEqual({ self: { _meta: 'circular' } });
+    expect(sanitized.circularArray).toEqual(['[Circular]']);
+    expect(JSON.stringify(sanitized.deepArray)).toContain('[TruncatedArray]');
+    expect(sanitized.hostileObject).toEqual({ _meta: 'hostile-metadata' });
+    expect(sanitized.hostileArray).toBe('[HostileArray]');
+    expect(sanitized.primitives).toEqual([null, null, true, '42', null, null, null]);
+  });
+
+  it('enforces the shared metadata node budget across a wide graph', () => {
+    const wide = Array.from({ length: 32 }, () => Array.from({ length: 32 }, () => ({ value: 1 })));
+    expect(JSON.stringify(sanitizeErrorMetadata({ wide }))).toContain('NodeBudgetExhausted');
+  });
+
+  it('caps the number of metadata fields retained from one object', () => {
+    const oversized = Object.fromEntries(
+      Array.from({ length: 40 }, (_, index) => [`field-${index}`, index]),
+    );
+    expect(Object.keys(sanitizeErrorMetadata(oversized))).toHaveLength(32);
+  });
+
+  it('returns an empty frozen record for non-object metadata', () => {
+    const sanitized = sanitizeErrorMetadata('not-an-object');
+    expect(sanitized).toEqual({});
+    expect(Object.isFrozen(sanitized)).toBe(true);
+  });
+
   it('is total on revoked Proxy metadata and definition inputs', () => {
     const revoked = Proxy.revocable({}, {});
     revoked.revoke();
@@ -99,6 +158,22 @@ describe('ToolError', () => {
     });
     expect(normalizeToolErrorDefinition(revoked.proxy)).toBeUndefined();
     expect(isToolErrorLike(revoked.proxy)).toBe(false);
+  });
+
+  it('rejects malformed definition owners and axes without invoking accessors', () => {
+    expect(normalizeToolErrorDefinition({ owner: [] })).toBeUndefined();
+    expect(
+      normalizeToolErrorDefinition({
+        ...coreSystemErrorCatalog.require('NOT_FOUND'),
+        owner: { displayName: 'Missing id' },
+      }),
+    ).toBeUndefined();
+    expect(
+      normalizeToolErrorDefinition({
+        ...coreSystemErrorCatalog.require('NOT_FOUND'),
+        kind: 'not-a-kind',
+      }),
+    ).toBeUndefined();
   });
 
   it('rejects a forged brand whose code and definition axes disagree', () => {
@@ -110,6 +185,64 @@ describe('ToolError', () => {
       [Symbol.for('@opensip-cli/core/tool-error-brand')]: { value: 1 },
     });
     expect(isToolErrorLike(forged)).toBe(false);
+  });
+
+  it('rebuilds a validated cross-copy ToolError thrown through Result helpers', () => {
+    const source = createToolError(coreSystemErrorCatalog.require('NOT_FOUND'), 'cross-copy');
+    const twin = {} as Record<PropertyKey, unknown>;
+    Object.defineProperties(twin, {
+      message: { value: source.message },
+      code: { value: source.code },
+      definition: { value: source.definition },
+      [Symbol.for('@opensip-cli/core/tool-error-brand')]: { value: 1 },
+    });
+
+    const result = tryCatch(() => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- models a structurally valid ToolError crossing a duplicate-core boundary
+      throw twin;
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error).toBeInstanceOf(ToolError);
+      expect(result.error).toMatchObject({ code: 'NOT_FOUND', message: 'cross-copy' });
+    }
+  });
+
+  it('degrades a hostile cross-copy message read after structural validation', () => {
+    const source = createToolError(coreSystemErrorCatalog.require('NOT_FOUND'), 'cross-copy');
+    const target = {};
+    Object.defineProperties(target, {
+      message: { value: source.message, configurable: true },
+      code: { value: source.code },
+      definition: { value: source.definition },
+      [Symbol.for('@opensip-cli/core/tool-error-brand')]: { value: 1 },
+    });
+    const twin = new Proxy(target, {
+      get(inner, key, receiver) {
+        if (key === 'message') throw new Error('message trap');
+        return Reflect.get(inner, key, receiver);
+      },
+    });
+
+    const result = tryCatch(() => {
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- models a structurally valid duplicate-core error with a post-validation hostile read
+      throw twin;
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toBe('Tool error');
+  });
+});
+
+describe('formatUnknownErrorMessage', () => {
+  it('formats primitive throws without invoking object stringification', () => {
+    expect(formatUnknownErrorMessage('plain')).toBe('plain');
+    expect(formatUnknownErrorMessage(42)).toBe('42');
+    expect(formatUnknownErrorMessage(false)).toBe('false');
+    expect(formatUnknownErrorMessage(42n)).toBe('42');
+    expect(formatUnknownErrorMessage(Symbol('symbolic'))).toBe('Symbol(symbolic)');
+    expect(formatUnknownErrorMessage(null)).toBe('null');
+    expect(formatUnknownErrorMessage(undefined)).toBe('undefined');
+    expect(formatUnknownErrorMessage({ message: 1 })).toBe('object');
   });
 });
 
@@ -485,5 +618,24 @@ describe('legacy option-bag warning (Plan 01 Task 1.3)', () => {
     });
     expect(built?.legacyCompatibility).toBeUndefined();
     expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('bounds distinct legacy option-bag warnings process-wide', async () => {
+    const warn = vi.fn();
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger,
+    });
+    const built: ToolError[] = [];
+    await runWithScope(scope, () => {
+      for (let index = 0; index < 65; index += 1) {
+        const options = { [`legacy-${index}`]: true };
+        built.push(new ToolError('x', 'SYSTEM_ERROR', options));
+      }
+      return Promise.resolve();
+    });
+    expect(built).toHaveLength(65);
+    expect(warn).toHaveBeenCalledTimes(64);
   });
 });

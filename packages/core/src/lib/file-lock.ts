@@ -95,9 +95,31 @@ export interface WithFileLockOptions {
   readonly onEvent?: (event: FileLockEvent) => void;
 }
 
+/** Injectable clock/poll seams for deterministic lock protocol tests. */
+export interface FileLockEnvironment {
+  /** Wall clock used only for diagnostic lock metadata. */
+  readonly now: () => number;
+  /** Monotonic clock used for acquisition deadlines and stale observations. */
+  readonly monotonicNow: () => number;
+  /** Asynchronous contention poll. */
+  readonly poll: (ms: number) => Promise<void>;
+  /** Synchronous contention poll. */
+  readonly pollSync: (ms: number) => void;
+}
+
+/** Isolated file-lock entry points bound to one environment. */
+export interface FileLockCoordinator {
+  readonly withFileLock: <T>(lockPath: string, options: WithFileLockOptions, fn: () => T) => T;
+  readonly withFileLockAsync: <T>(
+    lockPath: string,
+    options: WithFileLockOptions,
+    fn: () => Promise<T>,
+  ) => Promise<T>;
+}
+
 const POLL_MS = 50;
 
-function monotonicNow(): number {
+function defaultMonotonicNow(): number {
   return performance.now();
 }
 
@@ -111,18 +133,25 @@ function monotonicNow(): number {
  * context (it throws in some embedder main threads).
  */
 const sleepSyncCell = new Int32Array(new SharedArrayBuffer(4));
-function sleepSync(ms: number): void {
+function defaultPollSync(ms: number): void {
   if (ms <= 0) return;
   try {
     Atomics.wait(sleepSyncCell, 0, 0, ms);
   } catch {
     // @swallow-ok Atomics.wait disallowed on this thread — degrade to the spin.
-    const end = monotonicNow() + ms;
-    while (monotonicNow() < end) {
+    const end = defaultMonotonicNow() + ms;
+    while (defaultMonotonicNow() < end) {
       /* spin */
     }
   }
 }
+
+const DEFAULT_FILE_LOCK_ENVIRONMENT: FileLockEnvironment = Object.freeze({
+  now: () => Date.now(),
+  monotonicNow: defaultMonotonicNow,
+  poll: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+  pollSync: defaultPollSync,
+});
 
 // Registered lock definitions, bound once at module load so a typo fails the import rather
 // than a code path that only runs when a lock is already contended. These replace
@@ -626,10 +655,13 @@ function currentProcessIncarnation(): string | undefined {
  * a fixed short global TTL re-probes live owners when the final timeout poll
  * lands after the cache expires even though `waitMs` itself is shorter.
  */
-function createAcquisitionProcessInspector(waitMs: number): SafetyBiasedProcessInspector {
+function createAcquisitionProcessInspector(
+  waitMs: number,
+  environment: FileLockEnvironment,
+): SafetyBiasedProcessInspector {
   return createSafetyBiasedProcessInspector({
     inspect: inspectProcessIncarnation,
-    monotonicNow,
+    monotonicNow: environment.monotonicNow,
     ttlMs: Math.max(PROCESS_PROBE_CACHE_MS, waitMs + POLL_MS * 8 + 1000),
     maxEntries: PROCESS_PROBE_CACHE_ENTRIES,
   });
@@ -694,8 +726,9 @@ function unchangedForRecoveryHorizon(
   tracker: LockStaleTracker,
   snapshot: LockSnapshotBase,
   horizonMs: number,
+  environment: FileLockEnvironment,
 ): boolean {
-  const now = monotonicNow();
+  const now = environment.monotonicNow();
   const previous = tracker.observation;
   const sameObservation =
     previous?.horizonMs === horizonMs && sameSnapshot(previous.snapshot, snapshot);
@@ -785,6 +818,7 @@ interface StaleLockRecoveryContext {
   readonly onEvent?: (event: FileLockEvent) => void;
   readonly resource: FileLockResource;
   readonly operation?: string;
+  readonly environment: FileLockEnvironment;
 }
 
 function recoverStaleLock({
@@ -796,6 +830,7 @@ function recoverStaleLock({
   onEvent,
   resource,
   operation,
+  environment,
 }: StaleLockRecoveryContext): boolean {
   const classification = classifyOwnerForRecovery(snapshot.metadata, processInspector);
   if (classification === 'live') {
@@ -805,7 +840,7 @@ function recoverStaleLock({
   const recoveryHorizonMs = Math.max(snapshot.metadata.staleMs ?? 0, policy.staleMs);
   if (
     classification === 'observe-unchanged' &&
-    !unchangedForRecoveryHorizon(tracker, snapshot, recoveryHorizonMs)
+    !unchangedForRecoveryHorizon(tracker, snapshot, recoveryHorizonMs, environment)
   ) {
     return false;
   }
@@ -831,7 +866,7 @@ function recoverStaleLock({
     }
     if (
       freshClassification === 'observe-unchanged' &&
-      !unchangedForRecoveryHorizon(tracker, current, recoveryHorizonMs)
+      !unchangedForRecoveryHorizon(tracker, current, recoveryHorizonMs, environment)
     ) {
       return false;
     }
@@ -865,8 +900,11 @@ function emit(onEvent: WithFileLockOptions['onEvent'], event: FileLockEvent): vo
 type LockContentionOutcome = 'acquired' | 'retry' | 'timeout' | 'malformed';
 type NonRecordLockSnapshot = Exclude<LockSnapshot, LockRecordSnapshot>;
 
-function deadlineOutcome(deadline: number): Extract<LockContentionOutcome, 'retry' | 'timeout'> {
-  return monotonicNow() >= deadline ? 'timeout' : 'retry';
+function deadlineOutcome(
+  deadline: number,
+  environment: FileLockEnvironment,
+): Extract<LockContentionOutcome, 'retry' | 'timeout'> {
+  return environment.monotonicNow() >= deadline ? 'timeout' : 'retry';
 }
 
 function recoverCorruptSnapshot(
@@ -875,9 +913,10 @@ function recoverCorruptSnapshot(
   options: WithFileLockOptions,
   tracker: LockStaleTracker,
   deadline: number,
+  environment: FileLockEnvironment,
 ): LockContentionOutcome {
-  if (!unchangedForRecoveryHorizon(tracker, snapshot, options.policy.staleMs)) {
-    return deadlineOutcome(deadline);
+  if (!unchangedForRecoveryHorizon(tracker, snapshot, options.policy.staleMs, environment)) {
+    return deadlineOutcome(deadline, environment);
   }
   const current = readLockSnapshot(lockPath);
   if (
@@ -885,7 +924,7 @@ function recoverCorruptSnapshot(
     !sameSnapshot(snapshot, current)
   ) {
     resetStaleObservation(tracker);
-    return deadlineOutcome(deadline);
+    return deadlineOutcome(deadline, environment);
   }
   if (!unlinkSnapshotIfCurrent(lockPath, current)) return 'retry';
   resetStaleObservation(tracker);
@@ -905,15 +944,16 @@ function evaluateNonRecordContention(
   options: WithFileLockOptions,
   tracker: LockStaleTracker,
   deadline: number,
+  environment: FileLockEnvironment,
 ): LockContentionOutcome {
   if (snapshot.kind === 'missing') {
     resetStaleObservation(tracker);
     if (tryAcquireLock(lockPath, metadata)) return 'acquired';
-    return deadlineOutcome(deadline);
+    return deadlineOutcome(deadline, environment);
   }
   if (snapshot.kind === 'churn') {
     resetStaleObservation(tracker);
-    return deadlineOutcome(deadline);
+    return deadlineOutcome(deadline, environment);
   }
   if (snapshot.kind === 'unsafe') {
     resetStaleObservation(tracker);
@@ -923,7 +963,7 @@ function evaluateNonRecordContention(
   // Invalid and unreadable records carry no trustworthy owner identity. They
   // become recoverable only after the exact inode/content remains unchanged
   // for one complete local-monotonic stale horizon. Wall time is irrelevant.
-  return recoverCorruptSnapshot(lockPath, snapshot, options, tracker, deadline);
+  return recoverCorruptSnapshot(lockPath, snapshot, options, tracker, deadline, environment);
 }
 
 function evaluateLockContention(
@@ -934,6 +974,7 @@ function evaluateLockContention(
   processInspector: SafetyBiasedProcessInspector,
   deadline: number,
   acquisitionStartedAt: number,
+  environment: FileLockEnvironment,
 ): LockContentionOutcome {
   if (tryAcquireLock(lockPath, metadata)) return 'acquired';
 
@@ -942,7 +983,15 @@ function evaluateLockContention(
   // Unsafe path types fail closed; corrupt regular-file snapshots require an
   // exact unchanged monotonic stale horizon before guarded removal.
   if (existing.kind !== 'record') {
-    return evaluateNonRecordContention(lockPath, metadata, existing, options, tracker, deadline);
+    return evaluateNonRecordContention(
+      lockPath,
+      metadata,
+      existing,
+      options,
+      tracker,
+      deadline,
+      environment,
+    );
   }
 
   if (
@@ -955,19 +1004,20 @@ function evaluateLockContention(
       onEvent: options.onEvent,
       resource: options.resource,
       operation: options.operation,
+      environment,
     })
   ) {
     return 'retry';
   }
 
-  if (monotonicNow() >= deadline) return 'timeout';
+  if (environment.monotonicNow() >= deadline) return 'timeout';
 
   emit(options.onEvent, {
     kind: 'acquire.wait',
     lockPath,
     resource: options.resource,
     operation: options.operation,
-    waitMs: monotonicNow() - acquisitionStartedAt,
+    waitMs: environment.monotonicNow() - acquisitionStartedAt,
     ownerPid: existing.metadata.pid,
     ownerHostname: existing.metadata.hostname,
   });
@@ -996,11 +1046,12 @@ function startLockHeartbeat(
   lockPath: string,
   metadata: FileLockMetadata,
   heartbeatMs: number,
+  environment: FileLockEnvironment,
 ): ReturnType<typeof setInterval> {
   const timer = setInterval(() => {
     let stillOwned = false;
     try {
-      metadata.lastHeartbeatAt = Date.now();
+      metadata.lastHeartbeatAt = environment.now();
       stillOwned = writeLockMetadataIfOwner(
         lockPath,
         { ...metadata, lastHeartbeatAt: metadata.lastHeartbeatAt },
@@ -1052,7 +1103,12 @@ function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
  * @throws {TimeoutError} when live contention exceeds `policy.waitMs`.
  * @throws {SystemError} when lock metadata is malformed and cannot be recovered.
  */
-export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, fn: () => T): T {
+function withFileLockInEnvironment<T>(
+  lockPath: string,
+  options: WithFileLockOptions,
+  fn: () => T,
+  environment: FileLockEnvironment,
+): T {
   const policy = normalizeLockPolicy(options.policy);
   const normalizedOptions: WithFileLockOptions = { ...options, policy };
   const ownerToken = generateUUID();
@@ -1069,8 +1125,8 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     runId: options.runId,
     command: options.command,
     cwdBasename,
-    acquiredAt: Date.now(),
-    lastHeartbeatAt: Date.now(),
+    acquiredAt: environment.now(),
+    lastHeartbeatAt: environment.now(),
     staleMs: policy.staleMs,
   };
 
@@ -1081,10 +1137,10 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     operation: options.operation,
   });
 
-  const acquisitionStartedAt = monotonicNow();
+  const acquisitionStartedAt = environment.monotonicNow();
   const deadline = acquisitionStartedAt + policy.waitMs;
   const tracker: LockStaleTracker = {};
-  const processInspector = createAcquisitionProcessInspector(policy.waitMs);
+  const processInspector = createAcquisitionProcessInspector(policy.waitMs, environment);
   let acquired = false;
 
   while (!acquired) {
@@ -1096,6 +1152,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       processInspector,
       deadline,
       acquisitionStartedAt,
+      environment,
     );
     if (outcome === 'acquired') {
       acquired = true;
@@ -1108,12 +1165,12 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       });
     }
     if (outcome === 'timeout') break;
-    sleepSync(Math.min(POLL_MS, Math.max(0, deadline - monotonicNow())));
+    environment.pollSync(Math.min(POLL_MS, Math.max(0, deadline - environment.monotonicNow())));
   }
 
   if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs, environment);
   try {
     heartbeatTimer.unref?.();
   } catch {
@@ -1127,7 +1184,7 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
       lockPath,
       resource: options.resource,
       operation: options.operation,
-      waitMs: monotonicNow() - acquisitionStartedAt,
+      waitMs: environment.monotonicNow() - acquisitionStartedAt,
     });
     return result;
   } finally {
@@ -1139,10 +1196,11 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
 /**
  * Async variant for artifact writes that may await I/O while holding the lock.
  */
-export async function withFileLockAsync<T>(
+async function withFileLockAsyncInEnvironment<T>(
   lockPath: string,
   options: WithFileLockOptions,
   fn: () => Promise<T>,
+  environment: FileLockEnvironment,
 ): Promise<T> {
   const policy = normalizeLockPolicy(options.policy);
   const normalizedOptions: WithFileLockOptions = { ...options, policy };
@@ -1160,8 +1218,8 @@ export async function withFileLockAsync<T>(
     runId: options.runId,
     command: options.command,
     cwdBasename,
-    acquiredAt: Date.now(),
-    lastHeartbeatAt: Date.now(),
+    acquiredAt: environment.now(),
+    lastHeartbeatAt: environment.now(),
     staleMs: policy.staleMs,
   };
 
@@ -1172,13 +1230,11 @@ export async function withFileLockAsync<T>(
     operation: options.operation,
   });
 
-  const acquisitionStartedAt = monotonicNow();
+  const acquisitionStartedAt = environment.monotonicNow();
   const deadline = acquisitionStartedAt + policy.waitMs;
   const tracker: LockStaleTracker = {};
-  const processInspector = createAcquisitionProcessInspector(policy.waitMs);
+  const processInspector = createAcquisitionProcessInspector(policy.waitMs, environment);
   let acquired = false;
-
-  const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
   while (!acquired) {
     const outcome = evaluateLockContention(
@@ -1189,6 +1245,7 @@ export async function withFileLockAsync<T>(
       processInspector,
       deadline,
       acquisitionStartedAt,
+      environment,
     );
     if (outcome === 'acquired') {
       acquired = true;
@@ -1201,12 +1258,12 @@ export async function withFileLockAsync<T>(
       });
     }
     if (outcome === 'timeout') break;
-    await sleep(Math.min(POLL_MS, Math.max(0, deadline - monotonicNow())));
+    await environment.poll(Math.min(POLL_MS, Math.max(0, deadline - environment.monotonicNow())));
   }
 
   if (!acquired) throwLockTimeout(lockPath, normalizedOptions);
 
-  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs);
+  const heartbeatTimer = startLockHeartbeat(lockPath, metadata, policy.heartbeatMs, environment);
   try {
     heartbeatTimer.unref?.();
   } catch {
@@ -1220,11 +1277,52 @@ export async function withFileLockAsync<T>(
       lockPath,
       resource: options.resource,
       operation: options.operation,
-      waitMs: monotonicNow() - acquisitionStartedAt,
+      waitMs: environment.monotonicNow() - acquisitionStartedAt,
     });
     return result;
   } finally {
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     removeLockIfOwned(lockPath, ownerToken);
   }
+}
+
+/**
+ * Acquire an exclusive file lock with the production clock and poll primitives.
+ */
+export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, fn: () => T): T {
+  return withFileLockInEnvironment(lockPath, options, fn, DEFAULT_FILE_LOCK_ENVIRONMENT);
+}
+
+/**
+ * Acquire an exclusive file lock asynchronously with the production clock and
+ * poll primitives.
+ */
+export function withFileLockAsync<T>(
+  lockPath: string,
+  options: WithFileLockOptions,
+  fn: () => Promise<T>,
+): Promise<T> {
+  return withFileLockAsyncInEnvironment(lockPath, options, fn, DEFAULT_FILE_LOCK_ENVIRONMENT);
+}
+
+/**
+ * Build an isolated lock coordinator with deterministic clock and poll seams.
+ * Production top-level APIs remain bound to the frozen default environment;
+ * direct-module tests close over overrides without module-global run state.
+ */
+export function createFileLockCoordinator(
+  overrides: Partial<FileLockEnvironment> = {},
+): FileLockCoordinator {
+  const environment: FileLockEnvironment = Object.freeze({
+    ...DEFAULT_FILE_LOCK_ENVIRONMENT,
+    ...overrides,
+    monotonicNow:
+      overrides.monotonicNow ?? overrides.now ?? DEFAULT_FILE_LOCK_ENVIRONMENT.monotonicNow,
+  });
+  return Object.freeze({
+    withFileLock: <T>(lockPath: string, options: WithFileLockOptions, fn: () => T) =>
+      withFileLockInEnvironment(lockPath, options, fn, environment),
+    withFileLockAsync: <T>(lockPath: string, options: WithFileLockOptions, fn: () => Promise<T>) =>
+      withFileLockAsyncInEnvironment(lockPath, options, fn, environment),
+  });
 }
