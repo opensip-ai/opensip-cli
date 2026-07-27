@@ -12,18 +12,17 @@ export function gvRegisterGraphLayouts(): boolean {
     gvState.dagreRegistered = false;
     return false;
   }
+  let registered = true;
   try {
     if (!cytoscape.__gvDagreRegistered) {
       cytoscape.use(cytoscapeDagre);
       cytoscape.__gvDagreRegistered = true;
     }
-    gvState.dagreRegistered = true;
-    return true;
   } catch {
-    // @swallow-ok callers convert false into a visible layout-degradation notice.
-    gvState.dagreRegistered = false;
-    return false;
+    registered = false;
   }
+  gvState.dagreRegistered = registered;
+  return registered;
 }
 
 export function gvLayoutOptions(layoutId: string): Record<string, unknown> {
@@ -51,13 +50,13 @@ function gvSetLayoutSelection(container: HTMLElement, layoutId: string): void {
 }
 
 function gvTryRunLayout(cy: CyCore, layoutId: string): boolean {
+  let completed = true;
   try {
     cy.layout(gvLayoutOptions(layoutId)).run();
-    return true;
   } catch {
-    // @swallow-ok gvRunLayout owns the visible fallback/terminal notice.
-    return false;
+    completed = false;
   }
+  return completed;
 }
 
 export function gvRunLayout(container: HTMLElement, layoutId: string): void {
