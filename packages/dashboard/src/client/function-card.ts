@@ -146,17 +146,28 @@ function buildActions(occ: OccLike, card: HTMLElement): HTMLElement {
   if (editorUrl) {
     actions.append(el('a', { class: 'fc-action', href: editorUrl, text: 'Open in editor' }));
   } else {
-    actions.append(
-      el('button', {
-        class: 'fc-action',
-        text: 'Copy path',
-        onclick: () => {
-          if (navigator?.clipboard) {
-            void navigator.clipboard.writeText(occ.filePath + ':' + occ.line);
-          }
-        },
-      }),
-    );
+    const copyButton = el('button', {
+      class: 'fc-action',
+      text: 'Copy path',
+      onclick: () => {
+        const clipboard = globalThis.navigator?.clipboard;
+        if (!clipboard) {
+          copyButton.textContent = 'Copy unavailable — select path';
+          return;
+        }
+        void Promise.resolve()
+          .then(() => clipboard.writeText(occ.filePath + ':' + occ.line))
+          .then(
+            () => {
+              copyButton.textContent = 'Copied';
+            },
+            () => {
+              copyButton.textContent = 'Copy failed — select path';
+            },
+          );
+      },
+    });
+    actions.append(copyButton);
   }
   actions.append(
     el('button', {
@@ -224,9 +235,30 @@ function renderFunctionCard(occ: OccLike): void {
 }
 
 export function openFunctionCard(bodyHash: string): void {
-  if (!bodyHash) return;
   const occ = graphIndexes.byBodyHash.get(bodyHash);
-  if (occ) renderFunctionCard(occ);
+  if (occ) {
+    renderFunctionCard(occ);
+    return;
+  }
+
+  const overlay = getOrCreateOverlay();
+  while (overlay.firstChild) overlay.firstChild.remove();
+  const card = el('div', { class: 'function-card' });
+  const closeButton = el('button', {
+    class: 'fc-close',
+    text: '×',
+    onclick: closeFunctionCard,
+  });
+  card.append(closeButton);
+  card.append(el('h3', { text: 'Function unavailable' }));
+  card.append(
+    el('div', {
+      class: 'empty',
+      text: 'This function is not present in the report’s embedded graph catalog.',
+    }),
+  );
+  overlay.append(card);
+  closeButton.focus();
 }
 
 /** Open one already-qualified occurrence without collapsing body twins by hash. */

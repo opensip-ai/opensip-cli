@@ -268,7 +268,9 @@ export function openCodePathsSession(sessionId: string): void {
   });
   clearCodePathsHash();
   // Click the matching row to trigger the standard renderDetail flow.
-  const row = sessionsPanel?.querySelector<HTMLElement>('tr[data-session-id="' + sessionId + '"]');
+  const row = [...(sessionsPanel?.querySelectorAll<HTMLElement>('tr[data-session-id]') ?? [])].find(
+    (candidate) => candidate.dataset.sessionId === sessionId,
+  );
   if (row) row.click();
 }
 
@@ -279,13 +281,25 @@ export interface CodePathFunctionIdentity {
   readonly line: number;
 }
 
-function activateExploreSubtab(panel: Element): void {
+function activateExploreSubtab(panel: Element): HTMLElement | null {
+  const explorePanel = panel.querySelector<HTMLElement>('#panel-code-paths-explore');
+  if (!explorePanel) return null;
   panel.querySelectorAll('.subtab').forEach((tab) => {
     tab.classList.toggle('active', (tab as HTMLElement).dataset.subtab === 'explore');
   });
   panel.querySelectorAll('.subtab-panel').forEach((subpanel) => {
-    subpanel.classList.toggle('active', subpanel.id === 'panel-code-paths-explore');
+    subpanel.classList.toggle('active', subpanel === explorePanel);
   });
+  return explorePanel;
+}
+
+function showCodePathsNavigationFailure(host: Element, message: string): void {
+  const existing = host.querySelector<HTMLElement>('[data-code-paths-navigation-failure]');
+  const notice = existing ?? el('div', { class: 'empty' });
+  notice.dataset.codePathsNavigationFailure = 'true';
+  notice.setAttribute('role', 'status');
+  notice.textContent = message;
+  if (!existing) host.prepend(notice);
 }
 
 /** Open one exact current-catalog occurrence in Code Paths Explore. */
@@ -297,10 +311,26 @@ export function openCodePathsFunction(identity: CodePathFunctionIdentity): void 
       occurrence.line === identity.line,
   );
   const occurrence = matches.length === 1 ? matches[0] : undefined;
-  if (!occurrence || !activateReportTab('code-paths')) return;
   const panel = document.querySelector('#panel-code-paths');
-  if (!panel) return;
-  activateExploreSubtab(panel);
+  if (!panel || !activateReportTab('code-paths')) {
+    showCodePathsNavigationFailure(
+      document.body,
+      'Code Graph navigation is unavailable in this report.',
+    );
+    return;
+  }
+  const explorePanel = activateExploreSubtab(panel);
+  if (!explorePanel) {
+    showCodePathsNavigationFailure(panel, 'The Code Graph Explore section is unavailable.');
+    return;
+  }
+  if (!occurrence) {
+    showCodePathsNavigationFailure(
+      explorePanel,
+      'This function is not present as one exact occurrence in the current graph catalog.',
+    );
+    return;
+  }
   const activeView =
     document.querySelector<HTMLElement>('.code-paths-tab.active')?.dataset.view ?? views[0]?.id;
   try {

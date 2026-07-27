@@ -173,4 +173,46 @@ describe('dashboard hash init', () => {
     expect(activeSubtabs).toEqual(['sessions']);
     expect(activePanels).toEqual(['panel-code-paths-sessions']);
   });
+
+  it('matches persisted session ids without constructing a CSS selector', () => {
+    const html = generateDashboardHtml({
+      sessions: [graphSession],
+      graphCatalog: minimalCatalog,
+    });
+    bootReport(html);
+
+    expect(() =>
+      (
+        globalThis as typeof globalThis & {
+          openCodePathsSession: (sessionId: string) => void;
+        }
+      ).openCodePathsSession('graph-session"]'),
+    ).not.toThrow();
+  });
+
+  it('renders a visible state when exact function navigation misses the current catalog', () => {
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    bootReport(html);
+
+    (
+      globalThis as typeof globalThis & {
+        openCodePathsFunction: (identity: {
+          bodyHash: string;
+          qualifiedName: string;
+          filePath: string;
+          line: number;
+        }) => void;
+      }
+    ).openCodePathsFunction({
+      bodyHash: 'missing',
+      qualifiedName: 'pkg.missing',
+      filePath: 'packages/x/src/missing.ts',
+      line: 1,
+    });
+
+    expect(document.querySelector('#panel-code-paths')?.classList.contains('active')).toBe(true);
+    expect(document.querySelector('#panel-code-paths-explore')?.textContent).toContain(
+      'This function is not present as one exact occurrence in the current graph catalog.',
+    );
+  });
 });
