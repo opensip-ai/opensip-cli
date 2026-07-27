@@ -8,14 +8,26 @@
  * It is purely about *what files exist*.
  */
 
-import { existsSync, realpathSync, readFileSync } from 'node:fs';
+import { existsSync, realpathSync, readFileSync, statSync } from 'node:fs';
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 
-import { ConfigurationError, logger } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import {
+  createToolError,
+  isToolErrorLike,
+  logger,
+  normalizeFailure,
+  scrubText,
+} from '@opensip-cli/core';
+import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { normalizeProjectDir } from './normalize-project-dir.js';
+
+const MAX_TSCONFIG_BYTES = 1_000_000;
+const ABSOLUTE_PATH_FRAGMENT = /(?:[A-Za-z]:[\\/]|\/)[^\s'",;)]+/gu;
+const TSCONFIG_NOT_FOUND = graphErrorCatalog.require('GRAPH.TSCONFIG.NOT_FOUND');
+const TSCONFIG_INVALID = graphErrorCatalog.require('GRAPH.TSCONFIG.INVALID');
+const TSCONFIG_LOAD_FAILED = graphErrorCatalog.require('GRAPH.TSCONFIG.LOAD_FAILED');
 
 /** Input to {@link discoverFiles}: project directory and optional tsconfig override. */
 export interface DiscoveryInput {
@@ -64,63 +76,145 @@ function resolveTsConfigPath(projectDirAbs: string, override?: string): string {
     candidate = isAbsolute(override) ? override : resolve(projectDirAbs, override);
   }
   if (!existsSync(candidate)) {
-    throw new ConfigurationError(`tsconfig.json not found at ${candidate}`);
+    throw createToolError(TSCONFIG_NOT_FOUND, 'TypeScript configuration was not found.', {
+      metadata: {
+        condition: override === undefined ? 'default-config-missing' : 'override-missing',
+      },
+    });
   }
-  /* v8 ignore start */
   try {
     return realpathSync(candidate);
-  } catch {
+  } catch (error) {
+    // @swallow-ok canonicalization is optional when the same lexical path remains readable
+    const failure = normalizeFailure(error);
+    logger.warn({
+      evt: 'graph.adapter.tsconfig_realpath_degraded',
+      module: 'graph:adapter-typescript',
+      code: failure.code,
+      errno: failure.metadata.errno,
+      condition: 'config-realpath',
+      msg: 'TypeScript configuration canonicalization failed; discovery will use its lexical path',
+    });
     return candidate;
   }
-  /* v8 ignore stop */
 }
 
 function loadTsConfig(tsConfigPathAbs: string): {
   options: ts.CompilerOptions;
   fileNames: readonly string[];
 } {
-  const raw = readFileSync(tsConfigPathAbs, 'utf8');
-  const parsed = ts.parseConfigFileTextToJson(tsConfigPathAbs, raw);
-  /* v8 ignore start */
-  if (parsed.error) {
-    throw new ConfigurationError(
-      `Failed to parse ${tsConfigPathAbs}: ${ts.flattenDiagnosticMessageText(parsed.error.messageText, '\n')}`,
-    );
+  let raw: string;
+  try {
+    const stat = statSync(tsConfigPathAbs);
+    if (!stat.isFile()) {
+      throw createToolError(
+        TSCONFIG_LOAD_FAILED,
+        'TypeScript configuration is not a regular file.',
+        { metadata: { condition: 'config-not-file' } },
+      );
+    }
+    if (stat.size > MAX_TSCONFIG_BYTES) {
+      throw createToolError(TSCONFIG_INVALID, 'TypeScript configuration is too large.', {
+        metadata: { condition: 'config-too-large' },
+      });
+    }
+    raw = readFileSync(tsConfigPathAbs, 'utf8');
+  } catch (error) {
+    throwTsconfigLoadFailure(error, 'config-read');
   }
-  /* v8 ignore stop */
+  const parsed = ts.parseConfigFileTextToJson(tsConfigPathAbs, raw);
+  if (parsed.error) {
+    reportTsconfigDiagnostic(parsed.error, tsConfigPathAbs, 'config-parse');
+    throw createToolError(TSCONFIG_INVALID, 'TypeScript configuration is invalid.', {
+      metadata: { condition: 'config-parse', diagnosticCode: parsed.error.code },
+    });
+  }
   const readDirectoryBound = ts.sys.readDirectory.bind(ts.sys);
+  const hostReadFailures: unknown[] = [];
   const host: ts.ParseConfigHost = {
     fileExists: (p) => existsSync(p),
     readDirectory: readDirectoryBound,
-    /* v8 ignore start */
     readFile: (p) => {
       try {
         return readFileSync(p, 'utf8');
-      } catch {
+      } catch (error) {
+        // TypeScript's host contract represents absence as undefined. Retain
+        // that shape, then fail at the enclosing config boundary with evidence.
+        hostReadFailures.push(error);
         return;
       }
     },
-    /* v8 ignore stop */
     useCaseSensitiveFileNames: ts.sys.useCaseSensitiveFileNames,
   };
-  const result = ts.parseJsonConfigFileContent(
-    parsed.config as object,
-    host,
-    dirname(tsConfigPathAbs),
-    {},
-    tsConfigPathAbs,
-  );
-  /* v8 ignore start */
+  let result: ts.ParsedCommandLine;
+  try {
+    result = ts.parseJsonConfigFileContent(
+      parsed.config as object,
+      host,
+      dirname(tsConfigPathAbs),
+      {},
+      tsConfigPathAbs,
+    );
+  } catch (error) {
+    throwTsconfigLoadFailure(error, 'config-expand');
+  }
+  if (hostReadFailures.length > 0) {
+    throwTsconfigLoadFailure(hostReadFailures[0], 'extended-config-read');
+  }
   if (result.errors.length > 0) {
     const fatal = result.errors.find((e) => e.category === ts.DiagnosticCategory.Error);
     if (fatal) {
-      throw new ConfigurationError(
-        `Failed to load ${tsConfigPathAbs}: ${ts.flattenDiagnosticMessageText(fatal.messageText, '\n')}`,
-      );
+      reportTsconfigDiagnostic(fatal, tsConfigPathAbs, 'config-expand');
+      throw createToolError(TSCONFIG_INVALID, 'TypeScript configuration is invalid.', {
+        metadata: { condition: 'config-expand', diagnosticCode: fatal.code },
+      });
     }
+    const first = result.errors[0];
+    if (first !== undefined) reportTsconfigDiagnostic(first, tsConfigPathAbs, 'config-warning');
   }
-  /* v8 ignore stop */
   return { options: result.options, fileNames: result.fileNames };
+}
+
+function throwTsconfigLoadFailure(error: unknown, condition: string): never {
+  if (isToolErrorLike(error)) throw error;
+  const failure = normalizeFailure(error);
+  let definition = TSCONFIG_LOAD_FAILED;
+  if (failure.code === 'CORE.SYSTEM.PERMISSION' || failure.code === 'CORE.SYSTEM.RESOURCE') {
+    definition = failure.definition;
+  } else if (failure.code === 'NOT_FOUND') {
+    definition = TSCONFIG_NOT_FOUND;
+  }
+  throw createToolError(definition, 'TypeScript configuration could not be loaded.', {
+    cause: error,
+    metadata: {
+      condition,
+      ...(typeof failure.metadata.errno === 'string' ? { errno: failure.metadata.errno } : {}),
+    },
+  });
+}
+
+function reportTsconfigDiagnostic(
+  diagnostic: ts.Diagnostic,
+  tsConfigPathAbs: string,
+  condition: string,
+): void {
+  const detail = scrubText(
+    ts
+      .flattenDiagnosticMessageText(diagnostic.messageText, ' ')
+      .replaceAll(tsConfigPathAbs, '[tsconfig]')
+      .replaceAll(dirname(tsConfigPathAbs), '[project]')
+      .replaceAll(ABSOLUTE_PATH_FRAGMENT, '[path]'),
+    500,
+  );
+  logger.warn({
+    evt: 'graph.adapter.tsconfig_diagnostic',
+    module: 'graph:adapter-typescript',
+    code: TSCONFIG_INVALID.code,
+    condition,
+    diagnosticCode: diagnostic.code,
+    detail,
+    msg: 'TypeScript reported a configuration diagnostic',
+  });
 }
 
 function filterToSourceFiles(fileNames: readonly string[], signal?: AbortSignal): string[] {
@@ -130,13 +224,20 @@ function filterToSourceFiles(fileNames: readonly string[], signal?: AbortSignal)
     throwIfGraphAdapterAborted(signal, 'TypeScript discovery');
     if (!isSupportedSourceFile(f) || isDeclarationFile(f)) continue;
     let real = f;
-    /* v8 ignore start */
     try {
       real = realpathSync(f);
-    } catch {
-      // Use the original path if realpath fails (file might be in a symlinked dir).
+    } catch (error) {
+      // @swallow-ok a file admitted by tsc retains its lexical identity when optional canonicalization fails
+      const failure = normalizeFailure(error);
+      logger.debug({
+        evt: 'graph.adapter.source_realpath_degraded',
+        module: 'graph:adapter-typescript',
+        code: failure.code,
+        errno: failure.metadata.errno,
+        condition: 'source-realpath',
+        msg: 'A TypeScript source path could not be canonicalized; its lexical path is retained',
+      });
     }
-    /* v8 ignore stop */
     // Normalize separators on Windows so dedup works.
     const key = real.split(sep).join('/');
     if (seen.has(key)) continue;

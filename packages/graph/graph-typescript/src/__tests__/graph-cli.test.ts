@@ -16,6 +16,7 @@ import {
   NotFoundError,
   RunScope,
   ValidationError,
+  normalizeFailure,
   runWithScope,
   runWithScopeSync,
   applyToolContributeScope,
@@ -33,6 +34,7 @@ import type { ReportFailureDetail, Signal, ToolCliContext } from '@opensip-cli/c
 function exitFromToolError(error: unknown): number {
   if (error instanceof NotFoundError) return 3;
   if (error instanceof ConfigurationError || error instanceof ValidationError) return 2;
+  if (normalizeFailure(error).definition.exitClass === 'configuration') return 2;
   return 1;
 }
 
