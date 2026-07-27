@@ -58,6 +58,29 @@ const MAX_DIAGNOSTIC_BYTES = 2 * 1024;
 const VERSION_OUTPUT_BYTES = 4 * 1024;
 const VERSION_TIMEOUT_MS = 30_000;
 
+interface ProcessTextStream {
+  write(text: string): unknown;
+}
+
+function downstreamClosed(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EPIPE' || code === 'ERR_STREAM_DESTROYED';
+}
+
+/** Drop output after a normal downstream pipe close; preserve every other fault. */
+export function createTolerantProcessWriter(stream: ProcessTextStream): (text: string) => void {
+  let unavailable = false;
+  return (text) => {
+    if (unavailable) return;
+    try {
+      stream.write(text);
+    } catch (error) {
+      if (!downstreamClosed(error)) throw error;
+      unavailable = true;
+    }
+  };
+}
+
 export interface CliDependencies {
   readonly artifactFileSystem: ArtifactFileSystem;
   readonly cwd: () => string;
@@ -125,8 +148,8 @@ export const DEFAULT_CLI_DEPENDENCIES: CliDependencies = Object.freeze({
   resultsRoot: DEFAULT_RESULTS_ROOT,
   runArm: (task: GoldTask, arm: Arm, target: CliTarget) =>
     runTaskArm(task, arm, { cliTarget: target }),
-  stderr: (text: string) => process.stderr.write(text),
-  stdout: (text: string) => process.stdout.write(text),
+  stderr: createTolerantProcessWriter(process.stderr),
+  stdout: createTolerantProcessWriter(process.stdout),
 });
 
 function buildRequestedPaths(

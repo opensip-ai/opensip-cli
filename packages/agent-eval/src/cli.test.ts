@@ -18,6 +18,7 @@ import {
   DEFAULT_CLI_DEPENDENCIES,
   InvocationError,
   USAGE,
+  createTolerantProcessWriter,
   defaultJsonPath,
   main,
   markdownPathFor,
@@ -347,6 +348,35 @@ describe('parseGitProvenance', () => {
     expect(() => parseGitProvenance('# branch.oid (initial)\n# branch.head main\n')).toThrow(
       HarnessPrerequisiteError,
     );
+  });
+});
+
+describe('process output boundary', () => {
+  it.each(['EPIPE', 'ERR_STREAM_DESTROYED'] as const)(
+    'latches a normal downstream %s close',
+    (code) => {
+      let writes = 0;
+      const writer = createTolerantProcessWriter({
+        write: () => {
+          writes += 1;
+          throw Object.assign(new Error('downstream closed'), { code });
+        },
+      });
+
+      expect(() => writer('first')).not.toThrow();
+      expect(() => writer('second')).not.toThrow();
+      expect(writes).toBe(1);
+    },
+  );
+
+  it('preserves unrelated stream failures for the process error boundary', () => {
+    const writer = createTolerantProcessWriter({
+      write: () => {
+        throw Object.assign(new Error('stream failed'), { code: 'EIO' });
+      },
+    });
+
+    expect(() => writer('failure')).toThrow(/stream failed/u);
   });
 });
 
