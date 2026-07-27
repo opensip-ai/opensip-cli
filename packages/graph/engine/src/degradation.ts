@@ -1,5 +1,3 @@
-import { graphErrorCatalog } from './errors/graph-error-catalog.js';
-
 import type { Catalog, GraphRunDegradation } from './types.js';
 import type { Signal } from '@opensip-cli/core';
 
@@ -7,9 +5,6 @@ export type { GraphDegradationCondition, GraphRunDegradation } from './types.js'
 
 /** Engine-side identity for graph's run-level coverage diagnostic. */
 export const GRAPH_PARTIAL_COVERAGE_SLUG = 'graph:catalog-partial-coverage';
-
-/** Registered definition linked from every structured coverage marker. */
-export const GRAPH_PARTIAL_COVERAGE = graphErrorCatalog.require('GRAPH.CATALOG.PARTIAL_COVERAGE');
 
 /** Derive run-level degradation evidence from a catalog's persisted coverage. */
 export function catalogGraphDegradations(
