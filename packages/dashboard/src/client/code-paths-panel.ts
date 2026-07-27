@@ -38,7 +38,6 @@ import {
   type GraphRuleEntry,
 } from './catalog-recipes-tables.js';
 import { el } from './el.js';
-import { filterState } from './filters.js';
 import { closeFunctionCard, openFunctionCard, openFunctionOccurrence } from './function-card.js';
 import { graphVisualizationDegradation } from './graph-visualization-degradation.js';
 import { buildIndexes } from './indexes.js';
@@ -46,7 +45,7 @@ import { renderSessionTable } from './sessions.js';
 import { renderSubtabBar } from './subtab-bar.js';
 import { registerTabActivator } from './tab-activators.js';
 import { activateReportTab, replaceHash } from './tab-bar.js';
-import { activateView, views } from './views-registry.js';
+import { activateView, renderRegisteredView, views } from './views-registry.js';
 // view-coupling / view-distribution / view-graph register themselves into the
 // `views` array as a load-time side effect. Importing them here (the panel is
 // the Code Paths entry point) guarantees they are bundled and registered before
@@ -221,7 +220,7 @@ function renderCodePathsExplore(host: HTMLElement): void {
   // Render every view once on init.
   for (const view of views) {
     const container = document.querySelector<HTMLElement>('#code-paths-view-' + view.id);
-    if (container) view.render(container, cg.graphCatalog, cg.graphIndexes, filterState);
+    if (container) renderRegisteredView(view, container, cg.graphCatalog, cg.graphIndexes);
   }
   const hashId = readViewIdFromHash();
   const initialId = hashId ?? views[0]?.id;
