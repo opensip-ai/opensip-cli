@@ -50,6 +50,34 @@ describe('listGitVisibleFixtureFiles', () => {
     });
   });
 
+  it('redacts repository paths and credentials from Git diagnostics', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'agent-eval-inventory-sensitive-'));
+    roots.push(root);
+    const fixture = join(root, 'fixture');
+    const secret = 'inventory-secret-value';
+    mkdirSync(fixture);
+
+    const error = await listGitVisibleFixtureFiles(fixture, root, {
+      spawn: () =>
+        Promise.resolve({
+          ...timedOutResult(),
+          exitCode: 128,
+          signal: null,
+          stderr: `fatal: repository ${root} unavailable; password=${secret}`,
+          timedOut: false,
+        }),
+    }).then(
+      () => undefined,
+      (error_: unknown) => error_,
+    );
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain('[redacted-path]');
+    expect((error as Error).message).toContain('[redacted-credential]');
+    expect((error as Error).message).not.toContain(root);
+    expect((error as Error).message).not.toContain(secret);
+  });
+
   it('returns an exact repository-root view without ignored root files', async () => {
     const root = mkdtempSync(join(tmpdir(), 'agent-eval-dogfood-inventory-'));
     roots.push(root);

@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { buildDeterministicEnv } from '../runner/env.js';
+import { safeErrorDetail } from '../runner/error-detail.js';
 import {
   HarnessPrerequisiteError,
   spawnCli,
@@ -57,19 +58,24 @@ export function fixtureHomePath(projectRoot: string): string {
   return join(projectRoot, FIXTURE_HOME_DIRECTORY);
 }
 
-function diagnosticSuffix(result: SpawnResult): string {
+function diagnosticSuffix(result: SpawnResult, sensitivePaths: readonly string[]): string {
   const output = result.stderr.trim().length > 0 ? result.stderr : result.stdout;
   const tail = tailForDiagnostics(output.trim());
-  return tail.length === 0 ? '' : `\nDiagnostic tail:\n${tail}`;
+  const detail = safeErrorDetail(tail, sensitivePaths);
+  return detail.length === 0 ? '' : `\nDiagnostic tail:\n${detail}`;
 }
 
 function failureReason(
   result: SpawnResult,
   acceptedExitCodes: ReadonlySet<number>,
+  sensitivePaths: readonly string[],
 ): string | undefined {
   if (result.timedOut) return 'timed out';
   if (result.outputLimitExceeded) return 'exceeded the output limit';
-  if (result.error !== undefined) return `could not be spawned: ${result.error}`;
+  if (result.error !== undefined) {
+    const detail = safeErrorDetail(result.error, sensitivePaths) || 'unknown failure';
+    return `could not be spawned: ${detail}`;
+  }
   if (result.exitCode === null) {
     return result.signal === null
       ? 'closed without an exit code'
@@ -88,11 +94,12 @@ function requireSuccessfulStage(
   name: string,
   result: SpawnResult,
   acceptedExitCodes: ReadonlySet<number>,
+  sensitivePaths: readonly string[],
 ): SetupStageRecord {
-  const reason = failureReason(result, acceptedExitCodes);
+  const reason = failureReason(result, acceptedExitCodes, sensitivePaths);
   if (reason !== undefined || result.exitCode === null) {
     throw new HarnessPrerequisiteError(
-      `OpenSIP ${name} setup ${reason ?? 'failed'}.${diagnosticSuffix(result)}`,
+      `OpenSIP ${name} setup ${reason ?? 'failed'}.${diagnosticSuffix(result, sensitivePaths)}`,
     );
   }
   return {
@@ -116,16 +123,19 @@ export async function setupFixtureProject(
   dependencies.prepareHome(home);
   const env = dependencies.buildEnv({ HOME: home });
   const options: SpawnOptions = { cwd: projectRoot, env };
+  const sensitivePaths = [projectRoot, home];
 
   const init = requireSuccessfulStage(
     'init',
     await dependencies.spawnCli(buildInitArgv(projectRoot, language), options),
     INIT_EXIT_CODES,
+    sensitivePaths,
   );
   const graph = requireSuccessfulStage(
     'graph',
     await dependencies.spawnCli(buildGraphArgv(projectRoot, language), options),
     GRAPH_EXIT_CODES,
+    sensitivePaths,
   );
 
   return {

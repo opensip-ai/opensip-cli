@@ -4,6 +4,7 @@ import { relative, resolve, sep } from 'node:path';
 import { compareCodePoints } from '../model/value-helpers.js';
 
 import { buildDeterministicEnv } from './env.js';
+import { safeErrorDetail } from './error-detail.js';
 import { HarnessPrerequisiteError, spawnProcess } from './spawn.js';
 
 import type { SpawnOptions, SpawnResult } from './spawn.js';
@@ -96,8 +97,11 @@ async function gitInventory(
     result.outputLimitExceeded ||
     result.timedOut
   ) {
-    const stderrTail = result.stderr.trim().slice(0, 600);
-    const errorPart = result.error === undefined ? '' : `, error=${result.error}`;
+    const sensitivePaths = [root];
+    const stderrTail = safeErrorDetail(result.stderr.trim().slice(0, 600), sensitivePaths);
+    const errorDetail =
+      result.error === undefined ? '' : safeErrorDetail(result.error, sensitivePaths);
+    const errorPart = errorDetail.length === 0 ? '' : `, error=${errorDetail}`;
     const stderrPart = stderrTail.length === 0 ? '' : `, stderr=${stderrTail}`;
     throw new HarnessPrerequisiteError(
       'Agent-eval fixture Git inventory is unavailable ' +
