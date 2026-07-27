@@ -5,11 +5,10 @@
  * name — the ruling D1 package-name rule governs SUBSTRATE catalogs, and using a package name
  * here would give one owner two identities.
  *
- * The initial nine read/build literals become four definitions. Workspace child resilience adds
- * three Result-linked definitions below. Before registration the `GRAPH` head was mapped by
- * nothing, so every literal resolved to `CORE.SYSTEM.UNKNOWN_FAILURE` — severity fatal,
- * exposure operator-only. That is a poor fit for this surface: a cursor a caller mis-typed, a
- * catalog that changed under a build, and a timed-out child all need distinct recovery posture.
+ * Before registration the `GRAPH` head was mapped by nothing, so every literal resolved to
+ * `CORE.SYSTEM.UNKNOWN_FAILURE` — severity fatal, exposure operator-only. That is a poor fit
+ * for this surface: a cursor a caller mis-typed, a catalog that changed under a build, and a
+ * timed-out child all need distinct recovery posture.
  */
 
 import { defineErrorCatalog } from '@opensip-cli/core';
@@ -105,6 +104,46 @@ export const graphErrorCatalog = defineErrorCatalog(
       exposure: 'public',
       exitClass: 'runtime',
       operatorAction: 'Run `opensip graph` to rebuild the catalog, then retry the read.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /** A graph context producer was invoked without the datastore its RunScope must provide. */
+    'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED': {
+      code: 'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED',
+      publicPresentationKey: 'context-catalog-datastore-required',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Enter a project RunScope with its datastore before invoking graph context producers.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+
+    /**
+     * A scoped graph-context catalog operation failed after the boundary was entered.
+     *
+     * One environment/I/O definition covers datastore resolution and each repository operation
+     * (D9). The closed Result reasons remain operation-specific plain data; `metadata.condition`
+     * identifies the failed step in operator evidence without creating three equivalent codes.
+     */
+    'GRAPH.CONTEXT_CATALOG.OPERATION_FAILED': {
+      code: 'GRAPH.CONTEXT_CATALOG.OPERATION_FAILED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the operation condition and local datastore failure detail, restore storage availability, then retry.',
       stability: 'public',
       lifecycle: 'active',
       publicMetadataKeys: ['condition'],

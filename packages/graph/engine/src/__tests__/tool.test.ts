@@ -58,6 +58,12 @@ describe('graphTool contract conformance (AC-2)', () => {
     ).toBe('output-malformed');
   });
 
+  it('links the one-to-one context catalog Result reason to its registered definition', () => {
+    expect(
+      graphErrorCatalog.require('GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED').publicPresentationKey,
+    ).toBe('context-catalog-datastore-required');
+  });
+
   it('commands lists the unified graph subcommand plus the nested export/lookup/index/recipes/list queries', () => {
     const names = (graphTool.commands ?? []).map((c) => c.name);
     expect(names).toEqual([
