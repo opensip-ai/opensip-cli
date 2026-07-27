@@ -40,6 +40,7 @@ import {
 import { el } from './el.js';
 import { filterState } from './filters.js';
 import { closeFunctionCard, openFunctionCard, openFunctionOccurrence } from './function-card.js';
+import { graphVisualizationDegradation } from './graph-visualization-degradation.js';
 import { buildIndexes } from './indexes.js';
 import { renderSessionTable } from './sessions.js';
 import { renderSubtabBar } from './subtab-bar.js';
@@ -150,7 +151,8 @@ export function renderCodePathsTab(): void {
         if (cg.graphCatalog) {
           renderCodePathsExplore(p);
         } else {
-          p.append(el('div', { class: 'empty', text: 'No catalog yet.' }));
+          const degradation = graphVisualizationDegradation('catalog-projection-failed');
+          p.append(el('div', { class: 'empty', text: degradation?.message ?? 'No catalog yet.' }));
         }
       },
     },

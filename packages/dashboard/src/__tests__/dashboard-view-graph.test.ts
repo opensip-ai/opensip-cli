@@ -60,6 +60,14 @@ function embedViewModel(vm: unknown): void {
   document.body.append(blob);
 }
 
+function embedDegradation(condition: string, message: string): void {
+  const blob = document.createElement('script');
+  blob.type = 'application/json';
+  blob.id = 'graph-visualization-degradations';
+  blob.textContent = JSON.stringify([{ condition, message }]);
+  document.body.append(blob);
+}
+
 // Package-level sample: two packages, one directed edge pkg-a → pkg-b.
 const SAMPLE_VM = {
   language: 'typescript',
@@ -95,6 +103,14 @@ describe('View 8 — Visualization', () => {
     expect(c.querySelector('.empty')!.textContent).toContain('No graph to display');
   });
 
+  it('renders the catalog remediation recorded by the generator', () => {
+    embedDegradation('catalog-projection-failed', 'Re-run opensip graph.');
+    const env = loadEnv(false);
+    const c = document.createElement('div');
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
+    expect(c.querySelector('.empty')!.textContent).toBe('Re-run opensip graph.');
+  });
+
   it('renders the renderer-unavailable state when cytoscape is missing', () => {
     const env = loadEnv(false); // no vendor → no cytoscape global
     embedViewModel(SAMPLE_VM);
@@ -103,6 +119,16 @@ describe('View 8 — Visualization', () => {
     env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
     expect(c.querySelector('.empty')!.textContent).toContain('Graph renderer unavailable');
     expect(c.querySelector('#code-paths-graph-canvas')).toBeNull();
+  });
+
+  it('renders the missing-renderer remediation recorded by the generator', () => {
+    const env = loadEnv(false);
+    embedViewModel(SAMPLE_VM);
+    embedDegradation('renderer-asset-unavailable', 'Reinstall the renderer asset.');
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
+    expect(c.querySelector('.empty')!.textContent).toBe('Reinstall the renderer asset.');
   });
 
   it('renders the layout selector as a dropdown with dagre/cose/breadthfirst', () => {

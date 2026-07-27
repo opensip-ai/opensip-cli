@@ -171,6 +171,69 @@ const EXTERNAL_TAB_LABEL = 'External Tools';
 const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
 const CHANGE_IMPACT_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`;
 
+interface GraphVisualizationDegradation {
+  readonly condition: 'catalog-projection-failed' | 'renderer-asset-unavailable';
+  readonly message: string;
+}
+
+function graphArtifacts(
+  graphCatalog: GraphCatalog | null,
+  maxGraphCatalogBytes: number | undefined,
+): {
+  readonly boundedCatalog: ReturnType<typeof boundGraphCatalog>;
+  readonly catalog: GraphCatalog | null;
+  readonly graphViewModel: ReturnType<typeof projectCatalogToGraphViewModel> | null;
+  readonly degradations: readonly GraphVisualizationDegradation[];
+} {
+  if (graphCatalog === null) {
+    return {
+      boundedCatalog: boundGraphCatalog(null, maxGraphCatalogBytes),
+      catalog: null,
+      graphViewModel: null,
+      degradations: [],
+    };
+  }
+  try {
+    return {
+      boundedCatalog: boundGraphCatalog(graphCatalog, maxGraphCatalogBytes),
+      catalog: graphCatalog,
+      graphViewModel: projectCatalogToGraphViewModel(graphCatalog),
+      degradations: [],
+    };
+  } catch {
+    return {
+      boundedCatalog: boundGraphCatalog(null, maxGraphCatalogBytes),
+      catalog: null,
+      graphViewModel: null,
+      degradations: [
+        {
+          condition: 'catalog-projection-failed',
+          message:
+            'Graph exploration is unavailable because the stored catalog is malformed. Run `opensip graph`, then regenerate this report.',
+        },
+      ],
+    };
+  }
+}
+
+function codePathsVendor(): {
+  readonly javascript: string;
+  readonly degradation?: GraphVisualizationDegradation;
+} {
+  try {
+    return { javascript: dashboardCodePathsVendorJs() };
+  } catch {
+    return {
+      javascript: '',
+      degradation: {
+        condition: 'renderer-asset-unavailable',
+        message:
+          'Graph visualization is unavailable because its renderer asset is missing. Reinstall opensip-cli or run `pnpm --filter=@opensip-cli/dashboard vendor:cytoscape`, then regenerate this report.',
+      },
+    };
+  }
+}
+
 // Coerce a session.score into a finite number safe for HTML interpolation
 // in the <title> tag. Returns 0 for non-finite values so the rendered
 // title remains well-formed even if a legacy or corrupted session row
@@ -253,7 +316,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // one. Inlining it whole produced a 293 MB report on this repo. Project it to
   // the client's contract and bound what remains — truncation is surfaced to
   // the page (see `graphCatalogOmittedFunctions`), never silent.
-  const boundedCatalog = boundGraphCatalog(graphCatalog, maxGraphCatalogBytes);
+  const graph = graphArtifacts(graphCatalog, maxGraphCatalogBytes);
+  const boundedCatalog = graph.boundedCatalog;
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', boundedCatalog.catalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
@@ -261,8 +325,21 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // coupling weights + cross-package SCCs) here at generation time and embeds
   // it as its own JSON blob, sized for the renderer rather than for storage.
   // See code-paths/graph-view-model.ts.
-  const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
-  const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
+  const graphViewModelBlock = serializeOptionalBlob(
+    'graph-view-model',
+    graph.graphViewModel,
+    'json',
+  );
+  const vendor = codePathsVendor();
+  const graphVisualizationDegradations = [
+    ...graph.degradations,
+    ...(vendor.degradation === undefined ? [] : [vendor.degradation]),
+  ];
+  const graphVisualizationDegradationsBlock = serializeOptionalBlob(
+    'graph-visualization-degradations',
+    graphVisualizationDegradations.length === 0 ? null : graphVisualizationDegradations,
+    'json',
+  );
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
   const projectRootJs = serializeOptionalBlob('PROJECT_ROOT', projectRoot, 'literal');
   const reportSelectionJs = serializeOptionalBlob(
@@ -271,7 +348,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     'literal',
   );
   const normalizedSelection = normalizeReportViewSelection(selection);
-  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graphCatalog);
+  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graph.catalog);
   const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
   const safeChangeImpactJson = serializeJsonForScriptContext(boundedImpact.runs);
 
@@ -307,8 +384,15 @@ export function generateDashboardHtml(input: DashboardInput): string {
       : []),
   ].join('\n');
   const toolTabRenderCalls = [
-    ...toolTabs.map((t) => `${t.renderFunctionName}();`),
-    ...(hasExternalSessions ? ['renderExternalTab();'] : []),
+    ...toolTabs.map(
+      (t) =>
+        `renderDashboardPanel(${JSON.stringify('panel-' + t.id)}, ${JSON.stringify(t.label)}, () => ${t.renderFunctionName}());`,
+    ),
+    ...(hasExternalSessions
+      ? [
+          `renderDashboardPanel(${JSON.stringify('panel-' + EXTERNAL_TAB_ID)}, ${JSON.stringify(EXTERNAL_TAB_LABEL)}, () => renderExternalTab());`,
+        ]
+      : []),
   ].join('\n');
   // Overview's `tool → badge style` and `tool → tab id` maps, derived from the
   // same descriptors and injected as page globals so the bundled overview renderer
@@ -360,6 +444,7 @@ ${toolTabPanels}
 
 ${graphCatalogBlock}
 ${graphViewModelBlock}
+${graphVisualizationDegradationsBlock}
 <script>
 const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
@@ -394,15 +479,27 @@ const externalTabId = ${JSON.stringify(EXTERNAL_TAB_ID)};
 // The vendored Cytoscape renderer (defines the cytoscape / cytoscapeDagre
 // browser globals the Visualization view consumes). Inlined BEFORE the bundle so
 // those globals are present; it is a third-party UMD blob, not our client JS.
-${dashboardCodePathsVendorJs()}
+${vendor.javascript}
 ${DASHBOARD_CLIENT_BUNDLE}
 
 // =======================================================
 // RENDER TABS
 // =======================================================
-renderOverview();
+function renderDashboardPanel(panelId, label, render) {
+  try {
+    render();
+  } catch {
+    const panel = document.querySelector('#' + panelId);
+    if (!panel) return;
+    const notice = document.createElement('div');
+    notice.className = 'empty';
+    notice.textContent = label + ' could not render. The rest of the report remains available.';
+    panel.replaceChildren(notice);
+  }
+}
+renderDashboardPanel('panel-overview', 'Overview', () => renderOverview());
 ${toolTabRenderCalls}
-renderChangeImpact();
+renderDashboardPanel('panel-change-impact', 'Change Impact', () => renderChangeImpact());
 </script>
 </body>
 </html>`;

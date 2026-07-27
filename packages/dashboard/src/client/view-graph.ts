@@ -29,6 +29,7 @@
 
 import { el } from './el.js';
 import { makeSectionHeading } from './function-row.js';
+import { graphVisualizationDegradation } from './graph-visualization-degradation.js';
 import { fuzzyMatch } from './search.js';
 import { gvBuildFunctionElements, gvRenderControls } from './view-graph-controls.js';
 import { gvBuildElements, type GraphElement, type GraphViewModel } from './view-graph-elements.js';
@@ -251,8 +252,14 @@ function gvResolveElements(container: HTMLElement, indexes: IndexesLike): GraphE
     return elements;
   }
   const vm = gvLoadViewModel();
-  if (!vm?.nodes || vm.nodes.length === 0) return gvEmpty(container, 'No graph to display.');
-  if (typeof cytoscape !== 'function') return gvEmpty(container, 'Graph renderer unavailable.');
+  if (!vm?.nodes || vm.nodes.length === 0) {
+    const degradation = graphVisualizationDegradation('catalog-projection-failed');
+    return gvEmpty(container, degradation?.message ?? 'No graph to display.');
+  }
+  if (typeof cytoscape !== 'function') {
+    const degradation = graphVisualizationDegradation('renderer-asset-unavailable');
+    return gvEmpty(container, degradation?.message ?? 'Graph renderer unavailable.');
+  }
   const elements = gvBuildElements(vm);
   if (elements.length === 0) return gvEmpty(container, 'No packages to display.');
   return elements;
