@@ -212,10 +212,16 @@ export interface FunctionOccurrence {
   readonly dependencies?: readonly DependencyEdge[];
 }
 
+/** Closed registered-code vocabulary for non-fatal per-file graph omissions. */
+export type ParseErrorCode =
+  'GRAPH.TS.SOURCE_UNREADABLE' | 'GRAPH.TS.WALK_DEPTH_EXCEEDED' | 'GRAPH.TS.WALK_FAULT';
+
 /** Stage 1's parse-error record (e.g., file unparseable; reported but does not abort the run). */
 export interface ParseError {
   readonly filePath: string;
   readonly message: string;
+  /** Registered definition when the omission maps one-to-one to a graph failure condition. */
+  readonly code?: ParseErrorCode;
 }
 
 /**

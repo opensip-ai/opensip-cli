@@ -22,6 +22,11 @@ function boundedParseMessage(message: string): string {
     : singleLine;
 }
 
+function parseErrorLogEntry(error: ParseError): string {
+  const codePrefix = error.code === undefined ? '' : `[${error.code}] `;
+  return `${error.filePath}: ${codePrefix}${boundedParseMessage(error.message)}`;
+}
+
 /**
  * Name every file the parser dropped, in the run log only. The persisted
  * coverage payload stays count-only (privacy-safe); this local diagnostic is
@@ -33,9 +38,7 @@ function logDroppedParseFiles(parseErrors: readonly ParseError[]): void {
     evt: 'graph.catalog.parse.dropped',
     module: MODULE_NAME,
     count: parseErrors.length,
-    files: parseErrors
-      .slice(0, PARSE_DROP_FILE_CAP)
-      .map((error) => `${error.filePath}: ${boundedParseMessage(error.message)}`),
+    files: parseErrors.slice(0, PARSE_DROP_FILE_CAP).map(parseErrorLogEntry),
     overflow: Math.max(0, parseErrors.length - PARSE_DROP_FILE_CAP),
   });
 }

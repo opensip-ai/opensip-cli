@@ -404,6 +404,22 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['field'],
     },
 
+    /** A TypeScript source file could not be read for a non-fatal graph parse. */
+    'GRAPH.TS.SOURCE_UNREADABLE': {
+      code: 'GRAPH.TS.SOURCE_UNREADABLE',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Restore access to the omitted TypeScript source or exclude it, then rebuild the graph.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+
     /**
      * A shard-dependent operation has no trustworthy complete result.
      *

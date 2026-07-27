@@ -86,6 +86,32 @@ describe('catalogBuildCoverage', () => {
     expect(JSON.stringify(coverage)).not.toContain('broken.ts');
   });
 
+  it('includes a registered omission code in the bounded local diagnostic', () => {
+    const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-code-'));
+    roots.push(root);
+    const file = join(root, 'unreadable.ts');
+    writeFileSync(file, 'export const work = true;\n');
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    catalogBuildCoverage({
+      projectRoot: root,
+      files: [file],
+      parseErrors: [
+        {
+          filePath: 'unreadable.ts',
+          message: 'Source file could not be read.',
+          code: 'GRAPH.TS.SOURCE_UNREADABLE',
+        },
+      ],
+    });
+
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        files: ['unreadable.ts: [GRAPH.TS.SOURCE_UNREADABLE] Source file could not be read.'],
+      }),
+    );
+  });
+
   it('caps the logged file list and message length, recording the overflow', () => {
     const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-cap-'));
     roots.push(root);

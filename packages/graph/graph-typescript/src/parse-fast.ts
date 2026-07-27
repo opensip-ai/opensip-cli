@@ -75,6 +75,7 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
       parseErrors.push({
         filePath: safeProjectRelativePath(input, fileName),
         message: sourceReadFailureMessage(error),
+        code: 'GRAPH.TS.SOURCE_UNREADABLE',
       });
       continue;
     }

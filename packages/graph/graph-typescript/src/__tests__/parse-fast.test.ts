@@ -86,6 +86,7 @@ describe('parseProjectFast', () => {
       {
         filePath: 'private/missing.ts',
         message: 'Source file was unavailable when graph parsing began.',
+        code: 'GRAPH.TS.SOURCE_UNREADABLE',
       },
     ]);
     expect(out.parseErrors[0]?.message).not.toContain(dir);

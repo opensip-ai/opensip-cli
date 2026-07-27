@@ -86,7 +86,13 @@ describe('CatalogRepo shard-fragment cache', () => {
           discarded: false,
         },
       ],
-      parseErrors: [{ filePath: 'src/b.ts', message: 'line one\nline two' }],
+      parseErrors: [
+        {
+          filePath: 'src/b.ts',
+          message: 'line one\nline two',
+          code: 'GRAPH.TS.SOURCE_UNREADABLE',
+        },
+      ],
     };
     repo.upsertShardFragment(populated);
 

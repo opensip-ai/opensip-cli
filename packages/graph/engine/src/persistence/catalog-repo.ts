@@ -431,8 +431,18 @@ function isSafeParseErrors(value: unknown): boolean {
       (entry) =>
         isRecord(entry) &&
         isSafeCatalogText(entry.filePath) &&
-        isBoundedMessage(entry.message, MAX_CATALOG_TEXT),
+        isBoundedMessage(entry.message, MAX_CATALOG_TEXT) &&
+        isSafeParseErrorCode(entry.code),
     )
+  );
+}
+
+function isSafeParseErrorCode(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === 'GRAPH.TS.SOURCE_UNREADABLE' ||
+    value === 'GRAPH.TS.WALK_DEPTH_EXCEEDED' ||
+    value === 'GRAPH.TS.WALK_FAULT'
   );
 }
 
