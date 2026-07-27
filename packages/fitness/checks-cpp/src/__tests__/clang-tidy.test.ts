@@ -42,6 +42,22 @@ describe('parseClangTidyOutput', () => {
     expect(violations[0]?.severity).toBe('error');
   });
 
+  it('refuses to misattribute missing build inputs as source findings', () => {
+    const out = `/x/y.cpp:1:1: error: 'generated/config.h' file not found [clang-diagnostic-error]`;
+
+    expect(() => parseClangTidyOutput('', out, 1, ['/x/y.cpp'], '/x')).toThrow(
+      /could not analyze the translation unit.*file not found/u,
+    );
+  });
+
+  it('retains clang diagnostic errors that represent source syntax failures', () => {
+    const out = `/x/y.cpp:5:1: error: expected ';' [clang-diagnostic-error]`;
+
+    expect(parseClangTidyOutput('', out, 1, ['/x/y.cpp'], '/x')).toMatchObject([
+      { filePath: 'y.cpp', line: 5, severity: 'error' },
+    ]);
+  });
+
   it('skips note: lines (notes are continuations of prior diagnostics)', () => {
     const out = [
       '/x/y.cpp:5:1: warning: prefer enum class [modernize-use-enum-class]',
