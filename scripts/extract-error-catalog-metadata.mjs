@@ -53,12 +53,15 @@ const CATALOG_SOURCES = [
     file: 'packages/codebase/src/errors/codebase-error-catalog.ts',
     exportName: 'codebaseErrorCatalog',
   },
-  {
+  // Split for the same reason core's is: the host catalog outgrew the file-length bound as a
+  // single unit. Each module is listed because this manifest is the repository-wide code
+  // uniqueness authority and must see every definition, not just every catalog.
+  ...['host-wiring', 'suite-and-runs', 'init-and-policy'].map((domain) => ({
     packageName: 'opensip-cli',
     ownerId: 'opensip-cli',
-    file: 'packages/cli/src/errors/host-error-catalog.ts',
+    file: `packages/cli/src/errors/definitions/${domain}.ts`,
     exportName: 'hostErrorCatalog',
-  },
+  })),
   {
     packageName: '@opensip-cli/config',
     ownerId: '@opensip-cli/config',

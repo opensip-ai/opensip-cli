@@ -29,13 +29,22 @@ import {
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { EnvRegistry, isPlainRecord, withFileLock, type EnvVarSpec } from '@opensip-cli/core';
+import {
+  EnvRegistry,
+  isPlainRecord,
+  withFileLock,
+  type EnvVarSpec,
+  ValidationError,
+} from '@opensip-cli/core';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 
+import { configErrorCatalog } from '../errors/config-error-catalog.js';
 import {
   userTrustPolicySchema,
   type UserTrustPolicyDocument,
 } from '../policy/trust-policy-schema.js';
+
+const POLICY_DOCUMENT_INVALID = configErrorCatalog.require('CONFIG.POLICY.USER_DOCUMENT_INVALID');
 
 /**
  * Config-layer environment variables (§5.12). Declared as an
@@ -164,8 +173,13 @@ export function grantCapabilityTrust(grant: {
     const config = readGlobalConfig();
     const existing = readGlobalTrustPolicy();
     if (existing.error !== undefined) {
-      throw new Error(
+      throw new ValidationError(
         `user-level policy block is invalid (${existing.error}); fix ${GLOBAL_CONFIG_PATH} before granting trust`,
+        {
+          code: POLICY_DOCUMENT_INVALID.code,
+          definition: POLICY_DOCUMENT_INVALID,
+          metadata: { condition: 'existing-policy-invalid' },
+        },
       );
     }
     const policy: UserTrustPolicyDocument = existing.policy ?? {};
@@ -176,7 +190,14 @@ export function grantCapabilityTrust(grant: {
     });
     if (!nextPolicy.success) {
       const summary = nextPolicy.error.issues.map((issue) => issue.message).join('; ');
-      throw new Error(`capability trust grant would make the user policy invalid: ${summary}`);
+      throw new ValidationError(
+        `capability trust grant would make the user policy invalid: ${summary}`,
+        {
+          code: POLICY_DOCUMENT_INVALID.code,
+          definition: POLICY_DOCUMENT_INVALID,
+          metadata: { condition: 'grant-would-invalidate' },
+        },
+      );
     }
     writeGlobalConfig({
       ...config,

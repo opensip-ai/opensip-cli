@@ -77,5 +77,49 @@ export const datastoreErrorCatalog = defineErrorCatalog(
         'Reduce the size of the named field or payload before persisting it; the datastore bound protects shared storage.',
       publicMetadataKeys: ['field', 'bound'],
     },
+    /**
+     * The SQLite datastore did not close cleanly — checkpointing or the native connection
+     * close was not proven.
+     *
+     * `integrity`, not a mere I/O hiccup: an unproven checkpoint means the WAL may still hold
+     * writes the next open will not see, so reporting success here would be the silent
+     * data-loss path. `reason` names which half failed.
+     */
+    'DATASTORE.CLOSE.UNCLEAN': {
+      code: 'DATASTORE.CLOSE.UNCLEAN',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'The datastore could not be closed cleanly. Ensure no other process holds the database, then re-run; if it repeats, the file may need recovery.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A caller asked for the Drizzle handle from a datastore that is not Drizzle-backed.
+     *
+     * `tool-author` and `invariant`: this is a wiring mistake, not anything an operator can
+     * change, and the message names the correct alternative (repository APIs).
+     */
+    'DATASTORE.ACCESS.HANDLE_REQUIRED': {
+      code: 'DATASTORE.ACCESS.HANDLE_REQUIRED',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Report this to the tool author: the code path requires a Drizzle-backed DataStore and should use repository APIs instead.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
   },
 );

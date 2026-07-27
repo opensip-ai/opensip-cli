@@ -1,5 +1,11 @@
+import { SystemError } from '@opensip-cli/core';
+
+import { datastoreErrorCatalog } from './errors/datastore-error-catalog.js';
+
 import type { FileLockEvent, StateLockPolicy } from '@opensip-cli/core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+
+const HANDLE_REQUIRED = datastoreErrorCatalog.require('DATASTORE.ACCESS.HANDLE_REQUIRED');
 
 export type DrizzleHandle<TSchema extends Record<string, unknown> = Record<string, unknown>> =
   BetterSQLite3Database<TSchema>;
@@ -131,8 +137,9 @@ export function isDrizzleDataStore(value: unknown): value is DrizzleDataStore {
  */
 export function requireDrizzleHandle(datastore: DataStore): DrizzleDataStore {
   if (isDrizzleDataStore(datastore)) return datastore;
-  throw new Error(
+  throw new SystemError(
     'A Drizzle-backed DataStore is required for repository access. General callers should use repository APIs instead of the raw datastore handle.',
+    { code: HANDLE_REQUIRED.code, definition: HANDLE_REQUIRED },
   );
 }
 

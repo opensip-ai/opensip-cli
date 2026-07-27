@@ -1,3 +1,6 @@
+import { basename, join } from 'node:path';
+
+import { ValidationError } from '@opensip-cli/core';
 /**
  * @fileoverview Pure scanner-artifact path composition (ADR-0091, Phase-0
  * decision 1).
@@ -10,7 +13,9 @@
  * 3-arg `ProjectPaths` method.
  */
 
-import { basename, join } from 'node:path';
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
+
+const ARTIFACT_INVALID = externalToolErrorCatalog.require('EXTERNAL.SCANNER.ARTIFACT_INVALID');
 
 /** The minimal path scope the resolver needs (a `ProjectPaths` satisfies it). */
 export interface ArtifactPathScope {
@@ -37,8 +42,13 @@ export function resolveScannerArtifactPath(
   name: string,
 ): string {
   if (name.length === 0 || basename(name) !== name || name === '.' || name === '..') {
-    throw new Error(
+    throw new ValidationError(
       `resolveScannerArtifactPath: name must be a plain basename, got ${JSON.stringify(name)}`,
+      {
+        code: ARTIFACT_INVALID.code,
+        definition: ARTIFACT_INVALID,
+        metadata: { field: 'name' },
+      },
     );
   }
   return join(scope.artifactDir(tool), scope.runId, name);

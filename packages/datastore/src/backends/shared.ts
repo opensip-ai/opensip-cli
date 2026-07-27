@@ -1,6 +1,10 @@
-import { logger, withFileLock } from '@opensip-cli/core';
+import { logger, withFileLock, SystemError } from '@opensip-cli/core';
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
+
+import { datastoreErrorCatalog } from '../errors/datastore-error-catalog.js';
+
+const CLOSE_UNCLEAN = datastoreErrorCatalog.require('DATASTORE.CLOSE.UNCLEAN');
 
 import type {
   DataStoreLockContext,
@@ -104,11 +108,15 @@ export function checkpointAndCloseSqlite(sqlite: SqliteLifecycleConnection): Dat
   };
 }
 
-/** @throws {Error} When checkpointing or native connection closure was not proven. */
+/** @throws {SystemError} `DATASTORE.CLOSE.UNCLEAN` when checkpointing or native connection closure was not proven. */
 function throwCloseFailure(
   result: Exclude<DatastoreCloseResult, { checkpointed: true; closed: true }>,
 ): never {
-  throw new Error(`SQLite datastore close did not complete cleanly (${result.reason})`);
+  throw new SystemError(`SQLite datastore close did not complete cleanly (${result.reason})`, {
+    code: CLOSE_UNCLEAN.code,
+    definition: CLOSE_UNCLEAN,
+    metadata: { condition: result.reason },
+  });
 }
 
 export function buildSqliteDataStore(

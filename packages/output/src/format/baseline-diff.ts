@@ -1,3 +1,4 @@
+import { SystemError } from '@opensip-cli/core';
 /**
  * @fileoverview Pure baseline diff — the generic net-new ratchet (ADR-0036).
  *
@@ -10,7 +11,11 @@
  * `output`).
  */
 
+import { outputErrorCatalog } from '../errors/output-error-catalog.js';
+
 import type { Signal } from '@opensip-cli/core';
+
+const FINGERPRINT_INVALID = outputErrorCatalog.require('OUTPUT.GATE.FINGERPRINT_INVALID');
 
 /** One loaded baseline row: an opaque fingerprint + its stored full payload. */
 export interface BaselineDiffRow {
@@ -98,17 +103,27 @@ export function diffBaseline(
   const currentByFp = new Map<string, Signal>();
   for (const signal of current) {
     if (!signal.fingerprint) {
-      throw new Error(
+      throw new SystemError(
         `diffBaseline: signal ${signal.ruleId} has no fingerprint — the tool must stamp signals ` +
           `(stampFingerprints) at envelope-construction time before the gate seam; the plane never fingerprints.`,
+        {
+          code: FINGERPRINT_INVALID.code,
+          definition: FINGERPRINT_INVALID,
+          metadata: { condition: 'missing', ruleId: signal.ruleId },
+        },
       );
     }
     // M9: fail closed on fingerprint collisions — last-writer-wins would drop
     // a real finding from the ratchet (silent under-count of added/unchanged).
     if (currentByFp.has(signal.fingerprint)) {
-      throw new Error(
+      throw new SystemError(
         `diffBaseline: duplicate fingerprint among current signals (${signal.fingerprint}) — ` +
           `tools must stamp unique fingerprints; the plane refuses last-writer-wins.`,
+        {
+          code: FINGERPRINT_INVALID.code,
+          definition: FINGERPRINT_INVALID,
+          metadata: { condition: 'duplicate-current', fingerprint: signal.fingerprint },
+        },
       );
     }
     currentByFp.set(signal.fingerprint, signal);
@@ -117,9 +132,14 @@ export function diffBaseline(
   const baselineByFp = new Map<string, BaselineDiffRow>();
   for (const row of baseline) {
     if (baselineByFp.has(row.fingerprint)) {
-      throw new Error(
+      throw new SystemError(
         `diffBaseline: duplicate fingerprint among baseline rows (${row.fingerprint}) — ` +
           `baseline store must not collapse multi-instance findings.`,
+        {
+          code: FINGERPRINT_INVALID.code,
+          definition: FINGERPRINT_INVALID,
+          metadata: { condition: 'duplicate-baseline', fingerprint: row.fingerprint },
+        },
       );
     }
     baselineByFp.set(row.fingerprint, row);

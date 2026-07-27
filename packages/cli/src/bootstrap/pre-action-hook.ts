@@ -11,7 +11,6 @@ import {
   currentScope,
   exitScope,
   generatePrefixedId,
-  projectCoordinationKey,
   runWithScope,
   runWithScopeSync,
   SystemError,
@@ -25,7 +24,6 @@ import {
   acquireHostRuntimeLease,
   createRuntimeLeaseLifecycle,
   createSafeRuntimeLeaseEventBuffer,
-  hostPolicyNeedsProjectCoordination,
   type RuntimeLeaseLifecycle,
   type SafeRuntimeLeaseEventBuffer,
 } from '../commands/host-runtime-access.js';
@@ -35,6 +33,14 @@ import { setResolvedCommandLabel } from '../telemetry/command-label.js';
 
 import { executePostBailoutBootstrap } from './execute-post-bailout-bootstrap.js';
 import { planPreActionBootstrap } from './plan-pre-action-bootstrap.js';
+import {
+  MAX_RUNTIME_CONTEXT_STABILIZATION_ATTEMPTS,
+  assertStartupProjectKey,
+  cloneParsedOptions,
+  projectCoordinationChanged,
+  recoveryGuidance,
+  unstableRuntimeContext,
+} from './pre-action-bootstrap-guards.js';
 
 import type { CommandActionScopeRunner } from './command-action-scope-runner.js';
 import type { PreActionRuntime } from './pre-action-runtime.js';
@@ -49,8 +55,6 @@ const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export { resolveOwningTool } from './owning-tool-init.js';
 export type { PreActionRuntime } from './pre-action-runtime.js';
-
-const MAX_RUNTIME_CONTEXT_STABILIZATION_ATTEMPTS = 3;
 
 /**
  * Per-program bridge from async pre-action bootstrap into Commander's already
@@ -135,79 +139,6 @@ export interface PreparedLeasedBootstrapPlan {
   readonly plan: ReturnType<typeof planPreActionBootstrap>;
   readonly runtimeLeaseLifecycle: RuntimeLeaseLifecycle;
   readonly leaseEvents: SafeRuntimeLeaseEventBuffer;
-}
-
-function cloneParsedOptions(opts: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(opts).map(([key, value]) => [
-      key,
-      Array.isArray(value) ? value.map((item: unknown) => item) : value,
-    ]),
-  );
-}
-
-/**
- * Rewrap a recovery-required bootstrap failure with actionable guidance, or
- * propagate any other error unchanged.
- *
- * @throws {ConfigurationError} When `error` is a `ConfigurationError` whose
- *   code is `CONFIGURATION.RECOVERY_REQUIRED` — rethrown with `opensip
- *   status`/`opensip init` guidance appended to the message.
- * @throws {unknown} Rethrows `error` as-is for every other error.
- */
-function recoveryGuidance(error: unknown): never {
-  if (error instanceof ConfigurationError && error.code === 'CORE.RUNTIME_RECOVERY.REQUIRED') {
-    throw new ConfigurationError(
-      `${error.message} Run 'opensip status' to inspect recovery state, then run 'opensip init' to resume or reconcile it.`,
-      { code: error.code, cause: error },
-    );
-  }
-  throw error;
-}
-
-function unstableRuntimeContext(): ConfigurationError {
-  return new ConfigurationError(
-    'The canonical OpenSIP project root changed during startup. Retry after concurrent Init or project movement completes.',
-    {
-      code: PROJECT_REQUIRED.code,
-      definition: PROJECT_REQUIRED,
-      metadata: { condition: 'context-unstable' },
-    },
-  );
-}
-
-/**
- * Verify a startup-held lease's coordination key still matches the
- * (re-)discovered project root.
- *
- * @throws {ConfigurationError} When `startup` is defined and its lease's
- *   coordination key no longer matches `projectCoordinationKey(projectRoot)`
- *   (code `CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE`).
- */
-function assertStartupProjectKey(
-  startup: StartupRuntimeLeaseHandoff | undefined,
-  projectRoot: string,
-): void {
-  if (
-    startup !== undefined &&
-    startup.lease.coordinationKey !== projectCoordinationKey(projectRoot)
-  ) {
-    throw unstableRuntimeContext();
-  }
-}
-
-function projectCoordinationChanged(input: {
-  readonly held: RuntimeLease | undefined;
-  readonly declaredScope: CommandScopeRequirement;
-  readonly runtimePolicy: ReturnType<typeof planPreActionBootstrap>['runtimePolicy'];
-  readonly tentativeRoot: string;
-  readonly authoritativeRoot: string;
-}): boolean {
-  return (
-    input.held !== undefined &&
-    hostPolicyNeedsProjectCoordination(input.declaredScope, input.runtimePolicy) &&
-    projectCoordinationKey(input.tentativeRoot) !== projectCoordinationKey(input.authoritativeRoot)
-  );
 }
 
 function declaredScopeForCommand(input: PrepareLeasedBootstrapPlanInput): CommandScopeRequirement {

@@ -87,5 +87,30 @@ export const configErrorCatalog = defineErrorCatalog(
         'Upgrade opensip-cli to a version that understands this config schema, or request a target version this CLI supports.',
       publicMetadataKeys: ['condition', 'requested', 'supported'],
     },
+    /**
+     * The user-level trust policy block cannot be trusted: it is already invalid, or the grant
+     * being applied would make it invalid.
+     *
+     * One code, two conditions (D9) — the operator fixes the same file either way, and
+     * `metadata.condition` says whether the document was already broken or the requested grant
+     * would break it. Refused rather than repaired: silently dropping an unparsable trust block
+     * would widen capability trust by accident, which is the one direction that must never
+     * happen by default.
+     */
+    'CONFIG.POLICY.USER_DOCUMENT_INVALID': {
+      code: 'CONFIG.POLICY.USER_DOCUMENT_INVALID',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction:
+        'Correct the policy block in your global OpenSIP config before granting or revoking capability trust.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

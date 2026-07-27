@@ -526,7 +526,12 @@ function runCodeHeads(repoRoot, flags, stdout, stderr) {
         rel.includes('/src/') &&
         rel.endsWith('.ts') &&
         !rel.endsWith('.test.ts') &&
-        !rel.includes('/__tests__/'),
+        !rel.includes('/__tests__/') &&
+        // Check fixtures are excluded for the same reason test files are: a `violation` fixture
+        // exists precisely to contain an UNREGISTERED code, so demanding it be registered would
+        // make it impossible to test the check that finds unregistered codes.
+        !rel.includes('/__fixtures__/') &&
+        !rel.includes('/fixtures/'),
     );
   const violations = findUnmappedCodeHeads(repoRoot, files);
   const baselinePath = join(repoRoot, CODE_HEAD_BASELINE_REL);

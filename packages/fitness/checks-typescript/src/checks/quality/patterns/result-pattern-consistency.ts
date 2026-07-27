@@ -104,6 +104,13 @@ export const THROW_ALLOWED_PATHS = [
   /\/ids\//,
   /\/stores\//,
   /\/registry\//,
+  // Egress sinks: the process edge. A refused request never becomes a domain value —
+  // the sink converts at its own boundary — so a precondition throw here is the same
+  // category as the adapters and providers above.
+  /\/sinks?\//,
+  // On-disk configuration documents: read/write/validate of a user-authored file, which is
+  // the same I/O boundary as `/stores/`.
+  /\/documents?\//,
   // NOTE: project-specific boundary directories (e.g. `/llm/`, `/embeddings/`,
   // a bespoke `/governor/` or `packages/infrastructure/` layout) are NOT
   // hardcoded here — add them via the `additionalThrowAllowedPaths`
