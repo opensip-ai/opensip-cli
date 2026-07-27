@@ -207,4 +207,38 @@ describe('runLoadWindow', () => {
     expect(ct.calls()).toBeGreaterThan(0);
     expect(ct.calls()).toBeLessThan(100);
   });
+
+  it('bounds the terminal drain when a target never settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const context = ctx(new AbortController().signal);
+      const warn = vi.spyOn(context.logger, 'warn');
+      const target = vi.fn(() => new Promise<void>(() => undefined));
+      const run = runLoadWindow({ workload: { rps: 10 } }, context, {
+        windowMs: 100,
+        target,
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      await vi.advanceTimersByTimeAsync(5000);
+      const result = await run;
+
+      expect(target).toHaveBeenCalledOnce();
+      expect(result.metrics).toMatchObject({
+        totalRequests: 1,
+        successfulRequests: 0,
+        failedRequests: 1,
+        errorsGenerated: 1,
+      });
+      expect(result.firstFailure).toMatchObject({
+        code: 'CORE.SYSTEM.DEADLINE_EXCEEDED',
+      });
+      expect(warn).toHaveBeenCalledWith('Target requests exceeded the in-flight drain deadline', {
+        abandonedRequests: 1,
+        timeoutMs: 5000,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
