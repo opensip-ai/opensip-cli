@@ -8,13 +8,11 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import { Minimatch } from 'minimatch';
 
 import { graphPackageOf } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type { AuditSourceRolePolicy, GraphSourceFilter } from './query-contracts.js';
 import type { GraphReadError } from './types.js';
 import type { FunctionOccurrence } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /**
  * Max unique normalized project-relative catalog file paths classified against
@@ -75,9 +73,12 @@ export function compileSourceRoleMatcher(
   let matchers: Minimatch[];
   try {
     matchers = policy.testGlobs.map((glob) => new Minimatch(glob, MINIMATCH_OPTIONS));
-  } catch {
-    return err({
-      code: 'query-invalid',
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'request',
+      condition: 'source-role-glob',
+      module: 'graph:read:source-filter',
+      reason: 'query-invalid',
       operation: 'analysis',
       message: 'Failed to compile an audit source-role glob.',
     });

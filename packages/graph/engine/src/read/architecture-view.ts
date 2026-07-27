@@ -21,6 +21,7 @@ import {
   type GraphSymbolRef,
   type SourceScope,
 } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 import {
   isCanonicalProductionFilter,
   matchesGraphSourceFilterWithRoles,
@@ -29,9 +30,6 @@ import {
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /** Selectable architecture response families (P2 Phase 2.5). */
 export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
@@ -184,10 +182,6 @@ const MAX_ORIENTATION_ROWS = 10_000;
 const DESCENDING_KEY_CEILING = Number.MAX_SAFE_INTEGER;
 const MALFORMED_SYMBOL_REASON = 'malformed-symbol-omitted';
 const MALFORMED_CALL_REASON = 'malformed-call-edge-omitted';
-
-function archError(message: string): GraphReadError {
-  return { code: 'query-invalid', operation: 'analysis', message };
-}
 
 function resolutionMode(catalog: Catalog): 'exact' | 'fast' {
   return catalog.resolutionMode ?? 'exact';
@@ -756,8 +750,15 @@ export function buildArchitectureView(
       },
       ...(grouped === undefined ? {} : { groups: grouped.groups }),
     });
-  } catch {
-    return err(archError('Failed to build architecture view'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'architecture-projection',
+      module: 'graph:read:architecture',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to build architecture view',
+    });
   }
 }
 

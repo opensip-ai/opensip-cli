@@ -31,6 +31,8 @@ import { compareCodePointStrings } from '../code-point-order.js';
 import { isSafeGraphAdapterDescriptor } from '../lang-adapter/descriptor-validation.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 
+import { failGraphRead } from './read-boundary-failure.js';
+
 import type {
   FreshnessChangeSummary,
   FreshnessReasonCode,
@@ -220,13 +222,15 @@ export async function verifyCatalogInputs(
     return ok(
       complete(false, 'files-changed', 'Source files changed since catalog build', changes),
     );
-  } catch {
-    return err(
-      graphReadError(
-        'catalog-unreadable',
-        'Catalog input verification failed due to infrastructure error',
-      ),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'catalog-verification',
+      module: 'graph:read:catalog-freshness',
+      reason: 'catalog-unreadable',
+      operation: 'catalog-generation',
+      message: 'Catalog input verification failed due to infrastructure error',
+    });
   }
 }
 
@@ -358,10 +362,15 @@ function selectAdapter(
         ? selector.pick({ cwd: projectRoot, language: selection.requestedId })
         : selector.pick({ cwd: projectRoot }),
     );
-  } catch {
-    return err(
-      graphReadError('verify-selection', 'Adapter selection failed during catalog verification'),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'adapter-selection',
+      module: 'graph:read:catalog-freshness',
+      reason: 'verify-selection',
+      operation: 'catalog-generation',
+      message: 'Adapter selection failed during catalog verification',
+    });
   }
 }
 

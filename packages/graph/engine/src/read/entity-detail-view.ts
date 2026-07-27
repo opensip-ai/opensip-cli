@@ -4,6 +4,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 
 import { makeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 import { toGraphSymbolRef } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type { GraphReadFacetCoverage, GraphSymbolRef } from './query-contracts.js';
 import type { Catalog, FeatureTable, GraphReadError, Indexes, GraphReadReason } from './types.js';
@@ -207,7 +208,14 @@ export function projectEntityDetail(
         projection: makeFacet(true, reasons),
       }),
     });
-  } catch {
-    return err(detailError('entity-failed', 'Failed to project graph entity detail'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'entity-detail',
+      module: 'graph:read:entity-detail',
+      reason: 'entity-failed',
+      operation: 'analysis',
+      message: 'Failed to project graph entity detail',
+    });
   }
 }

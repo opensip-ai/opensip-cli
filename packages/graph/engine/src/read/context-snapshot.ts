@@ -8,11 +8,13 @@ import {
   testSelectionSnapshotIdentityMatches,
   testSelectionSnapshotSchema,
 } from '@opensip-cli/contracts';
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 
 import { ContextSnapshotRepo } from '../persistence/context-snapshot-repo.js';
 
-import type { GraphReadError, GraphReadReason } from './types.js';
+import { failGraphRead } from './read-boundary-failure.js';
+
+import type { GraphReadError } from './types.js';
 import type { ContextSnapshotPayload, ContextSnapshotRecord } from '../context-snapshot-types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -43,10 +45,6 @@ export type ContextSnapshotLookup =
         readonly payload: ContextSnapshotPayload;
       };
     };
-
-function readError(code: GraphReadReason, message: string): GraphReadError {
-  return { code, operation: 'catalog-generation', message };
-}
 
 /** @throws {Error} When a stored snapshot payload fails schema or identity verification. */
 function decode(record: ContextSnapshotRecord): ContextSnapshotLookup {
@@ -110,7 +108,14 @@ export function readContextSnapshot(
   try {
     const record = new ContextSnapshotRepo(store).get(id);
     return ok(record === null ? { status: 'missing', id } : decode(record));
-  } catch {
-    return err(readError('context-snapshot', 'Failed to read or decode graph context snapshot'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'context-snapshot',
+      module: 'graph:read:context-snapshot',
+      reason: 'context-snapshot',
+      operation: 'catalog-generation',
+      message: 'Failed to read or decode graph context snapshot',
+    });
   }
 }

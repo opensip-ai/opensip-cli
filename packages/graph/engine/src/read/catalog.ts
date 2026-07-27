@@ -2,11 +2,13 @@
  * Public catalog identity and generation reads over an opaque DataStore.
  */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
-import type { Catalog, CatalogIdentity, GraphReadError, GraphReadReason } from './types.js';
+import { failGraphRead } from './read-boundary-failure.js';
+
+import type { Catalog, CatalogIdentity, GraphReadError } from './types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /** Structural RunScope seam used by graph-owned context producer commands. */
@@ -14,15 +16,6 @@ export interface ContextCatalogAccessor {
   load(): Result<Catalog | null, GraphReadError>;
   generationIdentity(): Result<string | null, GraphReadError>;
   replace(catalog: Catalog): Result<void, GraphReadError>;
-}
-
-function readError(
-  code: GraphReadReason,
-  operation: GraphReadError['operation'],
-  message: string,
-): GraphReadError {
-  const truncated = message.length > 160 ? message.slice(0, 157) + '...' : message;
-  return { code, operation, message: truncated };
 }
 
 /**
@@ -35,10 +28,15 @@ export function readCatalogIdentity(
   try {
     const identity = new CatalogRepo(store).readIdentity();
     return ok(identity);
-  } catch {
-    return err(
-      readError('catalog-identity', 'catalog-identity', 'Failed to read graph catalog identity'),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'catalog-identity',
+      module: 'graph:read:catalog',
+      reason: 'catalog-identity',
+      operation: 'catalog-identity',
+      message: 'Failed to read graph catalog identity',
+    });
   }
 }
 
@@ -50,13 +48,14 @@ export function loadCatalogGeneration(store: DataStore): Result<Catalog | null, 
   try {
     const catalog = new CatalogRepo(store).loadFullCatalog();
     return ok(catalog);
-  } catch {
-    return err(
-      readError(
-        'catalog-generation',
-        'catalog-generation',
-        'Failed to load graph catalog generation',
-      ),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'catalog-generation',
+      module: 'graph:read:catalog',
+      reason: 'catalog-generation',
+      operation: 'catalog-generation',
+      message: 'Failed to load graph catalog generation',
+    });
   }
 }

@@ -9,12 +9,12 @@ import {
   type ImpactTrust,
 } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
-import { normalizeFailure } from '@opensip-cli/core';
 import { buildComputeImpactIndex, computeImpactAsync } from '@opensip-cli/shared-analysis';
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
 import { makeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type { GraphReadFacetCoverage } from './query-contracts.js';
 import type { Catalog, GraphReadError, GraphReadReason } from './types.js';
@@ -147,14 +147,13 @@ export async function buildImpactView(
         ),
       );
     }
-    // The message is RETAINED. Collapsing every unrecognised failure into one fixed sentence
-    // discarded the cause at the one boundary a caller can see, so an EACCES on the catalog and
-    // a genuine projection bug read identically. `normalizeFailure` bounds and redacts it.
-    return err(
-      impactError(
-        'impact-failed',
-        `Failed to build graph impact projection: ${normalizeFailure(error).message}`,
-      ),
-    );
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'impact-projection',
+      module: 'graph:read:impact',
+      reason: 'impact-failed',
+      operation: 'analysis',
+      message: 'Failed to build graph impact projection',
+    });
   }
 }

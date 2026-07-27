@@ -1,6 +1,6 @@
 /** Edge-kind-specific package strongly connected components. */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 
 import { codePointSortKey, compareCodePointStrings } from '../code-point-order.js';
 import { stronglyConnectedComponents } from '../pipeline/strongly-connected-components.js';
@@ -12,14 +12,12 @@ import {
   type PackageEvidenceView,
   type PackageImportEvidenceRow,
 } from './package-evidence.js';
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type { GraphReadFacetCoverage } from './query-contracts.js';
 import type { SourceRoleMatcher } from './source-filter.js';
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /** Labelled package edge retained as evidence for a strongly connected component. */
 export interface PackageCycleProofEdge {
@@ -190,9 +188,12 @@ export function buildPackageScc(
         projection: UNREQUESTED_FACET,
       }),
     });
-  } catch {
-    return err({
-      code: 'query-invalid',
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'package-scc',
+      module: 'graph:read:package-scc',
+      reason: 'query-invalid',
       operation: 'analysis',
       message: 'Failed to build package SCCs',
     });

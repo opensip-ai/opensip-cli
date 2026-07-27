@@ -28,6 +28,7 @@ import {
   type GraphReadFacetCoverage,
   type GraphSourceFilter,
 } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
@@ -41,9 +42,6 @@ import type {
   SemanticFactBundle,
   Visibility,
 } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /** Match semantics for declaration search (mirrors symbol search). */
 export type DeclarationSearchMatch = 'substring' | 'exact' | 'qualified';
@@ -132,10 +130,6 @@ export interface ReferencesToView {
   readonly unsupported: boolean;
   /** True when the declaration id is not present in the retained inventory. */
   readonly declarationMissing: boolean;
-}
-
-function viewError(message: string): GraphReadError {
-  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 function occurrenceLike(fact: {
@@ -462,8 +456,15 @@ export function searchDeclarationFacts(
         projection: makeFacet(true, new Set()),
       }),
     });
-  } catch {
-    return err(viewError('Failed to search declaration facts'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'declaration-search',
+      module: 'graph:read:declarations',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to search declaration facts',
+    });
   }
 }
 
@@ -581,7 +582,14 @@ export function referencesToDeclaration(
         projection: makeFacet(true, new Set()),
       }),
     });
-  } catch {
-    return err(viewError('Failed to load references to declaration'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'declaration-references',
+      module: 'graph:read:declarations',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to load references to declaration',
+    });
   }
 }

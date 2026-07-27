@@ -30,10 +30,12 @@ import type { ErrorDefinition } from '@opensip-cli/core';
  * that has axes to declare. `GraphReadError` stays a plain-data DTO (ADR-0147).
  */
 
+const TOOL_AUTHOR_RESPONSIBILITY = 'tool-author' as const;
+
 /** A caller's read request is unusable. Nothing is wrong with the catalog. */
 const READ_REQUEST = {
   source: 'application',
-  defaultResponsibility: 'tool-author',
+  defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
   kind: 'validation',
   retry: 'never',
   severity: 'error',
@@ -86,6 +88,50 @@ export const graphErrorCatalog = defineErrorCatalog(
     },
 
     /**
+     * An external dependency or persistence operation failed while serving a graph read.
+     *
+     * One environment/I/O family covers each read surface (D9); the boundary condition names
+     * the operation, while an already-defined cause remains primary in operator evidence.
+     */
+    'GRAPH.READ.INFRASTRUCTURE_FAILED': {
+      code: 'GRAPH.READ.INFRASTRUCTURE_FAILED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the read condition and local failure detail, restore the failing dependency, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * An otherwise valid graph generation could not be projected into one public read view.
+     *
+     * The read condition identifies the view (D9). This boundary never replaces a definition
+     * already carried by the cause.
+     */
+    'GRAPH.READ.PROJECTION_FAILED': {
+      code: 'GRAPH.READ.PROJECTION_FAILED',
+      source: 'application',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Capture the read condition and run id, then report the graph projection failure to the tool author.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
      * The stored catalog cannot be read, or could not be verified against the sources it
      * describes.
      *
@@ -114,7 +160,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       code: 'GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED',
       publicPresentationKey: 'context-catalog-datastore-required',
       source: 'application',
-      defaultResponsibility: 'tool-author',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
       kind: 'invariant',
       retry: 'never',
       severity: 'error',
@@ -293,7 +339,7 @@ export const graphErrorCatalog = defineErrorCatalog(
       code: 'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED',
       publicPresentationKey: 'output-malformed',
       source: 'application',
-      defaultResponsibility: 'tool-author',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
       kind: 'integrity',
       retry: 'never',
       severity: 'error',
@@ -317,7 +363,7 @@ export const graphErrorCatalog = defineErrorCatalog(
     'GRAPH.RULE.EVALUATION_FAILED': {
       code: 'GRAPH.RULE.EVALUATION_FAILED',
       source: 'application',
-      defaultResponsibility: 'tool-author',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
       kind: 'invariant',
       retry: 'never',
       severity: 'error',

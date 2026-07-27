@@ -1,6 +1,6 @@
 /** Canonical package call/import evidence and edge-kind-specific package SCCs. */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 
 import { codePointSortKey, compareCodePointStrings } from '../code-point-order.js';
 import { buildFeatures } from '../pipeline/features.js';
@@ -29,6 +29,7 @@ import {
   type PackageImportEvidence,
   type SourceScope,
 } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 import {
   isCanonicalProductionFilter,
   matchesGraphSourceFilterWithRoles,
@@ -44,9 +45,6 @@ import type {
   FunctionOccurrence,
   Indexes,
 } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 export interface PackageEvidenceQuery {
   readonly edgeKind: PackageEdgeKind;
@@ -194,14 +192,6 @@ function completeRowInventory(): CoverageFacet {
 
 function addReason(reasons: Set<string>, reason: string): void {
   reasons.add(reason);
-}
-
-function peError(message: string): GraphReadError {
-  return {
-    code: 'query-invalid',
-    operation: 'analysis',
-    message,
-  };
 }
 
 function modeOf(catalog: Catalog): 'exact' | 'fast' {
@@ -1017,7 +1007,14 @@ export function buildPackageEvidence(
       totalImportEvidence: imports.totalEvidence,
       coverage: facetsFromPackageReasons(reasons),
     });
-  } catch {
-    return err(peError('Failed to build package evidence'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'package-evidence',
+      module: 'graph:read:package-evidence',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to build package evidence',
+    });
   }
 }

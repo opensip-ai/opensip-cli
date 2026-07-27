@@ -4,13 +4,13 @@ import { posix } from 'node:path';
 
 import { buildTestSelectionSnapshotIdentity } from '@opensip-cli/contracts';
 import { err, ok, type Result } from '@opensip-cli/core';
-import { normalizeFailure } from '@opensip-cli/core';
 
 import { compareCodePointStrings } from '../code-point-order.js';
 
 import { makeFacet, rollupFacets, UNREQUESTED_FACET } from './bounded-view.js';
 import { catalogGenerationKey } from './catalog-generation-key.js';
 import { GRAPH_SYMBOL_NAME_MAX, toGraphSymbolRef } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type { GraphReadFacetCoverage } from './query-contracts.js';
 import type { SourceRoleMatcher } from './source-filter.js';
@@ -1311,14 +1311,13 @@ export async function selectStaticTests(
     if (error instanceof TestSelectionCancelledError) {
       return err(selectionError('test-selection-cancelled', 'Static test selection was cancelled'));
     }
-    // The message is RETAINED — see the same fix in `impact-view.ts`. `select_tests` is an
-    // agent-facing read, and "Failed to build static test selection" with no cause gives an
-    // agent nothing to decide with.
-    return err(
-      selectionError(
-        'test-selection-failed',
-        `Failed to build static test selection: ${normalizeFailure(error).message}`,
-      ),
-    );
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'test-selection',
+      module: 'graph:read:test-selection',
+      reason: 'test-selection-failed',
+      operation: 'analysis',
+      message: 'Failed to build static test selection',
+    });
   }
 }
