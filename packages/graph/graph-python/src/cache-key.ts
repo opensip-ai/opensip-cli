@@ -20,6 +20,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 
+import { logger, normalizeFailure } from '@opensip-cli/core';
 import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { hashConfig } from '@opensip-cli/graph-adapter-common';
 
@@ -44,8 +45,18 @@ function readPythonVersion(configPathAbs: string | undefined): string {
   let content: string;
   try {
     content = readFileSync(configPathAbs, 'utf8');
-  } catch {
-    /* v8 ignore next */
+  } catch (error) {
+    const failure = normalizeFailure(error);
+    if (failure.code !== 'NOT_FOUND') {
+      logger.warn({
+        evt: 'graph.adapter.python_version_unavailable',
+        module: 'graph:adapter-python',
+        code: failure.code,
+        errno: failure.metadata.errno,
+        condition: 'config-unreadable',
+        msg: 'Python version intent could not be read; the cache key uses unknown',
+      });
+    }
     return 'unknown';
   }
   const match = REQUIRES_PYTHON_RE.exec(content);

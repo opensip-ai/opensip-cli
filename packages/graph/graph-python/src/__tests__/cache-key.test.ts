@@ -5,11 +5,12 @@
  * line extraction.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { logger } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cacheKey } from '../cache-key.js';
 
@@ -74,5 +75,26 @@ describe('lang-python cacheKey — branches', () => {
     const a = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     const b = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
     expect(a).toBe(b);
+  });
+
+  it('reports an unreadable version anchor while retaining the unknown fallback', () => {
+    const configDirectory = join(dir, 'pyproject.toml');
+    mkdirSync(configDirectory);
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const out = cacheKey({
+      projectDirAbs: dir,
+      configPathAbs: configDirectory,
+      resolutionMode: 'exact',
+    });
+
+    expect(out).toBe(`py-unknown-unreadable:${configDirectory}-exact`);
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.adapter.python_version_unavailable',
+        code: 'SYSTEM_ERROR',
+        condition: 'config-unreadable',
+      }),
+    );
   });
 });
