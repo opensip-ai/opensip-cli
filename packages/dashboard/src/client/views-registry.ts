@@ -54,6 +54,7 @@ export function renderRegisteredView(
     return true;
   } catch {
     showViewFailure(view, container, 'rendered');
+    // @swallow-ok the extension failure is replaced with a visible in-page notice.
     return false;
   }
 }

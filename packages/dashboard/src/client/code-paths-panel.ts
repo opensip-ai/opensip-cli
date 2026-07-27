@@ -268,7 +268,8 @@ export function openCodePathsSession(sessionId: string): void {
   clearCodePathsHash();
   // Click the matching row to trigger the standard renderDetail flow.
   const row = [...(sessionsPanel?.querySelectorAll<HTMLElement>('tr[data-session-id]') ?? [])].find(
-    (candidate) => candidate.dataset.sessionId === sessionId,
+    // Session IDs are public report-routing keys, not authentication secrets.
+    (candidate) => Object.is(candidate.dataset.sessionId, sessionId),
   );
   if (row) row.click();
 }
