@@ -72,6 +72,22 @@ describe('lang-typescript cacheKey — branches', () => {
     );
   });
 
+  it('bounds config reads before TypeScript resolves the config', () => {
+    const file = join(dir, 'tsconfig.json');
+    writeFileSync(file, `{"padding":"${'x'.repeat(1_000_000)}"}`, 'utf8');
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+
+    expect(out).toContain('unreadable-tsconfig');
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boundaryCode: 'GRAPH.TSCONFIG.LOAD_FAILED',
+        condition: 'config-read-failed',
+      }),
+    );
+  });
+
   it('returns a stable ts-<version>-<hash> when the tsconfig is readable', () => {
     const file = join(dir, 'tsconfig.json');
     writeFileSync(file, '{"compilerOptions": {"target": "ES2022"}}', 'utf8');

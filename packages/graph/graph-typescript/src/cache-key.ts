@@ -42,7 +42,7 @@ import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { logger, normalizeFailure, readPackageVersion } from '@opensip-cli/core';
-import { graphErrorCatalog } from '@opensip-cli/graph';
+import { graphErrorCatalog, readSourceFileGuarded } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { throwIfGraphAdapterAborted } from './cancellation.js';
@@ -57,6 +57,7 @@ const ADAPTER_VERSION = readPackageVersion(import.meta.url);
 const TSCONFIG_NOT_FOUND = graphErrorCatalog.require('GRAPH.TSCONFIG.NOT_FOUND');
 const TSCONFIG_INVALID = graphErrorCatalog.require('GRAPH.TSCONFIG.INVALID');
 const TSCONFIG_LOAD_FAILED = graphErrorCatalog.require('GRAPH.TSCONFIG.LOAD_FAILED');
+const MAX_TSCONFIG_BYTES = 1_000_000;
 
 type ConfigHashFailureCondition =
   'config-missing' | 'config-read-failed' | 'config-invalid' | 'resolved-config-failed';
@@ -83,14 +84,16 @@ function hashResolvedTsconfig(configPathAbs: string | undefined, signal?: AbortS
   }
   let read: ReturnType<typeof ts.readConfigFile>;
   try {
-    read = ts.readConfigFile(configPathAbs, (path) => ts.sys.readFile(path));
+    read = ts.readConfigFile(configPathAbs, (path) =>
+      readSourceFileGuarded(path, MAX_TSCONFIG_BYTES),
+    );
   } catch (error) {
     return configHashFallback('config-read-failed', error);
   }
   if (read.error !== undefined || read.config === undefined) {
     const diagnosticCode = read.error?.code;
     return configHashFallback(
-      diagnosticCode === 5083 ? 'config-read-failed' : 'config-invalid',
+      diagnosticCode === 5012 || diagnosticCode === 5083 ? 'config-read-failed' : 'config-invalid',
       undefined,
       diagnosticCode,
     );
