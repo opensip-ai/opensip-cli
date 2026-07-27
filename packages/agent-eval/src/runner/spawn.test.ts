@@ -139,6 +139,21 @@ describe('spawnProcess', () => {
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(128);
   });
 
+  it('settles with degraded evidence when terminal cleanup rejects', async () => {
+    const result = await spawnProcess(
+      process.execPath,
+      ['-e', "require('node:fs').writeSync(1,'x'.repeat(100000))"],
+      {
+        maxOutputBytes: 128,
+        terminateProcessTree: () => Promise.reject(new Error('simulated cleanup rejection')),
+      },
+    );
+
+    expect(result.outputLimitExceeded).toBe(true);
+    expect(result.error).toMatch(/cleanup failed.*simulated cleanup rejection/u);
+    expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(128);
+  });
+
   it.skipIf(process.platform === 'win32')(
     'fails the run without leaking the root when descendant sampling is unavailable',
     async () => {

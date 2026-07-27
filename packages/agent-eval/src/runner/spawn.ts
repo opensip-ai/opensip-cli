@@ -89,6 +89,8 @@ export interface SpawnOptions {
   readonly spawnChild?: SpawnChild;
   /** Test-only process inventory seam. */
   readonly processSnapshot?: ProcessSnapshot;
+  /** Test-only terminal cleanup seam. */
+  readonly terminateProcessTree?: () => Promise<void>;
 }
 
 /**
@@ -189,6 +191,16 @@ function bufferedUtf8(chunks: readonly Buffer[], totalBytes: number): string {
   return combined.toString('utf8');
 }
 
+function boundedFailureDetail(error: unknown): string {
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return (
+    detail
+      .replace(/[\r\n\t]+/gu, ' ')
+      .trim()
+      .slice(0, 512) || 'unknown failure'
+  );
+}
+
 /** The package's sole child-process implementation, with time and output bounds. */
 export function spawnProcess(
   command: string,
@@ -276,6 +288,17 @@ export function spawnProcess(
 
     const settle = (exitCode: number | null, signal: NodeJS.Signals | null): void => {
       if (resolved) return;
+      let capturedStdout = '';
+      let capturedStderr = '';
+      try {
+        capturedStdout = bufferedUtf8(stdout, stdoutBytes);
+        capturedStderr = bufferedUtf8(stderr, stderrBytes);
+      } catch (settlementError) {
+        error ??= `Child process output settlement failed: ${boundedFailureDetail(settlementError)}.`;
+      }
+      // Mark resolved only after every potentially throwing output reconstruction
+      // has completed. The fallback above deliberately returns empty captures with
+      // an explicit degraded error instead of leaving this Promise pending forever.
       resolved = true;
       clearTimeout(timeout);
       if (forceSettlementTimer !== undefined) clearTimeout(forceSettlementTimer);
@@ -287,8 +310,8 @@ export function spawnProcess(
         exitCode,
         outputLimitExceeded,
         signal,
-        stderr: bufferedUtf8(stderr, stderrBytes),
-        stdout: bufferedUtf8(stdout, stdoutBytes),
+        stderr: capturedStderr,
+        stdout: capturedStdout,
         timedOut,
       });
     };
@@ -299,25 +322,51 @@ export function spawnProcess(
     // schedules forceSettle, which previously closed the repo's one
     // architecture.cycle. (When the timer fires, re-arming it was a no-op
     // anyway, so beginTermination alone is semantics-identical here.)
+    const retainTerminationFailure = (terminationError: unknown): void => {
+      error ??= `Child process cleanup failed: ${boundedFailureDetail(terminationError)}.`;
+    };
+
     const beginTermination = (): void => {
       if (terminating) return;
       terminating = true;
-      terminationPromise = escalate();
+      const terminateProcessTree = options.terminateProcessTree ?? escalate;
+      // Invoke through an already-observed promise so both synchronous throws
+      // and rejected cleanup promises are classified in the same turn. Waiting
+      // until `close` is too late: Node may already report a fast rejection as
+      // unhandled and the harness would contaminate its own run.
+      terminationPromise = Promise.resolve()
+        .then(terminateProcessTree)
+        .catch(retainTerminationFailure);
     };
 
     const forceSettle = async (): Promise<void> => {
       error ??=
         'Child process stdio did not settle after root exit; an unobserved detached descendant may remain.';
       beginTermination();
-      await (terminationPromise ?? Promise.resolve());
-      child.stdout?.destroy();
-      child.stderr?.destroy();
+      try {
+        await (terminationPromise ?? Promise.resolve());
+      } catch (terminationError) {
+        // Defensive for a future termination implementation that replaces the
+        // normalized promise after beginTermination.
+        retainTerminationFailure(terminationError);
+      }
+      try {
+        child.stdout?.destroy();
+        child.stderr?.destroy();
+      } catch (streamError) {
+        error ??= `Child process stream cleanup failed: ${boundedFailureDetail(streamError)}.`;
+      }
+      settle(rootExitCode, rootSignal);
+    };
+
+    const settleForcedFailure = (settlementError: unknown): void => {
+      error ??= `Child process forced settlement failed: ${boundedFailureDetail(settlementError)}.`;
       settle(rootExitCode, rootSignal);
     };
 
     const ensureForceSettlement = (): void => {
       forceSettlementTimer ??= setTimeout(() => {
-        void forceSettle();
+        void forceSettle().catch(settleForcedFailure);
       }, FORCE_SETTLE_MS);
     };
 
@@ -387,9 +436,13 @@ export function spawnProcess(
     child.on('close', (exitCode, signal) => {
       if (processTree !== undefined) sampleProcessTree(processTree);
       enforcePostExitCleanup();
-      void (terminationPromise ?? Promise.resolve()).then(() => {
-        settle(exitCode, signal);
-      });
+      void (terminationPromise ?? Promise.resolve()).then(
+        () => settle(exitCode, signal),
+        (terminationError: unknown) => {
+          retainTerminationFailure(terminationError);
+          settle(exitCode, signal);
+        },
+      );
     });
   });
 }
