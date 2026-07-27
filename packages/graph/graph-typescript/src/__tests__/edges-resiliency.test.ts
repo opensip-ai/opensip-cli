@@ -72,6 +72,7 @@ describe('TypeScript edge resolution resiliency', () => {
     const { root, walked, catalog } = fixture();
     const call = walked.callSites.find((site) => site.kind === 'call');
     expect(call).toBeDefined();
+    if (call === undefined) return;
     vi.spyOn(call.node, 'getStart').mockImplementation(() => {
       throw new Error('synthetic source-position fault');
     });

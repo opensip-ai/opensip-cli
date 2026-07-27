@@ -39,10 +39,13 @@ describe('tree-sitter adapter cancellation', () => {
 
   it('checks cancellation in parse and walk substrates', () => {
     const signal = cancelledSignal();
-    const adapter = {
+    const adapter: LanguageAdapter<ParsedFile> = {
       id: 'fixture',
+      fileExtensions: [],
       parse: (): ParsedFile => ({}) as ParsedFile,
-    } as LanguageAdapter<ParsedFile>;
+      stripStrings: (content): string => content,
+      stripComments: (content): string => content,
+    };
     const parseProject = createParseProjectFromAdapter(adapter);
     const walkInput: WalkInput<TreeSitterParsedProject> = {
       project: { files: new Map() },
