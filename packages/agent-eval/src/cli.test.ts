@@ -27,6 +27,10 @@ import {
   type ArtifactFileSystem,
   type CliDependencies,
 } from './cli.js';
+import {
+  resetInterruptCleanupsForTests,
+  runInterruptCleanups,
+} from './runner/interrupt-cleanup.js';
 import { HarnessPrerequisiteError } from './runner/spawn.js';
 
 import type { Arm, GoldTask } from './model/task.js';
@@ -42,6 +46,7 @@ const TASK_TWO = makeTask('orient.customer-ts');
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
+  resetInterruptCleanupsForTests();
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -470,6 +475,32 @@ describe('main', () => {
       { entrypoint: realEntrypoint, phase: 'version', source: 'installed' },
       { entrypoint: realEntrypoint, phase: 'arm', source: 'installed' },
     ]);
+  });
+
+  it('registers an installed target snapshot for process-boundary cleanup', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = installedCliEntrypoint(root);
+    let snapshotRoot: string | undefined;
+    const harness = dependencyHarness(root, {
+      runArm: (task, arm, target) => {
+        if (target.source !== 'installed') throw new TypeError('expected an installed target');
+        snapshotRoot = target.snapshotRoot;
+        expect(existsSync(snapshotRoot)).toBe(true);
+        runInterruptCleanups();
+        expect(existsSync(snapshotRoot)).toBe(false);
+        return Promise.resolve(armResult(task, arm));
+      },
+    });
+
+    await expect(
+      main(
+        ['--task', TASK_ONE.id, '--arm', 'opensip', '--opensip-entrypoint', entrypoint],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(2);
+
+    expect(snapshotRoot).toBeDefined();
+    expect(snapshotRoot === undefined ? true : existsSync(snapshotRoot)).toBe(false);
   });
 
   it('rejects an installed entrypoint that is not a usable JS bin with exit two', async () => {

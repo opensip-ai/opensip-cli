@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { resetInterruptCleanupsForTests, runInterruptCleanups } from './interrupt-cleanup.js';
 import {
   processTreeIsAlive,
   processTreeSummary,
@@ -37,6 +38,7 @@ function retainForTest(child: KillableChild, platform: NodeJS.Platform): PosixPr
 
 afterEach(() => {
   for (const tree of retainedTrees.splice(0)) stopProcessTreeTracking(tree);
+  resetInterruptCleanupsForTests();
 });
 
 function fakeChild(pid: number | undefined = 4242): {
@@ -75,6 +77,29 @@ describe('retained POSIX process trees', () => {
 
     signalProcessTree(tree, 'SIGTERM', { killProcess });
     expect(killProcess).toHaveBeenLastCalledWith(-4242, 'SIGTERM');
+  });
+
+  it('registers live trees for process-boundary termination', () => {
+    const retained = fakeChild();
+    const killProcess = vi.fn();
+    const tree = retainPosixProcessTree(retained.child, 'linux', {
+      killProcess,
+      snapshotProcesses: () => [
+        {
+          commandFingerprint: 'a'.repeat(64),
+          parentPid: 1,
+          pid: 4242,
+          processGroupId: 4242,
+          posixSession: 4242,
+          startedAt: 'test-root-start',
+        },
+      ],
+    });
+    retainedTrees.push(tree);
+
+    runInterruptCleanups();
+
+    expect(killProcess).toHaveBeenCalledWith(-4242, 'SIGKILL');
   });
 
   it('falls back to the retained root handle if group signalling fails', () => {

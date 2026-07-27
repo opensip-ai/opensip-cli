@@ -17,10 +17,12 @@ import {
   persistReport,
   requireExplicitPairAvailable,
 } from './cli-artifacts.js';
+import { installAgentEvalProcessBoundary } from './process-boundary.js';
 import { contractFingerprint } from './report/contract-fingerprint.js';
 import { EVAL_REPORT_SCHEMA_VERSION } from './report/model.js';
 import { safeErrorDetail } from './runner/error-detail.js';
 import { resolveGitProvenance } from './runner/git-provenance.js';
+import { registerInterruptCleanup } from './runner/interrupt-cleanup.js';
 import { runTaskArm } from './runner/run-task.js';
 import {
   HarnessPrerequisiteError,
@@ -318,6 +320,13 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
   // Construct the one immutable CLI target once, after help/list have returned, so
   // every version/init/graph/MCP spawn in this run measures the same build.
   const target = buildCliTarget(options.opensipEntrypoint);
+  let targetCleaned = false;
+  const cleanupTarget = (): void => {
+    if (targetCleaned) return;
+    targetCleaned = true;
+    cleanupCliTarget(target);
+  };
+  const releaseInterruptCleanup = registerInterruptCleanup(cleanupTarget);
   try {
     const requestedPaths = buildRequestedPaths(options, dependencies);
     if (requestedPaths !== undefined) {
@@ -325,7 +334,8 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
     }
     return await runEvaluation(tasks, arms, requestedPaths, target, dependencies);
   } finally {
-    cleanupCliTarget(target);
+    releaseInterruptCleanup();
+    cleanupTarget();
   }
 }
 
@@ -343,5 +353,17 @@ export async function main(
 
 const invokedPath = process.argv[1];
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
-  process.exitCode = await main(process.argv.slice(2));
+  const uninstallProcessBoundary = installAgentEvalProcessBoundary((reason, kind) =>
+    handleError(
+      new CliHarnessError(
+        `fatal ${kind}: ${unclassifiedHarnessDetail(reason, DEFAULT_CLI_DEPENDENCIES)}`,
+      ),
+      DEFAULT_CLI_DEPENDENCIES,
+    ),
+  );
+  try {
+    process.exitCode = await main(process.argv.slice(2));
+  } finally {
+    uninstallProcessBoundary();
+  }
 }

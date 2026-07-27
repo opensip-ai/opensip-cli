@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { compareCodePoints } from '../model/value-helpers.js';
 
 import { safeErrorDetail } from './error-detail.js';
+import { registerInterruptCleanup } from './interrupt-cleanup.js';
 
 import type { ChildProcess } from 'node:child_process';
 
@@ -497,6 +498,8 @@ class DescendantTracker {
 export interface PosixProcessTree {
   readonly child: KillableChild;
   readonly processGroupId: number;
+  /** Internal process-boundary registration release. */
+  readonly releaseInterruptCleanup: () => void;
   readonly tracker: DescendantTracker;
 }
 
@@ -526,7 +529,17 @@ export function retainPosixProcessTree(
     dependencies.monotonicNow ?? performance.now.bind(performance),
   );
   tracker.start();
-  return Object.freeze({ child, processGroupId: child.pid, tracker });
+  let releaseInterruptCleanup = (): void => undefined;
+  const tree: PosixProcessTree = Object.freeze({
+    child,
+    processGroupId: child.pid,
+    releaseInterruptCleanup: () => releaseInterruptCleanup(),
+    tracker,
+  });
+  releaseInterruptCleanup = registerInterruptCleanup(() =>
+    signalProcessTree(tree, 'SIGKILL', dependencies),
+  );
+  return tree;
 }
 
 export function sampleProcessTree(tree: PosixProcessTree): void {
@@ -539,6 +552,7 @@ export function sampleProcessTreeIfDue(tree: PosixProcessTree): void {
 }
 
 export function stopProcessTreeTracking(tree: PosixProcessTree): void {
+  tree.releaseInterruptCleanup();
   tree.tracker.stop();
 }
 
