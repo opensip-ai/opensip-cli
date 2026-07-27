@@ -11,6 +11,11 @@ import type { CrossPackageContext } from '../edge-helpers/cross-package-context.
 import type { Catalog, ResolverVerdict } from '@opensip-cli/graph';
 import type ts from 'typescript';
 
+/** Per-resolution, best-effort debug trace sink. */
+export interface ResolutionTraceSink {
+  append(fields: readonly string[]): void;
+}
+
 /** Shared context handed to each edge resolver: catalog, TS program, and project root. */
 export interface ResolverContext {
   readonly catalog: Catalog;
@@ -34,6 +39,8 @@ export interface ResolverContext {
    * the resolve loop.
    */
   readonly importSpecifiers: ReadonlyMap<string, string>;
+  /** Optional bounded trace sink created once by the enclosing resolution pass. */
+  readonly resolutionTrace?: ResolutionTraceSink;
 }
 
 export type EdgeResolver<N extends ts.Node = ts.Node> = (

@@ -22,6 +22,7 @@ import {
   throwIfGraphAdapterAborted,
 } from '@opensip-cli/graph';
 
+import { createResolutionTrace } from './edge-helpers/resolution-trace.js';
 import {
   buildImportBindingSourceIndex,
   buildImportIndex,
@@ -74,6 +75,7 @@ export async function resolveEdgesFromRecords(
   const sink = { edgesByOwner: callsByHash, stats };
 
   const crossPackage = input.crossPackage;
+  const resolutionTrace = createResolutionTrace();
   const importSpecifiersByFile = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
 
   let processed = 0;
@@ -107,6 +109,7 @@ export async function resolveEdgesFromRecords(
       projectDirAbs: input.projectDirAbs,
       crossPackage,
       importSpecifiers,
+      resolutionTrace,
     };
     const verdict = computeVerdict(r.node, ctx);
     if (verdict === null) continue;
