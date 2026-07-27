@@ -17,6 +17,7 @@
 
 import { relative } from 'node:path';
 
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { parseProjectFast, type TypescriptFastParsedProject } from './parse-fast.js';
@@ -46,10 +47,13 @@ export type TsParsed =
  * when semantic edge resolution actually needs it.
  */
 export function parseProject(input: ParseInput): ParseOutput<TsParsed> {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript parse');
   if (input.resolutionMode === 'fast') {
     return parseProjectFast(input);
   }
-  return parseProjectExact(input);
+  const parsed = parseProjectExact(input);
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript parse');
+  return parsed;
 }
 
 /** Constructs a tsc Program for the TS source files in the input, returning parse errors if any. */
@@ -76,11 +80,13 @@ function parseProjectExact(input: ParseInput): ParseOutput<TsParsed> {
   // walk's parent chains valid. (Fast mode skips all of this and substitutes
   // createSourceFile(setParentNodes:true); see parse-fast.ts.)
   program.getTypeChecker();
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript parse');
 
   const parseErrors: ParseError[] = [];
   /* v8 ignore start */
   const seenPaths = new Set<string>();
   for (const sf of program.getSourceFiles()) {
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript parse diagnostics');
     const diagnostics = program.getSyntacticDiagnostics(sf);
     if (diagnostics.length === 0) continue;
     const filePath = relative(input.projectDirAbs, sf.fileName);

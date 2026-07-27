@@ -35,6 +35,7 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
+  throwIfGraphAdapterAborted,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
 import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
@@ -70,6 +71,7 @@ function goPosition(
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- call-site resolution loops are intentionally parallel across language adapters for adapter-local grammar handling.
 export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveOutput {
+  throwIfGraphAdapterAborted(input.signal, 'Go call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:go' });
   // Same-language only: on the exact build the merged catalog holds every
   // language, so a Go call must not pin a same-named TS/Python/… occurrence.
@@ -79,6 +81,7 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
+    throwIfGraphAdapterAborted(input.signal, 'Go call resolution');
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as GoParsedFile;
     if (r.kind === 'creation') {
@@ -103,7 +106,7 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   // `go.mod`-mediated module-path resolution.
   const dependenciesByOwner =
     input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs)
+      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs, input.signal)
       : undefined;
 
   return dependenciesByOwner === undefined
@@ -149,13 +152,16 @@ function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
   projectDirAbs: string,
+  signal?: AbortSignal,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
+  throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
   const modulePath = readGoModulePath(projectDirAbs);
 
   // Build filePath → module-init bodyHash map. Catalog occurrences carry
   // project-relative POSIX filePath; module-init kind is filtered.
   const moduleInitByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
     if (!occs) continue;
     for (const o of occs) {
       if (o.kind === 'module-init') moduleInitByFilePath.set(o.filePath, o.bodyHash);
@@ -164,6 +170,7 @@ function resolveDependencies(
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
     const to = resolveGoImportPath(site.specifier, modulePath, moduleInitByFilePath);
     const edge: DependencyEdge = {
       to,
@@ -178,6 +185,7 @@ function resolveDependencies(
       existing.push(edge);
     }
   }
+  throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
   return out;
 }
 

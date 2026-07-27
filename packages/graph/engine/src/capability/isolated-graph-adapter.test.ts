@@ -154,6 +154,42 @@ describe('isolatedGraphAdapterBridge', () => {
     });
   });
 
+  it('cancels an in-flight proxy call without cloning the host signal', async () => {
+    const calls: unknown[] = [];
+    const contributions = await isolatedGraphAdapterBridge.createHostContributions(
+      hostContext((request) => {
+        calls.push(request);
+        if ((request as { kind?: unknown }).kind === 'graph.discover') {
+          return Promise.resolve({
+            adapter: { id: 'fixture', fileExtensions: ['.fixture'] },
+          });
+        }
+        return new Promise<never>(() => undefined);
+      }),
+    );
+    const adapter = contributions[0]?.contribution as {
+      cacheKey: (input: {
+        projectDirAbs: string;
+        resolutionMode: 'exact';
+        signal: AbortSignal;
+      }) => Promise<string>;
+    };
+    const controller = new AbortController();
+    const pending = adapter.cacheKey({
+      projectDirAbs: root,
+      resolutionMode: 'exact',
+      signal: controller.signal,
+    });
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ code: 'CORE.SYSTEM.CANCELLED' });
+    expect(calls[1]).toEqual({
+      kind: 'graph.cacheKey',
+      input: { projectDirAbs: root, resolutionMode: 'exact' },
+    });
+  });
+
   it('dispatches non-handle worker requests directly to the adapter', async () => {
     await expect(
       isolatedGraphAdapterBridge.runInWorker(

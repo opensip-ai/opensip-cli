@@ -7,7 +7,14 @@
 
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { isPathInside, err, ok, type Result, type LanguageAdapter } from '@opensip-cli/core';
+import {
+  currentScope,
+  isPathInside,
+  err,
+  ok,
+  type Result,
+  type LanguageAdapter,
+} from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../cache/engine-version.js';
 import { computeFilesFingerprint, parseFilesFingerprint } from '../cache/invalidate.js';
@@ -382,6 +389,7 @@ async function recomputeCatalogInputs(
   const discovery = await input.adapter.discoverFiles({
     cwd: input.projectRoot,
     diagnosticIntent: 'quiet',
+    signal: currentScope()?.abortSignal,
   });
   const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
   if (!discoveryCheck.ok) return discoveryCheck;
@@ -390,6 +398,7 @@ async function recomputeCatalogInputs(
     configPathAbs: discovery.configPathAbs,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: input.catalog.resolutionMode ?? 'exact',
+    signal: currentScope()?.abortSignal,
   });
   const validated = validateRawCacheKey(raw);
   return validated.ok
@@ -429,6 +438,7 @@ async function recomputeShardedInputs(
       ...(anchor.value.configPath === undefined
         ? {}
         : { configPathOverride: anchor.value.configPath }),
+      signal: currentScope()?.abortSignal,
     });
     const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
     if (!discoveryCheck.ok) return discoveryCheck;
@@ -437,6 +447,7 @@ async function recomputeShardedInputs(
       projectDirAbs: anchor.value.rootDir,
       configPathAbs: anchor.value.configPath ?? discovery.configPathAbs,
       resolutionMode: input.catalog.resolutionMode ?? 'exact',
+      signal: currentScope()?.abortSignal,
     });
     const validated = validateRawCacheKey(raw);
     if (!validated.ok) return validated;

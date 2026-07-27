@@ -189,6 +189,7 @@ async function buildShard(
 ): Promise<ShardBuildResult> {
   const { shard, projectRoot, resolutionMode } = spec;
   const adapter = pickAdapter(shard.rootDir, spec.language);
+  const adapterSignal = currentScope()?.abortSignal;
 
   // Anchor compiler options to the shard's own config, but compute
   // occurrence filePaths against the COMMON project root so fragments
@@ -204,6 +205,7 @@ async function buildShard(
     cwd: shard.rootDir,
     configPathOverride: shard.configPathAbs,
     diagnosticIntent: 'quiet',
+    signal: adapterSignal,
   });
   const discovery: DiscoverOutput = {
     projectDirAbs: projectRoot,
@@ -232,6 +234,7 @@ async function buildShard(
         // `planShardWork` compares against (loadValidShardFragment) and never
         // collides with a single-program (exact) catalog row.
         engineMode: 'sharded',
+        signal: adapterSignal,
       }),
   });
   const built = stableBuild.value;

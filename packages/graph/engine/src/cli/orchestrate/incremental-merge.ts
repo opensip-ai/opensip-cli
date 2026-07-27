@@ -29,6 +29,7 @@ export interface ClosureInput {
   readonly cachedCatalog: Catalog;
   readonly parsedProject: ParsedProject;
   readonly changedFilesAbs: readonly string[];
+  readonly signal?: AbortSignal;
 }
 
 export interface ClosureOutput {
@@ -45,7 +46,7 @@ export interface ClosureOutput {
  *
  */
 export async function expandClosureToFixpoint(input: ClosureInput): Promise<ClosureOutput> {
-  const { adapter, discovery, cachedCatalog, parsedProject, changedFilesAbs } = input;
+  const { adapter, discovery, cachedCatalog, parsedProject, changedFilesAbs, signal } = input;
   const closureRel = new Set(
     changedFilesAbs.map((p) => relative(discovery.projectDirAbs, p).split(sep).join('/')),
   );
@@ -59,6 +60,7 @@ export async function expandClosureToFixpoint(input: ClosureInput): Promise<Clos
     closureAbs,
     cachedHashesByFile,
     projectDirAbs: discovery.projectDirAbs,
+    signal,
   };
 
   const walked = await walkClosureToFixpoint(adapter, parsedProject, discovery, ctx);
@@ -72,6 +74,7 @@ interface ClosureExpansionContext {
   readonly closureAbs: Set<string>;
   readonly cachedHashesByFile: ReadonlyMap<string, ReadonlySet<string>>;
   readonly projectDirAbs: string;
+  readonly signal?: AbortSignal;
 }
 
 async function walkClosureToFixpoint(
@@ -84,6 +87,7 @@ async function walkClosureToFixpoint(
     project: parsedProject,
     files: discovery.files.filter((p) => ctx.closureAbs.has(p)),
     projectDirAbs: discovery.projectDirAbs,
+    signal: ctx.signal,
   });
   return expandClosureOnce(walked, ctx)
     ? walkClosureToFixpoint(adapter, parsedProject, discovery, ctx)

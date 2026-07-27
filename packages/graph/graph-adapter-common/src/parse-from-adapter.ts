@@ -14,8 +14,8 @@
 
 import { relative } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
-import { readSourceFileGuarded } from '@opensip-cli/graph';
+import { isToolErrorLike, logger } from '@opensip-cli/core';
+import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type { LanguageAdapter } from '@opensip-cli/core';
@@ -37,47 +37,21 @@ export function createParseProjectFromAdapter(
     const parseErrors: ParseError[] = [];
 
     for (const path of input.files) {
-      let source: string;
-      /* v8 ignore start */
-      try {
-        source = readSourceFileGuarded(path);
-      } catch (error) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: `read failed: ${error instanceof Error ? error.message : String(error)}`,
-        });
+      const result = parseOneFile(adapter, input, path);
+      if (!result.ok) {
+        parseErrors.push(result.error);
         continue;
       }
-      /* v8 ignore stop */
-      let parsed: ParsedFile | null;
-      /* v8 ignore start */
-      try {
-        parsed = adapter.parse(source, path);
-      } catch (error) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-      /* v8 ignore stop */
-      /* v8 ignore start */
-      if (parsed === null) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: 'tree-sitter returned no tree',
-        });
-        continue;
-      }
-      /* v8 ignore stop */
-      if (parsed.tree.rootNode.hasError) {
+      if (result.parsed.tree.rootNode.hasError) {
         parseErrors.push({
           filePath: relative(input.projectDirAbs, path),
           message: 'tree-sitter reported syntax errors; partial tree retained',
         });
       }
-      files.set(path, parsed);
+      files.set(path, result.parsed);
     }
+
+    throwIfGraphAdapterAborted(input.signal, `${adapter.id} parse`);
 
     logger.info({
       evt: 'graph.parse.complete',
@@ -88,4 +62,55 @@ export function createParseProjectFromAdapter(
 
     return { project: { files }, parseErrors };
   };
+}
+
+type FileParseResult =
+  | { readonly ok: true; readonly parsed: ParsedFile }
+  | { readonly ok: false; readonly error: ParseError };
+
+function parseOneFile(
+  adapter: LanguageAdapter<ParsedFile>,
+  input: ParseInput,
+  path: string,
+): FileParseResult {
+  const stage = `${adapter.id} parse`;
+  throwIfGraphAdapterAborted(input.signal, stage);
+  let source: string;
+  /* v8 ignore start */
+  try {
+    source = readSourceFileGuarded(path);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    return {
+      ok: false,
+      error: parseError(
+        input,
+        path,
+        `read failed: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    };
+  }
+  /* v8 ignore stop */
+  throwIfGraphAdapterAborted(input.signal, stage);
+  let parsed: ParsedFile | null;
+  /* v8 ignore start */
+  try {
+    parsed = adapter.parse(source, path);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    return {
+      ok: false,
+      error: parseError(input, path, error instanceof Error ? error.message : String(error)),
+    };
+  }
+  if (parsed === null) {
+    return { ok: false, error: parseError(input, path, 'tree-sitter returned no tree') };
+  }
+  /* v8 ignore stop */
+  throwIfGraphAdapterAborted(input.signal, stage);
+  return { ok: true, parsed };
+}
+
+function parseError(input: ParseInput, path: string, message: string): ParseError {
+  return { filePath: relative(input.projectDirAbs, path), message };
 }

@@ -7,6 +7,7 @@ import {
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
 
+import { graphAdapterSignal, throwIfGraphAdapterAborted } from '../lang-adapter/cancellation.js';
 import {
   isSafeGraphAdapterDescriptor,
   isSafeGraphAdapterMetadata,
@@ -143,31 +144,65 @@ function createProxyAdapter(
   return {
     ...descriptor,
     discoverFiles: async (input: DiscoverInput): Promise<DiscoverOutput> =>
-      (await invoke({
-        kind: 'graph.discoverFiles',
-        input,
-      } satisfies GraphInvokeRequest)) as DiscoverOutput,
+      await invokeAdapter<DiscoverOutput>('graph.discoverFiles', input, invoke, 'discovery'),
     parseProject: async (input: ParseInput): Promise<ParseOutput<unknown>> =>
-      (await invoke({
-        kind: 'graph.parseProject',
-        input,
-      } satisfies GraphInvokeRequest)) as ParseOutput<unknown>,
+      await invokeAdapter<ParseOutput<unknown>>('graph.parseProject', input, invoke, 'parse'),
     walkProject: async (input: WalkInput<unknown>): Promise<WalkOutput> =>
-      (await invoke({
-        kind: 'graph.walkProject',
-        input,
-      } satisfies GraphInvokeRequest)) as WalkOutput,
+      await invokeAdapter<WalkOutput>('graph.walkProject', input, invoke, 'walk'),
     resolveCallSites: async (input: ResolveInput<unknown>): Promise<ResolveOutput> =>
-      (await invoke({
-        kind: 'graph.resolveCallSites',
-        input,
-      } satisfies GraphInvokeRequest)) as ResolveOutput,
+      await invokeAdapter<ResolveOutput>('graph.resolveCallSites', input, invoke, 'resolution'),
     cacheKey: async (input: CacheKeyInput): Promise<string> =>
-      (await invoke({
-        kind: 'graph.cacheKey',
-        input,
-      } satisfies GraphInvokeRequest)) as string,
+      await invokeAdapter<string>('graph.cacheKey', input, invoke, 'cache-key computation'),
   };
+}
+
+type AdapterInvocationInput =
+  DiscoverInput | ParseInput | WalkInput<unknown> | ResolveInput<unknown> | CacheKeyInput;
+
+/** Invoke an isolated adapter without attempting to structured-clone AbortSignal. */
+async function invokeAdapter<T>(
+  kind: GraphInvokeRequest['kind'],
+  input: AdapterInvocationInput,
+  invoke: (request: unknown) => Promise<unknown>,
+  stage: string,
+): Promise<T> {
+  const signal = graphAdapterSignal(input.signal);
+  throwIfGraphAdapterAborted(signal, stage);
+  const { signal: omittedSignal, ...wireInput } = input;
+  void omittedSignal;
+  const operation = invoke({ kind, input: wireInput } satisfies GraphInvokeRequest) as Promise<T>;
+  if (signal === undefined) return await operation;
+  return await settleWithAbort(operation, signal, stage);
+}
+
+function settleWithAbort<T>(operation: Promise<T>, signal: AbortSignal, stage: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = (): void => signal.removeEventListener('abort', onAbort);
+    const onAbort = (): void => {
+      cleanup();
+      try {
+        throwIfGraphAdapterAborted(signal, stage);
+      } catch (error) {
+        // The checkpoint only throws registered ErrorDefinition-backed errors.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+        reject(error);
+      }
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+    operation.then(
+      (value) => {
+        cleanup();
+        resolve(value);
+      },
+      (error: unknown) => {
+        cleanup();
+        // Preserve the worker supervisor's typed rejection without downgrading it.
+        // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+        reject(error);
+      },
+    );
+    if (signal.aborted) onAbort();
+  });
 }
 
 async function handleParseProject(
@@ -194,6 +229,7 @@ async function handleWalkProject(
     project: parsed.project,
     projectDirAbs: input.projectDirAbs,
     files: input.files,
+    signal: input.signal,
   });
   return {
     ...walked,
@@ -215,6 +251,7 @@ async function handleResolveCallSites(
     project: parsed.project,
     projectDirAbs: input.projectDirAbs,
     files: input.project.parseInput.files,
+    signal: input.signal,
   });
   // @fitness-ignore-next-line async-waterfall-detection -- resolveCallSites needs the walked call/dependency sites.
   return await adapter.resolveCallSites({

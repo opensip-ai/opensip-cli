@@ -26,6 +26,7 @@ import {
   packageGroupOf,
   resolveSpecifierToPackage,
   sortReasonCodes,
+  throwIfGraphAdapterAborted,
   type CrossFileReferenceFact,
   type DeclarationFact,
   type DeclarationKind,
@@ -50,6 +51,7 @@ export interface CollectSemanticFactsInput {
   readonly projectRootAbs: string;
   readonly crossPackage: CrossPackageContext;
   readonly limits?: SemanticFactLimits;
+  readonly signal?: AbortSignal;
 }
 
 interface MutableCoverage {
@@ -76,6 +78,7 @@ interface CollectScope {
   readonly crossPackage: CrossPackageContext;
   readonly limits: SemanticFactLimits;
   readonly coverage: MutableCoverage;
+  readonly signal?: AbortSignal;
 }
 
 /** Mutable sinks + shared scope for phase-1 declaration collection. */
@@ -126,6 +129,7 @@ interface FileReferenceCtx {
 export function collectSemanticReferenceFacts(
   input: CollectSemanticFactsInput,
 ): SemanticFactBundle {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic fact collection');
   const limits = input.limits ?? DEFAULT_SEMANTIC_FACT_LIMITS;
   const coverage: MutableCoverage = {
     inspectedDeclarations: 0,
@@ -156,12 +160,14 @@ export function collectSemanticReferenceFacts(
     crossPackage: input.crossPackage,
     limits,
     coverage,
+    signal: input.signal,
   };
 
   // Phase 1: collect declarations from project source files.
   const declBySymbol = new Map<ts.Symbol, DeclRecord>();
   const decls: DeclarationFact[] = [];
   collectDeclarations({ ...scope, decls, declBySymbol });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic declaration collection');
 
   // Unique exported-declaration index for workspace .d.ts joins.
   const exportIndex = buildUniqueExportIndex(decls, input.crossPackage);
@@ -169,6 +175,7 @@ export function collectSemanticReferenceFacts(
   // Phase 2: collect cross-file references.
   const refs: CrossFileReferenceFact[] = [];
   collectReferences({ ...scope, declBySymbol, exportIndex, refs });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic reference collection');
 
   return applySemanticFactCaps(
     decls,
@@ -190,6 +197,7 @@ export function collectSemanticReferenceFacts(
 /** Phase 1: collect declaration facts from discovered project source files. */
 function collectDeclarations(ctx: DeclarationCollectCtx): void {
   for (const sf of ctx.program.getSourceFiles()) {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic declaration collection');
     if (sf.isDeclarationFile) continue;
     if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
     const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);
@@ -216,6 +224,7 @@ function collectDeclarations(ctx: DeclarationCollectCtx): void {
 /** Phase 2: collect cross-file reference facts from discovered project source files. */
 function collectReferences(ctx: ReferenceCollectCtx): void {
   for (const sf of ctx.program.getSourceFiles()) {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic reference collection');
     if (sf.isDeclarationFile) continue; // omit reference sites inside .d.ts
     if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
     const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);

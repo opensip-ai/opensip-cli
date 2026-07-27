@@ -135,6 +135,10 @@ export type {
   CacheKeyInput,
   ParsedProject,
 } from './lang-adapter/types.js';
+// Cooperative cancellation checkpoint for adapter implementations. This is a
+// value export because accepting a signal in the type contract without a
+// canonical definition-preserving checkpoint would invite divergent handling.
+export { throwIfGraphAdapterAborted } from './lang-adapter/cancellation.js';
 export type { CallConfidence as AdapterCallConfidence } from './types.js';
 export {
   pickAdapter,

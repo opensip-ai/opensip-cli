@@ -20,6 +20,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { logger } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { glob, Ignore, type IgnoreLike } from 'glob';
 
 import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
@@ -58,6 +59,7 @@ export function createDiscover(
     void input.diagnosticIntent;
     void module;
     void logger;
+    throwIfGraphAdapterAborted(input.signal, `${languageId} discovery`);
 
     const projectDirAbs = normalizeProjectDir(input.cwd);
     const configPathAbs = resolveConfigPath(
@@ -65,7 +67,15 @@ export function createDiscover(
       input.configPathOverride,
       configCandidates,
     );
-    const files = collectFiles(projectDirAbs, pattern, excludedDirGlobs, preserveExcludedPath);
+    const files = collectFiles(
+      projectDirAbs,
+      pattern,
+      excludedDirGlobs,
+      preserveExcludedPath,
+      input.signal,
+      languageId,
+    );
+    throwIfGraphAdapterAborted(input.signal, `${languageId} discovery`);
 
     const out: DiscoverOutput =
       configPathAbs === undefined
@@ -117,6 +127,8 @@ function collectFiles(
   pattern: string,
   excludedDirGlobs: readonly string[],
   preserveExcludedPath: ((projectRelativePath: string) => boolean) | undefined,
+  signal: AbortSignal | undefined,
+  languageId: string,
 ): readonly string[] {
   const ignore = buildIgnore(excludedDirGlobs, preserveExcludedPath);
   const matches: string[] = glob.sync(pattern, {
@@ -130,6 +142,7 @@ function collectFiles(
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of matches) {
+    throwIfGraphAdapterAborted(signal, `${languageId} discovery`);
     let real: string = m;
     /* v8 ignore start */
     try {

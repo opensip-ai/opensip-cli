@@ -227,6 +227,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
   // Normalize the tier once at the boundary; absence ⇒ exact (historical).
   const resolutionMode: ResolutionMode = input.resolution ?? 'exact';
+  const adapterSignal = currentScope()?.abortSignal;
 
   const monitor = createPressureMonitor();
   const discoveryStarted = Date.now();
@@ -249,6 +250,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
             cwd: input.cwd,
             configPathOverride: input.tsConfigPath,
             diagnosticIntent: 'normal',
+            signal: adapterSignal,
           });
           return { ...raw, files: resolveCanonicalFileSet(raw.files) };
         },
@@ -286,6 +288,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       projectRoot: input.cwd,
       onProgress: input.onProgress,
       monitor,
+      signal: adapterSignal,
     });
 
     const indexes: Indexes = await runStage({

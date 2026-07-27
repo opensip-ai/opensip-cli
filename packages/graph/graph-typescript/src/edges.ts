@@ -19,6 +19,7 @@ import {
   createMutableStats,
   ownerEdgeKey,
   pushCreationEdge as pushSharedCreationEdge,
+  throwIfGraphAdapterAborted,
 } from '@opensip-cli/graph';
 
 import {
@@ -65,11 +66,13 @@ export interface EdgeResolutionFromRecordsInput {
    * read + export-index pass the caller already performed.
    */
   readonly crossPackage: CrossPackageContext;
+  readonly signal?: AbortSignal;
 }
 
 export async function resolveEdgesFromRecords(
   input: EdgeResolutionFromRecordsInput,
 ): Promise<EdgeResolutionOutput> {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
@@ -81,7 +84,10 @@ export async function resolveEdgesFromRecords(
 
   let processed = 0;
   for (const r of input.callSites) {
-    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
+    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) {
+      await yieldToEventLoop();
+      throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
+    }
     processed += 1;
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
@@ -113,6 +119,8 @@ export async function resolveEdgesFromRecords(
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
 
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
+
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
 
   logger.info({
@@ -132,11 +140,13 @@ export interface EdgeResolutionSyntacticInput {
   readonly catalog: Catalog;
   readonly projectDirAbs: string;
   readonly callSites: readonly CallSiteRecord[];
+  readonly signal?: AbortSignal;
 }
 
 export async function resolveEdgesSyntactic(
   input: EdgeResolutionSyntacticInput,
 ): Promise<EdgeResolutionOutput> {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
   logger.info({ evt: 'graph.edges.syntactic.start', module: 'graph:edges' });
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
@@ -147,7 +157,10 @@ export async function resolveEdgesSyntactic(
 
   let processed = 0;
   for (const r of input.callSites) {
-    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) await yieldToEventLoop();
+    if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) {
+      await yieldToEventLoop();
+      throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
+    }
     processed += 1;
     const ownerKey = ownerEdgeKey(
       r.ownerHash,
@@ -182,6 +195,8 @@ export async function resolveEdgesSyntactic(
     if (verdict === null) continue;
     pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
   }
+
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
 

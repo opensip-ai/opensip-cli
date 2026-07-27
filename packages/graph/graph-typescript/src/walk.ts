@@ -24,6 +24,8 @@
 
 import { relative, sep } from 'node:path';
 
+import { isToolErrorLike } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
@@ -157,6 +159,7 @@ export interface WalkInput {
   readonly sourceFiles: Iterable<ts.SourceFile>;
   readonly files: readonly string[];
   readonly projectDirAbs: string;
+  readonly signal?: AbortSignal;
 }
 
 export interface WalkOutput {
@@ -179,13 +182,16 @@ export function walkProgram(input: WalkInput): WalkOutput {
   const filesSet = new Set(input.files.map(normalizeForCompare));
 
   for (const sf of input.sourceFiles) {
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
     if (sf.isDeclarationFile) continue;
     const sfPath = normalizeForCompare(sf.fileName);
     if (!filesSet.has(sfPath)) continue;
     try {
       walkFile(sf, input.projectDirAbs, functions, callSites, dependencySites);
       collectReExports(sf, input.projectDirAbs, reExports);
+      throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
     } catch (error) {
+      if (isToolErrorLike(error)) throw error;
       /* v8 ignore start */
       parseErrors.push({
         filePath: relative(input.projectDirAbs, sf.fileName),
@@ -194,6 +200,8 @@ export function walkProgram(input: WalkInput): WalkOutput {
       /* v8 ignore stop */
     }
   }
+
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
 
   return { functions, callSites, dependencySites, reExports, parseErrors };
 }

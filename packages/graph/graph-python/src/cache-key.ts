@@ -20,6 +20,7 @@
 
 import { existsSync, readFileSync } from 'node:fs';
 
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { hashConfig } from '@opensip-cli/graph-adapter-common';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
@@ -30,8 +31,10 @@ import type { CacheKeyInput } from '@opensip-cli/graph';
 const REQUIRES_PYTHON_RE = /^[\t ]*requires-python[\t ]*=[\t ]*["']([^"'\n]+)["']/m;
 
 export function cacheKey(input: CacheKeyInput): string {
-  const configHash = hashConfig(input.configPathAbs);
+  throwIfGraphAdapterAborted(input.signal, 'Python cache-key computation');
+  const configHash = hashConfig(input.configPathAbs, input.signal);
   const pythonVersion = readPythonVersion(input.configPathAbs);
+  throwIfGraphAdapterAborted(input.signal, 'Python cache-key computation');
   return `py-${pythonVersion}-${configHash}-${input.resolutionMode}`;
 }
 

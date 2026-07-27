@@ -23,7 +23,8 @@
 
 import { extname, relative } from 'node:path';
 
-import { readSourceFileGuarded } from '@opensip-cli/graph';
+import { isToolErrorLike } from '@opensip-cli/core';
+import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
@@ -57,10 +58,12 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
   const parseErrors: ParseError[] = [];
 
   for (const fileName of input.files) {
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript fast parse');
     let text: string;
     try {
       text = readSourceFileGuarded(fileName);
     } catch (error) {
+      if (isToolErrorLike(error)) throw error;
       /* v8 ignore next */
       parseErrors.push({
         filePath: relative(input.projectDirAbs, fileName),
@@ -79,6 +82,7 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
       scriptKindForFile(fileName),
     );
     sourceFiles.set(fileName, sourceFile);
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript fast parse');
 
     const diagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics;
     if (diagnostics && diagnostics.length > 0) {
@@ -91,6 +95,8 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
       }
     }
   }
+
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript fast parse');
 
   return { project: { kind: 'fast', sourceFiles }, parseErrors };
 }

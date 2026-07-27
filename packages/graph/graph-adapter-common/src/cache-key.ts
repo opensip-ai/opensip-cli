@@ -18,6 +18,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+
 import type { CacheKeyInput } from '@opensip-cli/graph';
 
 /**
@@ -28,20 +30,24 @@ import type { CacheKeyInput } from '@opensip-cli/graph';
  *   - read fails               → `'unreadable:<path>'`
  *   - otherwise                → first 16 hex of sha256(content)
  */
-export function hashConfig(configPathAbs: string | undefined): string {
+export function hashConfig(configPathAbs: string | undefined, signal?: AbortSignal): string {
+  throwIfGraphAdapterAborted(signal, 'config hashing');
   if (configPathAbs === undefined || configPathAbs.length === 0) {
     return 'no-config';
   }
   if (!existsSync(configPathAbs)) {
     return `missing:${configPathAbs}`;
   }
+  let hash: string;
   try {
     const content = readFileSync(configPathAbs, 'utf8');
-    return createHash('sha256').update(content).digest('hex').slice(0, 16);
+    hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
   } catch {
     /* v8 ignore next */
     return `unreadable:${configPathAbs}`;
   }
+  throwIfGraphAdapterAborted(signal, 'config hashing');
+  return hash;
 }
 
 /**
@@ -54,6 +60,6 @@ export function makeConfigCacheKey(options: {
 }): (input: CacheKeyInput) => string {
   const { prefix } = options;
   return function cacheKey(input: CacheKeyInput): string {
-    return `${prefix}-${hashConfig(input.configPathAbs)}-${input.resolutionMode}`;
+    return `${prefix}-${hashConfig(input.configPathAbs, input.signal)}-${input.resolutionMode}`;
   };
 }

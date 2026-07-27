@@ -42,6 +42,7 @@ import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { readPackageVersion } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
@@ -53,7 +54,9 @@ import type { CacheKeyInput } from '@opensip-cli/graph';
 const ADAPTER_VERSION = readPackageVersion(import.meta.url);
 
 export function cacheKey(input: CacheKeyInput): string {
-  const tsconfigHash = hashResolvedTsconfig(input.configPathAbs);
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript cache-key computation');
+  const tsconfigHash = hashResolvedTsconfig(input.configPathAbs, input.signal);
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript cache-key computation');
   return `ts-${ts.version}-adapter-${ADAPTER_VERSION}-${input.resolutionMode}-${tsconfigHash}`;
 }
 
@@ -63,7 +66,7 @@ export function cacheKey(input: CacheKeyInput): string {
  * shared `tsconfig.base.json`'s `paths`/`baseUrl`/`moduleResolution` that the
  * named config `extends` changes the key (the fragments rebuild), not a stale hit.
  */
-function hashResolvedTsconfig(configPathAbs: string | undefined): string {
+function hashResolvedTsconfig(configPathAbs: string | undefined, signal?: AbortSignal): string {
   if (configPathAbs === undefined || configPathAbs.length === 0) {
     return 'no-tsconfig';
   }
@@ -86,6 +89,7 @@ function hashResolvedTsconfig(configPathAbs: string | undefined): string {
     undefined,
     configPathAbs,
   );
+  throwIfGraphAdapterAborted(signal, 'TypeScript config hashing');
   return createHash('sha256').update(stableStringify(parsed.options)).digest('hex').slice(0, 16);
 }
 

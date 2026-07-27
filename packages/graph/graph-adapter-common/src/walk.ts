@@ -21,7 +21,8 @@
 
 import { relative } from 'node:path';
 
-import { withSpan } from '@opensip-cli/core';
+import { isToolErrorLike, withSpan } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
@@ -136,6 +137,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
     'graph.walk',
     () => {
       for (const path of sortedPaths) {
+        throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
         const file = input.project.files.get(path);
         if (!file) continue;
         try {
@@ -145,13 +147,17 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
             input.projectDirAbs,
             sinks,
           );
+          throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
         } catch (error) {
+          if (isToolErrorLike(error)) throw error;
           parseErrors.push({
             filePath: relative(input.projectDirAbs, path),
             message: error instanceof Error ? error.message : String(error),
           });
         }
       }
+
+      throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
 
       return { occurrences, callSites, dependencySites, parseErrors };
     },

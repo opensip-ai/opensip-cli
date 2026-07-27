@@ -65,6 +65,8 @@ export interface DiscoverInput {
    * that pass `normal` own the single aggregate terminal discovery event.
    */
   readonly diagnosticIntent: DiscoveryDiagnosticIntent;
+  /** Host cancellation/deadline signal. Adapters should check it during long work. */
+  readonly signal?: AbortSignal;
 }
 
 export interface DiscoverOutput {
@@ -103,6 +105,8 @@ export interface ParseInput {
    * require, a per-adapter fast implementation.
    */
   readonly resolutionMode: ResolutionMode;
+  /** Host cancellation/deadline signal. Adapters should check it during long work. */
+  readonly signal?: AbortSignal;
 }
 
 export interface ParseOutput<P = ParsedProject> {
@@ -116,6 +120,8 @@ export interface WalkInput<P = ParsedProject> {
   readonly project: P;
   readonly projectDirAbs: string;
   readonly files: readonly string[];
+  /** Host cancellation/deadline signal. Adapters should check it during long work. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -232,6 +238,8 @@ export interface ResolveInput<P = ParsedProject> {
    * `boundaryCalls` undefined. Omitted/false in single-process builds.
    */
   readonly emitBoundaryCalls?: boolean;
+  /** Host cancellation/deadline signal. Adapters should check it during long work. */
+  readonly signal?: AbortSignal;
 }
 
 export interface ResolveOutput {
@@ -279,6 +287,8 @@ export interface CacheKeyInput {
    * be a cache miss against the other tier, not a wrong-tier reuse).
    */
   readonly resolutionMode: ResolutionMode;
+  /** Host cancellation/deadline signal. Adapters should check it during long work. */
+  readonly signal?: AbortSignal;
 }
 
 // ── method 6 ──────────────────────────────────────────────────────

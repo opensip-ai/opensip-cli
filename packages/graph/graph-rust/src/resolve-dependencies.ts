@@ -12,18 +12,23 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+
 import type { Catalog, DependencyEdge, DependencySiteRecord } from '@opensip-cli/graph';
 
 export function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
   projectDirAbs: string,
+  signal?: AbortSignal,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
+  throwIfGraphAdapterAborted(signal, 'Rust dependency resolution');
   const packageName = readCargoPackageName(projectDirAbs);
-  const { moduleInitByModulePath, modulePathByFilePath } = buildCrateModuleIndex(catalog);
+  const { moduleInitByModulePath, modulePathByFilePath } = buildCrateModuleIndex(catalog, signal);
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'Rust dependency resolution');
     const importerModulePath = lookupImporterModulePath(
       catalog,
       modulePathByFilePath,
@@ -41,13 +46,17 @@ export function resolveDependencies(
  * `filePath → modulePath` (used to rewrite `super::` / `self::` paths
  * relative to the importer's own module).
  */
-function buildCrateModuleIndex(catalog: Catalog): {
+function buildCrateModuleIndex(
+  catalog: Catalog,
+  signal?: AbortSignal,
+): {
   readonly moduleInitByModulePath: ReadonlyMap<string, string>;
   readonly modulePathByFilePath: ReadonlyMap<string, string>;
 } {
   const moduleInitByModulePath = new Map<string, string>();
   const modulePathByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Rust dependency indexing');
     if (!occs) continue;
     for (const o of occs) {
       if (o.kind !== 'module-init') continue;

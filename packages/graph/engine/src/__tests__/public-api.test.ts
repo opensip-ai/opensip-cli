@@ -91,6 +91,7 @@ const EXPECTED_VALUE_EXPORTS = [
   'sortReasonCodes',
   'shingle',
   'tool',
+  'throwIfGraphAdapterAborted',
   'truncateForCallEdge',
   // Per-file source size guard shared by adapter parse steps (10 MB cap, shared
   // with the fitness engine's FileAccessor policy).

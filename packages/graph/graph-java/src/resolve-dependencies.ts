@@ -9,6 +9,8 @@
  * Phase 4 of opensip's substrate consolidation (DEC-498).
  */
 
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+
 import type {
   Catalog,
   DependencyEdge,
@@ -45,11 +47,14 @@ import type {
 export function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
+  signal?: AbortSignal,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
-  const { typeFQN, packageFQN } = buildJavaFQNIndex(catalog);
+  throwIfGraphAdapterAborted(signal, 'Java dependency resolution');
+  const { typeFQN, packageFQN } = buildJavaFQNIndex(catalog, signal);
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'Java dependency resolution');
     const to = resolveJavaImportSpecifier(site.specifier, typeFQN, packageFQN);
     const edge: DependencyEdge = {
       to,
@@ -80,7 +85,10 @@ const JAVA_SOURCE_ROOT_PREFIXES = ['src/main/java/', 'src/test/java/', 'src/'] a
  *   3. Slash-to-dot → that's the type FQN. The package is everything
  *      before the last dot.
  */
-function buildJavaFQNIndex(catalog: Catalog): {
+function buildJavaFQNIndex(
+  catalog: Catalog,
+  signal?: AbortSignal,
+): {
   readonly typeFQN: ReadonlyMap<string, string>;
   readonly packageFQN: ReadonlyMap<string, readonly string[]>;
 } {
@@ -88,6 +96,7 @@ function buildJavaFQNIndex(catalog: Catalog): {
   const packageFQN = new Map<string, string[]>();
 
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Java dependency indexing');
     if (!occs) continue;
     for (const o of occs) {
       indexModuleInitOccurrence(o, typeFQN, packageFQN);

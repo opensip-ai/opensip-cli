@@ -12,6 +12,7 @@ import { existsSync, realpathSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, resolve, sep } from 'node:path';
 
 import { ConfigurationError, logger } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { normalizeProjectDir } from './normalize-project-dir.js';
@@ -20,6 +21,7 @@ import { normalizeProjectDir } from './normalize-project-dir.js';
 export interface DiscoveryInput {
   readonly projectDir: string;
   readonly tsConfigPath?: string;
+  readonly signal?: AbortSignal;
 }
 
 /** Result of {@link discoverFiles}: resolved paths, source files, and TS compiler options. */
@@ -38,11 +40,13 @@ export function discoverFiles(
   // Local helper keeps intent optional; GraphLanguageAdapter.DiscoverInput is required.
   void input.diagnosticIntent;
   void logger;
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript discovery');
 
   const projectDirAbs = normalizeProjectDir(input.projectDir);
   const tsConfigPathAbs = resolveTsConfigPath(projectDirAbs, input.tsConfigPath);
   const { options, fileNames } = loadTsConfig(tsConfigPathAbs);
-  const files = filterToSourceFiles(fileNames);
+  const files = filterToSourceFiles(fileNames, input.signal);
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript discovery');
 
   return {
     projectDirAbs,
@@ -119,10 +123,11 @@ function loadTsConfig(tsConfigPathAbs: string): {
   return { options: result.options, fileNames: result.fileNames };
 }
 
-function filterToSourceFiles(fileNames: readonly string[]): string[] {
+function filterToSourceFiles(fileNames: readonly string[], signal?: AbortSignal): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const f of fileNames) {
+    throwIfGraphAdapterAborted(signal, 'TypeScript discovery');
     if (!isSupportedSourceFile(f) || isDeclarationFile(f)) continue;
     let real = f;
     /* v8 ignore start */

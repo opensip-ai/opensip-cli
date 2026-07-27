@@ -362,6 +362,7 @@ export async function planShardWork(
         projectDirAbs: shard.rootDir,
         configPathAbs: shard.configPathAbs,
         resolutionMode,
+        signal: currentScope()?.abortSignal,
       }),
       // Shard fragments only ever feed the sharded engine; stamp the mode so a
       // fragment row can never be confused with a single-program (exact) build.

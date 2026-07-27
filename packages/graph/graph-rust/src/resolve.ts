@@ -45,6 +45,7 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
+  throwIfGraphAdapterAborted,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
 import { isReturnValueDiscarded, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
@@ -85,6 +86,7 @@ function rustPosition(
 }
 
 export function resolveCallSites(input: ResolveInput<RustParsedProject>): ResolveOutput {
+  throwIfGraphAdapterAborted(input.signal, 'Rust call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:rust' });
   // Same-language only (see graph-go/resolve.ts): the merged exact catalog holds
   // every language, so a Rust call must not pin a same-named foreign occurrence.
@@ -94,6 +96,7 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
   const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
+    throwIfGraphAdapterAborted(input.signal, 'Rust call resolution');
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as RustParsedFile;
     if (r.kind === 'creation') {
@@ -120,7 +123,7 @@ export function resolveCallSites(input: ResolveInput<RustParsedProject>): Resolv
   // module layout conventions.
   const dependenciesByOwner =
     input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs)
+      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs, input.signal)
       : undefined;
 
   return dependenciesByOwner === undefined

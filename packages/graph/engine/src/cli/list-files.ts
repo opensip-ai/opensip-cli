@@ -29,7 +29,12 @@ import { realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { EXIT_CODES } from '@opensip-cli/contracts';
-import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
+import {
+  createToolLogger,
+  ConfigurationError,
+  currentScope,
+  isToolErrorLike,
+} from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -127,7 +132,11 @@ async function discoverScopedFiles(opts: GraphCommandOptions): Promise<readonly 
   const scopes =
     opts.paths && opts.paths.length > 0 ? resolvePositionalPaths(opts.paths, opts.cwd) : [opts.cwd];
   const discoveredByScope = await mapInBatches(scopes, (scope) =>
-    adapter.discoverFiles({ cwd: scope, diagnosticIntent: 'quiet' }),
+    adapter.discoverFiles({
+      cwd: scope,
+      diagnosticIntent: 'quiet',
+      signal: currentScope()?.abortSignal,
+    }),
   );
   return discoveredByScope.flatMap((discovered) => discovered.files);
 }
@@ -158,8 +167,10 @@ async function discoverWorkspaceFiles(
         cwd: unit.rootDir,
         configPathOverride: unit.configPath,
         diagnosticIntent: 'quiet',
+        signal: currentScope()?.abortSignal,
       });
-    } catch {
+    } catch (error) {
+      if (isToolErrorLike(error)) throw error;
       return null; // a unit the graph adapter can't discover is skipped, not fatal
     }
   });

@@ -27,7 +27,11 @@
 
 import { relative, resolve, sep } from 'node:path';
 
-import { ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
+import {
+  ownerEdgeKey,
+  resolveSpecifierToPackage,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
@@ -104,11 +108,14 @@ const THROW_SYNTAX_REGEX = /\bthrow\s+(?:new\s+)?[A-Za-z_$]/;
 // ── Adapter façade ─────────────────────────────────────────────────
 
 function discoverFilesAdapter(input: DiscoverInput): DiscoverOutput {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript discovery');
   const result = discoverTypescriptFiles({
     projectDir: input.cwd,
     tsConfigPath: input.configPathOverride,
     diagnosticIntent: input.diagnosticIntent,
+    signal: input.signal,
   });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript discovery');
   return {
     projectDirAbs: result.projectDirAbs,
     files: result.files,
@@ -128,11 +135,14 @@ function sourceFilesOf(project: TsParsed): Iterable<ts.SourceFile> {
 }
 
 function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
   const walked = walkProgram({
     sourceFiles: sourceFilesOf(input.project),
     files: input.files,
     projectDirAbs: input.projectDirAbs,
+    signal: input.signal,
   });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
   // Translate the TS-internal CallSiteRecord (node/sourceFile) into the
   // contract's opaque shape (nodeRef/sourceFileRef). No data loss —
   // the same handles flow back into resolveCallSites unchanged.
@@ -202,6 +212,7 @@ function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSite
 }
 
 async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<ResolveOutput> {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
   // Branch on the parsed-project tier BEFORE touching the checker. The
   // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
   // cannot run on it.
@@ -209,6 +220,7 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
     input.project.kind === 'fast'
       ? await resolveCallSitesFast(input, input.project)
       : await resolveCallSitesExact(input, input.project);
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
   // Sharded build: also emit cross-boundary descriptors for calls that
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
@@ -229,6 +241,7 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
     input.projectDirAbs,
     resolveMethodTarget,
   );
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript boundary resolution');
   return { ...base, boundaryCalls };
 }
 
@@ -248,6 +261,7 @@ async function resolveCallSitesExact(
     projectDirAbs: input.projectDirAbs,
     callSites: tsCallSites,
     crossPackage,
+    signal: input.signal,
   });
 
   // Phase 4 (DEC-498): resolve dependency sites if any. Translate
@@ -277,6 +291,7 @@ async function resolveCallSitesExact(
       project.program,
       input.projectDirAbs,
       crossPackage,
+      input.signal,
     );
   }
 
@@ -288,6 +303,7 @@ async function resolveCallSitesExact(
     discoveredFiles,
     projectRootAbs: input.projectDirAbs,
     crossPackage,
+    signal: input.signal,
   });
 
   return {
@@ -332,6 +348,7 @@ async function resolveCallSitesFast(
     catalog: input.catalog,
     projectDirAbs: input.projectDirAbs,
     callSites: tsCallSites,
+    signal: input.signal,
   });
   return {
     edgesByOwner: collectByOwner(result.catalog),
@@ -545,7 +562,9 @@ function resolveDependencies(
   program: ts.Program,
   projectDirAbs: string,
   crossPackage: CrossPackageContext,
+  signal?: AbortSignal,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
+  throwIfGraphAdapterAborted(signal, 'TypeScript dependency resolution');
   const moduleInitByFilePath = buildModuleInitIndex(catalog);
   const compilerOptions = program.getCompilerOptions();
   const moduleResolutionHost = createModuleResolutionHost();
@@ -557,6 +576,7 @@ function resolveDependencies(
   // Initialize every module-init owner to an explicit empty array (Task 0.1 #3).
   const out = new Map<string, DependencyEdge[]>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'TypeScript dependency resolution');
     if (!occs) continue;
     for (const occ of occs) {
       if (occ.kind === 'module-init') {
@@ -573,6 +593,7 @@ function resolveDependencies(
     manifestIndex,
   };
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'TypeScript dependency resolution');
     const r = resolveSiteTargets(site, resolveContext);
     const edge = buildDependencyEdge(site, r);
     // Key per owner OCCURRENCE (module-init bodyHash + file + line + column) to
@@ -593,6 +614,7 @@ function resolveDependencies(
       existing.push(edge);
     }
   }
+  throwIfGraphAdapterAborted(signal, 'TypeScript dependency resolution');
   return out;
 }
 
