@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { PluginIncompatibleError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isolatedGraphAdapterBridge } from './isolated-graph-adapter.js';
@@ -135,19 +136,22 @@ describe('isolatedGraphAdapterBridge', () => {
   });
 
   it('rejects unsafe worker descriptor metadata before creating a host proxy', async () => {
-    await expect(
-      isolatedGraphAdapterBridge.createHostContributions(
-        hostContext(() =>
-          Promise.resolve({
-            adapter: {
-              id: 'fixture',
-              displayName: 'Fixture Graph',
-              fileExtensions: ['**/*'],
-            },
-          }),
-        ),
+    const failure = isolatedGraphAdapterBridge.createHostContributions(
+      hostContext(() =>
+        Promise.resolve({
+          adapter: {
+            id: 'fixture',
+            displayName: 'Fixture Graph',
+            fileExtensions: ['**/*'],
+          },
+        }),
       ),
-    ).rejects.toThrow('unsafe graph adapter descriptor');
+    );
+    await expect(failure).rejects.toThrow(PluginIncompatibleError);
+    await expect(failure).rejects.toMatchObject({
+      code: 'CORE.CONTRIBUTION.SCHEMA_MISMATCH',
+      metadata: { condition: 'worker-descriptor', exportName: 'adapter' },
+    });
   });
 
   it('dispatches non-handle worker requests directly to the adapter', async () => {
@@ -190,9 +194,12 @@ describe('isolatedGraphAdapterBridge', () => {
         context({ kind: 'graph.cacheKey', input: { projectDirAbs: root } }),
       ),
     ).resolves.toBe('fixture-key');
-    await expect(
-      isolatedGraphAdapterBridge.runInWorker(context({ kind: 'unknown' })),
-    ).rejects.toThrow('unknown graph capability worker request');
+    const unknown = isolatedGraphAdapterBridge.runInWorker(context({ kind: 'unknown' }));
+    await expect(unknown).rejects.toThrow(PluginIncompatibleError);
+    await expect(unknown).rejects.toMatchObject({
+      code: 'CORE.CONTRIBUTION.SCHEMA_MISMATCH',
+      metadata: { condition: 'worker-request' },
+    });
   });
 
   it('keeps adapter project and call-site handles worker-local', async () => {

@@ -22,14 +22,8 @@
  * above; see the graph CLI language-neutral scoping design notes
  */
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
-import {
-  createToolLogger,
-  ConfigurationError,
-  currentScope,
-  ToolError,
-  ValidationError,
-} from '@opensip-cli/core';
+import { mapFailureToExitCode } from '@opensip-cli/contracts';
+import { createToolLogger, currentScope, ToolError } from '@opensip-cli/core';
 
 const log = createToolLogger('graph:cli');
 
@@ -46,7 +40,6 @@ import {
 import { executeSinglePathGraph } from './graph-single-run-mode.js';
 import { executeWorkspaceGraph } from './graph-workspace-mode.js';
 import { resolveGraphRecipeSelection } from './orchestrate.js';
-import { MemoryPressureError } from './pressure-monitor.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
@@ -165,15 +158,9 @@ export async function handleGraphError(
   jsonRequested = false,
 ): Promise<void> {
   const message = `${label}: ${error instanceof Error ? error.message : String(error)}`;
-  let exitCode: number = EXIT_CODES.RUNTIME_ERROR;
-  if (error instanceof ConfigurationError || error instanceof ValidationError) {
-    exitCode = EXIT_CODES.CONFIGURATION_ERROR;
-  } else if (error instanceof MemoryPressureError || error instanceof ToolError) {
-    exitCode = EXIT_CODES.RUNTIME_ERROR;
-  }
   await cli.reportFailure({
     message,
-    exitCode,
+    exitCode: mapFailureToExitCode(error),
     ...(error instanceof ToolError ? { error } : {}),
     jsonRequested,
     log: {

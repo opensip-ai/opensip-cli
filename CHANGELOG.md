@@ -52,6 +52,9 @@ exit code are deliberately absent.
 | Runtime-promotion journal is unreadable or names an invalid phase     |      1 |     2 | Now `CLI.INIT.PROMOTION_JOURNAL_INVALID` (`integrity`, `configuration`). The recovery path already BRANCHED on this condition; it previously reported as an unknown internal failure.    |
 | Runtime promotion stopped in a state needing recovery                 |      1 |     2 | Now `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` (`conflict`, `configuration`): the operator re-runs `opensip init` to resume, so this is a configuration failure rather than a runtime fault. |
 | Graph live worker is cooperatively cancelled                           |      1 |   130 | The graph worker now uses the shared cancellation protocol and preserves `CORE.SYSTEM.CANCELLED` across IPC instead of collapsing cancellation into an untyped worker failure.          |
+| Graph command cannot find a requested resource                         |      1 |     3 | Graph now uses the host's canonical failure mapper, so a `NotFoundError` preserves the documented not-found exit instead of the hand-written runtime fallback.                          |
+| Graph command rejects an incompatible plugin                           |      1 |     5 | Graph now preserves `PluginIncompatibleError` and capability-admission definitions through the host mapping rather than flattening every `ToolError` to runtime exit 1.                 |
+| Graph command is cancelled outside the live worker                     |      1 |   130 | The static and auxiliary graph error boundary now maps the cancelled exit class canonically instead of flattening it to runtime exit 1.                                                |
 
 #### Behaviour changes: MCP error codes are uniform (Plan 01)
 

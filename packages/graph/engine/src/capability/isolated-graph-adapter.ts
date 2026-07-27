@@ -1,5 +1,8 @@
 import {
+  coreErrorCatalog,
   importCapabilityPackageModule,
+  isToolErrorLike,
+  PluginIncompatibleError,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
@@ -38,6 +41,28 @@ interface GraphInvokeRequest {
 
 type GraphWorkerRequest = GraphDiscoverRequest | GraphInvokeRequest;
 
+const CONTRIBUTION_SCHEMA_MISMATCH = coreErrorCatalog.require('CORE.CONTRIBUTION.SCHEMA_MISMATCH');
+const REQUIRED_PACK_LOAD_FAILED = coreErrorCatalog.require(
+  'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+);
+
+function incompatibleContribution(
+  message: string,
+  condition: string,
+  exportName?: string,
+  cause?: unknown,
+): PluginIncompatibleError {
+  return new PluginIncompatibleError(message, {
+    code: CONTRIBUTION_SCHEMA_MISMATCH.code,
+    definition: CONTRIBUTION_SCHEMA_MISMATCH,
+    ...(cause === undefined ? {} : { cause }),
+    metadata: {
+      condition,
+      ...(exportName === undefined ? {} : { exportName }),
+    },
+  });
+}
+
 interface GraphDiscoverResult {
   readonly adapter: {
     readonly id: string;
@@ -59,19 +84,33 @@ function isGraphAdapter(value: unknown): value is GraphLanguageAdapter {
 /**
  * Load and validate the graph adapter export from an isolated package.
  *
- * @throws {Error} when the export is missing or is not a graph adapter.
+ * @throws {PluginIncompatibleError} when the package cannot load or its export is not an adapter.
  */
 async function loadAdapter(
   args: Parameters<CapabilityIsolationBridge['runInWorker']>[0],
 ): Promise<GraphLanguageAdapter> {
-  const mod = await importCapabilityPackageModule({
-    ...args.pkg,
-    errorConstructor: Error,
-  });
+  let mod: Record<string, unknown>;
+  try {
+    mod = await importCapabilityPackageModule(args.pkg);
+  } catch (error) {
+    // A normalizing boundary must never downgrade an already-defined failure (ruling D6).
+    if (isToolErrorLike(error)) throw error;
+    throw new PluginIncompatibleError(`capability package '${args.pkg.name}' could not be loaded`, {
+      code: REQUIRED_PACK_LOAD_FAILED.code,
+      definition: REQUIRED_PACK_LOAD_FAILED,
+      cause: error,
+      metadata: {
+        condition: 'graph-adapter-load',
+        packageName: args.pkg.name,
+      },
+    });
+  }
   const value = mod[args.descriptor.exportName];
   if (!isGraphAdapter(value)) {
-    throw new Error(
+    throw incompatibleContribution(
       `capability pack export '${args.descriptor.exportName}' must be a graph adapter`,
+      'graph-adapter-export',
+      args.descriptor.exportName,
     );
   }
   return value;
@@ -189,7 +228,7 @@ async function handleResolveCallSites(
 /**
  * Dispatch one worker-side graph-adapter request.
  *
- * @throws {Error} when the request kind is unknown.
+ * @throws {PluginIncompatibleError} when the request kind is unknown.
  */
 async function runGraphWorkerRequest(
   adapter: GraphLanguageAdapter,
@@ -222,13 +261,13 @@ async function runGraphWorkerRequest(
       return await adapter.cacheKey(request.input as CacheKeyInput);
     }
   }
-  throw new Error('unknown graph capability worker request');
+  throw incompatibleContribution('unknown graph capability worker request', 'worker-request');
 }
 
 /**
  * Create the host-side proxy contribution from worker-reported adapter metadata.
  *
- * @throws {Error} when the worker returns an unsafe graph adapter descriptor.
+ * @throws {PluginIncompatibleError} when the worker returns an unsafe adapter descriptor.
  */
 async function createHostContributions(
   context: Parameters<CapabilityIsolationBridge['createHostContributions']>[0],
@@ -237,7 +276,11 @@ async function createHostContributions(
     kind: 'graph.discover',
   } satisfies GraphDiscoverRequest)) as GraphDiscoverResult;
   if (!isSafeGraphAdapterMetadata(result.adapter)) {
-    throw new Error('capability pack returned an unsafe graph adapter descriptor');
+    throw incompatibleContribution(
+      'capability pack returned an unsafe graph adapter descriptor',
+      'worker-descriptor',
+      context.descriptor.exportName,
+    );
   }
   return [{ contribution: createProxyAdapter(result.adapter, context.invoke) }];
 }
