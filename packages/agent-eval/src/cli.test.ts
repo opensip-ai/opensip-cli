@@ -762,14 +762,17 @@ describe('main', () => {
     expect(harness.stderr()).toContain('Run pnpm build');
   });
 
-  it('maps unexpected harness failures to exit one without leaking error or environment secrets', async () => {
+  it('maps unexpected harness failures to exit one with bounded redacted detail', async () => {
     const root = temporaryDirectory();
     const canary = 'canary-not-a-real-secret';
     const previous = process.env.OPENSIP_API_KEY;
     process.env.OPENSIP_API_KEY = canary;
     try {
       const harness = dependencyHarness(root, {
-        runArm: () => Promise.reject(new Error(`child capture contained ${canary}`)),
+        runArm: () =>
+          Promise.reject(
+            new Error(`child capture for ${root} contained ${canary} token=literal-secret\nretry`),
+          ),
       });
 
       await expect(
@@ -777,7 +780,18 @@ describe('main', () => {
       ).resolves.toBe(1);
       expect(harness.stdout()).not.toContain(canary);
       expect(harness.stderr()).not.toContain(canary);
+      expect(harness.stderr()).not.toContain(root);
+      expect(harness.stderr()).not.toContain('literal-secret');
       expect(harness.stderr()).toContain('harness error');
+      expect(harness.stderr()).toContain('Error: child capture for [redacted-path]');
+      expect(harness.stderr()).toContain('[redacted-credential]');
+      const diagnosticLines = harness
+        .stderr()
+        .trim()
+        .split('\n')
+        .filter((line) => line.includes('harness error'));
+      expect(diagnosticLines).toHaveLength(1);
+      expect(diagnosticLines[0]).toContain('retry');
       expect(existsSync(join(root, 'secret.json'))).toBe(false);
     } finally {
       if (previous === undefined) delete process.env.OPENSIP_API_KEY;

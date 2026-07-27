@@ -19,6 +19,7 @@ import {
 } from './cli-artifacts.js';
 import { contractFingerprint } from './report/contract-fingerprint.js';
 import { EVAL_REPORT_SCHEMA_VERSION } from './report/model.js';
+import { safeErrorDetail } from './runner/error-detail.js';
 import { resolveGitProvenance } from './runner/git-provenance.js';
 import { runTaskArm } from './runner/run-task.js';
 import {
@@ -263,6 +264,25 @@ function boundedOneLine(message: string): string {
   return bounded.length === 0 ? 'required evaluation inputs are unavailable.' : bounded;
 }
 
+function unclassifiedHarnessDetail(error: unknown, dependencies: CliDependencies): string {
+  const sensitivePaths = [dependencies.resultsRoot];
+  try {
+    sensitivePaths.push(dependencies.cwd());
+  } catch {
+    // The original failure remains authoritative if cwd resolution is itself unavailable.
+  }
+  let identity = 'UnknownFailure';
+  if (error instanceof Error) {
+    try {
+      identity = error.name.trim() || 'Error';
+    } catch {
+      identity = 'Error';
+    }
+  }
+  const detail = safeErrorDetail(error, sensitivePaths) || 'failure detail unavailable';
+  return safeErrorDetail(new Error(`${identity}: ${detail}`), sensitivePaths);
+}
+
 function handleError(error: unknown, dependencies: CliDependencies): number {
   if (error instanceof InvocationError) {
     void dependencies.stderr(`agent-eval: ${boundedOneLine(error.message)}\n\n${USAGE}`);
@@ -276,7 +296,9 @@ function handleError(error: unknown, dependencies: CliDependencies): number {
     void dependencies.stderr(`agent-eval: ${boundedOneLine(error.message)}\n`);
     return 1;
   }
-  void dependencies.stderr('agent-eval: harness error; inspect the reported task and retry.\n');
+  void dependencies.stderr(
+    `agent-eval: harness error: ${boundedOneLine(unclassifiedHarnessDetail(error, dependencies))}\n`,
+  );
   return 1;
 }
 
