@@ -387,6 +387,23 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'errno'],
     },
 
+    /** A TypeScript adapter record lost coordinates required by occurrence-identity stitching. */
+    'GRAPH.TS.OWNER_POSITION_MISSING': {
+      code: 'GRAPH.TS.OWNER_POSITION_MISSING',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Report the graph adapter invariant failure with the affected coordinate field.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['field'],
+    },
+
     /**
      * A shard-dependent operation has no trustworthy complete result.
      *

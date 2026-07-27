@@ -27,7 +27,9 @@
 
 import { relative, resolve, sep } from 'node:path';
 
+import { createToolError } from '@opensip-cli/core';
 import {
+  graphErrorCatalog,
   ownerEdgeKey,
   resolveSpecifierToPackage,
   throwIfGraphAdapterAborted,
@@ -104,6 +106,7 @@ const TYPESCRIPT_SIDE_EFFECT_PRIMITIVES: readonly string[] = [
 ];
 
 const THROW_SYNTAX_REGEX = /\bthrow\s+(?:new\s+)?[A-Za-z_$]/;
+const OWNER_POSITION_MISSING = graphErrorCatalog.require('GRAPH.TS.OWNER_POSITION_MISSING');
 
 // ── Adapter façade ─────────────────────────────────────────────────
 
@@ -189,12 +192,16 @@ function walkProjectAdapter(input: WalkInput<TsParsed>): WalkOutput {
  * Fail loud on the impossible absent case rather than defaulting — a `?? default`
  * would silently mismatch the stitch key for any owner not at 1:0.
  *
- * @throws {Error} If `value` is undefined — an invariant violation (the TS walk
- *   always sets owner positions on a same-adapter call-site record).
+ * @throws {ToolError} If `value` is undefined — an invariant violation (the TS
+ *   walk always sets owner positions on a same-adapter call-site record).
  */
 function requireOwnerPos(value: number | undefined, field: 'ownerLine' | 'ownerColumn'): number {
   if (value === undefined) {
-    throw new Error(`graph-typescript: same-adapter call-site record is missing ${field}`);
+    throw createToolError(
+      OWNER_POSITION_MISSING,
+      'TypeScript graph record is missing an owner coordinate.',
+      { metadata: { field } },
+    );
   }
   return value;
 }
