@@ -207,6 +207,21 @@ describe('renderSessionTable / renderDetail', () => {
     expect(detail!.textContent).toContain('no-console-log');
   });
 
+  it('renders a visible degradation for a malformed per-check payload', () => {
+    const panel = loadEnv().render([
+      makeSession({
+        payload: {
+          summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
+          checks: { unexpected: 'object' },
+        },
+      }),
+    ]);
+
+    expect(detailSection(panel)?.textContent).toContain(
+      'Session detail could not be rendered because its stored check data is malformed.',
+    );
+  });
+
   it('renders an external-adapter (gitleaks) payload with a fallback "Check" column and only the masked secret preview', () => {
     const panel = loadEnv().render([
       makeSession({

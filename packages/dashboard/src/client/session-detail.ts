@@ -327,6 +327,22 @@ function renderEmptyChecks(detailContainer: HTMLElement, session: DashboardSessi
   );
 }
 
+/** Render a fixed state when a stored payload's per-item detail is not an array. */
+function renderMalformedChecks(detailContainer: HTMLElement, session: DashboardSession): void {
+  detailContainer.append(
+    el('h3', {
+      text: 'Session Detail — ' + new Date(session.startedAt).toLocaleString(),
+      style: 'margin-bottom:4px',
+    }),
+  );
+  detailContainer.append(
+    el('div', {
+      class: 'empty',
+      text: 'Session detail could not be rendered because its stored check data is malformed.',
+    }),
+  );
+}
+
 /** Build the populated detail table (header + rows) for a non-empty checks payload. */
 function buildDetailTable(checks: readonly Check[], tool: string, filterUid: string): HTMLElement {
   // Tools share the structural payload.checks shape but name their items
@@ -388,7 +404,12 @@ export function renderSessionDetail(
 
   // Per-item detail lives in the tool-owned opaque payload. Fitness calls these
   // "checks"; graph groups signals by rule (relabeled in buildDetailTable).
-  const checks = (session.payload.checks as Check[] | undefined) ?? [];
+  const storedChecks = session.payload.checks;
+  if (storedChecks !== undefined && !Array.isArray(storedChecks)) {
+    renderMalformedChecks(detailContainer, session);
+    return;
+  }
+  const checks = (storedChecks ?? []) as readonly Check[];
 
   // A payload that records no per-item rows (e.g. a clean graph run — graph only
   // persists rules that emitted a finding) would otherwise render a header-only

@@ -35,6 +35,11 @@ interface CheckStat {
   lastRun: string | null;
 }
 
+interface CheckStatsResult {
+  stats: Record<string, CheckStat>;
+  malformedSessions: number;
+}
+
 const DIM = 'color:var(--text-dim)';
 const EM_DASH = '—';
 const EXPANDER_ROW = 'expander-row';
@@ -108,27 +113,81 @@ function paginateFilteredGroups(pag: HTMLElement, groups: HTMLElement[][]): void
   renderFilteredPage(pag, groups, 0, totalPages);
 }
 
-function computeCheckStats(): Record<string, CheckStat> {
-  const stats: Record<string, CheckStat> = {};
-  for (const s of sessions) {
-    if (s.tool !== 'fit') continue;
-    // Per-session detail lives in the tool-owned opaque payload; fitness
-    // sessions carry { summary, checks }. Sessions without checks (graph, sim)
-    // contribute nothing here.
-    const checks =
-      (s.payload?.checks as { checkSlug: string; passed?: boolean }[] | undefined) ?? [];
-    for (const ch of checks) {
-      stats[ch.checkSlug] ??= { runs: 0, passed: 0, failed: 0, lastRun: null };
-      const st = stats[ch.checkSlug];
-      st.runs++;
-      if (ch.passed) st.passed++;
-      else st.failed++;
-      if (!st.lastRun || s.startedAt > st.lastRun) st.lastRun = s.startedAt;
-    }
-  }
-  return stats;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
-const checkStats = computeCheckStats();
+
+function normalizeCheckEntry(value: unknown): CheckEntry | null {
+  if (!isRecord(value)) return null;
+  const { slug, name, source, confidence } = value;
+  if (
+    typeof slug !== 'string' ||
+    typeof name !== 'string' ||
+    typeof source !== 'string' ||
+    typeof confidence !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    slug,
+    name,
+    source,
+    confidence,
+    tags: Array.isArray(value.tags)
+      ? value.tags.filter((tag): tag is string => typeof tag === 'string')
+      : [],
+    ...(typeof value.longDescription === 'string'
+      ? { longDescription: value.longDescription }
+      : {}),
+  };
+}
+
+function accumulateCheckStat(
+  value: unknown,
+  startedAt: unknown,
+  stats: Record<string, CheckStat>,
+): boolean {
+  if (!isRecord(value) || typeof value.checkSlug !== 'string') return false;
+  stats[value.checkSlug] ??= { runs: 0, passed: 0, failed: 0, lastRun: null };
+  const stat = stats[value.checkSlug];
+  stat.runs++;
+  if (value.passed === true) stat.passed++;
+  else stat.failed++;
+  if (typeof startedAt === 'string' && (!stat.lastRun || startedAt > stat.lastRun)) {
+    stat.lastRun = startedAt;
+  }
+  return true;
+}
+
+/** Add one fitness session's stats; return true when its check detail is malformed. */
+function accumulateSessionStats(value: unknown, stats: Record<string, CheckStat>): boolean {
+  if (!isRecord(value) || value.tool !== 'fit') return false;
+  const payload = value.payload;
+  if (payload === undefined) return false;
+  if (!isRecord(payload)) return true;
+  const payloadChecks = payload.checks;
+  if (payloadChecks === undefined) return false;
+  if (!Array.isArray(payloadChecks)) return true;
+
+  let malformed = false;
+  for (const check of payloadChecks) {
+    if (!accumulateCheckStat(check, value.startedAt, stats)) malformed = true;
+  }
+  return malformed;
+}
+
+function computeCheckStats(): CheckStatsResult {
+  const stats: Record<string, CheckStat> = {};
+  let malformedSessions = 0;
+  const injectedSessions: unknown = typeof sessions === 'undefined' ? undefined : sessions;
+  const sourceSessions: readonly unknown[] = Array.isArray(injectedSessions)
+    ? injectedSessions
+    : [];
+  for (const session of sourceSessions) {
+    if (accumulateSessionStats(session, stats)) malformedSessions++;
+  }
+  return { stats, malformedSessions };
+}
 
 /** Render longDescription as DOM nodes with bold and code formatting. Safe — no innerHTML. */
 function renderLongDesc(text: string | undefined): HTMLElement {
@@ -210,7 +269,12 @@ function buildLastRunCell(lastRun: string | null): HTMLElement {
 }
 
 /** Build one catalog data row (+ its expander row when it has a long description). */
-function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[] {
+function buildCheckRow(
+  check: CheckEntry,
+  i: number,
+  uid: string,
+  checkStats: Readonly<Record<string, CheckStat>>,
+): HTMLElement[] {
   const st = checkStats[check.slug] ?? EMPTY_STAT;
   const rate = st.runs > 0 ? Math.round((st.passed / st.runs) * 100) : -1;
   const hasDesc = !!check.longDescription;
@@ -290,10 +354,49 @@ function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[]
 }
 
 export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly unknown[]): void {
-  const entries = catalogData as readonly CheckEntry[];
+  const catalogValues = Array.isArray(catalogData) ? catalogData : [];
+  const entries = catalogValues
+    .map((entry) => normalizeCheckEntry(entry))
+    .filter((entry): entry is CheckEntry => entry !== null);
+  const omittedEntries = catalogValues.length - entries.length;
   if (entries.length === 0) {
-    panel.append(el('div', { class: 'empty', text: 'No checks registered.' }));
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          omittedEntries === 0
+            ? 'No checks registered.'
+            : 'The checks catalog could not be rendered because its entries are malformed.',
+      }),
+    );
     return;
+  }
+
+  if (omittedEntries > 0) {
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          omittedEntries +
+          ' malformed check catalog ' +
+          (omittedEntries === 1 ? 'entry was' : 'entries were') +
+          ' omitted.',
+      }),
+    );
+  }
+
+  const { stats: checkStats, malformedSessions } = computeCheckStats();
+  if (malformedSessions > 0) {
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          'Run statistics omit ' +
+          malformedSessions +
+          (malformedSessions === 1 ? ' session' : ' sessions') +
+          ' with malformed check detail.',
+      }),
+    );
   }
 
   const allTags = new Set<string>();
@@ -333,7 +436,7 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
   const uid = 'cc-' + Math.random().toString(36).slice(2, 8);
 
   sorted.forEach((check, i) => {
-    buildCheckRow(check, i, uid).forEach((r) => tbody.append(r));
+    buildCheckRow(check, i, uid, checkStats).forEach((r) => tbody.append(r));
   });
 
   table.append(tbody);

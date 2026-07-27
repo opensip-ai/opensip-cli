@@ -287,6 +287,32 @@ describe('checks catalog re-pagination (delegated listener survives data swap)',
     expect(cells[6]?.textContent).toContain('100%');
   });
 
+  it('loads the bundle and visibly omits malformed persisted check statistics', () => {
+    const { renderChecksCatalog } = bundleGlobals([
+      {
+        tool: 'fit',
+        startedAt: '2026-07-19T00:00:00.000Z',
+        payload: { checks: { unexpected: 'object' } },
+      },
+    ]);
+    const panel = document.createElement('div');
+    renderChecksCatalog(panel, buildCatalog(1));
+
+    expect(panel.textContent).toContain(
+      'Run statistics omit 1 session with malformed check detail.',
+    );
+    expect(panel.querySelectorAll('tbody tr:not(.expander-row)')).toHaveLength(1);
+  });
+
+  it('omits malformed catalog entries without aborting valid rows', () => {
+    const { renderChecksCatalog } = bundleGlobals();
+    const panel = document.createElement('div');
+    renderChecksCatalog(panel, [buildCatalog(1)[0], { slug: 'broken', source: 'community' }]);
+
+    expect(panel.textContent).toContain('1 malformed check catalog entry was omitted.');
+    expect(panel.querySelectorAll('tbody tr:not(.expander-row)')).toHaveLength(1);
+  });
+
   it('sorts localized Last Run labels by their underlying timestamps', async () => {
     const sourceSessions = [
       {
