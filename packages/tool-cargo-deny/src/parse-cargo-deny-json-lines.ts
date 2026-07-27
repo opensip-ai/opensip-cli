@@ -15,6 +15,7 @@ import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/extern
 
 const ARTIFACT_INVALID = externalToolErrorCatalog.require('EXTERNAL.SCANNER.ARTIFACT_INVALID');
 
+// @yagni-ignore-next-line duplicate-body-candidate -- scanner packages stay peer-independent while retaining scanner-specific definition metadata and logger provenance.
 function reportParseErrors(ctx: AdapterRunContext, errorCount: number, signalCount: number): void {
   if (errorCount === 0) return;
   if (signalCount === 0) {
