@@ -17,6 +17,7 @@
  */
 
 import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
+import { datastoreErrorCatalog } from '@opensip-cli/datastore';
 
 import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
@@ -77,7 +78,7 @@ const ALLOWED_HOST_RPC_ERROR_CODES = new Set<string>([
   hostErrorCatalog.require('CLI.HOST.OPTION_INVALID').code,
   hostErrorCatalog.require('CLI.HOST.ARTIFACT_WRITE_FAILED').code,
   hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED').code,
-  'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE',
+  datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE').code,
 ]);
 
 /**

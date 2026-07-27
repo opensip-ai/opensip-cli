@@ -43,21 +43,46 @@ function findMatchingParen(str: string, openIndex: number): number {
 }
 
 /**
- * Parse the trailing numeric literal immediately before `argsText`'s end
- * (after skipping trailing whitespace/newlines) — e.g. the `10000` in
- * `"() => {\n  doWork();\n}, 10000"`. Returns null when the final token
- * isn't a bare digit run (a variable reference, another call, etc.),
- * matching the "hardcoded literal only" scope of the other extractors.
+ * Split `argsText` (the text between a call's balanced parens) into its
+ * top-level, comma-separated arguments — commas nested inside `()`/`{}`/`[]`
+ * (e.g. inside the callback body) do not split.
+ */
+function splitTopLevelArgs(argsText: string): string[] {
+  const args: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < argsText.length; i++) {
+    const ch = argsText[i];
+    if (ch === '(' || ch === '{' || ch === '[') depth++;
+    else if (ch === ')' || ch === '}' || ch === ']') depth--;
+    else if (ch === ',' && depth === 0) {
+      args.push(argsText.slice(start, i));
+      start = i + 1;
+    }
+  }
+  args.push(argsText.slice(start));
+  return args;
+}
+
+/**
+ * Parse `setTimeout`'s delay argument — the second top-level argument, e.g.
+ * the `10000` in `"() => {\n  doWork();\n}, 10000"`. `setTimeout(cb, delay,
+ * ...args)` forwards any further arguments to the callback, so the delay is
+ * NOT necessarily the call's last argument — it is always the second one.
+ * Returns null when that argument isn't a bare digit run (a variable
+ * reference, another call, etc.), matching the "hardcoded literal only"
+ * scope of the other extractors.
  */
 function parseTrailingTimeoutArg(argsText: string): { timeout: number; digitCount: number } | null {
-  let end = argsText.length;
-  while (end > 0 && /\s/.test(argsText[end - 1] ?? '')) end--;
-  let start = end;
-  while (start > 0 && isDigit(argsText[start - 1])) start--;
-  const digitCount = end - start;
-  if (digitCount === 0) return null;
-  // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by isDigit loop above
-  return { timeout: Number.parseInt(argsText.slice(start, end), 10), digitCount };
+  const args = splitTopLevelArgs(argsText);
+  if (args.length < 2) return null;
+  const delayArg = (args[1] ?? '').trim();
+  if (delayArg.length === 0) return null;
+  for (const ch of delayArg) {
+    if (!isDigit(ch)) return null;
+  }
+  // @fitness-ignore-next-line numeric-validation -- substring is guaranteed digit-only by the loop above
+  return { timeout: Number.parseInt(delayArg, 10), digitCount: delayArg.length };
 }
 
 /* v8 ignore start -- timeout extraction state machines; many parser-state branches covered indirectly */

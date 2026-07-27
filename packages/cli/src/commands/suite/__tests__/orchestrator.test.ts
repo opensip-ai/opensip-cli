@@ -1192,7 +1192,7 @@ describe('runSuite', () => {
       expect(result.steps[0]).toMatchObject({
         exitCode: EXIT_CODES.RUNTIME_ERROR,
         outcome: 'faulted',
-        errorCode: 'RUN.CAPABILITY.MISMATCH',
+        errorCode: 'CLI.SUITE.CAPABILITY_MISMATCH',
       });
       expect(result.steps[0]?.verdict).toBeUndefined();
       expect(completeRun).toHaveBeenCalledWith({});
@@ -1230,7 +1230,7 @@ describe('runSuite', () => {
       expect(result.steps[0]).toMatchObject({
         exitCode: EXIT_CODES.RUNTIME_ERROR,
         outcome: 'faulted',
-        errorCode: 'RUN.EVIDENCE.MISSING',
+        errorCode: 'CLI.SUITE.EVIDENCE_MISSING',
       });
       expect(result.steps[0]?.verdict).toBeUndefined();
       const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
@@ -1323,7 +1323,7 @@ describe('runSuite', () => {
         exitCode: EXIT_CODES.RUNTIME_ERROR,
         outcome: 'faulted',
         readiness: 'unavailable',
-        errorCode: 'RUN.CAPABILITY.MISMATCH',
+        errorCode: 'CLI.SUITE.CAPABILITY_MISMATCH',
       });
       expect(result.steps[0]?.verdict).toBeUndefined();
       expect(completeRun).toHaveBeenCalledWith(evidence);
@@ -2312,7 +2312,7 @@ describe('runSuite', () => {
       expect(result.steps[0]).toMatchObject({
         exitCode: EXIT_CODES.RUNTIME_ERROR,
         outcome: 'faulted',
-        errorCode: 'RUN.EVIDENCE.MISSING',
+        errorCode: 'CLI.SUITE.EVIDENCE_MISSING',
       });
       const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
       expect(persisted?.evidence).toBeUndefined();
@@ -2399,7 +2399,7 @@ describe('runSuite', () => {
       expect(result.steps[0]).toMatchObject({
         exitCode: EXIT_CODES.RUNTIME_ERROR,
         outcome: 'faulted',
-        errorCode: 'RUN.CAPABILITY.MISMATCH',
+        errorCode: 'CLI.SUITE.CAPABILITY_MISMATCH',
       });
       expect(result.steps[0]?.verdict).toBeUndefined();
       const persisted = new RunRepo(datastore).listStepsForRun(result.runId ?? '')[0];
@@ -2544,7 +2544,7 @@ describe('runSuite', () => {
       exitCode: EXIT_CODES.RUNTIME_ERROR,
       outcome: 'faulted',
       error: 'Verdict-producing suite step completed without session or captured evidence.',
-      errorCode: 'RUN.EVIDENCE.MISSING',
+      errorCode: 'CLI.SUITE.EVIDENCE_MISSING',
     });
     expect(result.steps[5]?.verdict).toBeUndefined();
 
