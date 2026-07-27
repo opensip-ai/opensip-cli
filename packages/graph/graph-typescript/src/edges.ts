@@ -77,7 +77,8 @@ export interface EdgeResolutionFromRecordsInput {
 export async function resolveEdgesFromRecords(
   input: EdgeResolutionFromRecordsInput,
 ): Promise<EdgeResolutionOutput> {
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
+  // Synchronous checkpoints inside async resolution; there is no promise to detach.
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges' });
   const checker = input.program.getTypeChecker();
   const callsByHash = new Map<string, CallEdge[]>();
@@ -99,13 +100,13 @@ export async function resolveEdgesFromRecords(
   for (const r of input.callSites) {
     if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) {
       await yieldToEventLoop();
-      throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
+      void throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
     }
     processed += 1;
     if (resolveExactRecord(r, state)) degradedCallSites += 1;
   }
 
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
 
@@ -137,7 +138,8 @@ export interface EdgeResolutionSyntacticInput {
 export async function resolveEdgesSyntactic(
   input: EdgeResolutionSyntacticInput,
 ): Promise<EdgeResolutionOutput> {
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
+  // Synchronous checkpoints inside async resolution; there is no promise to detach.
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
   logger.info({ evt: 'graph.edges.syntactic.start', module: 'graph:edges' });
   const callsByHash = new Map<string, CallEdge[]>();
   const stats = createMutableStats();
@@ -158,13 +160,13 @@ export async function resolveEdgesSyntactic(
   for (const r of input.callSites) {
     if (processed > 0 && processed % YIELD_EVERY_CALL_SITES === 0) {
       await yieldToEventLoop();
-      throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
+      void throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
     }
     processed += 1;
     if (resolveSyntacticRecord(r, state)) degradedCallSites += 1;
   }
 
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
 
   const newCatalog = rebuildCatalog(input.catalog, callsByHash);
 

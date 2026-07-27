@@ -159,6 +159,7 @@ describe('evaluateRules', () => {
       slug: 'graph:a',
       defaultSeverity: 'warning',
       evaluate: () => {
+        // @fitness-ignore-next-line result-pattern-consistency -- fixture proves preservation of a thrown registered cause at the rule-isolation boundary.
         throw new NotFoundError('fixture missing');
       },
     };

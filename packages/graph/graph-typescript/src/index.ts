@@ -217,7 +217,8 @@ function toTsCallSites(callSites: readonly ContractCallSiteRecord[]): TsCallSite
 }
 
 async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<ResolveOutput> {
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
+  // Synchronous checkpoints inside async resolution; there is no promise to detach.
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
   // Branch on the parsed-project tier BEFORE touching the checker. The
   // fast tier has no `ts.Program`, so the exact (checker-backed) resolver
   // cannot run on it.
@@ -225,7 +226,7 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
     input.project.kind === 'fast'
       ? await resolveCallSitesFast(input, input.project)
       : await resolveCallSitesExact(input, input.project);
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript resolution');
   // Sharded build: also emit cross-boundary descriptors for calls that
   // didn't land within this shard's own occurrences. Syntactic and
   // mode-independent, so it runs identically for both tiers.
@@ -259,7 +260,7 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
     input.projectDirAbs,
     resolveMethodTarget,
   );
-  throwIfGraphAdapterAborted(input.signal, 'TypeScript boundary resolution');
+  void throwIfGraphAdapterAborted(input.signal, 'TypeScript boundary resolution');
   return {
     ...base,
     boundaryCalls,

@@ -41,7 +41,8 @@ export async function rebuildCatalog(
       } catch (error) {
         // D7: the expensive rebuild succeeded. Preserve that usable evidence and record the
         // persistence degradation instead of destroying the catalog with a failed Result.
-        reportGraphReadFailure(error, {
+        // Synchronous evidence reporter inside an async boundary; there is no promise to detach.
+        void reportGraphReadFailure(error, {
           boundary: 'infrastructure',
           condition: 'catalog-persistence',
           module: 'graph:read:rebuild',

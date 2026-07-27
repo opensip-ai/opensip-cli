@@ -167,7 +167,8 @@ async function invokeAdapter<T>(
   stage: string,
 ): Promise<T> {
   const signal = graphAdapterSignal(input.signal);
-  throwIfGraphAdapterAborted(signal, stage);
+  // Synchronous checkpoint inside an async boundary; there is no promise to detach.
+  void throwIfGraphAdapterAborted(signal, stage);
   const { signal: omittedSignal, ...wireInput } = input;
   void omittedSignal;
   const operation = invoke({ kind, input: wireInput } satisfies GraphInvokeRequest) as Promise<T>;
