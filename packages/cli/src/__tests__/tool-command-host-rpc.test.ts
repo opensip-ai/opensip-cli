@@ -14,7 +14,8 @@
  * `external-tool-dispatch.test.ts` (modes `rpc` / `rpc-fail`).
  */
 
-import { ConfigurationError } from '@opensip-cli/core';
+import { ConfigurationError, ValidationError } from '@opensip-cli/core';
+import { datastoreErrorCatalog } from '@opensip-cli/datastore';
 import { describe, expect, it, vi } from 'vitest';
 
 import { handleHostRpc } from '../bootstrap/dispatch-host-rpc-handler.js';
@@ -341,6 +342,36 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     expect(reply.ok).toBe(false);
     expect(reply.error.toolErrorCode).toBe('CONFIGURATION_ERROR');
     expect(reply.error.code).toBe('CLI.GATE.BASELINE_INVALID');
+  });
+
+  it('allowlists the registered DATASTORE.WRITE.RECORD_TOO_LARGE code for an oversized toolState.put payload', async () => {
+    // Regression: the allowlist used to carry the pre-Plan-01 bare literal
+    // 'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE', but ToolStateRepo.put now throws
+    // the registered DATASTORE.WRITE.RECORD_TOO_LARGE code — the stale literal
+    // never matched, so this fault crossed the boundary as the generic fallback
+    // with no code at all.
+    const RECORD_TOO_LARGE = datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE');
+    const ctx = {
+      ...makeDispatchHostCtx().ctx,
+      toolState: {
+        ...makeDispatchHostCtx().ctx.toolState,
+        put: () =>
+          Promise.reject(
+            new ValidationError("tool_state payload for 't/k' is over the byte cap", {
+              code: RECORD_TOO_LARGE.code,
+              definition: RECORD_TOO_LARGE,
+              metadata: { field: 'tool-state-payload' },
+            }),
+          ),
+      },
+    } as unknown as Parameters<typeof handleHostRpc>[1];
+
+    const reply = (await handleHostRpc(
+      { rpcId: 1, seam: 'toolState.put', tool: 't', key: 'k', payload: { big: true } },
+      ctx,
+    )) as Extract<RpcReply, { ok: false }>;
+    expect(reply.ok).toBe(false);
+    expect(reply.error.code).toBe('DATASTORE.WRITE.RECORD_TOO_LARGE');
   });
 
   it('returns a bounded generic message for a non-Error host fault', async () => {

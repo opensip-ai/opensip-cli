@@ -173,10 +173,18 @@ const CATALOG_DECLARATION_PATTERN =
  * as that entry's `code` value. A file that USES a code never does both. This is deliberately a
  * statement about shape rather than about any one framework.
  */
+/** Escape a literal string for safe interpolation into a `RegExp` source. */
+function escapeRegExpLiteral(literal: string): string {
+  return literal.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function declaresErrorCodes(content: string): boolean {
   for (const match of content.matchAll(/['"]([A-Z][A-Z0-9_]*(?:\.[A-Z][A-Z0-9_]*)+)['"]\s*:/gu)) {
     const code = match[1];
-    if (code !== undefined && new RegExp(`\\bcode:\\s*['"]${code}['"]`, 'u').test(content)) {
+    if (
+      code !== undefined &&
+      new RegExp(`\\bcode:\\s*['"]${escapeRegExpLiteral(code)}['"]`, 'u').test(content)
+    ) {
       return true;
     }
   }

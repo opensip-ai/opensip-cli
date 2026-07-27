@@ -314,6 +314,38 @@ describe('error-code-registration', () => {
     });
     expect(result.signals.length).toBe(0);
   });
+
+  it('does not let an unescaped "." in a shape-detected code false-match a lookalike (regex-escape)', async () => {
+    // Regression: the shape-based registry detector built `new RegExp("\\bcode:...['"]${code}['"]")`
+    // straight from a source-extracted dotted code, so its "." wildcards matched any character —
+    // a `code: 'FOOXBARXBAZ'` decoy (dots replaced by X) used to satisfy the pattern built from the
+    // object key "FOO.BAR.BAZ", misclassifying this plain file as a registry and hiding its own
+    // real unregistered-code usage from Phase 2.
+    const shapeCwd = makeFixtureDir('err-code-shape');
+    writeFixture(
+      shapeCwd,
+      'src/services/shape-collision.ts',
+      [
+        'export const SHAPE = {',
+        "  'FOO.BAR.BAZ': 1,",
+        '};',
+        '',
+        'export function useUnregisteredCode() {',
+        "  throw { code: 'SOME.OTHER.CODE', message: 'boom' };",
+        '}',
+        '',
+        'export function decoy() {',
+        "  return { code: 'FOOXBARXBAZ' };",
+        '}',
+      ].join('\n'),
+    );
+    const result = await findCheck('error-code-registration').run(shapeCwd, {
+      targetFiles: [join(shapeCwd, 'src/services/shape-collision.ts')],
+    });
+    rmSync(shapeCwd, { recursive: true, force: true });
+    const types = result.signals.map((s) => s.metadata.type);
+    expect(types).toContain('unregistered-error-code');
+  });
 });
 
 // =============================================================================

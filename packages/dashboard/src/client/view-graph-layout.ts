@@ -85,6 +85,11 @@ function reportFailure(
   if (!existing) container.prepend(notice);
 }
 
+/** Remove a previously reported degradation notice, if one is present. */
+function clearFailure(container: HTMLElement): void {
+  container.querySelector<HTMLElement>('[data-graph-layout-degradation]')?.remove();
+}
+
 function gvSetLayoutSelection(container: HTMLElement, layoutId: string): void {
   const select = container.querySelector<HTMLSelectElement>('select[data-control="layout"]');
   if (select) select.value = layoutId;
@@ -115,6 +120,8 @@ export function gvRunLayout(container: HTMLElement, layoutId: string): void {
         'The layered layout is unavailable. The graph is using the built-in Cose layout.',
         registration.condition,
       );
+    } else {
+      clearFailure(container);
     }
     return;
   }

@@ -361,6 +361,15 @@ describe('no-hardcoded-timeouts edges', () => {
       'src/non-numeric.ts',
       ['export function setup(client: any) {', '  client.timeout(THIRTY_SECONDS);', '}'].join('\n'),
     );
+    writeFixture(
+      cwd,
+      'src/set-timeout-forwarded-args.ts',
+      [
+        'export function schedule(cb: (a: number, b: number) => void) {',
+        '  setTimeout(() => cb(1, 2), 90000, 6000);',
+        '}',
+      ].join('\n'),
+    );
   });
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
@@ -377,6 +386,16 @@ describe('no-hardcoded-timeouts edges', () => {
       targetFiles: [join(cwd, 'src/non-numeric.ts')],
     });
     expect(result.signals.length).toBe(0);
+  });
+
+  it('reads the delay as the 2nd argument, not the trailing forwarded arg', async () => {
+    // setTimeout(callback, delay, ...args) forwards extra args to the callback —
+    // the delay is always the 2nd argument, never necessarily the last one.
+    const result = await findCheck('no-hardcoded-timeouts').run(cwd, {
+      targetFiles: [join(cwd, 'src/set-timeout-forwarded-args.ts')],
+    });
+    expect(result.signals.length).toBe(1);
+    expect(result.signals[0]?.message).toContain('90000ms');
   });
 });
 
