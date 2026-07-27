@@ -118,6 +118,14 @@ describe('spawnProcess', () => {
     });
   });
 
+  it('retains the native code when process creation fails', async () => {
+    const missingCommand = join(temporaryDirectory(), 'missing-command');
+    const result = await spawnProcess(missingCommand, []);
+
+    expect(result.errorCode).toBe('ENOENT');
+    expect(result.error).toBeTypeOf('string');
+  });
+
   it('terminates a child that exceeds the time bound', async () => {
     const result = await spawnProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
       timeoutMs: 50,

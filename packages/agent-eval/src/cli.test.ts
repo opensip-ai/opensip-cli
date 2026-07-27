@@ -349,6 +349,42 @@ describe('parseGitProvenance', () => {
       HarnessPrerequisiteError,
     );
   });
+
+  it('distinguishes bounded Git query failures without echoing child diagnostics', async () => {
+    const success = {
+      durationMs: 1,
+      exitCode: 0,
+      outputLimitExceeded: false,
+      signal: null,
+      stderr: '',
+      stdout: '# branch.oid abcdef1234567890abcdef1234567890abcdef12\n',
+      timedOut: false,
+    } as const;
+    const failStatus = (_command: string, args: readonly string[]) =>
+      Promise.resolve(
+        args[0] === 'status'
+          ? {
+              ...success,
+              error: 'spawn /private/repository/git ENOENT secret-token',
+              errorCode: 'ENOENT',
+              exitCode: null,
+            }
+          : success,
+      );
+
+    await expect(
+      resolveGitProvenance('/private/repository', { spawn: failStatus }),
+    ).rejects.toThrow('Git status query could not start (ENOENT).');
+    await expect(
+      resolveGitProvenance('/private/repository', { spawn: failStatus }),
+    ).rejects.not.toThrow(/private|secret-token/u);
+
+    const timeoutInventory = (_command: string, args: readonly string[]) =>
+      Promise.resolve(args[0] === 'status' ? success : { ...success, timedOut: true });
+    await expect(resolveGitProvenance('/repository', { spawn: timeoutInventory })).rejects.toThrow(
+      'Git ignored-source inventory query timed out.',
+    );
+  });
 });
 
 describe('process output boundary', () => {

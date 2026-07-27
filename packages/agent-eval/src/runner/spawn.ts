@@ -165,6 +165,8 @@ export interface SpawnResult {
   readonly containment?: ProcessTreeSummary;
   readonly durationMs: number;
   readonly error?: string;
+  /** Native errno captured at process creation (for example ENOENT or EACCES). */
+  readonly errorCode?: string;
   readonly exitCode: number | null;
   readonly outputLimitExceeded: boolean;
   readonly signal: NodeJS.Signals | null;
@@ -247,6 +249,7 @@ export function spawnProcess(
     let stderrBytes = 0;
     let stdoutBytes = 0;
     let error: string | undefined;
+    let errorCode: string | undefined;
     let outputLimitExceeded = false;
     let resolved = false;
     let rootExitCode: number | null = null;
@@ -308,6 +311,7 @@ export function spawnProcess(
         ...(processTree === undefined ? {} : { containment: processTreeSummary(processTree) }),
         durationMs: Math.max(0, performance.now() - startedAt),
         ...(error === undefined ? {} : { error }),
+        ...(errorCode === undefined ? {} : { errorCode }),
         exitCode,
         outputLimitExceeded,
         signal,
@@ -417,6 +421,8 @@ export function spawnProcess(
     });
     child.on('error', (spawnError) => {
       error = spawnError.message;
+      errorCode =
+        'code' in spawnError && typeof spawnError.code === 'string' ? spawnError.code : undefined;
     });
 
     const timeout = setTimeout(() => {
