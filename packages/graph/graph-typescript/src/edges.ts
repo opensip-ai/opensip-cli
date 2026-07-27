@@ -14,7 +14,7 @@
 
 import { relative, sep } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { logger, yieldToEventLoop } from '@opensip-cli/core';
 import {
   createMutableStats,
   ownerEdgeKey,
@@ -42,12 +42,6 @@ import type ts from 'typescript';
 export { isReturnValueDiscarded } from './edges-dispatch.js';
 
 const YIELD_EVERY_CALL_SITES = 250;
-
-function yieldToEventLoop(): Promise<void> {
-  return new Promise<void>((resolve) => {
-    setImmediate(resolve);
-  });
-}
 
 export interface EdgeResolutionOutput {
   readonly catalog: Catalog;
