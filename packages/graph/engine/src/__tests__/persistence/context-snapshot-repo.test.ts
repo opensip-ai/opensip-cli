@@ -6,7 +6,7 @@ import {
   buildTaskContextProjectIdentity,
   projectInventorySnapshotSchema,
 } from '@opensip-cli/contracts';
-import { RunScope, logger, runWithScopeSync } from '@opensip-cli/core';
+import { RunScope, logger, normalizeFailure, runWithScopeSync } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { readTaskContextRun, RunRepo } from '@opensip-cli/session-store';
@@ -647,6 +647,9 @@ describe('ContextSnapshotRepo', () => {
         payload: {},
       })
       .run();
+    expect(() => repo.get('malformed')).toThrow(
+      expect.objectContaining({ code: 'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED' }),
+    );
     expect(readContextSnapshot(datastore, 'malformed')).toMatchObject({
       ok: false,
       error: { code: 'context-snapshot' },
@@ -669,6 +672,9 @@ describe('ContextSnapshotRepo', () => {
         payload,
       })
       .run();
+    expect(() => repo.get('row-a')).toThrow(
+      expect.objectContaining({ code: 'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED' }),
+    );
     expect(readContextSnapshot(datastore, 'row-a')).toMatchObject({
       ok: false,
       error: { code: 'context-snapshot' },
@@ -708,6 +714,36 @@ describe('ContextSnapshotRepo', () => {
       expect(readContextSnapshot(datastore, row.payload.snapshotId)).toMatchObject({
         ok: false,
         error: { code: 'context-snapshot' },
+      });
+    }
+  });
+
+  it('rejects persisted byte-count drift before returning a direct repository record', () => {
+    const payload = inventory('stored-byte-count');
+    requireDrizzleHandle(datastore)
+      .db.insert(graphContextSnapshot)
+      .values({
+        id: payload.snapshotId,
+        kind: 'inventory',
+        schemaVersion: 1,
+        producerVersion: '0.6.0',
+        createdAt: '2026-07-13T00:00:00.000Z',
+        sourceIdentity: 'source:1',
+        configIdentity: 'config:1',
+        byteCount: 1,
+        payload,
+      })
+      .run();
+
+    try {
+      repo.latest('inventory');
+      expect.unreachable('malformed persisted byte count must fail closed');
+    } catch (error) {
+      const failure = normalizeFailure(error);
+      expect(failure).toMatchObject({
+        known: 'known',
+        code: 'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED',
+        metadata: { condition: 'byte-count-mismatch' },
       });
     }
   });

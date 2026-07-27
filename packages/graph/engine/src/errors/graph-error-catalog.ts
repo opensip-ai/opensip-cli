@@ -149,6 +149,23 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition'],
     },
 
+    /** A persisted context snapshot no longer proves the immutable identity recorded for it. */
+    'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED': {
+      code: 'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Discard the malformed context snapshot and re-run its producing graph context command.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
     /**
      * A build could not produce a complete catalog: sources changed underneath it, or shards
      * failed.
