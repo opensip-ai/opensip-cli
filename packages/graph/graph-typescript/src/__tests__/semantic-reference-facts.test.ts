@@ -207,6 +207,23 @@ describe('collectSemanticReferenceFacts', () => {
     expect(facts.coverage.reasons).toContain('semantic-checker-fault');
   });
 
+  it('bounds semantic AST traversal and records partial coverage', async () => {
+    const projectDir = writeProject({
+      'src/deep.ts': `export const value = ${'('.repeat(600)}1${')'.repeat(600)};\n`,
+    });
+    const { program, discovery, catalog } = await exactSemanticFacts(projectDir);
+
+    const facts = collectSemanticReferenceFacts({
+      program,
+      discoveredFiles: discovery.files,
+      projectRootAbs: discovery.projectDirAbs,
+      crossPackage: buildCrossPackageContext(catalog, discovery.projectDirAbs),
+    });
+
+    expect(facts.coverage.status).toBe('partial');
+    expect(facts.coverage.reasons).toContain('semantic-walk-depth');
+  });
+
   it('accounts for an unresolvable declaration path before classifying it as external', () => {
     const projectDir = writeProject({ 'src/a.ts': 'export const a = 1;\n' });
     const coverage = { reasons: [] as string[] };

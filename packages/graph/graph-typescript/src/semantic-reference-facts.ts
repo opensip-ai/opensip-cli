@@ -104,6 +104,7 @@ interface FileDeclarationCtx {
   readonly coverage: MutableCoverage;
   readonly decls: DeclarationFact[];
   readonly declBySymbol: Map<ts.Symbol, DeclRecord>;
+  readonly signal?: AbortSignal;
 }
 
 /** Per-source-file reference walk context (wide params collapsed). */
@@ -119,7 +120,10 @@ interface FileReferenceCtx {
   readonly limits: SemanticFactLimits;
   readonly coverage: MutableCoverage;
   readonly refs: CrossFileReferenceFact[];
+  readonly signal?: AbortSignal;
 }
+
+const MAX_SEMANTIC_WALK_DEPTH = 512;
 
 /**
  * Collect bounded declaration + cross-file reference facts from an exact
@@ -212,6 +216,7 @@ function collectDeclarations(ctx: DeclarationCollectCtx): void {
       coverage: ctx.coverage,
       decls: ctx.decls,
       declBySymbol: ctx.declBySymbol,
+      signal: ctx.signal,
     };
     visitDeclarations(sf, fileCtx);
     if (ctx.decls.length >= ctx.limits.maxDeclarations) {
@@ -242,6 +247,7 @@ function collectReferences(ctx: ReferenceCollectCtx): void {
       limits: ctx.limits,
       coverage: ctx.coverage,
       refs: ctx.refs,
+      signal: ctx.signal,
     });
     if (ctx.refs.length >= ctx.limits.maxReferences) {
       ctx.coverage.reasons.push('reference-cap');
@@ -250,7 +256,12 @@ function collectReferences(ctx: ReferenceCollectCtx): void {
   }
 }
 
-function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
+function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx, depth = 0): void {
+  throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic declaration collection');
+  if (depth > MAX_SEMANTIC_WALK_DEPTH) {
+    ctx.coverage.reasons.push('semantic-walk-depth');
+    return;
+  }
   const kind = declarationKindOf(node);
   if (kind !== undefined) {
     ctx.coverage.inspectedDeclarations++;
@@ -272,12 +283,17 @@ function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
     }
   }
   ts.forEachChild(node, (child) => {
-    visitDeclarations(child, ctx);
+    visitDeclarations(child, ctx, depth + 1);
   });
 }
 
 function visitReferences(ctx: FileReferenceCtx): void {
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node, depth: number): void => {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic reference collection');
+    if (depth > MAX_SEMANTIC_WALK_DEPTH) {
+      ctx.coverage.reasons.push('semantic-walk-depth');
+      return;
+    }
     if (ctx.refs.length >= ctx.limits.maxReferences) return;
 
     // Identifier / type-reference / heritage / import-export sites.
@@ -293,9 +309,11 @@ function visitReferences(ctx: FileReferenceCtx): void {
       // Walk children for identifiers; kind inferred at identifier site.
     }
 
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => {
+      visit(child, depth + 1);
+    });
   };
-  visit(ctx.sourceFile);
+  visit(ctx.sourceFile, 0);
 }
 
 /** Resolve the identifier a reference site keys on (identifier or member name). */
