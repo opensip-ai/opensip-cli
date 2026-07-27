@@ -21,11 +21,38 @@ import {
 } from 'node:fs';
 import { join, sep } from 'node:path';
 
+import { SystemError } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import { digestMarkerContent, USER_UNINSTALL_MARKER_BASENAME } from './user-uninstall-receipt.js';
 
-/** @throws {Error} Always — a resume precondition the recovery path cannot satisfy safely. */
-export function recoveryFailure(message: string): never {
-  throw new Error(`Cannot recover user uninstall safely: ${message}`);
+const USER_RECOVERY_UNSAFE = hostErrorCatalog.require('CLI.UNINSTALL.USER_RECOVERY_UNSAFE');
+
+/**
+ * The single classification point for every fail-closed refusal in the user-uninstall recovery
+ * path — roughly two dozen conditions across this file, `user-removal-transaction.ts` and
+ * `user-removal.ts`.
+ *
+ * It threw a bare `Error`, which normalizes to `SYSTEM_ERROR` with `exposure: 'redacted'`, so
+ * every one of those messages reached the user as "The operation failed." — on a command that
+ * had just stopped partway through deleting their OpenSIP state. The messages are specific and
+ * actionable ("the final operation marker path is occupied by a foreign entry"); the projection
+ * was throwing them away.
+ *
+ * `condition` is optional and exists for callers whose consumers need to BRANCH. Most do not:
+ * the message carries the detail, and inventing two dozen labels nobody switches on would be
+ * ceremony, not machine semantics.
+ *
+ * @throws {SystemError} Always (`CLI.UNINSTALL.USER_RECOVERY_UNSAFE`) — a resume precondition
+ *   the recovery path cannot satisfy safely.
+ */
+export function recoveryFailure(message: string, condition?: string): never {
+  throw new SystemError(`Cannot recover user uninstall safely: ${message}`, {
+    code: USER_RECOVERY_UNSAFE.code,
+    definition: USER_RECOVERY_UNSAFE,
+    ...(condition === undefined ? {} : { metadata: { condition } }),
+  });
 }
 
 export function safeDirectoryExists(path: string): boolean {

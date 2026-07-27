@@ -12,8 +12,8 @@ generated: true
 
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
-- Catalog sources: **21**
-- Definitions: **213**
+- Catalog sources: **22**
+- Definitions: **218**
 
 ## Catalogs
 
@@ -28,6 +28,7 @@ generated: true
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 5 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
 | `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 5 |
@@ -69,6 +70,11 @@ generated: true
 | `CLI.SUITE.EVIDENCE_MISSING` | `opensip-cli` |  |  | invariant |  |  |  |  | The step completed without the evidence or verdict it is required to produce. Re-run with --verbose; if it repeats, report it to the tool author. |
 | `CLI.SUITE.INVALID` | `opensip-cli` |  |  |  |  |  |  |  | Correct the named suite step in opensip-cli.config.yml; the message names the offending field and value. |
 | `CLI.SUITE.UNKNOWN_REFERENCE` | `opensip-cli` |  |  | not-found |  |  |  |  | The suite step names something that does not exist or is ambiguous. Run `opensip tools list` and use an exact tool and command name. |
+| `CLI.UNINSTALL.REFUSED_PROJECT_ROOT` | `opensip-cli` |  |  | security |  |  |  |  | The project path is not a real directory. Pass a real project directory to uninstall. |
+| `CLI.UNINSTALL.REFUSED_SYMLINK_LEAF` | `opensip-cli` |  |  | security |  |  |  |  | A managed directory is a symbolic link. Replace it with a real directory, or remove the link yourself, then re-run uninstall. |
+| `CLI.UNINSTALL.REFUSED_SYMLINK_USER_ROOT` | `opensip-cli` |  |  | security |  |  |  |  | The OpenSIP user directory is a symbolic link. Replace it with a real directory, or remove the link yourself, then re-run. |
+| `CLI.UNINSTALL.TARGET_ESCAPES_ROOTS` | `opensip-cli` |  | tool-author | integrity |  |  |  |  | Uninstall refused: a removal target resolved outside the project and cache roots. Nothing was deleted. Report this with the run id. |
+| `CLI.UNINSTALL.USER_RECOVERY_UNSAFE` | `opensip-cli` |  | environment | integrity |  |  |  |  | User-level uninstall stopped in a state it will not modify further. Re-run to resume; if it repeats, the named path needs manual inspection. |
 | `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` | `@opensip-cli/codebase` | application | user | validation | never | error | configuration | active | Remove the circular reference or non-JSON (bigint) value from the project configuration document, then re-run. |
 | `CODEBASE.INVENTORY.INPUT_INVALID` | `@opensip-cli/codebase` | application | tool-author | validation | never | error | runtime | active | Correct the named buildProjectInventory input: bounds must be positive finite numbers, and `signal` must be a real AbortSignal. Omit a bound to accept the built-in maximum. |
 | `CONFIG.MIGRATION.UNMIGRATABLE_DOCUMENT` | `@opensip-cli/config` | application | user | integrity | never | error | configuration | active | Fix the reported problem in opensip-cli.config.yml — it must be valid YAML with a mapping at the top level — then re-run. |

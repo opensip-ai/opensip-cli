@@ -28,6 +28,7 @@ import { defineErrorCatalog } from '@opensip-cli/core';
 import { hostWiringDefinitions } from './definitions/host-wiring.js';
 import { initAndPolicyDefinitions } from './definitions/init-and-policy.js';
 import { suiteAndRunsDefinitions } from './definitions/suite-and-runs.js';
+import { uninstallDefinitions } from './definitions/uninstall.js';
 
 /** Substrate catalogs are keyed on the npm package name (ruling D1). */
 export const HOST_ERROR_OWNER_ID = 'opensip-cli';
@@ -54,5 +55,6 @@ export const hostErrorCatalog = defineErrorCatalog(
     ...hostWiringDefinitions,
     ...suiteAndRunsDefinitions,
     ...initAndPolicyDefinitions,
+    ...uninstallDefinitions,
   },
 );

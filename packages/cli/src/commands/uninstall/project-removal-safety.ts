@@ -6,10 +6,17 @@ import {
   isPathInside,
   resolveProjectPaths,
   resolveUserPaths,
+  ValidationError,
 } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import type { Target } from './targets.js';
 import type { UninstallDoneResult, UninstallRemovalBuckets } from '@opensip-cli/contracts';
+
+const REFUSED_SYMLINK_LEAF = hostErrorCatalog.require('CLI.UNINSTALL.REFUSED_SYMLINK_LEAF');
+const REFUSED_PROJECT_ROOT = hostErrorCatalog.require('CLI.UNINSTALL.REFUSED_PROJECT_ROOT');
+const TARGET_ESCAPES_ROOTS = hostErrorCatalog.require('CLI.UNINSTALL.TARGET_ESCAPES_ROOTS');
 
 /** @throws {Error} When the candidate deletion leaf is a symbolic link. */
 function assertNotSymlinkLeaf(path: string, label: string): void {
@@ -20,11 +27,15 @@ function assertNotSymlinkLeaf(path: string, label: string): void {
     return;
   }
   if (stat.isSymbolicLink()) {
-    throw new Error(`Refusing project removal: ${label} is a symbolic link (${path}).`);
+    throw new ValidationError(`Refusing project removal: ${label} is a symbolic link (${path}).`, {
+      code: REFUSED_SYMLINK_LEAF.code,
+      definition: REFUSED_SYMLINK_LEAF,
+      metadata: { condition: label, path },
+    });
   }
 }
 
-/** @throws {Error} When the project path or a managed layout root is unsafe. */
+/** @throws {ValidationError} `CLI.UNINSTALL.REFUSED_*` when the project path or a managed layout root is unsafe. */
 export function assertSafeProjectDir(projectDir: string): void {
   const resolved = resolve(projectDir);
   let stat: ReturnType<typeof lstatSync>;
@@ -34,12 +45,24 @@ export function assertSafeProjectDir(projectDir: string): void {
     return;
   }
   if (stat.isSymbolicLink()) {
-    throw new Error(
+    throw new ValidationError(
       `Refusing project removal: project path is a symbolic link (${resolved}). Pass a real directory.`,
+      {
+        code: REFUSED_PROJECT_ROOT.code,
+        definition: REFUSED_PROJECT_ROOT,
+        metadata: { condition: 'symlink', path: resolved },
+      },
     );
   }
   if (!stat.isDirectory()) {
-    throw new Error(`Refusing project removal: project path is not a directory (${resolved}).`);
+    throw new ValidationError(
+      `Refusing project removal: project path is not a directory (${resolved}).`,
+      {
+        code: REFUSED_PROJECT_ROOT.code,
+        definition: REFUSED_PROJECT_ROOT,
+        metadata: { condition: 'not-a-directory', path: resolved },
+      },
+    );
   }
   const paths = resolveProjectPaths(resolved);
   assertNotSymlinkLeaf(paths.userSourceDir, 'opensip-cli/');
@@ -72,7 +95,14 @@ function assertTargetsContained(projectDir: string, targets: readonly Target[]):
       continue;
     }
     if (!isPathInside(real, projectReal) && !isPathInside(real, cacheRootReal)) {
-      throw new Error(`Refusing project removal: target escapes allowed roots (${target.bucket}).`);
+      throw new ValidationError(
+        `Refusing project removal: target escapes allowed roots (${target.bucket}).`,
+        {
+          code: TARGET_ESCAPES_ROOTS.code,
+          definition: TARGET_ESCAPES_ROOTS,
+          metadata: { condition: 'outside-allowed-roots', bucket: target.bucket },
+        },
+      );
     }
   }
 }
