@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { closeSync, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs';
 import { dirname, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -89,6 +89,122 @@ function updateHash(hash: ReturnType<typeof createHash>, value: string | Uint8Ar
   hash.update(value);
 }
 
+function nodeErrorCode(error: unknown): string | undefined {
+  return typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+    ? error.code
+    : undefined;
+}
+
+function fixtureReadError(error: unknown, relativePath: string): HarnessPrerequisiteError {
+  if (error instanceof HarnessPrerequisiteError) return error;
+  const code = nodeErrorCode(error);
+  const codeDetail = code === undefined ? '' : ` (${code})`;
+  return new HarnessPrerequisiteError(
+    `Agent-eval contract fixture file could not be inspected: ${relativePath}${codeDetail}`,
+  );
+}
+
+function sameFileIdentity(
+  left: ReturnType<typeof fstatSync>,
+  right: ReturnType<typeof fstatSync>,
+): boolean {
+  return left.dev === right.dev && left.ino === right.ino;
+}
+
+function closeDescriptor(
+  descriptor: number | undefined,
+): { readonly ok: true } | { readonly error: unknown; readonly ok: false } {
+  if (descriptor === undefined) return { ok: true };
+  try {
+    closeSync(descriptor);
+    return { ok: true };
+  } catch (error) {
+    return { error, ok: false };
+  }
+}
+
+function updateFixtureFile(
+  hash: ReturnType<typeof createHash>,
+  file: FixtureInventoryFile,
+  remainingBytes: number,
+): number {
+  let descriptor: number | undefined;
+  let outcome:
+    { readonly bytes: number; readonly ok: true } | { readonly error: unknown; readonly ok: false };
+  try {
+    const pathStats = lstatSync(file.absolutePath);
+    if (pathStats.isSymbolicLink() || !pathStats.isFile()) {
+      throw new HarnessPrerequisiteError(
+        `Agent-eval contract fixture file changed while it was inspected: ${file.relativePath}`,
+      );
+    }
+    descriptor = openSync(file.absolutePath, 'r');
+    const initialStats = fstatSync(descriptor);
+    if (!initialStats.isFile() || !sameFileIdentity(pathStats, initialStats)) {
+      throw new HarnessPrerequisiteError(
+        `Agent-eval contract fixture file changed while it was inspected: ${file.relativePath}`,
+      );
+    }
+    if (!Number.isSafeInteger(initialStats.size)) {
+      throw new HarnessPrerequisiteError(
+        `Agent-eval contract fixture file has an invalid size: ${file.relativePath}`,
+      );
+    }
+    if (initialStats.size > MAX_CONTRACT_FILE_BYTES) {
+      throw new HarnessPrerequisiteError(
+        `Agent-eval contract fixture file exceeds bounds: ${file.relativePath}`,
+      );
+    }
+    if (initialStats.size > remainingBytes) {
+      throw new HarnessPrerequisiteError('Agent-eval contract fixture bytes exceed bounds.');
+    }
+
+    updateHash(hash, `file\0${file.relativePath}\0${String(initialStats.size)}\0`);
+    const buffer = Buffer.allocUnsafe(64 * 1024);
+    let totalBytes = 0;
+    let bytesRead: number;
+    do {
+      bytesRead = readSync(descriptor, buffer, 0, buffer.byteLength, null);
+      totalBytes += bytesRead;
+      if (totalBytes > initialStats.size || totalBytes > MAX_CONTRACT_FILE_BYTES) {
+        throw new HarnessPrerequisiteError(
+          `Agent-eval contract fixture file changed while it was inspected: ${file.relativePath}`,
+        );
+      }
+      if (bytesRead > 0) updateHash(hash, buffer.subarray(0, bytesRead));
+    } while (bytesRead > 0);
+
+    const finalStats = fstatSync(descriptor);
+    const finalPathStats = lstatSync(file.absolutePath);
+    if (
+      totalBytes !== initialStats.size ||
+      finalStats.size !== initialStats.size ||
+      finalStats.mtimeMs !== initialStats.mtimeMs ||
+      finalStats.ctimeMs !== initialStats.ctimeMs ||
+      finalPathStats.isSymbolicLink() ||
+      !finalPathStats.isFile() ||
+      !sameFileIdentity(initialStats, finalStats) ||
+      !sameFileIdentity(finalStats, finalPathStats)
+    ) {
+      throw new HarnessPrerequisiteError(
+        `Agent-eval contract fixture file changed while it was inspected: ${file.relativePath}`,
+      );
+    }
+    updateHash(hash, '\0');
+    outcome = { bytes: totalBytes, ok: true };
+  } catch (error) {
+    outcome = { error, ok: false };
+  }
+
+  const closed = closeDescriptor(descriptor);
+  if (!outcome.ok) throw fixtureReadError(outcome.error, file.relativePath);
+  if (!closed.ok) throw fixtureReadError(closed.error, file.relativePath);
+  return outcome.bytes;
+}
+
 /**
  * Feed one fixture's portable identity and bytes into the contract digest.
  *
@@ -97,28 +213,21 @@ function updateHash(hash: ReturnType<typeof createHash>, value: string | Uint8Ar
 function updateFixture(
   hash: ReturnType<typeof createHash>,
   fixture: string,
-  files: readonly FixtureInventoryFile[],
+  files: readonly FixtureInventoryFile[] | undefined,
 ): void {
   updateHash(hash, `fixture\0${fixture}\0`);
   if (fixture === 'dogfood') {
     updateHash(hash, 'source-bound-to-report-git-sha\0');
     return;
   }
+  if (files === undefined) {
+    throw new HarnessPrerequisiteError(
+      `Agent-eval contract fixture inventory is unavailable: ${fixture}`,
+    );
+  }
   let totalBytes = 0;
   for (const file of files) {
-    const content = readFileSync(file.absolutePath);
-    if (content.byteLength > MAX_CONTRACT_FILE_BYTES) {
-      throw new HarnessPrerequisiteError(
-        `Agent-eval contract fixture file exceeds bounds: ${file.relativePath}`,
-      );
-    }
-    totalBytes += content.byteLength;
-    if (totalBytes > MAX_CONTRACT_BYTES) {
-      throw new HarnessPrerequisiteError('Agent-eval contract fixture bytes exceed bounds.');
-    }
-    updateHash(hash, `file\0${file.relativePath}\0${String(content.byteLength)}\0`);
-    updateHash(hash, content);
-    updateHash(hash, '\0');
+    totalBytes += updateFixtureFile(hash, file, MAX_CONTRACT_BYTES - totalBytes);
   }
 }
 
@@ -159,7 +268,7 @@ export async function contractFingerprint(
   updateHash(hash, 'opensip-agent-eval-contract-v1\0');
   for (const task of ordered) updateHash(hash, `task\0${stableJson(authoredContract(task))}\0`);
   for (const fixture of fixtures) {
-    updateFixture(hash, fixture, inventories.get(fixture) ?? []);
+    updateFixture(hash, fixture, inventories.get(fixture));
   }
   return `sha256:${hash.digest('hex')}`;
 }

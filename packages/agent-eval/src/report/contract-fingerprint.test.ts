@@ -128,4 +128,13 @@ describe('contractFingerprint', () => {
       /fixture roots may not be symlinks/u,
     );
   });
+
+  it('rejects an oversized fixture file without accepting it into the digest', async () => {
+    const root = fixtureRoot();
+    writeFileSync(join(root, 'fixture-a', 'oversized.bin'), Buffer.alloc(2 * 1024 * 1024 + 1));
+
+    await expect(contractFingerprint([task('a')], { fixturesRoot: root })).rejects.toThrow(
+      /fixture file exceeds bounds: oversized\.bin/u,
+    );
+  });
 });
