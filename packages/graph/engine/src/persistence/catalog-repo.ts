@@ -17,6 +17,7 @@ import { sql } from 'drizzle-orm';
 
 import { isSafeShardedCacheAnchor } from '../cache/sharded-cache-key.js';
 import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
+import { CALL_EDGE_TEXT_MAX } from '../lang-adapter/edge-helpers.js';
 import { isValidDependencyFormRole } from '../types.js';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
@@ -67,6 +68,8 @@ const MAX_EDGES_PER_OCCURRENCE = 100_000;
 const MAX_NESTED_EDGES = 5_000_000;
 const MAX_TARGETS_PER_EDGE = 10_000;
 const MAX_NESTED_TARGETS = 10_000_000;
+const MAX_BOUNDARY_CALLS = 5_000_000;
+const MAX_PARSE_ERRORS = 1_000_000;
 const MAX_FINGERPRINT = 64 * 1024 * 1024;
 const ADAPTER_ID = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/;
 
@@ -360,6 +363,98 @@ function addBoundedEdges(
     if (counts.targets > MAX_NESTED_TARGETS) return false;
   }
   return true;
+}
+
+interface ShardFragmentRowIdentity {
+  readonly shardId: string;
+  readonly language: string;
+  readonly cacheKey: string;
+  readonly shardFingerprint: string;
+}
+
+/** Fail-closed validator for one decoded shard-fragment cache payload. */
+function validateShardBuildResult(
+  value: unknown,
+  row: ShardFragmentRowIdentity,
+): asserts value is ShardBuildResult {
+  if (
+    !isRecord(value) ||
+    value.shardId !== row.shardId ||
+    value.fingerprint !== row.shardFingerprint
+  ) {
+    throw new Error('Malformed shard fragment identity');
+  }
+  validateCatalogShape(value.fragment);
+  validateFunctionContainers(value.fragment);
+  if (
+    value.fragment.language !== row.language ||
+    value.fragment.cacheKey !== row.cacheKey ||
+    !isSafeBoundaryCalls(value.boundaryCalls) ||
+    !isSafeParseErrors(value.parseErrors)
+  ) {
+    throw new Error('Malformed shard fragment payload');
+  }
+}
+
+function isSafeBoundaryCalls(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_BOUNDARY_CALLS &&
+    value.every((entry) => isSafeBoundaryCall(entry))
+  );
+}
+
+function isSafeBoundaryCall(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    isSafeCatalogText(value.ownerHash) &&
+    isSafeCatalogText(value.ownerFile) &&
+    isPositiveInteger(value.ownerLine) &&
+    isNonNegativeInteger(value.ownerColumn) &&
+    isSafeCatalogText(value.calleeName) &&
+    isOptionalCatalogText(value.importedName) &&
+    isOptionalCatalogText(value.importSpecifier) &&
+    isOptionalCatalogText(value.targetFile) &&
+    (value.importSpecifier !== undefined || value.targetFile !== undefined) &&
+    isPositiveInteger(value.line) &&
+    isNonNegativeInteger(value.column) &&
+    isBoundedMessage(value.text, CALL_EDGE_TEXT_MAX) &&
+    (value.discarded === undefined || typeof value.discarded === 'boolean')
+  );
+}
+
+function isSafeParseErrors(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_PARSE_ERRORS &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        isSafeCatalogText(entry.filePath) &&
+        isBoundedMessage(entry.message, MAX_CATALOG_TEXT),
+    )
+  );
+}
+
+function isOptionalCatalogText(value: unknown): boolean {
+  return value === undefined || isSafeCatalogText(value);
+}
+
+function isPositiveInteger(value: unknown): boolean {
+  return Number.isSafeInteger(value) && (value as number) > 0;
+}
+
+function isNonNegativeInteger(value: unknown): boolean {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isBoundedMessage(value: unknown, maxLength: number): boolean {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= maxLength &&
+    !value.includes('\0')
+  );
 }
 
 /**
@@ -666,7 +761,23 @@ export class CatalogRepo {
     if (row.cacheKey !== expectedCacheKey || row.shardFingerprint !== expectedFingerprint) {
       return null;
     }
-    return row.payload as ShardBuildResult;
+    const payload: unknown = row.payload;
+    try {
+      validateShardBuildResult(payload, row);
+      return payload;
+    } catch (error) {
+      // @swallow-ok the shard cache is disposable: reject this row, report the
+      // registered integrity condition, and let the planner rebuild the shard.
+      logger.error({
+        evt: 'graph.shard_fragment.read.error',
+        module: MODULE_NAME,
+        code: CATALOG_UNREADABLE.code,
+        definition: CATALOG_UNREADABLE,
+        metadata: { condition: 'shard-fragment-malformed', shard: shardId },
+        err: boundedErrorCause(error),
+      });
+      return null;
+    }
   }
 
   /**
