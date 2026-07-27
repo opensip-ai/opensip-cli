@@ -468,6 +468,7 @@ function decodeShardWorkerOutput(
   try {
     value = JSON.parse(stdout) as unknown;
   } catch {
+    // @swallow-ok the enclosing spawn boundary classifies this as stdout_parse.
     return undefined;
   }
   if (isShardBuildResult(value, expectedShardId)) return { kind: 'result', result: value };

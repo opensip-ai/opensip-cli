@@ -94,7 +94,9 @@ function mockCli(): { cli: ToolCliContext; setExitCode: MockInstance } {
   return {
     cli: {
       setExitCode,
-      emitRaw: (value: unknown) => process.stdout.write(JSON.stringify(value)),
+      emitRaw: (value: unknown) => {
+        stdout += JSON.stringify(value);
+      },
       scope: { languages: new LanguageRegistry() },
       reportFailure: makeReportFailureMock(setExitCode),
     } as unknown as ToolCliContext,
@@ -103,7 +105,6 @@ function mockCli(): { cli: ToolCliContext; setExitCode: MockInstance } {
 }
 
 let dir: string;
-let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let stdout = '';
 let stderr = '';
@@ -113,10 +114,6 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'shard-worker-'));
   stdout = '';
   stderr = '';
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((c: string | Uint8Array) => {
-    stdout += typeof c === 'string' ? c : c.toString();
-    return true;
-  });
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((c: string | Uint8Array) => {
     stderr += typeof c === 'string' ? c : c.toString();
     return true;
@@ -125,7 +122,6 @@ beforeEach(() => {
 
 afterEach(() => {
   currentAdapterRegistry().clear();
-  stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(dir, { recursive: true, force: true });
 });

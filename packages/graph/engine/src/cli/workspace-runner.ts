@@ -367,6 +367,7 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
       }
       const parsed = parseChildSignals(stdout, input.unit.rootDir, stderr);
       if (!parsed.ok) {
+        // @swallow-ok the Result error is converted into a typed workspace child failure.
         settleResult(
           workspaceChildFailure(input, 'output-malformed', parsed.condition, 'stdout_parse', {
             stderr: failureStderr(

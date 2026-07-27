@@ -26,7 +26,6 @@
 
 import {
   createCancelledError,
-  createSignal,
   createToolError,
   currentScope,
   logger,
@@ -38,6 +37,7 @@ import {
 
 import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
+import { createGraphSignal } from './create-graph-signal.js';
 import { currentRules } from './registry.js';
 
 import type { Catalog, FeatureTable, GraphConfig, Indexes, Rule, RuleHints } from '../types.js';
@@ -87,7 +87,7 @@ export function evaluateRules(ruleSet: readonly Rule[], data: RuleEvaluationInpu
       ruleSignals = rule.evaluate(catalog, indexes, config, hints, features);
       throwIfRuleEvaluationCancelled();
     } catch (error) {
-      ruleSignals = [ruleEvaluationFailureSignal(rule, error)];
+      ruleSignals = [ruleEvaluationFailureSignal(rule, config, error)];
       status = 'failed';
     }
     // Indexed append rather than spread-in-loop — avoids re-allocating the
@@ -136,7 +136,7 @@ function throwIfRuleEvaluationCancelled(): void {
  * Definition-backed causes keep their primary code (D6); unknown causes are normalized at this
  * boundary onto GRAPH.RULE.EVALUATION_FAILED. Both forms carry the boundary code for grouping.
  */
-function ruleEvaluationFailureSignal(rule: Rule, error: unknown): Signal {
+function ruleEvaluationFailureSignal(rule: Rule, config: GraphConfig, error: unknown): Signal {
   const original = normalizeFailure(error);
   if (original.definition.kind === 'cancelled') throw error;
 
@@ -163,9 +163,7 @@ function ruleEvaluationFailureSignal(rule: Rule, error: unknown): Signal {
     failure: toOperatorFailureProjection(failure),
   });
 
-  return createSignal({
-    source: 'graph',
-    ruleId: rule.slug,
+  return createGraphSignal(rule.slug, config, {
     severity: 'high',
     category: 'error',
     message: `Graph rule "${safeRule}" could not be evaluated.`,
