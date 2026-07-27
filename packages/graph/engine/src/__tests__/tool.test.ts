@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { graphTool } from '../tool.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -36,6 +37,13 @@ describe('graphTool contract conformance (AC-2)', () => {
 
   it('metadata.version matches package.json', () => {
     expect(graphTool.metadata.version).toBe(pkg.version);
+  });
+
+  it('registers the graph error catalog on the Tool extension point', () => {
+    expect(graphTool.extensionPoints?.errorCatalog?.owner).toEqual(graphErrorCatalog.owner);
+    expect(graphTool.extensionPoints?.errorCatalog?.list.map(({ code }) => code)).toEqual(
+      graphErrorCatalog.list.map(({ code }) => code),
+    );
   });
 
   it('commands lists the unified graph subcommand plus the nested export/lookup/index/recipes/list queries', () => {

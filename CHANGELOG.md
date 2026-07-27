@@ -51,6 +51,7 @@ exit code are deliberately absent.
 | Runtime coordination record is structurally corrupt                   |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.CORRUPT_RECORD` (`integrity`, `configuration`): remove the named record. Distinct from the containment case above.                                        |
 | Runtime-promotion journal is unreadable or names an invalid phase     |      1 |     2 | Now `CLI.INIT.PROMOTION_JOURNAL_INVALID` (`integrity`, `configuration`). The recovery path already BRANCHED on this condition; it previously reported as an unknown internal failure.    |
 | Runtime promotion stopped in a state needing recovery                 |      1 |     2 | Now `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` (`conflict`, `configuration`): the operator re-runs `opensip init` to resume, so this is a configuration failure rather than a runtime fault. |
+| Graph live worker is cooperatively cancelled                           |      1 |   130 | The graph worker now uses the shared cancellation protocol and preserves `CORE.SYSTEM.CANCELLED` across IPC instead of collapsing cancellation into an untyped worker failure.          |
 
 #### Behaviour changes: MCP error codes are uniform (Plan 01)
 
