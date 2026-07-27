@@ -792,6 +792,36 @@ describe('main', () => {
     expect(harness.stderr()).toContain('already exists');
   });
 
+  it('preserves a collision and reports failed rollback while trying the next default pair', async () => {
+    const root = temporaryDirectory();
+    const files = new Map<string, string>();
+    let writeCount = 0;
+    const fileSystem: ArtifactFileSystem = {
+      exists: () => Promise.resolve(false),
+      mkdir: () => Promise.resolve(),
+      remove: () => Promise.reject(Object.assign(new Error('read-only'), { code: 'EACCES' })),
+      writeExclusive: (path, content) => {
+        writeCount += 1;
+        if (writeCount === 2) {
+          return Promise.reject(
+            Object.assign(new Error('simulated collision'), { code: 'EEXIST' }),
+          );
+        }
+        files.set(path, content);
+        return Promise.resolve();
+      },
+    };
+    const harness = dependencyHarness(root, { artifactFileSystem: fileSystem });
+
+    await expect(main(['--task', TASK_ONE.id], harness.dependencies)).resolves.toBe(0);
+
+    expect(writeCount).toBe(4);
+    expect(files.size).toBe(3);
+    expect(harness.stdout()).toContain('-2.json');
+    expect(harness.stderr()).toContain('partial JSON');
+    expect(harness.stderr()).toContain('manual cleanup may be required');
+  });
+
   it('maps invalid invocation and unknown tasks to exit two with usage and known ids', async () => {
     const root = temporaryDirectory();
     for (const argv of [['--wat'], ['--arm', 'hostile'], ['--task']] as const) {

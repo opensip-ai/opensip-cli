@@ -276,6 +276,9 @@ async function runEvaluation(
     baseDefaultPath,
     dependencies.artifactFileSystem,
   );
+  for (const warning of paths.warnings ?? []) {
+    void dependencies.stderr(`agent-eval: warning: ${warning}\n`);
+  }
   void dependencies.stderr('agent-eval: report artifacts complete\n');
   printSuccess(paths, report, dependencies);
   return 0;
