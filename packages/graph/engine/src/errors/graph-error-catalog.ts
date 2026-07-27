@@ -338,6 +338,55 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'diagnosticCode', 'errno'],
     },
 
+    /** The graph project root does not exist. */
+    'GRAPH.PROJECT_DIR.NOT_FOUND': {
+      code: 'GRAPH.PROJECT_DIR.NOT_FOUND',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction: 'Correct the graph project root or create the requested directory.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /** The graph project root resolves to a non-directory filesystem entry. */
+    'GRAPH.PROJECT_DIR.NOT_A_DIRECTORY': {
+      code: 'GRAPH.PROJECT_DIR.NOT_A_DIRECTORY',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction: 'Choose a directory as the graph project root, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /** The project root could not be inspected or canonicalized for an unclassified I/O reason. */
+    'GRAPH.PROJECT_DIR.INSPECTION_FAILED': {
+      code: 'GRAPH.PROJECT_DIR.INSPECTION_FAILED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the project-root condition and OS errno, restore filesystem access, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'errno'],
+    },
+
     /**
      * A shard-dependent operation has no trustworthy complete result.
      *

@@ -51,7 +51,9 @@ describe('projectdir-normalization acceptance fixture', () => {
     expect(out.projectDirAbs).toBe(realDir);
   });
 
-  it('throws ConfigurationError on a missing directory', () => {
-    expect(() => discoverFiles({ projectDir: `${realDir}-missing` })).toThrow(/does not exist/);
+  it('uses the graph project definition on a missing directory', () => {
+    expect(() => discoverFiles({ projectDir: `${realDir}-missing` })).toThrow(
+      expect.objectContaining({ code: 'GRAPH.PROJECT_DIR.NOT_FOUND' }),
+    );
   });
 });
