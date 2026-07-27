@@ -32,87 +32,22 @@ import { makeSectionHeading } from './function-row.js';
 import { graphVisualizationDegradation } from './graph-visualization-degradation.js';
 import { fuzzyMatch } from './search.js';
 import { gvBuildFunctionElements, gvRenderControls } from './view-graph-controls.js';
-import { gvBuildElements, type GraphElement, type GraphViewModel } from './view-graph-elements.js';
+import { gvBuildElements, type GraphElement } from './view-graph-elements.js';
 import { GRAPH_VIEW_HELP } from './view-graph-help.js';
+import {
+  gvLayoutOptions,
+  gvRegisterGraphLayouts,
+  gvReportDagreUnavailable,
+  gvReportLayoutInitializationFallback,
+  gvRunLayout,
+} from './view-graph-layout.js';
+import { gvLoadViewModel } from './view-graph-model.js';
 import { gvState } from './view-graph-state.js';
 import { gvStylesheet } from './view-graph-stylesheet.js';
 import { views } from './views-registry.js';
 
 import type { CatalogLike, IndexesLike } from './code-paths-types.js';
 import type { CyCollection, CyCore, CyElement, CyEvent } from './cytoscape-types.js';
-
-// Register the dagre layout extension once. Called LAZILY at first render (not
-// at module load) so it does not depend on the vendored `cytoscape` global
-// being defined before this bundle — the vendor blob may be inlined after it.
-// Guarded so a double-call is harmless.
-function gvRegisterGraphLayouts(): boolean {
-  if (typeof cytoscape !== 'function' || typeof cytoscapeDagre === 'undefined') {
-    gvState.dagreRegistered = false;
-    return false;
-  }
-  try {
-    if (!cytoscape.__gvDagreRegistered) {
-      cytoscape.use(cytoscapeDagre);
-      cytoscape.__gvDagreRegistered = true;
-    }
-    gvState.dagreRegistered = true;
-    return true;
-  } catch {
-    gvState.dagreRegistered = false;
-    return false;
-  }
-}
-
-type GraphViewModelLoad =
-  { state: 'absent' } | { state: 'malformed' } | { state: 'loaded'; value: GraphViewModel };
-
-function gvIsRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function gvIsNode(value: unknown): boolean {
-  if (!gvIsRecord(value)) return false;
-  if (typeof value.id !== 'string' || typeof value.label !== 'string') return false;
-  if (
-    value.totalCoupling !== undefined &&
-    (typeof value.totalCoupling !== 'number' || !Number.isFinite(value.totalCoupling))
-  ) {
-    return false;
-  }
-  return value.sccId === undefined || value.sccId === null || typeof value.sccId === 'string';
-}
-
-function gvIsEdge(value: unknown): boolean {
-  if (!gvIsRecord(value)) return false;
-  if (typeof value.source !== 'string' || typeof value.target !== 'string') return false;
-  if (
-    value.weight !== undefined &&
-    (typeof value.weight !== 'number' || !Number.isFinite(value.weight))
-  ) {
-    return false;
-  }
-  return value.isCycleEdge === undefined || typeof value.isCycleEdge === 'boolean';
-}
-
-function gvLoadViewModel(): GraphViewModelLoad {
-  const blob = document.querySelector('#graph-view-model');
-  if (!blob?.textContent) return { state: 'absent' };
-  try {
-    const parsed: unknown = JSON.parse(blob.textContent);
-    if (
-      !gvIsRecord(parsed) ||
-      !Array.isArray(parsed.nodes) ||
-      !parsed.nodes.every((node) => gvIsNode(node)) ||
-      !Array.isArray(parsed.edges) ||
-      !parsed.edges.every((edge) => gvIsEdge(edge))
-    ) {
-      return { state: 'malformed' };
-    }
-    return { state: 'loaded', value: parsed as unknown as GraphViewModel };
-  } catch {
-    return { state: 'malformed' };
-  }
-}
 
 // The init loop renders EVERY Code Graph panel, not just the active one — the
 // row-table views re-render in O(rows), but a full Cytoscape mount + dagre
@@ -126,67 +61,6 @@ function gvPanelHidden(container: HTMLElement): boolean {
   return !!(
     container?.classList?.contains('code-paths-view') && !container.classList.contains('active')
   );
-}
-
-function gvLayoutOptions(layoutId: string): Record<string, unknown> {
-  if (layoutId === 'dagre' && gvState.dagreRegistered) {
-    return { name: 'dagre', rankDir: 'LR', nodeSep: 24, rankSep: 64, fit: true, padding: 24 };
-  }
-  if (layoutId === 'breadthfirst') {
-    return { name: 'breadthfirst', directed: true, spacingFactor: 1.2, fit: true, padding: 24 };
-  }
-  return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 6000 };
-}
-
-function gvShowLayoutDegradation(container: HTMLElement, message: string): void {
-  const existing = container.querySelector<HTMLElement>('[data-graph-layout-degradation]');
-  const notice = existing ?? el('div', { class: 'empty' });
-  notice.dataset.graphLayoutDegradation = 'true';
-  notice.setAttribute('role', 'status');
-  notice.textContent = message;
-  if (!existing) container.prepend(notice);
-}
-
-function gvSetLayoutSelection(container: HTMLElement, layoutId: string): void {
-  const select = container.querySelector<HTMLSelectElement>('select[data-control="layout"]');
-  if (select) select.value = layoutId;
-}
-
-function gvTryRunLayout(cy: CyCore, layoutId: string): boolean {
-  try {
-    cy.layout(gvLayoutOptions(layoutId)).run();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function gvRunLayout(container: HTMLElement, layoutId: string): void {
-  const cy = gvState.cy;
-  if (!cy) return;
-  const dagreUnavailable = layoutId === 'dagre' && !gvRegisterGraphLayouts();
-  const selectedLayout = dagreUnavailable ? 'cose' : layoutId;
-  if (gvTryRunLayout(cy, selectedLayout)) {
-    gvState.currentLayout = selectedLayout;
-    gvSetLayoutSelection(container, selectedLayout);
-    if (dagreUnavailable) {
-      gvShowLayoutDegradation(
-        container,
-        'The layered layout is unavailable. The graph is using the built-in Cose layout.',
-      );
-    }
-    return;
-  }
-  if (selectedLayout !== 'cose' && gvTryRunLayout(cy, 'cose')) {
-    gvState.currentLayout = 'cose';
-    gvSetLayoutSelection(container, 'cose');
-    gvShowLayoutDegradation(
-      container,
-      'The selected layout could not run. The graph is using the built-in Cose layout.',
-    );
-    return;
-  }
-  gvShowLayoutDegradation(container, 'The graph layout could not be updated.');
 }
 
 // Emphasize cross-package cyclic clusters on the live graph. A node is "in a
@@ -387,11 +261,7 @@ function gvMountCanvas(container: HTMLElement, elements: GraphElement[]): boolea
         canvas.replaceChildren();
         gvState.cy = gvCreateCanvasCore(canvas, elements, 'cose');
         gvState.currentLayout = 'cose';
-        gvSetLayoutSelection(container, 'cose');
-        gvShowLayoutDegradation(
-          container,
-          'The selected layout could not initialize. The graph is using the built-in Cose layout.',
-        );
+        gvReportLayoutInitializationFallback(container);
         return true;
       } catch {
         // The fixed renderer notice below owns both initialization failures.
@@ -467,10 +337,7 @@ function gvRenderGraph(
   const elements = gvResolveElements(container, indexes);
   if (!elements) return;
   if (dagreUnavailable) {
-    gvShowLayoutDegradation(
-      container,
-      'The layered layout is unavailable. The graph is using the built-in Cose layout.',
-    );
+    gvReportDagreUnavailable(container);
   }
   if (!gvMountCanvas(container, elements)) return;
   gvWireInteractions();

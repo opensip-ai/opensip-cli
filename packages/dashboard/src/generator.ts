@@ -15,78 +15,24 @@ import { formatScore } from '@opensip-cli/format';
 // live in that bundle (src/client/*.ts).
 import { boundChangeImpactRuns, projectChangeImpactRuns } from './change-impact/project.js';
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
-import { boundGraphCatalog } from './code-paths/bound-catalog.js';
-import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
-import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { renderDeclaredInputs } from './declared-inputs-html.js';
+import {
+  codePathsVendor,
+  graphArtifacts,
+  projectBrowserSessions,
+  projectOverviewRuns,
+} from './generator-artifacts.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { normalizeReportViewSelection } from './report-selection.js';
 import { serializeJsonForScriptContext } from './script-context-json.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
+import type { DashboardRun } from './generator-artifacts.js';
 import type { ReportSelectionEvidence, ReportViewSelection } from './report-selection.js';
-import type {
-  StoredRun,
-  StoredRunStep,
-  StoredSession,
-  GraphCatalog,
-  DeclaredInputs,
-} from '@opensip-cli/contracts';
+import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/contracts';
 
-/** A persisted host-owned run plus its ordered steps for dashboard rendering. */
-export interface DashboardRun extends StoredRun {
-  readonly steps: readonly StoredRunStep[];
-}
-
-type OverviewDashboardRun = Pick<
-  DashboardRun,
-  | 'aggregate'
-  | 'completedAt'
-  | 'durationMs'
-  | 'exitCode'
-  | 'id'
-  | 'legacySuiteRunId'
-  | 'name'
-  | 'source'
-  | 'startedAt'
-  | 'steps'
->;
-
-/** Keep the Overview ledger lean; Change Impact owns the bounded ReviewBrief copy. */
-function projectOverviewRuns(runs: readonly DashboardRun[]): readonly OverviewDashboardRun[] {
-  return runs.map((run) => ({
-    id: run.id,
-    name: run.name,
-    source: run.source,
-    startedAt: run.startedAt,
-    completedAt: run.completedAt,
-    durationMs: run.durationMs,
-    exitCode: run.exitCode,
-    aggregate: run.aggregate,
-    steps: run.steps,
-    ...(run.legacySuiteRunId === undefined ? {} : { legacySuiteRunId: run.legacySuiteRunId }),
-  }));
-}
-
-/** Remove impact's duplicate opaque copy after the bounded Change Impact model is projected. */
-function projectBrowserSessions(sessions: readonly StoredSession[]): readonly StoredSession[] {
-  return sessions.map((session) => {
-    const payload = session.payload;
-    if (
-      session.tool !== 'graph' ||
-      typeof payload !== 'object' ||
-      payload === null ||
-      Array.isArray(payload)
-    ) {
-      return session;
-    }
-    const browserPayload = Object.fromEntries(
-      Object.entries(payload).filter(([key]) => key !== 'impact' && key !== 'impactStatus'),
-    );
-    return { ...session, payload: browserPayload };
-  });
-}
+export type { DashboardRun } from './generator-artifacts.js';
 
 /**
  * Inputs to the dashboard HTML generator.
@@ -170,69 +116,6 @@ const EXTERNAL_TAB_LABEL = 'External Tools';
 // Shield icon (lucide) — external adapters are typically secret/vuln scanners.
 const EXTERNAL_TAB_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`;
 const CHANGE_IMPACT_ICON = String.raw`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>`;
-
-interface GraphVisualizationDegradation {
-  readonly condition: 'catalog-projection-failed' | 'renderer-asset-unavailable';
-  readonly message: string;
-}
-
-function graphArtifacts(
-  graphCatalog: GraphCatalog | null,
-  maxGraphCatalogBytes: number | undefined,
-): {
-  readonly boundedCatalog: ReturnType<typeof boundGraphCatalog>;
-  readonly catalog: GraphCatalog | null;
-  readonly graphViewModel: ReturnType<typeof projectCatalogToGraphViewModel> | null;
-  readonly degradations: readonly GraphVisualizationDegradation[];
-} {
-  if (graphCatalog === null) {
-    return {
-      boundedCatalog: boundGraphCatalog(null, maxGraphCatalogBytes),
-      catalog: null,
-      graphViewModel: null,
-      degradations: [],
-    };
-  }
-  try {
-    return {
-      boundedCatalog: boundGraphCatalog(graphCatalog, maxGraphCatalogBytes),
-      catalog: graphCatalog,
-      graphViewModel: projectCatalogToGraphViewModel(graphCatalog),
-      degradations: [],
-    };
-  } catch {
-    return {
-      boundedCatalog: boundGraphCatalog(null, maxGraphCatalogBytes),
-      catalog: null,
-      graphViewModel: null,
-      degradations: [
-        {
-          condition: 'catalog-projection-failed',
-          message:
-            'Graph exploration is unavailable because the stored catalog is malformed. Run `opensip graph`, then regenerate this report.',
-        },
-      ],
-    };
-  }
-}
-
-function codePathsVendor(): {
-  readonly javascript: string;
-  readonly degradation?: GraphVisualizationDegradation;
-} {
-  try {
-    return { javascript: dashboardCodePathsVendorJs() };
-  } catch {
-    return {
-      javascript: '',
-      degradation: {
-        condition: 'renderer-asset-unavailable',
-        message:
-          'Graph visualization is unavailable because its renderer asset is missing. Reinstall opensip-cli or run `pnpm --filter=@opensip-cli/dashboard vendor:cytoscape`, then regenerate this report.',
-      },
-    };
-  }
-}
 
 // Coerce a session.score into a finite number safe for HTML interpolation
 // in the <title> tag. Returns 0 for non-finite values so the rendered

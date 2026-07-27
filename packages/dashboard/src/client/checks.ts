@@ -13,32 +13,12 @@
 
 import { formatScore } from '@opensip-cli/format';
 
+import { computeCheckStats, normalizeCheckEntry } from './check-catalog-data.js';
 import { el } from './el.js';
 import { paginateGroupedRows, renderPageButtons, wirePagination } from './pagination.js';
 import { registerSortRefreshHandler } from './sortable.js';
 
-/** A check catalog entry (tool domain vocabulary, read structurally). */
-interface CheckEntry {
-  slug: string;
-  name: string;
-  source: string;
-  confidence: string;
-  tags?: string[];
-  longDescription?: string;
-}
-
-/** Aggregated run stats for one check, derived from the session payloads. */
-interface CheckStat {
-  runs: number;
-  passed: number;
-  failed: number;
-  lastRun: string | null;
-}
-
-interface CheckStatsResult {
-  stats: Record<string, CheckStat>;
-  malformedSessions: number;
-}
+import type { CheckEntry, CheckStat } from './check-catalog-data.js';
 
 const DIM = 'color:var(--text-dim)';
 const EM_DASH = '—';
@@ -111,82 +91,6 @@ function paginateFilteredGroups(pag: HTMLElement, groups: HTMLElement[][]): void
   // never re-attaches the listener).
   wirePagination(pag, (p) => renderFilteredPage(pag, groups, p, totalPages));
   renderFilteredPage(pag, groups, 0, totalPages);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function normalizeCheckEntry(value: unknown): CheckEntry | null {
-  if (!isRecord(value)) return null;
-  const { slug, name, source, confidence } = value;
-  if (
-    typeof slug !== 'string' ||
-    typeof name !== 'string' ||
-    typeof source !== 'string' ||
-    typeof confidence !== 'string'
-  ) {
-    return null;
-  }
-  return {
-    slug,
-    name,
-    source,
-    confidence,
-    tags: Array.isArray(value.tags)
-      ? value.tags.filter((tag): tag is string => typeof tag === 'string')
-      : [],
-    ...(typeof value.longDescription === 'string'
-      ? { longDescription: value.longDescription }
-      : {}),
-  };
-}
-
-function accumulateCheckStat(
-  value: unknown,
-  startedAt: unknown,
-  stats: Record<string, CheckStat>,
-): boolean {
-  if (!isRecord(value) || typeof value.checkSlug !== 'string') return false;
-  stats[value.checkSlug] ??= { runs: 0, passed: 0, failed: 0, lastRun: null };
-  const stat = stats[value.checkSlug];
-  stat.runs++;
-  if (value.passed === true) stat.passed++;
-  else stat.failed++;
-  if (typeof startedAt === 'string' && (!stat.lastRun || startedAt > stat.lastRun)) {
-    stat.lastRun = startedAt;
-  }
-  return true;
-}
-
-/** Add one fitness session's stats; return true when its check detail is malformed. */
-function accumulateSessionStats(value: unknown, stats: Record<string, CheckStat>): boolean {
-  if (!isRecord(value) || value.tool !== 'fit') return false;
-  const payload = value.payload;
-  if (payload === undefined) return false;
-  if (!isRecord(payload)) return true;
-  const payloadChecks = payload.checks;
-  if (payloadChecks === undefined) return false;
-  if (!Array.isArray(payloadChecks)) return true;
-
-  let malformed = false;
-  for (const check of payloadChecks) {
-    if (!accumulateCheckStat(check, value.startedAt, stats)) malformed = true;
-  }
-  return malformed;
-}
-
-function computeCheckStats(): CheckStatsResult {
-  const stats: Record<string, CheckStat> = {};
-  let malformedSessions = 0;
-  const injectedSessions: unknown = typeof sessions === 'undefined' ? undefined : sessions;
-  const sourceSessions: readonly unknown[] = Array.isArray(injectedSessions)
-    ? injectedSessions
-    : [];
-  for (const session of sourceSessions) {
-    if (accumulateSessionStats(session, stats)) malformedSessions++;
-  }
-  return { stats, malformedSessions };
 }
 
 /** Render longDescription as DOM nodes with bold and code formatting. Safe — no innerHTML. */
