@@ -79,9 +79,27 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
 
     expect(html).toContain('function renderDashboardPanel(panelId, label, render)');
+    expect(html).toContain("globalThis.addEventListener('error'");
+    expect(html).toContain("globalThis.addEventListener('unhandledrejection'");
+    expect(html).toContain('id="report-degradation-banner"');
     expect(html).toContain('The rest of the report remains available.');
     expect(html).toContain("renderDashboardPanel('panel-change-impact'");
     expect(html).toContain('renderDashboardPanel("panel-code-paths", "Code Graph"');
+    expect(html.indexOf('function renderDashboardPanel')).toBeLessThan(
+      html.indexOf('// The vendored Cytoscape renderer'),
+    );
+  });
+
+  it('does not load fonts or other resources from external hosts', () => {
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    const remoteResourceTags =
+      html.match(
+        /<(?:audio|iframe|img|link|script|source|video)\b[^>]*(?:href|src)=["']https?:\/\//giu,
+      ) ?? [];
+
+    expect(remoteResourceTags).toEqual([]);
+    expect(html).not.toMatch(/url\(["']?https?:\/\//iu);
+    expect(html).not.toContain('fonts.googleapis.com');
   });
 
   it('embeds EDITOR_PROTOCOL = null when no editorProtocol is supplied', () => {

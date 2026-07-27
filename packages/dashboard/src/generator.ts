@@ -386,11 +386,11 @@ export function generateDashboardHtml(input: DashboardInput): string {
   const toolTabRenderCalls = [
     ...toolTabs.map(
       (t) =>
-        `renderDashboardPanel(${JSON.stringify('panel-' + t.id)}, ${JSON.stringify(t.label)}, () => ${t.renderFunctionName}());`,
+        `renderDashboardPanel(${serializeJsonForScriptContext('panel-' + t.id)}, ${serializeJsonForScriptContext(t.label)}, () => ${t.renderFunctionName}());`,
     ),
     ...(hasExternalSessions
       ? [
-          `renderDashboardPanel(${JSON.stringify('panel-' + EXTERNAL_TAB_ID)}, ${JSON.stringify(EXTERNAL_TAB_LABEL)}, () => renderExternalTab());`,
+          `renderDashboardPanel(${serializeJsonForScriptContext('panel-' + EXTERNAL_TAB_ID)}, ${serializeJsonForScriptContext(EXTERNAL_TAB_LABEL)}, () => renderExternalTab());`,
         ]
       : []),
   ].join('\n');
@@ -398,10 +398,13 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // same descriptors and injected as page globals so the bundled overview renderer
   // (src/client/overview.ts) reads them as ambient data — the descriptor
   // derivation stays type-checked Node code rather than a string template (F1/F8).
-  const toolBadgeStylesJson = JSON.stringify(
+  const toolBadgeStylesJson = serializeJsonForScriptContext(
     Object.fromEntries(toolTabs.map((t) => [t.tool, t.badgeStyle])),
   );
-  const tabMapJson = JSON.stringify(Object.fromEntries(toolTabs.map((t) => [t.tool, t.id])));
+  const tabMapJson = serializeJsonForScriptContext(
+    Object.fromEntries(toolTabs.map((t) => [t.tool, t.id])),
+  );
+  const externalTabIdJson = serializeJsonForScriptContext(EXTERNAL_TAB_ID);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -410,8 +413,6 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreLabel}` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="${REPORT_CUP_FAVICON_DATA_URI}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
 <style>
 ${dashboardCss()}
 </style>
@@ -430,6 +431,8 @@ ${dashboardCss()}
   ${renderDeclaredInputs(declaredInputs)}
 </div>
 
+<div id="report-degradation-banner" class="report-degradation-banner" role="status" aria-live="polite" hidden></div>
+
 <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Report views">
   <button type="button" id="tab-overview" class="tab active" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
   <button type="button" id="tab-change-impact" class="tab" role="tab" aria-selected="false" aria-controls="panel-change-impact" tabindex="-1" data-tab="change-impact">${CHANGE_IMPACT_ICON} Change Impact</button>
@@ -445,6 +448,37 @@ ${toolTabPanels}
 ${graphCatalogBlock}
 ${graphViewModelBlock}
 ${graphVisualizationDegradationsBlock}
+<script>
+// This host-owned guard is deliberately defined before any vendored or client
+// code. It reports fixed, non-sensitive degradation text even when client
+// module initialization fails before an individual panel can render.
+const dashboardDegradedAreas = new Set();
+function showDashboardDegradation(label) {
+  dashboardDegradedAreas.add(label);
+  const banner = document.getElementById('report-degradation-banner');
+  if (!banner) return;
+  banner.textContent = 'Some report content could not render. Unavailable areas: ' +
+    Array.from(dashboardDegradedAreas).join(', ') + '. The remaining report content is still available.';
+  banner.hidden = false;
+}
+function renderDashboardPanel(panelId, label, render) {
+  try {
+    render();
+  } catch {
+    showDashboardDegradation(label);
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const notice = document.createElement('div');
+    notice.className = 'empty';
+    notice.textContent = label + ' could not render. The rest of the report remains available.';
+    panel.replaceChildren(notice);
+  }
+}
+globalThis.addEventListener('error', () => showDashboardDegradation('A report component'));
+globalThis.addEventListener('unhandledrejection', () =>
+  showDashboardDegradation('A report component'),
+);
+</script>
 <script>
 const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
@@ -474,7 +508,7 @@ const tabMap = ${tabMapJson};
 // (external-adapter scans). Rendered in the "External Tools" tab; the overview
 // row-click handler routes unclaimed-tool rows to externalTabId.
 const externalSessions = sessions.filter(s => !(s.tool in tabMap));
-const externalTabId = ${JSON.stringify(EXTERNAL_TAB_ID)};
+const externalTabId = ${externalTabIdJson};
 
 // The vendored Cytoscape renderer (defines the cytoscape / cytoscapeDagre
 // browser globals the Visualization view consumes). Inlined BEFORE the bundle so
@@ -485,18 +519,6 @@ ${DASHBOARD_CLIENT_BUNDLE}
 // =======================================================
 // RENDER TABS
 // =======================================================
-function renderDashboardPanel(panelId, label, render) {
-  try {
-    render();
-  } catch {
-    const panel = document.querySelector('#' + panelId);
-    if (!panel) return;
-    const notice = document.createElement('div');
-    notice.className = 'empty';
-    notice.textContent = label + ' could not render. The rest of the report remains available.';
-    panel.replaceChildren(notice);
-  }
-}
 renderDashboardPanel('panel-overview', 'Overview', () => renderOverview());
 ${toolTabRenderCalls}
 renderDashboardPanel('panel-change-impact', 'Change Impact', () => renderChangeImpact());
