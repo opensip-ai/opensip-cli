@@ -13,12 +13,16 @@ import {
 } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
-import { performance } from 'node:perf_hooks';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { SystemError, TimeoutError } from '../errors.js';
-import { type FileLockMetadata, withFileLock, withFileLockAsync } from '../file-lock.js';
+import {
+  createFileLockCoordinator,
+  type FileLockMetadata,
+  withFileLock as withDefaultFileLock,
+  withFileLockAsync as withDefaultFileLockAsync,
+} from '../file-lock.js';
 
 import type {
   DerivedHostIdentity,
@@ -64,6 +68,29 @@ vi.mock('../host-process-identity.js', async (importOriginal) => {
 
 const POLICY = { waitMs: 200, staleMs: 50, heartbeatMs: 20 };
 
+let testMonotonicNow = 0;
+let pollTransition: ((now: number) => void) | undefined;
+
+function advanceTestClock(ms: number): void {
+  testMonotonicNow += ms;
+  pollTransition?.(testMonotonicNow);
+}
+
+const deterministicFileLocks = createFileLockCoordinator({
+  monotonicNow: () => testMonotonicNow,
+  poll: (ms) => {
+    advanceTestClock(ms);
+    return Promise.resolve();
+  },
+  pollSync: advanceTestClock,
+});
+const { withFileLock, withFileLockAsync } = deterministicFileLocks;
+
+function resetTestClock(): void {
+  testMonotonicNow = 0;
+  pollTransition = undefined;
+}
+
 function captureOwnedMetadata(lockPath: string): FileLockMetadata {
   let metadata: FileLockMetadata | undefined;
   withFileLock(lockPath, { policy: POLICY, resource: 'runtime' }, () => {
@@ -100,8 +127,10 @@ describe('withFileLock', () => {
   let dir: string;
 
   afterEach(() => {
+    resetTestClock();
     processProbe.calls.clear();
     processProbe.inspect = undefined;
+    vi.useRealTimers();
     vi.restoreAllMocks();
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
@@ -110,7 +139,7 @@ describe('withFileLock', () => {
     dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
     const lockPath = join(dir, 'test.lock');
     const events: string[] = [];
-    const out = withFileLock(
+    const out = withDefaultFileLock(
       lockPath,
       {
         policy: POLICY,
@@ -389,7 +418,7 @@ describe('withFileLock', () => {
       const wallNow = Date.now();
       vi.spyOn(Date, 'now').mockReturnValue(wallNow + 10 * 365 * 24 * 60 * 60 * 1000);
 
-      const startedAt = performance.now();
+      const startedAt = testMonotonicNow;
       expect(
         withFileLock(
           lockPath,
@@ -400,7 +429,7 @@ describe('withFileLock', () => {
           () => 'recovered',
         ),
       ).toBe('recovered');
-      expect(performance.now() - startedAt).toBeGreaterThanOrEqual(25);
+      expect(testMonotonicNow - startedAt).toBeGreaterThanOrEqual(30);
       expect(existsSync(lockPath)).toBe(false);
     },
   );
@@ -533,7 +562,7 @@ describe('withFileLock', () => {
         staleMs: 130,
       };
       writeFileSync(lockPath, JSON.stringify(owner), { mode: 0o600 });
-      const startedAt = performance.now();
+      const startedAt = testMonotonicNow;
 
       expect(
         withFileLock(
@@ -545,7 +574,7 @@ describe('withFileLock', () => {
           () => 'recovered',
         ),
       ).toBe('recovered');
-      expect(performance.now() - startedAt).toBeGreaterThanOrEqual(120);
+      expect(testMonotonicNow - startedAt).toBeGreaterThanOrEqual(130);
     },
   );
 
@@ -559,29 +588,29 @@ describe('withFileLock', () => {
         staleMs: 80,
       };
       writeFileSync(lockPath, JSON.stringify(owner), { mode: 0o600 });
-      const startedAt = performance.now();
-      const heartbeat = setTimeout(() => {
+      const startedAt = testMonotonicNow;
+      let heartbeatPublished = false;
+      pollTransition = (now) => {
+        if (heartbeatPublished || now - startedAt < 65) return;
+        heartbeatPublished = true;
         replaceJsonAtomically(lockPath, {
           ...owner,
           lastHeartbeatAt: owner.lastHeartbeatAt + 1,
         });
-      }, 65);
+      };
 
-      try {
-        await expect(
-          withFileLockAsync(
-            lockPath,
-            {
-              policy: { waitMs: 350, staleMs: 80, heartbeatMs: 5 },
-              resource: 'runtime',
-            },
-            () => Promise.resolve('recovered'),
-          ),
-        ).resolves.toBe('recovered');
-      } finally {
-        clearTimeout(heartbeat);
-      }
-      expect(performance.now() - startedAt).toBeGreaterThanOrEqual(140);
+      await expect(
+        withFileLockAsync(
+          lockPath,
+          {
+            policy: { waitMs: 350, staleMs: 80, heartbeatMs: 5 },
+            resource: 'runtime',
+          },
+          () => Promise.resolve('recovered'),
+        ),
+      ).resolves.toBe('recovered');
+      expect(heartbeatPublished).toBe(true);
+      expect(testMonotonicNow - startedAt).toBeGreaterThanOrEqual(145);
     },
   );
 
@@ -592,7 +621,7 @@ describe('withFileLock', () => {
     const wallNow = Date.now();
     vi.spyOn(Date, 'now').mockReturnValue(wallNow + 10 * 365 * 24 * 60 * 60 * 1000);
 
-    const startedAt = performance.now();
+    const startedAt = testMonotonicNow;
     expect(
       withFileLock(
         lockPath,
@@ -603,7 +632,7 @@ describe('withFileLock', () => {
         () => 'recovered',
       ),
     ).toBe('recovered');
-    expect(performance.now() - startedAt).toBeGreaterThanOrEqual(25);
+    expect(testMonotonicNow - startedAt).toBeGreaterThanOrEqual(30);
     expect(existsSync(lockPath)).toBe(false);
   });
 
@@ -882,7 +911,7 @@ describe('withFileLock', () => {
         wallNow -= 60_000;
         return wallNow;
       });
-      const startedAt = performance.now();
+      const startedAt = testMonotonicNow;
 
       expect(() =>
         withFileLock(
@@ -894,7 +923,7 @@ describe('withFileLock', () => {
           () => 'never',
         ),
       ).toThrow(TimeoutError);
-      expect(performance.now() - startedAt).toBeLessThan(2000);
+      expect(testMonotonicNow - startedAt).toBe(40);
       expect(existsSync(lockPath)).toBe(true);
     },
   );
@@ -1090,8 +1119,10 @@ describe('withFileLockAsync', () => {
   let dir: string;
 
   afterEach(() => {
+    resetTestClock();
     processProbe.calls.clear();
     processProbe.inspect = undefined;
+    vi.useRealTimers();
     vi.restoreAllMocks();
     if (dir) rmSync(dir, { recursive: true, force: true });
   });
@@ -1099,7 +1130,7 @@ describe('withFileLockAsync', () => {
   it('acquires, awaits fn, and releases the lockfile', async () => {
     dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
     const lockPath = join(dir, 'async.lock');
-    const out = await withFileLockAsync(
+    const out = await withDefaultFileLockAsync(
       lockPath,
       {
         policy: POLICY,
@@ -1125,7 +1156,7 @@ describe('withFileLockAsync', () => {
         wallNow -= 60_000;
         return wallNow;
       });
-      const startedAt = performance.now();
+      const startedAt = testMonotonicNow;
 
       await expect(
         withFileLockAsync(
@@ -1137,7 +1168,7 @@ describe('withFileLockAsync', () => {
           () => Promise.resolve('never'),
         ),
       ).rejects.toThrow(TimeoutError);
-      expect(performance.now() - startedAt).toBeLessThan(2000);
+      expect(testMonotonicNow - startedAt).toBe(40);
       expect(existsSync(lockPath)).toBe(true);
     },
   );
@@ -1145,6 +1176,7 @@ describe('withFileLockAsync', () => {
   it.runIf(process.platform !== 'win32')(
     'keeps heartbeat writes at mode 0600 under a restrictive umask',
     async () => {
+      vi.useFakeTimers();
       dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
       const lockPath = join(dir, 'heartbeat-mode.lock');
       const previousUmask = process.umask(0o777);
@@ -1156,7 +1188,7 @@ describe('withFileLockAsync', () => {
             resource: 'runtime',
           },
           async () => {
-            await new Promise((resolve) => setTimeout(resolve, 35));
+            await vi.advanceTimersByTimeAsync(10);
             expect(lstatSync(lockPath).mode & 0o777).toBe(0o600);
           },
         );
@@ -1168,6 +1200,7 @@ describe('withFileLockAsync', () => {
   );
 
   it('publishes every heartbeat as a complete replacement inode', async () => {
+    vi.useFakeTimers();
     dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
     const lockPath = join(dir, 'heartbeat-replacement.lock');
 
@@ -1180,7 +1213,7 @@ describe('withFileLockAsync', () => {
       async () => {
         const initial = lstatSync(lockPath, { bigint: true });
         expect(() => JSON.parse(readFileSync(lockPath, 'utf8'))).not.toThrow();
-        await new Promise((resolve) => setTimeout(resolve, 35));
+        await vi.advanceTimersByTimeAsync(10);
         const afterHeartbeat = lstatSync(lockPath, { bigint: true });
         expect(afterHeartbeat.ino).not.toBe(initial.ino);
         expect(() => JSON.parse(readFileSync(lockPath, 'utf8'))).not.toThrow();
@@ -1189,6 +1222,7 @@ describe('withFileLockAsync', () => {
   });
 
   it('does not heartbeat into or release a successor lock', async () => {
+    vi.useFakeTimers();
     dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
     const lockPath = join(dir, 'successor.lock');
     const replacement = JSON.stringify({
@@ -1209,7 +1243,7 @@ describe('withFileLockAsync', () => {
       async () => {
         unlinkSync(lockPath);
         writeFileSync(lockPath, replacement, 'utf8');
-        await new Promise((resolve) => setTimeout(resolve, 35));
+        await vi.advanceTimersByTimeAsync(10);
         expect(readFileSync(lockPath, 'utf8')).toBe(replacement);
       },
     );
