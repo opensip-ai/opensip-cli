@@ -5,11 +5,11 @@
  * name — the ruling D1 package-name rule governs SUBSTRATE catalogs, and using a package name
  * here would give one owner two identities.
  *
- * Nine `GRAPH.*` literals become four definitions. The `GRAPH` head was mapped by nothing, so
- * every one of them resolved to `CORE.SYSTEM.UNKNOWN_FAILURE` — severity fatal, exposure
- * operator-only. That is a poor fit for most of this surface: a cursor a caller mis-typed and a
- * catalog that changed under a build are neither fatal nor internal, and MCP consumers read
- * these codes to decide whether to retry, re-page, or rebuild.
+ * The initial nine read/build literals become four definitions. Workspace child resilience adds
+ * three Result-linked definitions below. Before registration the `GRAPH` head was mapped by
+ * nothing, so every literal resolved to `CORE.SYSTEM.UNKNOWN_FAILURE` — severity fatal,
+ * exposure operator-only. That is a poor fit for this surface: a cursor a caller mis-typed, a
+ * catalog that changed under a build, and a timed-out child all need distinct recovery posture.
  */
 
 import { defineErrorCatalog } from '@opensip-cli/core';
@@ -131,6 +131,72 @@ export const graphErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
       publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A workspace child process could not be created.
+     *
+     * Kept separate from timeout even though both fail one workspace unit: a spawn failure is
+     * an OS I/O problem and carries an errno, while a timeout is a deadline with a different
+     * retry decision. The non-throwing workspace result uses `spawn-failed` as its closed reason
+     * token, linked here rather than replacing that DTO with a ToolError (ruling D4).
+     */
+    'GRAPH.WORKSPACE.CHILD_SPAWN_FAILED': {
+      code: 'GRAPH.WORKSPACE.CHILD_SPAWN_FAILED',
+      publicPresentationKey: 'spawn-failed',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Check process limits, permissions, and the reported OS errno, then retry the workspace run.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'errno', 'unit'],
+    },
+
+    /** A workspace child exceeded its hard wall-clock deadline. */
+    'GRAPH.WORKSPACE.CHILD_TIMEOUT': {
+      code: 'GRAPH.WORKSPACE.CHILD_TIMEOUT',
+      publicPresentationKey: 'timeout',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'timeout',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Reduce the workspace unit workload or raise the child deadline, then retry the run.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'timeoutMs', 'unit'],
+    },
+
+    /**
+     * A successful child exit did not carry a valid SignalEnvelope.
+     *
+     * This is a hard run fault under ruling D7: treating corrupt or absent output as an empty
+     * signal list would make a whole workspace unit false-green.
+     */
+    'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED': {
+      code: 'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED',
+      publicPresentationKey: 'output-malformed',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'integrity',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Ensure the parent and child use the same opensip-cli build, then report the malformed child envelope if it recurs.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'unit'],
     },
   },
 );

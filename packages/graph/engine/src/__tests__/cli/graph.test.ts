@@ -604,12 +604,11 @@ describe('executeGraph — --workspace aggregation', () => {
       fakeCliPath,
       `
 const out = {
-  version: '1.0', tool: 'graph', timestamp: new Date().toISOString(),
-  recipe: 'graph', score: 100, passed: true,
-  summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
-  checks: [], durationMs: 0,
+  tool: 'graph', runId: 'workspace-child', createdAt: new Date().toISOString(),
+  verdict: { score: 100, passed: true, summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 } },
+  units: [], signals: [],
 };
-process.stdout.write(JSON.stringify(out));
+process.stdout.write(JSON.stringify({ envelope: out }));
 process.exit(0);
 `,
     );

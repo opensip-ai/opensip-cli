@@ -46,6 +46,18 @@ describe('graphTool contract conformance (AC-2)', () => {
     );
   });
 
+  it('links workspace Result reasons to registered graph definitions', () => {
+    expect(
+      graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_SPAWN_FAILED').publicPresentationKey,
+    ).toBe('spawn-failed');
+    expect(graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_TIMEOUT').publicPresentationKey).toBe(
+      'timeout',
+    );
+    expect(
+      graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED').publicPresentationKey,
+    ).toBe('output-malformed');
+  });
+
   it('commands lists the unified graph subcommand plus the nested export/lookup/index/recipes/list queries', () => {
     const names = (graphTool.commands ?? []).map((c) => c.name);
     expect(names).toEqual([

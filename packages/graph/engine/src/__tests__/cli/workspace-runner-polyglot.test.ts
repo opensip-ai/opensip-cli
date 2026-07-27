@@ -11,11 +11,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import {
+  RunScope,
+  runWithScope,
+  type LanguageAdapter,
+  type WorkspaceUnit,
+} from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { discoverPolyglotUnits, runWorkspaceUnitsInParallel } from '../../cli/workspace-runner.js';
-
-import type { LanguageAdapter, WorkspaceUnit } from '@opensip-cli/core';
 
 function mockAdapter(id: string, units?: readonly WorkspaceUnit[]): LanguageAdapter {
   return {
@@ -121,7 +125,15 @@ describe('runWorkspaceUnitsInParallel', () => {
         `
 const { appendFileSync } = require('node:fs');
 appendFileSync(${JSON.stringify(argvPath)}, JSON.stringify(process.argv.slice(2)) + '\\n');
-process.stdout.write(JSON.stringify({ signals: [] }));
+const envelope = {
+  tool: 'graph',
+  runId: 'workspace-child',
+  createdAt: '2026-01-01T00:00:00.000Z',
+  verdict: {},
+  units: [],
+  signals: [],
+};
+process.stdout.write(JSON.stringify({ envelope }));
 `,
         'utf8',
       );
@@ -161,6 +173,63 @@ process.stdout.write(JSON.stringify({ signals: [] }));
     }
   });
 
+  it('faults the aggregate when a successful child emits malformed JSON', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'workspace-runner-malformed-'));
+    try {
+      const unitRoot = join(root, 'packages', 'broken-output');
+      mkdirSync(unitRoot, { recursive: true });
+      const cliScript = join(root, 'malformed-cli.cjs');
+      writeFileSync(cliScript, `process.stdout.write('{"signals":');\n`, 'utf8');
+
+      const out = await runWorkspaceUnitsInParallel({
+        cwd: root,
+        units: [{ id: 'broken-output', rootDir: unitRoot }],
+        cliScript,
+        concurrency: 1,
+        noCache: true,
+      });
+
+      expect(out.anyChildFailed).toBe(true);
+      expect(out.perUnit[0]).toMatchObject({
+        exitCode: 1,
+        failureReason: 'output-malformed',
+        errorCode: 'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED',
+        failureClass: 'stdout_parse',
+        failureCondition: 'invalid-json',
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('terminates an active child and preserves host cancellation', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'workspace-runner-cancel-'));
+    const controller = new AbortController();
+    const scope = new RunScope({ abortSignal: controller.signal });
+    try {
+      const unitRoot = join(root, 'packages', 'cancelled');
+      mkdirSync(unitRoot, { recursive: true });
+      const cliScript = join(root, 'cancel-cli.cjs');
+      writeFileSync(cliScript, `setInterval(() => {}, 1000);\n`, 'utf8');
+
+      const pending = runWithScope(scope, () =>
+        runWorkspaceUnitsInParallel({
+          cwd: root,
+          units: [{ id: 'cancelled', rootDir: unitRoot }],
+          cliScript,
+          concurrency: 1,
+          noCache: true,
+        }),
+      );
+      queueMicrotask(() => controller.abort());
+
+      await expect(pending).rejects.toMatchObject({ code: 'CORE.SYSTEM.CANCELLED' });
+    } finally {
+      scope.dispose();
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   it('SIGKILLs a hung unit child after the hard kill-timeout instead of hanging forever', async () => {
     const root = mkdtempSync(join(tmpdir(), 'workspace-runner-hang-'));
     try {
@@ -182,8 +251,14 @@ process.stdout.write(JSON.stringify({ signals: [] }));
 
       expect(out.anyChildFailed).toBe(true);
       expect(out.perUnit).toHaveLength(1);
-      expect(out.perUnit[0]?.exitCode).toBe(-1);
-      expect(out.perUnit[0]?.stderr).toContain('hard kill-timeout');
+      expect(out.perUnit[0]).toMatchObject({
+        exitCode: 1,
+        failureReason: 'timeout',
+        errorCode: 'GRAPH.WORKSPACE.CHILD_TIMEOUT',
+        failureClass: 'timeout',
+        failureCondition: 'hard-kill-timeout',
+      });
+      expect(out.perUnit[0]?.stderr).toContain('hard deadline');
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

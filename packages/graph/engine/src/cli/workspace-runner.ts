@@ -19,20 +19,34 @@ import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
 import { relative } from 'node:path';
 
+import { EXIT_CODES, isSignalEnvelope, type SignalEnvelope } from '@opensip-cli/contracts';
 import {
+  createCancelledError,
   createToolLogger,
   ConfigurationError,
+  currentScope,
+  scrubText,
   type LanguageAdapter,
   type Signal,
   type WorkspaceUnit,
 } from '@opensip-cli/core';
 
-const log = createToolLogger('graph:cli');
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import { runWorkerPool } from './orchestrate/worker-pool.js';
 
 import type { ResolutionMode } from '../types.js';
-import type { SignalEnvelope } from '@opensip-cli/contracts';
+
+const log = createToolLogger('graph:cli');
+
+/** Closed Result-reason vocabulary for workspace child failures (ruling D4). */
+export type WorkspaceChildFailureReason = 'spawn-failed' | 'timeout' | 'output-malformed';
+
+/** Bounded branch detail for a workspace child failure. */
+export type WorkspaceChildFailureCondition =
+  'spawn-error' | 'hard-kill-timeout' | 'empty-output' | 'invalid-json' | 'invalid-envelope';
+
+type WorkspaceChildFailureClass = 'spawn' | 'timeout' | 'stdout_parse';
 
 /**
  * Per-unit result from a `graph --workspace` fan-out — one entry per
@@ -57,6 +71,16 @@ export interface WorkspaceUnitRunResult {
   readonly signals: readonly Signal[];
   readonly exitCode: number;
   readonly stderr: string;
+  /** Closed plain-data reason; the matching definition declares its publicPresentationKey. */
+  readonly failureReason?: WorkspaceChildFailureReason;
+  /** Registered code linked to {@link failureReason}; this remains a Result, not a thrown error. */
+  readonly errorCode?: string;
+  /** Existing worker-boundary taxonomy retained for operational filtering. */
+  readonly failureClass?: WorkspaceChildFailureClass;
+  /** Distinguishes branches clustered under one definition (ruling D9). */
+  readonly failureCondition?: WorkspaceChildFailureCondition;
+  /** Safe OS errno when process creation fails. */
+  readonly errno?: string;
 }
 
 /**
@@ -148,6 +172,10 @@ export async function runWorkspaceUnitsInParallel(
   }
 
   const concurrency = Math.max(1, input.concurrency ?? Math.max(1, cpus().length - 1));
+  const abortSignal = currentScope()?.abortSignal;
+  if (abortRequested(abortSignal)) {
+    throw createCancelledError('Graph workspace run cancelled before child scheduling.');
+  }
   log.info({
     evt: 'graph.cli.workspace.start',
     module: 'graph:cli',
@@ -157,21 +185,29 @@ export async function runWorkspaceUnitsInParallel(
 
   // Shared bounded worker pool (also used by the shard runner). Each slot
   // spawns one child at a time and pulls the next unit when it finishes.
-  const results = await runWorkerPool(input.units, concurrency, (unit) =>
-    spawnGraphChild({
-      cliScript: input.cliScript,
-      unit,
-      cwd: input.cwd,
-      ...(input.configPath === undefined ? {} : { configPath: input.configPath }),
-      noCache: input.noCache === true,
-      resolution: input.resolution,
-      recipe: input.recipe,
-      ...(input.language === undefined ? {} : { language: input.language }),
-      ...(input.hardKillTimeoutMs === undefined
-        ? {}
-        : { hardKillTimeoutMs: input.hardKillTimeoutMs }),
-    }),
+  const results = await runWorkerPool(
+    input.units,
+    concurrency,
+    (unit) =>
+      spawnGraphChild({
+        cliScript: input.cliScript,
+        unit,
+        cwd: input.cwd,
+        ...(input.configPath === undefined ? {} : { configPath: input.configPath }),
+        noCache: input.noCache === true,
+        resolution: input.resolution,
+        recipe: input.recipe,
+        abortSignal,
+        ...(input.language === undefined ? {} : { language: input.language }),
+        ...(input.hardKillTimeoutMs === undefined
+          ? {}
+          : { hardKillTimeoutMs: input.hardKillTimeoutMs }),
+      }),
+    () => abortRequested(abortSignal),
   );
+  if (abortRequested(abortSignal)) {
+    throw createCancelledError('Graph workspace run cancelled while children were running.');
+  }
   const anyChildFailed = results.some((r) => r.exitCode !== 0);
 
   // Sort for deterministic display order regardless of completion
@@ -186,6 +222,10 @@ export async function runWorkspaceUnitsInParallel(
   });
 
   return { perUnit: results, anyChildFailed };
+}
+
+function abortRequested(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }
 
 /**
@@ -203,12 +243,13 @@ interface SpawnInput {
   readonly resolution?: ResolutionMode;
   readonly language?: string;
   readonly recipe?: string;
+  readonly abortSignal?: AbortSignal;
   /** Test override for the hard kill-timeout (default {@link WORKSPACE_HARD_KILL_TIMEOUT_MS}). */
   readonly hardKillTimeoutMs?: number;
 }
 
 function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
-  return new Promise((resolvePromise) => {
+  return new Promise((resolvePromise, rejectPromise) => {
     const args: string[] = [
       input.cliScript,
       'graph',
@@ -245,6 +286,7 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     // never keeps the loop alive past a clean settle; cleared on EVERY path.
     const hardKillMs = input.hardKillTimeoutMs ?? WORKSPACE_HARD_KILL_TIMEOUT_MS;
     let timedOut = false;
+    let settled = false;
     const killTimer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGKILL');
@@ -265,69 +307,192 @@ function spawnGraphChild(input: SpawnInput): Promise<WorkspaceUnitRunResult> {
     child.stderr.on('data', (chunk: string) => {
       stderr += chunk;
     });
+    const cleanup = (): void => {
+      clearTimeout(killTimer);
+      input.abortSignal?.removeEventListener('abort', onAbort);
+    };
+    const settleResult = (result: WorkspaceUnitRunResult): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolvePromise(result);
+    };
+    const onAbort = (): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      child.kill('SIGKILL');
+      rejectPromise(createCancelledError('Graph workspace child cancelled by the host.'));
+    };
+    input.abortSignal?.addEventListener('abort', onAbort, { once: true });
+    if (input.abortSignal?.aborted === true) onAbort();
     child.on('error', (err) => {
       /* v8 ignore start */
-      clearTimeout(killTimer);
-      resolvePromise({
-        unitId: input.unit.id,
-        rootDir: input.unit.rootDir,
-        displayPath: relative(input.cwd, input.unit.rootDir),
-        signals: [],
-        exitCode: -1,
-        stderr: `failed to spawn child: ${err.message}`,
-      });
+      const errno =
+        typeof (err as NodeJS.ErrnoException).code === 'string'
+          ? (err as NodeJS.ErrnoException).code
+          : undefined;
+      settleResult(
+        workspaceChildFailure(input, 'spawn-failed', 'spawn-error', 'spawn', {
+          stderr: scrubText(`Failed to spawn graph workspace child: ${err.message}`),
+          ...(errno === undefined ? {} : { errno }),
+        }),
+      );
       /* v8 ignore stop */
     });
     child.on('close', (code) => {
-      clearTimeout(killTimer);
+      if (settled) return;
       if (timedOut) {
-        resolvePromise({
+        settleResult(
+          workspaceChildFailure(input, 'timeout', 'hard-kill-timeout', 'timeout', {
+            stderr: failureStderr(
+              `Graph workspace child exceeded its ${String(hardKillMs)}ms hard deadline.`,
+              stderr,
+            ),
+          }),
+        );
+        return;
+      }
+      const exitCode = code ?? -1;
+      if (exitCode !== EXIT_CODES.SUCCESS) {
+        settleResult({
           unitId: input.unit.id,
           rootDir: input.unit.rootDir,
           displayPath: relative(input.cwd, input.unit.rootDir),
           signals: [],
-          exitCode: -1,
-          stderr: `${stderr}\ngraph workspace unit killed after ${String(hardKillMs)}ms hard kill-timeout`,
+          exitCode,
+          stderr: scrubText(stderr),
         });
         return;
       }
-      const signals = parseChildSignals(stdout, input.unit.rootDir, stderr);
-      resolvePromise({
+      const parsed = parseChildSignals(stdout, input.unit.rootDir, stderr);
+      if (!parsed.ok) {
+        settleResult(
+          workspaceChildFailure(input, 'output-malformed', parsed.condition, 'stdout_parse', {
+            stderr: failureStderr(
+              `Graph workspace child returned malformed output (${parsed.condition}).`,
+              stderr,
+            ),
+          }),
+        );
+        return;
+      }
+      settleResult({
         unitId: input.unit.id,
         rootDir: input.unit.rootDir,
         displayPath: relative(input.cwd, input.unit.rootDir),
-        signals,
-        /* v8 ignore next */
-        exitCode: code ?? -1,
-        stderr,
+        signals: parsed.signals,
+        exitCode,
+        stderr: scrubText(stderr),
       });
     });
   });
 }
 
+const WORKSPACE_CHILD_FAILURE_DEFINITIONS = {
+  'spawn-failed': graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_SPAWN_FAILED'),
+  timeout: graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_TIMEOUT'),
+  'output-malformed': graphErrorCatalog.require('GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED'),
+} as const;
+
+interface WorkspaceFailureOptions {
+  readonly stderr: string;
+  readonly errno?: string;
+}
+
+function workspaceChildFailure(
+  input: SpawnInput,
+  reason: WorkspaceChildFailureReason,
+  condition: WorkspaceChildFailureCondition,
+  failureClass: WorkspaceChildFailureClass,
+  options: WorkspaceFailureOptions,
+): WorkspaceUnitRunResult {
+  return {
+    unitId: input.unit.id,
+    rootDir: input.unit.rootDir,
+    displayPath: relative(input.cwd, input.unit.rootDir),
+    signals: [],
+    exitCode: EXIT_CODES.RUNTIME_ERROR,
+    stderr: options.stderr,
+    failureReason: reason,
+    errorCode: WORKSPACE_CHILD_FAILURE_DEFINITIONS[reason].code,
+    failureClass,
+    failureCondition: condition,
+    ...(options.errno === undefined ? {} : { errno: options.errno }),
+  };
+}
+
+function failureStderr(message: string, childStderr: string): string {
+  const tail = scrubText(childStderr.trim(), 1000);
+  return tail.length === 0 ? message : `${message}\n${tail}`;
+}
+
+type ChildSignalsParseResult =
+  | { readonly ok: true; readonly signals: readonly Signal[] }
+  | {
+      readonly ok: false;
+      readonly condition: Extract<
+        WorkspaceChildFailureCondition,
+        'empty-output' | 'invalid-json' | 'invalid-envelope'
+      >;
+    };
+
 /**
  * Parse a child's `--json` {@link SignalEnvelope} stdout into a flat
  * `Signal[]` (ADR-0011 — `graph --json` now emits the envelope, not the
- * legacy `CliOutput`). Returns an empty array on parse failure; the caller
- * surfaces the child's stderr separately.
+ * legacy `CliOutput`). Returns a closed failure condition when the child did
+ * not produce a valid envelope; the caller faults that workspace unit.
  */
-function parseChildSignals(stdout: string, rootDir: string, stderr: string): readonly Signal[] {
+function parseChildSignals(
+  stdout: string,
+  rootDir: string,
+  stderr: string,
+): ChildSignalsParseResult {
   const trimmed = stdout.trim();
-  if (trimmed.length === 0) return [];
-  let parsed: SignalEnvelope;
-  try {
-    parsed = JSON.parse(trimmed) as SignalEnvelope;
-  } catch (error) {
-    /* v8 ignore start */
+  if (trimmed.length === 0) {
     log.warn({
       evt: 'graph.cli.workspace.parse-error',
       module: 'graph:cli',
       rootDir,
-      err: error instanceof Error ? error.message : String(error),
-      stderrPreview: stderr.slice(0, 200),
+      condition: 'empty-output',
+      stderrLength: stderr.length,
     });
-    return [];
-    /* v8 ignore stop */
+    return { ok: false, condition: 'empty-output' };
   }
-  return parsed.signals ?? [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed) as unknown;
+  } catch (error) {
+    log.warn({
+      evt: 'graph.cli.workspace.parse-error',
+      module: 'graph:cli',
+      rootDir,
+      condition: 'invalid-json',
+      err: scrubText(error instanceof Error ? error.message : String(error)),
+      stderrLength: stderr.length,
+    });
+    return { ok: false, condition: 'invalid-json' };
+  }
+  const envelope = childSignalEnvelope(parsed);
+  if (envelope === undefined) {
+    log.warn({
+      evt: 'graph.cli.workspace.parse-error',
+      module: 'graph:cli',
+      rootDir,
+      condition: 'invalid-envelope',
+      stderrLength: stderr.length,
+    });
+    return { ok: false, condition: 'invalid-envelope' };
+  }
+  return { ok: true, signals: envelope.signals };
+}
+
+/** Accept the current CommandOutcome carrier plus the former bare-envelope form. */
+function childSignalEnvelope(value: unknown): SignalEnvelope | undefined {
+  if (isSignalEnvelope(value)) return value;
+  if (typeof value !== 'object' || value === null || !Object.hasOwn(value, 'envelope')) {
+    return undefined;
+  }
+  const envelope = (value as { readonly envelope?: unknown }).envelope;
+  return isSignalEnvelope(envelope) ? envelope : undefined;
 }

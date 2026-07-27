@@ -16,6 +16,8 @@ export async function runWorkerPool<I, O>(
   items: readonly I[],
   concurrency: number,
   run: (item: I) => Promise<O>,
+  /** Optional cooperative stop check, observed before each new item is pulled. */
+  shouldStop?: () => boolean,
 ): Promise<O[]> {
   if (!Number.isFinite(concurrency)) {
     throw new TypeError(
@@ -31,6 +33,7 @@ export async function runWorkerPool<I, O>(
 
   async function worker(): Promise<void> {
     for (;;) {
+      if (shouldStop?.() === true) return;
       const item = queue.shift();
       if (item === undefined) return;
       results.push(await run(item));
