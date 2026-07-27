@@ -136,7 +136,7 @@ describe('CapabilityRegistry', () => {
       expect(caught).toBeInstanceOf(CapabilitySchemaMismatchError);
       expect(caught).toBeInstanceOf(ValidationError); // subclass — existing handling still catches it
       const err = caught as CapabilitySchemaMismatchError;
-      expect(err.code).toBe('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH');
+      expect(err.code).toBe('CORE.CONTRIBUTION.SCHEMA_MISMATCH');
       expect(err.domainId).toBe('audit-rule');
       expect(err.ownerToolId).toBe('audit');
       expect(err.diagnostic).toContain('name');

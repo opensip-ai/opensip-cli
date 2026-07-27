@@ -16,6 +16,7 @@ import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datast
 import { sql } from 'drizzle-orm';
 
 import { isSafeShardedCacheAnchor } from '../cache/sharded-cache-key.js';
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { isValidDependencyFormRole } from '../types.js';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
@@ -31,6 +32,10 @@ import type {
 } from '../types.js';
 import type { GraphCatalog } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+const CATALOG_UNREADABLE = graphErrorCatalog.require('GRAPH.CATALOG.UNREADABLE');
 
 const MODULE_NAME = 'graph:catalog-repo';
 
@@ -577,7 +582,9 @@ export class CatalogRepo {
       logger.error({
         evt: 'graph.catalog.read.error',
         module: MODULE_NAME,
-        code: 'GRAPH.CATALOG.READ_FAILED',
+        code: CATALOG_UNREADABLE.code,
+        definition: CATALOG_UNREADABLE,
+        metadata: { view: 'read-failed' },
         err: boundedErrorCause(error),
       });
       throw error;

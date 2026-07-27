@@ -24,6 +24,7 @@ import {
 import { defaultAdapterConfig, defaultAdapterConfigManifest } from './adapter-config.js';
 import { type AdapterToolMarkers } from './adapter-manifest.js';
 import { buildDoctorCommand } from './doctor-command.js';
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
 import { resolveFingerprintStrategy } from './fingerprint.js';
 import { externalAdapterProgressOf } from './progress.js';
 import { runScanLoop } from './run-loop.js';
@@ -38,6 +39,9 @@ import type {
   ToolConfigManifestDescriptor,
   ToolRunCompletion,
 } from '@opensip-cli/core';
+
+// Plan 01: registered replacements for `ADAPTER.*` literals that nothing registered.
+const SPEC_INVALID = externalToolErrorCatalog.require('EXTERNAL.ADAPTER.SPEC_INVALID');
 
 const SCAN_COMMON_FLAGS = [
   'json',
@@ -102,7 +106,9 @@ function assertSpec(spec: ExternalToolAdapterSpec): void {
     throw new ValidationError(
       `External adapter '${spec.identity.name}' must declare at least one command.`,
       {
-        code: 'ADAPTER.SPEC.NO_COMMANDS',
+        code: SPEC_INVALID.code,
+        definition: SPEC_INVALID,
+        metadata: { field: 'commands' },
       },
     );
   }
@@ -110,7 +116,7 @@ function assertSpec(spec: ExternalToolAdapterSpec): void {
     if (command.output.kind !== 'sarif' && command.parse === undefined) {
       throw new ValidationError(
         `External adapter '${spec.identity.name}' command '${command.name}' (${command.output.kind}) must declare a 'parse' (only SARIF commands may omit it — the shared ingestSarif handles those).`,
-        { code: 'ADAPTER.SPEC.MISSING_PARSE' },
+        { code: SPEC_INVALID.code, definition: SPEC_INVALID, metadata: { field: 'parse' } },
       );
     }
   }

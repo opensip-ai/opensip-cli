@@ -2,7 +2,11 @@ import { logger, ValidationError } from '@opensip-cli/core';
 import { and, asc, eq } from 'drizzle-orm';
 
 import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './data-store.js';
+import { datastoreErrorCatalog } from './errors/datastore-error-catalog.js';
 import { toolState } from './schema/tool-state.js';
+
+// Plan 01: registered replacements for literals that only resolved through head-guessing.
+const RECORD_TOO_LARGE = datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE');
 
 const MODULE_NAME = 'datastore:tool-state-repo';
 
@@ -71,7 +75,11 @@ export class ToolStateRepo {
       throw new ValidationError(
         `tool_state payload for '${tool}/${key}' is ${bytes} bytes — over the ` +
           `${TOOL_STATE_MAX_PAYLOAD_BYTES}-byte cap (ADR-0042). Shard or summarize the payload.`,
-        { code: 'VALIDATION.TOOL_STATE.PAYLOAD_TOO_LARGE' },
+        {
+          code: RECORD_TOO_LARGE.code,
+          definition: RECORD_TOO_LARGE,
+          metadata: { field: 'tool-state-payload' },
+        },
       );
     }
     this.datastore.withWriteLock('tool_state.put', () => {

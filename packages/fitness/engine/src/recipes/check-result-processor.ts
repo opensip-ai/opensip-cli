@@ -7,6 +7,7 @@
 
 import { logger, SystemError } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { isFrameworkErrorResult } from '../framework/ignore-processing.js';
 import { type CheckMemoryProfile } from '../framework/memory-profiler.js';
 import { resolveMemoryProfiler } from '../framework/scope-registry.js';
@@ -19,6 +20,10 @@ import type {
 } from './service-types.js';
 import type { FitnessRecipe, RecipeCheckResult } from './types.js';
 import type { CheckResult } from '../types/findings.js';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const CHECK_ERROR = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_ERROR');
 
 // =============================================================================
 // TYPES
@@ -374,7 +379,7 @@ export function processErrorResult(
       checkSlug,
       error instanceof Error
         ? error
-        : new SystemError(errMsg, { code: 'SYSTEM.FITNESS.CHECK_ERROR' }),
+        : new SystemError(errMsg, { code: CHECK_ERROR.code, definition: CHECK_ERROR }),
     );
     callbacks.onCheckComplete?.(checkSlug, summary, checkIndex, totalChecks);
   } catch (cbError) {

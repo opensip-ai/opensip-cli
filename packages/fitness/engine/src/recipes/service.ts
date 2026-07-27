@@ -51,6 +51,10 @@ import type {
   FitnessRecipeSession,
 } from './service-types.js';
 
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
+
 const MODULE_FITNESS_RECIPES = 'fitness:recipes';
 
 /**
@@ -98,7 +102,9 @@ export class FitnessRecipeService {
   private get session(): FitnessRecipeSession {
     if (!this.activeSession) {
       throw new SystemError('No active session', {
-        code: 'SYSTEM.FITNESS.NO_SESSION',
+        code: ENGINE_STATE.code,
+        definition: ENGINE_STATE,
+        metadata: { condition: 'no-session' },
       });
     }
     return this.activeSession;
@@ -119,8 +125,8 @@ export class FitnessRecipeService {
   async start(recipeOrName: FitnessRecipe | string): Promise<FitnessRecipeResult> {
     if (this.activeSession) {
       throw new SystemError('Recipe execution already in progress', {
-        code: 'SYSTEM.FITNESS.SESSION_IN_PROGRESS',
-        definition: fitnessErrorCatalog.require('SYSTEM.FITNESS.SESSION_IN_PROGRESS'),
+        code: 'FIT.FITNESS.SESSION_IN_PROGRESS',
+        definition: fitnessErrorCatalog.require('FIT.FITNESS.SESSION_IN_PROGRESS'),
       });
     }
 
@@ -129,8 +135,8 @@ export class FitnessRecipeService {
     if (!recipe) {
       const identifier = typeof recipeOrName === 'string' ? recipeOrName : recipeOrName.name;
       throw new NotFoundError(`Recipe not found: ${identifier}`, {
-        code: 'RESOURCE.NOT_FOUND.RECIPE',
-        definition: fitnessErrorCatalog.require('RESOURCE.NOT_FOUND.RECIPE'),
+        code: 'FIT.NOT_FOUND.RECIPE',
+        definition: fitnessErrorCatalog.require('FIT.NOT_FOUND.RECIPE'),
         metadata: { entity: 'recipe', identifier },
       });
     }

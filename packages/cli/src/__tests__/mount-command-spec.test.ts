@@ -31,10 +31,15 @@ import {
 } from '../bootstrap/run-plane.js';
 import { createRuntimeLeaseLifecycle } from '../commands/host-runtime-access.js';
 import { mountCommandSpec } from '../commands/mount-command-spec.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import type { CommandMountContext, HostCommandSpec } from '../commands/mount-command-spec.js';
 import type { CommandResult } from '@opensip-cli/contracts';
 import type { CommandSpec, Logger, ToolCliContext } from '@opensip-cli/core';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 /** A Commander argParser reducer that accumulates repeated flag values into an array. */
 function accumulateReducer(raw: string, previous: unknown): string[] {
@@ -542,7 +547,9 @@ describe('mountCommandSpec — dispatchOutput modes', () => {
     await program.parseAsync(['undefined-result'], { from: 'user' });
     expect(ctx.reportFailure).toHaveBeenCalledWith({
       error: expect.objectContaining({
-        code: 'SYSTEM.COMMAND_RESULT.UNDEFINED',
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'command-result-undefined' },
       }),
       jsonRequested: false,
     });

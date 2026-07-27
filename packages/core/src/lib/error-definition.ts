@@ -7,6 +7,7 @@
  * at composition boundaries.
  */
 
+import { ErrorDefinitionError } from './error-definition-error.js';
 import { isPlainDataObject } from './plain-data-object.js';
 
 /** Where the failure arose. */
@@ -110,20 +111,28 @@ export interface ErrorCatalogOwner {
 export interface ErrorCatalog<TCodes extends string = string> {
   readonly schemaVersion: typeof ERROR_CATALOG_SCHEMA_VERSION;
   readonly owner: ErrorCatalogOwner;
+  /**
+   * The single `OWNER` segment every code in this catalog starts with, derived from the
+   * definitions rather than declared. `undefined` only for the legacy class-default catalog,
+   * whose codes predate the dotted grammar.
+   */
+  readonly codeHead: string | undefined;
   readonly definitions: Readonly<Record<TCodes, ErrorDefinition>>;
   readonly list: readonly ErrorDefinition[];
   get(code: string): ErrorDefinition | undefined;
   require(code: TCodes): ErrorDefinition;
 }
 
-/** Thrown when an error definition or catalog fails validation. */
-export class ErrorDefinitionError extends Error {
-  readonly code = 'CORE.ERROR_DEFINITION.INVALID';
-  constructor(message: string) {
-    super(message);
-    this.name = 'ErrorDefinitionError';
-  }
-}
+/**
+ * Re-exported from its leaf module so existing importers are untouched (ruling D10).
+ * The class itself lives in `error-definition-error.ts` because it is thrown *by* catalog
+ * validation and therefore cannot import a catalog to resolve its own definition.
+ */
+export {
+  ErrorDefinitionError,
+  ERROR_DEFINITION_ERROR_BRAND,
+  isErrorDefinitionErrorLike,
+} from './error-definition-error.js';
 
 /**
  * Deep-freeze a plain JSON-like value. Used so catalogs are runtime-immutable,
@@ -297,8 +306,41 @@ function requireEnum<T extends string>(value: unknown, allowed: readonly T[], la
 }
 
 /**
+ * Enforce that a `supersededBy` pointer means something.
+ *
+ * This replaces an empty `if (lifecycle === 'tombstoned' && !supersededBy) {}` branch whose
+ * only content was a comment. The rule that branch gestured at — "a tombstone must name a
+ * successor" — is **deliberately not enforced**, because the comment it carried states the
+ * opposite intent: a code can be permanently retired with no replacement, and requiring a
+ * successor would make that legitimate state unrepresentable.
+ *
+ * What was genuinely unguarded is the pointer itself. `supersededBy` was accepted as any
+ * string, truncated to 128 characters, frozen, and published into the generated error-code
+ * index — so a typo'd or self-referential pointer became a permanent dangling reference in a
+ * public document, and a resolution loop for anything that follows it.
+ *
+ * @throws {ErrorDefinitionError} When `supersededBy` is not a valid code, points at its own
+ * code, or is present on a definition still declared `active`.
+ */
+function assertSupersessionCoherent(definition: ErrorDefinition): void {
+  const successor = definition.supersededBy;
+  if (successor === undefined) return;
+  // Legacy codes are allowed: a superseded code may well point at a legacy-grammar one
+  // during migration, which is exactly when supersession is used.
+  assertErrorCodeShape(successor, { allowLegacy: true });
+  if (successor === definition.code) {
+    throw new ErrorDefinitionError(`definition ${definition.code}: supersededBy points at itself`);
+  }
+  if (definition.lifecycle === 'active') {
+    throw new ErrorDefinitionError(
+      `definition ${definition.code}: supersededBy requires lifecycle 'deprecated' or 'tombstoned'`,
+    );
+  }
+}
+
+/**
  * Copy and validate a hostile external definition object into a plain frozen definition.
- * @throws {ErrorDefinitionError} When raw is not a plain object, the code/operatorAction are invalid, or any axis fails enum validation.
+ * @throws {ErrorDefinitionError} When raw is not a plain object, the code/operatorAction are invalid, any axis fails enum validation, or `supersededBy` is incoherent.
  */
 export function normalizeErrorDefinition(
   raw: unknown,
@@ -349,15 +391,29 @@ export function normalizeErrorDefinition(
     ...(publicMetadataKeys === undefined ? {} : { publicMetadataKeys }),
   };
 
-  if (definition.lifecycle === 'tombstoned' && !definition.supersededBy) {
-    // tombstones may omit supersededBy when permanently retired without replacement
-  }
+  assertSupersessionCoherent(definition);
   return deepFreeze(definition);
 }
 
 /**
  * Build an immutable package/tool error catalog.
- * @throws {ErrorDefinitionError} When the owner lacks id/displayName, the definition count exceeds the cap, or two entries share a code.
+ *
+ * Every code in one catalog must share one head — the `OWNER` segment of
+ * `OWNER.DOMAIN.CONDITION`. The head is not declared; it is READ from the first definition and
+ * the rest are held to it, so a catalog cannot disagree with itself and there is no second
+ * place for the head to drift out of sync with the codes.
+ *
+ * The rule buys two things. Codes become collision-proof across owners without any central
+ * allocator: two packages that both need a "config is invalid" condition cannot mint the same
+ * string. And the head names the OWNER rather than the failure kind, which is what makes it
+ * worth reading — `kind`, `severity`, `source` and `exitClass` are already structured fields on
+ * the definition, so a head like `VALIDATION.` was both redundant and free to contradict them.
+ *
+ * `allowLegacyCodes` opts out, and exists for exactly one catalog: the class-default codes
+ * (`VALIDATION_ERROR`, `UNKNOWN_FAILURE`, …) that predate the dotted grammar and are the
+ * totality fallback for unregistered input (ruling D11).
+ *
+ * @throws {ErrorDefinitionError} When the owner lacks id/displayName, the definition count exceeds the cap, two entries share a code, or the codes do not share one head.
  */
 export function defineErrorCatalog<
   const TDefs extends Record<string, Omit<ErrorDefinition, 'owner'> & { code?: string }>,
@@ -384,11 +440,22 @@ export function defineErrorCatalog<
   const definitions: Record<string, ErrorDefinition> = {};
   const seen = new Set<string>();
 
+  let head: string | undefined;
+
   for (const key of keys) {
     const raw = ownData(definitionsInput, key);
     const def = normalizeErrorDefinition(raw, normalizedOwner, { ...opts, defaultCode: key });
     if (seen.has(def.code)) {
       throw new ErrorDefinitionError(`duplicate error code in catalog: ${def.code}`);
+    }
+    if (opts.allowLegacyCodes !== true) {
+      const codeHead = def.code.slice(0, def.code.indexOf('.'));
+      head ??= codeHead;
+      if (codeHead !== head) {
+        throw new ErrorDefinitionError(
+          `definition ${def.code}: catalog head is '${head}', so every code in it must start with '${head}.'`,
+        );
+      }
     }
     seen.add(def.code);
     definitions[key] = def;
@@ -402,6 +469,7 @@ export function defineErrorCatalog<
   const catalog: ErrorCatalog<Extract<keyof TDefs, string>> = {
     schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
     owner: normalizedOwner,
+    codeHead: head,
     definitions: frozenDefs,
     list,
     get(code: string) {
@@ -456,6 +524,9 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Verify the resource name and list available options.',
       stability: 'public',
       lifecycle: 'active',
+      // fromNativeError records the errno here; without the allowlist
+      // `allowlistedMetadata` discards the one machine-classification datum it captured.
+      publicMetadataKeys: ['errno'],
     },
     SYSTEM_ERROR: {
       code: 'SYSTEM_ERROR',
@@ -469,6 +540,9 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Retry once; if it persists, capture the run id and report a bug.',
       stability: 'public',
       lifecycle: 'active',
+      // fromNativeError records the errno here; without the allowlist
+      // `allowlistedMetadata` discards the one machine-classification datum it captured.
+      publicMetadataKeys: ['errno'],
     },
     TIMEOUT: {
       code: 'TIMEOUT',
@@ -521,7 +595,7 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
       operatorAction: 'Check filesystem permissions for the affected path.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['errno'],
+      publicMetadataKeys: ['errno', 'hop'],
     },
     'CORE.SYSTEM.RESOURCE': {
       code: 'CORE.SYSTEM.RESOURCE',
@@ -610,58 +684,25 @@ export const coreSystemErrorCatalog = defineErrorCatalog(
 );
 
 /**
- * Map common subcode families (e.g. `PLUGIN.WORKER.*`, `CONFIGURATION.GATE.*`)
- * onto the canonical legacy catalog entry so custom detail codes keep the
- * parent exit class / axes instead of demoting to {@link UNKNOWN_FAILURE}.
- */
-function legacyFamilyCode(code: string): string | undefined {
-  if (!code.includes('.')) return undefined;
-  const head = code.slice(0, code.indexOf('.'));
-  switch (head) {
-    case 'CONFIG':
-    case 'CONFIGURATION': {
-      return 'CONFIGURATION_ERROR';
-    }
-    case 'VALIDATION': {
-      return 'VALIDATION_ERROR';
-    }
-    case 'PLUGIN': {
-      return 'PLUGIN_INCOMPATIBLE';
-    }
-    case 'TIMEOUT': {
-      return 'TIMEOUT';
-    }
-    case 'SYSTEM': {
-      return 'SYSTEM_ERROR';
-    }
-    case 'NETWORK': {
-      return 'NETWORK_ERROR';
-    }
-    case 'CAPABILITY': {
-      // Unknown domain → not-found; schema/contribution mismatch → validation.
-      return code.includes('.DOMAIN.') ? 'NOT_FOUND' : 'VALIDATION_ERROR';
-    }
-    default: {
-      return undefined;
-    }
-  }
-}
-
-/**
- * Resolve a legacy ToolError string code to a core definition when possible.
+ * Resolve a ToolError string code against the core adapter catalog.
  *
- * Exact catalog hits win. Dotted subcodes fall back to their family bucket
- * (exit class preserved). Only truly unknown codes map to UNKNOWN_FAILURE.
+ * CLEAN BREAK (Plan 01): the family fallback is GONE. This used to guess a definition from the
+ * first token of the code — `CONFIG.*` meant "configuration error", `SYSTEM.*` meant "internal
+ * invariant" — which made an unregistered code look classified while carrying axes nobody
+ * chose for it, and quietly demoted anything whose head was not in the switch. Guessing is now
+ * impossible: a code either resolves to a definition some package actually declared, or it is
+ * honestly unknown.
+ *
+ * The function stays TOTAL (ruling D11). An unknown code resolves to `UNKNOWN_FAILURE` rather
+ * than throwing, because a third-party tool shipping a code nobody registered must not be able
+ * to crash the host — and because this runs while something has already failed.
+ *
+ * Callers should prefer `resolveDefinitionForCode`, which consults every registered catalog
+ * (core's own, plus substrates and loaded tools via the per-run registry) before falling back
+ * here.
  */
 export function definitionFromLegacyCode(code: string): ErrorDefinition {
-  const direct = coreSystemErrorCatalog.get(code);
-  if (direct) return direct;
-  const family = legacyFamilyCode(code);
-  if (family) {
-    const familyDef = coreSystemErrorCatalog.get(family);
-    if (familyDef) return familyDef;
-  }
-  return coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
+  return coreSystemErrorCatalog.get(code) ?? coreSystemErrorCatalog.require('UNKNOWN_FAILURE');
 }
 
 /**

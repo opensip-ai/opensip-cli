@@ -2,6 +2,7 @@ import { SystemError } from '@opensip-cli/core';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { and, countDistinct, eq, isNotNull, sql } from 'drizzle-orm';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import {
   canonicalArrayItemBytes,
   evidenceInclusion,
@@ -29,6 +30,9 @@ import type {
 } from '@opensip-cli/contracts';
 import type { DataStore } from '@opensip-cli/datastore';
 import type { DrizzleHandle } from '@opensip-cli/datastore/internal';
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const UNREADABLE = sessionStoreErrorCatalog.require('SESSION.EVIDENCE.UNREADABLE');
 
 const PAYLOAD_PROPERTY_OVERHEAD_BYTES = 11;
 
@@ -190,7 +194,9 @@ function projectEvidenceSnapshot(
       .get()?.value ?? 0;
   if (retainedLinkedSessions !== totalSessions) {
     throw new SystemError(`Parent Run ${run.id} contains a missing retained Session link.`, {
-      code: 'SYSTEM.RUN_READ.LINKED_SESSION_MISSING',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { field: 'linked-session-missing' },
     });
   }
   const candidates = readRunStepsPageFromTx(tx, run.id, 0, options.stepLimit);
@@ -308,7 +314,9 @@ function readLazySessionCandidate(tx: DrizzleHandle, sessionId: string): LazySes
   const row = tx.select().from(sessions).where(eq(sessions.id, sessionId)).get();
   if (row === undefined) {
     throw new SystemError(`Parent Run links missing retained Session ${sessionId}.`, {
-      code: 'SYSTEM.RUN_READ.LINKED_SESSION_MISSING',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { field: 'linked-session-missing' },
     });
   }
   const metricsRow = tx
@@ -354,7 +362,9 @@ function hydrateLazySessionCandidate(
     .get();
   if (payloadRow === undefined) {
     throw new SystemError(`Stored Session ${candidate.row.id} lost its payload during read.`, {
-      code: 'SYSTEM.RUN_READ.SESSION_PAYLOAD_MISSING',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { field: 'payload-missing' },
     });
   }
   let payload: unknown;
@@ -362,7 +372,9 @@ function hydrateLazySessionCandidate(
     payload = JSON.parse(payloadRow.rawPayload) as unknown;
   } catch (error) {
     throw new SystemError(`Stored Session ${candidate.row.id} has invalid JSON payload.`, {
-      code: 'SYSTEM.RUN_READ.SESSION_PAYLOAD_INVALID',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { field: 'payload-invalid' },
       cause: error,
     });
   }

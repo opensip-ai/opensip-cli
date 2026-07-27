@@ -18,7 +18,7 @@
 
 import { assertJsonPayloadSize } from '../graph-query-page.js';
 
-import type { McpReadError } from '../mcp-error.js';
+import type { McpReadError, McpReadReason } from '../mcp-error.js';
 import type { CallToolResult } from '../server.js';
 
 /** Serialize a successful tool payload as a single pretty-printed JSON text item. */
@@ -41,7 +41,7 @@ export function errorResult(error: McpReadError): CallToolResult {
 }
 
 /** Build an inline structured error result from a `code` + `message` pair. */
-export function failure(code: string, message: string): CallToolResult {
+export function failure(code: McpReadReason, message: string): CallToolResult {
   return errorResult({ code, message });
 }
 

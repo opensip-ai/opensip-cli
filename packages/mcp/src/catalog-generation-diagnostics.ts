@@ -3,6 +3,7 @@ import { ephemeralProjectCacheKey } from '@opensip-cli/core';
 import { fromGraphReadError, readError, type McpReadError } from './mcp-error.js';
 
 import type { CatalogGeneration } from './catalog-generation-model.js';
+import type { GraphReadReason } from '@opensip-cli/graph/read';
 
 export type GenerationLog = (
   evt: string,
@@ -35,7 +36,10 @@ export function logGenerationTransition(
 }
 
 /** Map graph-read failures at the generation load boundary. */
-export function mapCatalogLoadError(error: { code: string; message: string }): McpReadError {
+export function mapCatalogLoadError(error: {
+  code: GraphReadReason;
+  message: string;
+}): McpReadError {
   return fromGraphReadError({
     code: error.code,
     operation: 'catalog-generation',

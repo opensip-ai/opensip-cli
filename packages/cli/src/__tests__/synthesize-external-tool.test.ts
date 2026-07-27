@@ -63,7 +63,7 @@ describe('synthesizeExternalTool (ADR-0054 M4-G)', () => {
     try {
       tool.commandSpecs?.[0]?.handler({}, {} as never);
     } catch (error) {
-      expect((error as SystemError).code).toBe('SYSTEM.DISPATCH.EXTERNAL_HANDLER_UNREACHABLE');
+      expect((error as SystemError).code).toBe('CLI.HOST.DISPATCH_FAILED');
     }
   });
 

@@ -13,9 +13,15 @@ import {
   type WorkerMessage,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import { buildCapabilityWorkerChildEnv } from './env.js';
 
 import type { CapabilityWorkerSpec } from './types.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 export const CAPABILITY_WORKER_SUBCOMMAND = '__capability-pack-worker';
 const DEFAULT_CAPABILITY_WORKER_TIMEOUT_MS = 120_000;
@@ -198,7 +204,9 @@ function workerError(
   stderrTail?: string,
 ): SystemError {
   return new SystemError(`capability pack ${spec.pkg.name}: ${message}`, {
-    code: 'SYSTEM.CAPABILITY_WORKER.FAILED',
+    code: DISPATCH_FAILED.code,
+    definition: DISPATCH_FAILED,
+    metadata: { condition: 'capability-worker' },
     context: {
       packageName: spec.pkg.name,
       domainId: spec.domainId,

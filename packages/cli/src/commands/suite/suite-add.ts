@@ -7,6 +7,14 @@ import { isReservedSuiteName, reservedSuiteNameMessage } from '@opensip-cli/conf
 import { ConfigurationError, currentLogger, type Tool } from '@opensip-cli/core';
 import { isMap, isSeq, parseDocument, type Document as YAMLDocument, type YAMLMap } from 'yaml';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_EDIT_REFUSED = hostErrorCatalog.require('CLI.SUITE.EDIT_REFUSED');
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
+const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CLI.SUITE.UNKNOWN_REFERENCE');
+
 const MAX_EDITABLE_CONFIG_BYTES = 1_000_000;
 
 export interface SuiteAddInput {
@@ -31,7 +39,9 @@ export function addSuiteStep(input: SuiteAddInput): SuiteAddOutput {
   // config the document schema then rejects on every subsequent command.
   if (isReservedSuiteName(input.suite)) {
     throw new ConfigurationError(reservedSuiteNameMessage(input.suite), {
-      code: 'CONFIG.SUITE_ADD.RESERVED_NAME',
+      code: SUITE_INVALID.code,
+      definition: SUITE_INVALID,
+      metadata: { condition: 'reserved-name' },
     });
   }
   const tool = resolveTool(input.tool, input.tools);
@@ -39,7 +49,11 @@ export function addSuiteStep(input: SuiteAddInput): SuiteAddOutput {
   if (command === undefined) {
     throw new ConfigurationError(
       `Tool '${tool.metadata.name}' has no command '${input.command}'.`,
-      { code: 'CONFIG.SUITE_ADD.UNKNOWN_COMMAND' },
+      {
+        code: SUITE_UNKNOWN_REFERENCE.code,
+        definition: SUITE_UNKNOWN_REFERENCE,
+        metadata: { condition: 'unknown-command' },
+      },
     );
   }
   const configPath = input.configPath ?? join(input.projectRoot, 'opensip-cli.config.yml');
@@ -65,12 +79,16 @@ function resolveTool(selector: string, tools: readonly Tool[]): Tool {
     throw new ConfigurationError(
       `Tool selector '${selector}' matched multiple tools. Use a UUID.`,
       {
-        code: 'CONFIG.SUITE_ADD.AMBIGUOUS_TOOL',
+        code: SUITE_UNKNOWN_REFERENCE.code,
+        definition: SUITE_UNKNOWN_REFERENCE,
+        metadata: { condition: 'ambiguous-tool' },
       },
     );
   }
   throw new ConfigurationError(`Unknown tool '${selector}'.`, {
-    code: 'CONFIG.SUITE_ADD.UNKNOWN_TOOL',
+    code: SUITE_UNKNOWN_REFERENCE.code,
+    definition: SUITE_UNKNOWN_REFERENCE,
+    metadata: { condition: 'unknown-tool' },
   });
 }
 
@@ -80,7 +98,9 @@ function parseArgPairs(pairs: readonly string[]): Readonly<Record<string, unknow
     const eq = pair.indexOf('=');
     if (eq <= 0) {
       throw new ConfigurationError(`Invalid --arg '${pair}'. Expected key=value.`, {
-        code: 'CONFIG.SUITE_ADD.INVALID_ARG',
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'invalid-arg' },
       });
     }
     args[pair.slice(0, eq)] = parseScalar(pair.slice(eq + 1));
@@ -108,7 +128,9 @@ function appendSuiteStep(
     root.set('suites', suites);
   } else if (!isMap(suites)) {
     throw new ConfigurationError(`Cannot edit suites in ${configPath}.`, {
-      code: 'CONFIG.SUITE_ADD.INVALID_SUITES',
+      code: SUITE_EDIT_REFUSED.code,
+      definition: SUITE_EDIT_REFUSED,
+      metadata: { condition: 'suites-block' },
     });
   }
   const suitesMap = suites as YAMLMap;
@@ -118,7 +140,9 @@ function appendSuiteStep(
     suitesMap.set(suiteName, suite);
   } else if (!isMap(suite)) {
     throw new ConfigurationError(`Cannot edit suites.${suiteName} in ${configPath}.`, {
-      code: 'CONFIG.SUITE_ADD.INVALID_SUITE',
+      code: SUITE_EDIT_REFUSED.code,
+      definition: SUITE_EDIT_REFUSED,
+      metadata: { condition: 'suite-block' },
     });
   }
   const suiteMap = suite as YAMLMap;
@@ -129,7 +153,9 @@ function appendSuiteStep(
   }
   if (!isSeq(seq)) {
     throw new ConfigurationError(`Cannot edit suites.${suiteName}.steps in ${configPath}.`, {
-      code: 'CONFIG.SUITE_ADD.INVALID_STEPS',
+      code: SUITE_EDIT_REFUSED.code,
+      definition: SUITE_EDIT_REFUSED,
+      metadata: { condition: 'steps-block' },
     });
   }
   const yamlSeq = seq;
@@ -175,14 +201,20 @@ function readOrCreateDocument(configPath: string): YAMLDocument {
   if (stat.size > MAX_EDITABLE_CONFIG_BYTES) {
     throw new ConfigurationError(
       `Cannot edit ${configPath}: file is larger than ${MAX_EDITABLE_CONFIG_BYTES} bytes.`,
-      { code: 'CONFIG.SUITE_ADD.CONFIG_TOO_LARGE' },
+      {
+        code: SUITE_EDIT_REFUSED.code,
+        definition: SUITE_EDIT_REFUSED,
+        metadata: { condition: 'too-large' },
+      },
     );
   }
   const doc = parseDocument(readFileSync(configPath, 'utf8'));
   if (doc.errors.length > 0) {
     const first = doc.errors[0]?.message ?? 'unknown YAML error';
     throw new ConfigurationError(`Cannot edit ${configPath}: ${first}.`, {
-      code: 'CONFIG.SUITE_ADD.MALFORMED_YAML',
+      code: SUITE_EDIT_REFUSED.code,
+      definition: SUITE_EDIT_REFUSED,
+      metadata: { condition: 'malformed-yaml' },
     });
   }
   return doc;
@@ -193,7 +225,11 @@ function ensureRootMap(doc: YAMLDocument, configPath: string): YAMLMap {
   if (!isMap(doc.contents)) {
     throw new ConfigurationError(
       `Cannot edit ${configPath}: opensip-cli.config.yml must start with a YAML map.`,
-      { code: 'CONFIG.SUITE_ADD.NON_MAP_CONFIG' },
+      {
+        code: SUITE_EDIT_REFUSED.code,
+        definition: SUITE_EDIT_REFUSED,
+        metadata: { condition: 'non-map' },
+      },
     );
   }
   return doc.contents;

@@ -42,6 +42,9 @@ import type {
   Visibility,
 } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 /** Match semantics for declaration search (mirrors symbol search). */
 export type DeclarationSearchMatch = 'substring' | 'exact' | 'qualified';
 
@@ -132,7 +135,7 @@ export interface ReferencesToView {
 }
 
 function viewError(message: string): GraphReadError {
-  return { code: 'GRAPH.READ.DECLARATION_REFERENCE', operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 function occurrenceLike(fact: {
@@ -417,7 +420,7 @@ export function searchDeclarationFacts(
       );
       if (found === undefined) {
         return err({
-          code: 'GRAPH.READ.CURSOR_INVALID',
+          code: 'cursor-invalid',
           operation: 'analysis',
           message: 'Cursor continuation anchor is not present in this catalog view',
         });
@@ -528,7 +531,7 @@ export function referencesToDeclaration(
       );
       if (found === undefined) {
         return err({
-          code: 'GRAPH.READ.CURSOR_INVALID',
+          code: 'cursor-invalid',
           operation: 'analysis',
           message: 'Cursor continuation anchor is not present in this catalog view',
         });

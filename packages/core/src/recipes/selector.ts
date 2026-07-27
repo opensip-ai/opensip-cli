@@ -34,6 +34,7 @@
  * overrides the built-in arm — see `predicates` below.
  */
 
+import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { SystemError } from '../lib/errors.js';
 
 import type { RecipeUnitConfigMap } from './unit-config.js';
@@ -109,15 +110,18 @@ export interface ResolveSelectorOptions<
   readonly predicates?: Readonly<Record<string, (item: T, selector: S) => boolean>>;
 }
 
-const NO_MATCHER_CODE = 'SYSTEM.CORE.SELECTOR_NO_MATCHER';
-const UNKNOWN_SELECTOR_CODE = 'SYSTEM.CORE.UNKNOWN_SELECTOR';
+// Registered replacement for the two un-catalogued `SYSTEM.CORE.*` selector literals; the
+// specific condition travels in metadata rather than in a second code (D9).
+const SELECTOR_INVALID = coreErrorCatalog.require('CORE.SELECTOR.INVALID');
 
 function requireMatcher(match: Matcher | undefined, arm: string): Matcher {
   if (match === undefined) {
     throw new SystemError(
       `resolveSelector: '${arm}' selector needs a 'match' matcher but none was supplied`,
       {
-        code: NO_MATCHER_CODE,
+        code: SELECTOR_INVALID.code,
+        definition: SELECTOR_INVALID,
+        metadata: { condition: 'no-matcher', arm },
       },
     );
   }
@@ -233,7 +237,9 @@ export function resolveSelector<T extends Registerable, S extends { readonly typ
       throw new SystemError(
         `resolveSelector: unknown selector type: ${JSON.stringify(_exhaustive)}`,
         {
-          code: UNKNOWN_SELECTOR_CODE,
+          code: SELECTOR_INVALID.code,
+          definition: SELECTOR_INVALID,
+          metadata: { condition: 'unknown-arm' },
         },
       );
     }

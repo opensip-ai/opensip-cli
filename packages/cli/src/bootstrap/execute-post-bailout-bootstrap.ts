@@ -177,7 +177,7 @@ export async function executePostBailoutBootstrap(
       d.enterScope(inspection.scope);
       if (!d.isScopeEntered()) {
         throw new SystemError('Inspection scope was not entered before command dispatch', {
-          code: 'SYSTEM.SCOPE.NOT_ENTERED',
+          code: 'CORE.SCOPE.NOT_ENTERED',
         });
       }
       return { scope: inspection.scope, runLogger: inspection.logger };
@@ -317,7 +317,7 @@ export async function executePostBailoutBootstrap(
 
       if (!d.isScopeEntered()) {
         throw new SystemError('Scope was not entered before command dispatch', {
-          code: 'SYSTEM.SCOPE.NOT_ENTERED',
+          code: 'CORE.SCOPE.NOT_ENTERED',
         });
       }
     });

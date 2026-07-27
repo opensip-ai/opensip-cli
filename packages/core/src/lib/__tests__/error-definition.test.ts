@@ -91,18 +91,34 @@ describe('defineErrorCatalog', () => {
     expect(MACHINE_CONSUMER_COMPATIBILITY.catalogSchemaVersion).toBe(ERROR_CATALOG_SCHEMA_VERSION);
   });
 
-  it('maps dotted subcodes to family exit classes instead of UNKNOWN_FAILURE', () => {
-    expect(definitionFromLegacyCode('PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS').exitClass).toBe(
-      'plugin-incompatible',
-    );
-    expect(definitionFromLegacyCode('CONFIGURATION.RECOVERY_REQUIRED').exitClass).toBe(
-      'configuration',
-    );
-    expect(definitionFromLegacyCode('CONFIG.GRAPH.NOT_A_REPO').exitClass).toBe('configuration');
-    expect(definitionFromLegacyCode('TIMEOUT.RUNTIME_ACCESS_COMPOSITE').exitClass).toBe('runtime');
-    expect(definitionFromLegacyCode('CAPABILITY.DOMAIN.UNKNOWN').exitClass).toBe('not-found');
-    expect(definitionFromLegacyCode('CAPABILITY.CONTRIBUTION.SCHEMA_MISMATCH').exitClass).toBe(
-      'configuration',
+  it('no longer guesses a definition from the code head (Plan 01 clean break)', () => {
+    // WAS: `legacyFamilyCode` mapped eight heads onto family buckets, so an UNREGISTERED
+    // `CONFIG.*` code silently acquired configuration axes and a `PLUGIN.*` code acquired
+    // plugin-incompatible axes. That made an unregistered code look classified while carrying
+    // axes nobody chose for it — and demoted anything whose head was not in the switch.
+    //
+    // Guessing is now impossible: a code either resolves to a definition some package actually
+    // declared, or it is honestly unknown. Every code these assertions used to cover is now
+    // REGISTERED and resolves through `resolveDefinitionForCode`.
+    for (const unregistered of [
+      'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS',
+      'CONFIGURATION.RECOVERY_REQUIRED',
+      'CONFIG.GRAPH.NOT_A_REPO',
+      'CAPABILITY.DOMAIN.UNKNOWN',
+    ]) {
+      expect(definitionFromLegacyCode(unregistered).code, unregistered).toBe(
+        'CORE.SYSTEM.UNKNOWN_FAILURE',
+      );
+    }
+  });
+
+  it('stays total for a hostile or unknown code (ruling D11)', () => {
+    // The runtime must never throw here: a third-party tool shipping a code nobody registered
+    // must not be able to crash the host, and this path runs when something has already failed.
+    expect(() => definitionFromLegacyCode('')).not.toThrow();
+    expect(() => definitionFromLegacyCode('\u0000\u0000')).not.toThrow();
+    expect(definitionFromLegacyCode('WHOLLY.UNKNOWN.HEAD').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
     );
   });
 
@@ -227,5 +243,103 @@ describe('error definition axes coverage', () => {
     expect(catalog.list.map((d) => d.code).sort()).toEqual(['TEST.A.FIRST', 'TEST.Z.LAST']);
     expect(catalog.get('TEST.A.FIRST')?.code).toBe('TEST.A.FIRST');
     expect(catalog.get('MISSING')).toBeUndefined();
+  });
+});
+
+describe('supersession coherence (Plan 01 Task 1.2)', () => {
+  const owner = { id: 'test.owner', displayName: 'Test' };
+  const base = {
+    source: 'application' as const,
+    defaultResponsibility: 'user' as const,
+    kind: 'validation' as const,
+    retry: 'never' as const,
+    severity: 'error' as const,
+    exposure: 'public' as const,
+    exitClass: 'configuration' as const,
+    operatorAction: 'fix it',
+    stability: 'public' as const,
+  };
+
+  it('accepts a tombstone with NO successor', () => {
+    // Deliberately permitted: a code can be permanently retired without a replacement.
+    // The empty branch this guard replaced gestured at forbidding it, which would have made
+    // permanent retirement unrepresentable.
+    const definition = normalizeErrorDefinition(
+      { ...base, code: 'TEST.DEMO.GONE', lifecycle: 'tombstoned' },
+      owner,
+    );
+    expect(definition.lifecycle).toBe('tombstoned');
+    expect(definition.supersededBy).toBeUndefined();
+  });
+
+  it('rejects a successor that is not a valid code', () => {
+    // Was accepted, truncated to 128 chars, frozen, and published into the generated
+    // error-code index — a permanent dangling reference in a public document.
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.DEMO.OLD', lifecycle: 'deprecated', supersededBy: 'not a code' },
+        owner,
+      ),
+    ).toThrow(ErrorDefinitionError);
+  });
+
+  it('rejects a self-referential successor', () => {
+    expect(() =>
+      normalizeErrorDefinition(
+        {
+          ...base,
+          code: 'TEST.DEMO.LOOP',
+          lifecycle: 'deprecated',
+          supersededBy: 'TEST.DEMO.LOOP',
+        },
+        owner,
+      ),
+    ).toThrow(/points at itself/);
+  });
+
+  it('rejects a successor on a definition still declared active', () => {
+    expect(() =>
+      normalizeErrorDefinition(
+        { ...base, code: 'TEST.DEMO.ACTIVE', lifecycle: 'active', supersededBy: 'TEST.DEMO.NEW' },
+        owner,
+      ),
+    ).toThrow(/lifecycle 'deprecated' or 'tombstoned'/);
+  });
+
+  it('accepts a deprecated definition pointing at a legacy-grammar successor', () => {
+    // Supersession is used precisely DURING migration, when the successor may still be a
+    // legacy single-token code.
+    const definition = normalizeErrorDefinition(
+      {
+        ...base,
+        code: 'TEST.DEMO.OLD',
+        lifecycle: 'deprecated',
+        supersededBy: 'VALIDATION_ERROR',
+      },
+      owner,
+    );
+    expect(definition.supersededBy).toBe('VALIDATION_ERROR');
+  });
+});
+
+describe('legacyFamilyCode stays total (ruling D11)', () => {
+  it('resolves an unknown head to UNKNOWN_FAILURE rather than throwing', () => {
+    // D11: the runtime must never throw on a hostile or unknown code. The build-time
+    // `error-resiliency-inventory code-heads` ratchet is what stops NEW unmapped heads
+    // being introduced; the runtime stays total so a third-party tool cannot crash the host
+    // by shipping a code nobody registered.
+    const resolved = definitionFromLegacyCode('WHOLLY.UNKNOWN.HEAD');
+    expect(resolved.code).toBe('CORE.SYSTEM.UNKNOWN_FAILURE');
+  });
+
+  it('does NOT map the two heads Wave 1 retired', () => {
+    // Adding `ERRORS` or `TOOL` to the switch is exactly what D11 forbids: it would make the
+    // fallback quieter without registering anything.
+    expect(definitionFromLegacyCode('ERRORS.CONFIG.NOT_FOUND').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+    expect(definitionFromLegacyCode('TOOL.IDENTITY.INVALID_NAME').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
   });
 });

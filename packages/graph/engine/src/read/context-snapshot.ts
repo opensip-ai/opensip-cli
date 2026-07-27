@@ -12,7 +12,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 
 import { ContextSnapshotRepo } from '../persistence/context-snapshot-repo.js';
 
-import type { GraphReadError } from './types.js';
+import type { GraphReadError, GraphReadReason } from './types.js';
 import type { ContextSnapshotPayload, ContextSnapshotRecord } from '../context-snapshot-types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -44,7 +44,7 @@ export type ContextSnapshotLookup =
       };
     };
 
-function readError(code: string, message: string): GraphReadError {
+function readError(code: GraphReadReason, message: string): GraphReadError {
   return { code, operation: 'catalog-generation', message };
 }
 
@@ -111,8 +111,6 @@ export function readContextSnapshot(
     const record = new ContextSnapshotRepo(store).get(id);
     return ok(record === null ? { status: 'missing', id } : decode(record));
   } catch {
-    return err(
-      readError('GRAPH.READ.CONTEXT_SNAPSHOT', 'Failed to read or decode graph context snapshot'),
-    );
+    return err(readError('context-snapshot', 'Failed to read or decode graph context snapshot'));
   }
 }

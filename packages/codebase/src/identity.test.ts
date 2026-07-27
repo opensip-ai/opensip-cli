@@ -1,3 +1,4 @@
+import { isToolErrorLike } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { projectConfigIdentity } from './identity.js';
@@ -67,4 +68,46 @@ describe('projectConfigIdentity', () => {
     expect(() => projectConfigIdentity(circular)).toThrow(/circular values/u);
     expect(() => projectConfigIdentity({ unsupported: 1n })).toThrow(/bigint values/u);
   });
+
+  it('terminates a cyclic document with a coded refusal, not a stack overflow', () => {
+    const circular: Record<string, unknown> = { retained: 1 };
+    circular.self = circular;
+
+    const error = catchFrom(() => projectConfigIdentity(circular));
+
+    expect(isToolErrorLike(error)).toBe(true);
+    if (!isToolErrorLike(error)) return;
+    expect(error.code).toBe('CODEBASE.CONFIG.IDENTITY_UNENCODABLE');
+    expect(error.metadata).toMatchObject({ condition: 'circular-reference' });
+    expect(error).not.toBeInstanceOf(RangeError);
+  });
+
+  it('reports the bigint branch through the same code with its own condition (D9)', () => {
+    const error = catchFrom(() => projectConfigIdentity({ unsupported: 1n }));
+
+    expect(isToolErrorLike(error)).toBe(true);
+    if (!isToolErrorLike(error)) return;
+    expect(error.code).toBe('CODEBASE.CONFIG.IDENTITY_UNENCODABLE');
+    expect(error.metadata).toMatchObject({ condition: 'bigint-scalar' });
+  });
+
+  it('attributes the refusal to the codebase package and a user-fixable exit (D1)', () => {
+    const error = catchFrom(() => projectConfigIdentity({ unsupported: 1n }));
+
+    expect(isToolErrorLike(error)).toBe(true);
+    if (!isToolErrorLike(error)) return;
+    expect(error.definition.owner.id).toBe('@opensip-cli/codebase');
+    expect(error.definition.exitClass).toBe('configuration');
+    expect(error.definition.exposure).toBe('public');
+    expect(error.definition.publicMetadataKeys).toEqual(['condition']);
+  });
 });
+
+function catchFrom(run: () => unknown): unknown {
+  try {
+    run();
+  } catch (error) {
+    return error;
+  }
+  return undefined;
+}

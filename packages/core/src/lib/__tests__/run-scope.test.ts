@@ -187,14 +187,14 @@ describe('runWithScope / currentScope', () => {
     scope.dispose();
   });
 
-  // NOTE on the always-on enterScope guard (SYSTEM.SCOPE.REENTRANT):
+  // NOTE on the always-on enterScope guard (CORE.SCOPE.REENTRANT):
   // the `beforeEach enterScope(freshScope)` reset-pattern tests across the
   // repo (e.g. recipes/__tests__/service.test.ts, framework/__tests__/
   // register-helpers.test.ts, and the sibling graph/sim/fitness engine
   // beforeEach blocks) need NO change — Vitest gives each `beforeEach` a clean
   // ALS store, so `currentScope()` is undefined on entry and the guard never
   // fires for them. The guard only throws on a DIFFERENT current scope.
-  it('enterScope throws SYSTEM.SCOPE.REENTRANT when a different scope is already current', async () => {
+  it('enterScope throws CORE.SCOPE.REENTRANT when a different scope is already current', async () => {
     // Wrap in an outer runWithScope frame so the (would-be) enterWith only
     // affects this frame's async subtree and does not leak into the test runner.
     // The always-on guard now rejects a DIFFERENT scope: concurrent/nested work
@@ -208,7 +208,7 @@ describe('runWithScope / currentScope', () => {
         enterScope(entered);
         expect.unreachable('enterScope should have thrown for a different current scope');
       } catch (error) {
-        expect((error as SystemError).code).toBe('SYSTEM.SCOPE.REENTRANT');
+        expect((error as SystemError).code).toBe('CORE.SCOPE.REENTRANT');
       }
       // The current scope is unchanged — the guard threw before enterWith.
       expect(currentScope()).toBe(outer);

@@ -30,6 +30,9 @@ import {
 import type { GraphReadError } from './types.js';
 import type { Catalog, FeatureTable, Indexes } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 /** Selectable architecture response families (P2 Phase 2.5). */
 export type ArchitectureSection = 'metrics' | 'packageEdges' | 'hotspots';
 
@@ -183,7 +186,7 @@ const MALFORMED_SYMBOL_REASON = 'malformed-symbol-omitted';
 const MALFORMED_CALL_REASON = 'malformed-call-edge-omitted';
 
 function archError(message: string): GraphReadError {
-  return { code: 'GRAPH.READ.ARCHITECTURE_VIEW', operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 function resolutionMode(catalog: Catalog): 'exact' | 'fast' {
@@ -696,7 +699,7 @@ export function buildArchitectureView(
     });
     if (packagePage.cursorInvalid || hotspotPage.cursorInvalid) {
       return err({
-        code: 'GRAPH.READ.CURSOR_INVALID',
+        code: 'cursor-invalid',
         operation: 'analysis',
         message: 'Cursor continuation anchor is not present in this architecture view',
       });

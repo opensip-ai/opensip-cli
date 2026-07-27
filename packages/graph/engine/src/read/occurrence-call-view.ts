@@ -22,6 +22,9 @@ import type {
 } from '../pipeline/occurrence-call-graph.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 /** Traversal, identity, and source-selection options for an occurrence call view. */
 export interface OccurrenceCallViewQuery {
   readonly filter: GraphSourceFilter;
@@ -95,7 +98,7 @@ interface CachedOccurrenceIndex {
 const occurrenceIndexCache = new WeakMap<Indexes, CachedOccurrenceIndex>();
 
 function viewError(message: string): GraphReadError {
-  return { code: 'GRAPH.READ.OCCURRENCE_VIEW', operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 /** Build an occurrence or body-twin-union call view from canonical read indexes. */

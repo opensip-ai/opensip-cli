@@ -275,6 +275,27 @@ function boundedWithoutMembershipResolver(targets: FakeTargets): BoundedTargetRe
   };
 }
 
+/** Cancels a real controller on the Nth bounded global-exclude invocation. */
+class AbortOnNthExcludeTargets extends FakeTargets {
+  constructor(
+    definitions: readonly TargetView[],
+    files: Readonly<Record<string, readonly string[]>>,
+    private readonly abortOnCall: number,
+    private readonly controller: AbortController,
+  ) {
+    super(definitions, files);
+  }
+
+  override applyGlobalExcludesBounded(
+    files: readonly string[],
+    rootDir: string,
+    options: BoundedTargetResolutionOptions,
+  ): Promise<BoundedTargetResolution> {
+    if (this.boundedApplyCalls + 1 === this.abortOnCall) this.controller.abort();
+    return super.applyGlobalExcludesBounded(files, rootDir, options);
+  }
+}
+
 class ThrowingTargets extends FakeTargets {
   override resolveTargetsBounded(): Promise<BoundedTargetResolution> {
     return Promise.reject(new Error('fixture resolution failure'));
@@ -787,10 +808,13 @@ describe('buildProjectInventory', () => {
     });
 
     expect(targets.boundedCalls).toHaveLength(1);
-    expect(targets.boundedCalls[0]).toEqual({
-      maxResults: 7,
-      signal: controller.signal,
-    });
+    // The seam receives the host-composed cancellation plane (caller + ambient scope +
+    // deadline), not the caller's signal object by identity: composing is what makes an
+    // OS interrupt reach a capability the caller never wired a signal into (ruling D5).
+    const seen = targets.boundedCalls[0];
+    expect(seen?.maxResults).toBe(7);
+    expect(seen?.signal).toBeInstanceOf(AbortSignal);
+    expect(seen?.signal?.aborted).toBe(false);
     expect(targets.resolveCalls).toBe(0);
     expect(controller.signal.aborted).toBe(false);
     expect(inventory.snapshot.files).toEqual([]);
@@ -1897,24 +1921,23 @@ describe('buildProjectInventory', () => {
 
   it('stops manifest discovery when cancellation is observed during root enumeration', async () => {
     const root = tempRoot();
-    writeJson(join(root, 'package.json'), { name: 'root' });
-    let reads = 0;
-    const signal = {
-      get aborted() {
-        reads += 1;
-        return reads >= 2;
-      },
-    } as AbortSignal;
+    writeJson(join(root, 'package.json'), { name: 'root', workspaces: ['packages/*'] });
+    writeJson(join(root, 'packages/a/package.json'), { name: 'a' });
+    const controller = new AbortController();
+    // Call 1 is the zero-retention preflight; call 2 is the root-manifest exclusion during
+    // root enumeration, which is where this fixture cancels.
+    const targets = new AbortOnNthExcludeTargets([target('source')], { source: [] }, 2, controller);
 
     const inventory = await buildProjectInventory({
       projectRoot: root,
       configIdentity: 'cfg',
-      targets: new FakeTargets([target('source')], { source: [] }),
-      signal,
+      targets,
+      signal: controller.signal,
     });
 
+    expect(controller.signal.aborted).toBe(true);
     expect(inventory.snapshot.coverage.reasonCodes).toContain('inventory-cancelled');
-    expect(reads).toBeGreaterThanOrEqual(2);
+    expect(inventory.snapshot.packages).toEqual([]);
   });
 
   it('fails closed when structural marker canonicalization or global exclusion fails', async () => {

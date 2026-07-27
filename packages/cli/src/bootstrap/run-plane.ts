@@ -18,6 +18,7 @@ import {
   type ToolRunCompletion,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
+import { normalizeFailure, toOperatorFailureProjection } from '@opensip-cli/core';
 import { commitEvidenceBundle, type EvidenceBundleCommitResult } from '@opensip-cli/session-store';
 
 import { manifestVersionFor } from './declared-inputs.js';
@@ -246,11 +247,19 @@ export function createRunPlaneFactory(deps: RunPlaneDeps): RunPlaneFactory {
     try {
       await deps.executeReportEffect(drained.reportEffect);
     } catch (error) {
+      // `error.name` alone reduced every deferred-report failure to a label: an EACCES on the
+      // output path, a cancelled run and a tool-author bug all logged as "Error". The operator
+      // projection is the redacted, bounded form built for this (D8), so the log carries the
+      // code and the action without re-implementing redaction here.
+      const failure = toOperatorFailureProjection(normalizeFailure(error));
       const errorName = error instanceof Error ? error.name : 'UnknownError';
       log.warn?.({
         evt: 'cli.report.deferred_open_failed',
         module: MODULE_TAG,
         errorName,
+        code: failure.code,
+        reason: failure.message,
+        operatorDetail: failure.operatorDetail,
       });
       try {
         await deps.onReportEffectFailure?.({

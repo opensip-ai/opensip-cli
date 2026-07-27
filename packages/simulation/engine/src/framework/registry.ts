@@ -61,7 +61,9 @@ export function createScenarioRegistry(): Registry<RunnableScenario> {
     duplicatePolicy: 'silent-skip',
     evtPrefix: 'scenario.registry',
     nameCollisionMode: 'throw',
-    validationCode: 'VALIDATION.REGISTRY.NAME_COLLISION',
+    // No `validationCode` override: the registry's own default is the REGISTERED
+    // CORE.REGISTRY.NAME_COLLISION. Pinning the old literal here silently opted this registry
+    // out of registration and back into an unresolvable code.
   });
 }
 

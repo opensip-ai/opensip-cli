@@ -90,10 +90,21 @@ export interface DuplicateFindings {
  *  OBSERVABLE skip, never a silent one (plan 09 fail-loud consistency). */
 export interface NearDupCoverage {
   readonly complete: boolean;
-  /** `['lsh-bucket-cap']` when any bucket exceeded the pairwise cap and was sampled. */
+  /**
+   * Why the pass was bounded. `'lsh-bucket-cap'` when a bucket exceeded the pairwise
+   * cap and was sampled; `'cluster-size-cap'` when a component exceeded
+   * `MAX_CLUSTER_SIZE` and was truncated to its first members.
+   */
   readonly reasons: readonly string[];
   /** Number of LSH buckets sampled down to the pairwise cap. */
   readonly cappedBuckets: number;
+  /**
+   * Number of components truncated by the cluster-size cap. Counted because a
+   * truncated component still yields a finding, so without this the pass would
+   * report `complete: true` over a walk it knowingly bounded — indistinguishable
+   * from having analysed every member.
+   */
+  readonly cappedClusters: number;
 }
 
 /** Result of {@link findNearDuplicates}: clusters + the pass's coverage evidence. */

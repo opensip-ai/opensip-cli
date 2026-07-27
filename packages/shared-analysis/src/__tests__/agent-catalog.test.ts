@@ -673,7 +673,7 @@ describe('projectAgentCatalogRuntimeFacts', () => {
       projectAgentCatalogRuntimeFacts(inventory, ['help']);
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
-      expect((error as ValidationError).code).toBe('AGENT_CATALOG.INCOMPLETE_INVENTORY');
+      expect((error as ValidationError).code).toBe('CORE.AGENT_CATALOG.UNPUBLISHABLE');
     }
   });
 });

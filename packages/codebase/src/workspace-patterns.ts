@@ -1,3 +1,4 @@
+import { tryCatch } from '@opensip-cli/core';
 import { braceExpand, Minimatch } from 'minimatch';
 
 import { byCodePoint, deepFreeze } from './freeze.js';
@@ -103,12 +104,29 @@ function safeExpandedAlternative(value: string): boolean {
   );
 }
 
+/**
+ * Expand and bound one authored pattern.
+ *
+ * `braceExpand` is third-party glob machinery reached from an authored workspace array, so
+ * it is untrusted input crossing into untrusted code. It rejects — for example on an
+ * expansion limit — and an unguarded rejection would abort the whole inventory build over
+ * one bad line in a package.json. A rejection is an unusable pattern, which this boundary
+ * already has a total answer for.
+ */
 function inspectNormalizedWorkspacePattern(
   normalized: NormalizedPattern,
 ): InspectedPattern | undefined {
-  const expandedAlternatives = braceExpand(normalized.body, {
-    braceExpandMax: MAX_WORKSPACE_BRACE_EXPANSIONS + 1,
-  });
+  const expanded = tryCatch(() =>
+    braceExpand(normalized.body, {
+      braceExpandMax: MAX_WORKSPACE_BRACE_EXPANSIONS + 1,
+    }),
+  );
+  if (!expanded.ok) {
+    // @swallow-ok an unexpandable pattern is reported by the caller as
+    // `workspace-pattern-invalid`, exactly like a pattern that expands into unsafe paths.
+    return undefined;
+  }
+  const expandedAlternatives = expanded.value;
   if (
     expandedAlternatives.length > MAX_WORKSPACE_BRACE_EXPANSIONS ||
     expandedAlternatives.some((alternative) => !safeExpandedAlternative(alternative))
@@ -172,8 +190,45 @@ export function projectWorkspacePatterns(
   return deepFreeze({ values: [...unique].sort(byCodePoint), capped, invalid });
 }
 
-function compileMatcher(pattern: InspectedPattern): Minimatch {
-  return new Minimatch(pattern.body, WORKSPACE_MATCH_OPTIONS);
+/**
+ * Compile one admitted pattern, or report that it could not be compiled.
+ *
+ * The second untrusted-code boundary in this file: `new Minimatch` builds a regular
+ * expression from an authored glob and can reject. Admission through `braceExpand` does not
+ * prove compilability, so this needs its own guard rather than the caller's.
+ */
+function compileMatcher(pattern: InspectedPattern): Minimatch | undefined {
+  const compiled = tryCatch(() => new Minimatch(pattern.body, WORKSPACE_MATCH_OPTIONS));
+  // @swallow-ok: an uncompilable pattern is dropped and reported as
+  // `workspace-pattern-invalid`; it must not abort the surrounding inventory build.
+  return compiled.ok ? compiled.value : undefined;
+}
+
+interface CompiledMatchers {
+  readonly positives: readonly Minimatch[];
+  readonly negatives: readonly Minimatch[];
+  /** Admitted patterns that actually produced a matcher. */
+  readonly retained: readonly InspectedPattern[];
+}
+
+/** Compile each admitted pattern once, dropping and reporting the ones that will not build. */
+function compileAdmittedPatterns(
+  inspectedPatterns: readonly InspectedPattern[],
+  reasons: Set<string>,
+): CompiledMatchers {
+  const positives: Minimatch[] = [];
+  const negatives: Minimatch[] = [];
+  const retained: InspectedPattern[] = [];
+  for (const inspected of inspectedPatterns) {
+    const matcher = compileMatcher(inspected);
+    if (matcher === undefined) {
+      reasons.add('workspace-pattern-invalid');
+      continue;
+    }
+    retained.push(inspected);
+    (inspected.negative ? negatives : positives).push(matcher);
+  }
+  return { positives, negatives, retained };
 }
 
 /**
@@ -226,11 +281,7 @@ export function compileWorkspacePatterns(patterns: readonly string[]): CompiledW
     expandedBytes = nextBytes;
     inspectedPatterns.push(inspected);
   }
-  const positives: Minimatch[] = [];
-  const negatives: Minimatch[] = [];
-  for (const inspected of inspectedPatterns) {
-    (inspected.negative ? negatives : positives).push(compileMatcher(inspected));
-  }
+  const { positives, negatives, retained } = compileAdmittedPatterns(inspectedPatterns, reasons);
   const matches = (packageRoot: string): boolean =>
     positives.some((matcher) => matcher.match(packageRoot)) &&
     !negatives.some((matcher) => matcher.match(packageRoot));
@@ -238,7 +289,9 @@ export function compileWorkspacePatterns(patterns: readonly string[]): CompiledW
     relativeDirectory.length === 0 ||
     positives.some((matcher) => matcher.match(relativeDirectory, true));
   return deepFreeze({
-    patterns: inspectedPatterns.map((pattern) => pattern.normalized),
+    // Only patterns that actually compiled are reported as retained: a pattern listed here
+    // but absent from the matchers would claim discovery coverage nothing enforces.
+    patterns: retained.map((pattern) => pattern.normalized),
     matcherCount: positives.length + negatives.length,
     reasonCodes: [...reasons].sort(byCodePoint),
     hasPositivePatterns: positives.length > 0,

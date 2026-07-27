@@ -30,14 +30,21 @@ import {
   type DatastoreCloseResult,
 } from '@opensip-cli/datastore';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { buildDatastoreLockContext } from './state-lock-policy.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 /**
  * Strict reader: the only way to obtain the per-run scope is `currentScope()`
  * (entered by pre-action-hook or explicit runWithScope in tests). All previous
  * holder fallbacks were removed.
  *
- * @throws {SystemError} (`SYSTEM.SCOPE.NOT_ENTERED`) When accessed before the
+ * @throws {SystemError} (`CORE.SCOPE.NOT_ENTERED`) When accessed before the
  *   pre-action-hook constructed and entered the scope.
  */
 export function readScope(): RunScope {
@@ -47,7 +54,7 @@ export function readScope(): RunScope {
       'CLI scope accessed before pre-action-hook constructed and entered it (enterScope + ALS). ' +
         'All production paths (tool actions, host commands, report/error seams) must run inside ' +
         'an entered RunScope. See host-planes-scope-seams-hygiene plan Phase 3 and currentScope().',
-      { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
+      { code: 'CORE.SCOPE.NOT_ENTERED' },
     );
   }
   return bound;
@@ -66,7 +73,11 @@ export function getCurrentProjectRoot(): string {
   if (!project) {
     throw new SystemError(
       'getCurrentProjectRoot() called before pre-action-hook resolved the context.',
-      { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'project-unset' },
+      },
     );
   }
   return project.projectRoot;
@@ -88,7 +99,11 @@ export function getCurrentRuntimePaths(): RuntimePaths {
   if (!project) {
     throw new SystemError(
       'getCurrentRuntimePaths() called before pre-action-hook resolved the context.',
-      { code: 'SYSTEM.BOOTSTRAP.PROJECT_UNSET' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'project-unset' },
+      },
     );
   }
   return resolveRuntimePathsForScope(project);
@@ -137,7 +152,11 @@ export function buildDatastoreThunk(
       throw new SystemError(
         'Datastore accessed in a non-project context. The action body should have ' +
           'errored earlier with "No OpenSIP CLI project found" before touching this.',
-        { code: 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT' },
+        {
+          code: WIRING_INVALID.code,
+          definition: WIRING_INVALID,
+          metadata: { condition: 'datastore-outside-project' },
+        },
       );
     }
     const runtime = resolveRuntimePathsForScope(project);
@@ -249,14 +268,23 @@ export function getProjectDatastore(): DataStore {
   try {
     return getOrOpenDatastore();
   } catch (error) {
+    // Branches on code AND condition. `CLI.HOST.WIRING_INVALID` is a CLUSTER (ruling D9):
+    // several host-wiring failures share it and are told apart by `metadata.condition`. A
+    // consumer that matched only the code would convert every host wiring fault into
+    // "run from inside a project", which is wrong for all but this one.
     if (
       error instanceof SystemError &&
-      error.code === 'SYSTEM.BOOTSTRAP.DATASTORE_OUTSIDE_PROJECT'
+      error.code === WIRING_INVALID.code &&
+      error.metadata.condition === 'datastore-outside-project'
     ) {
       throw new ConfigurationError(
         'This operation requires an OpenSIP CLI project (an opensip-cli.config.yml with a targets: block or similar). ' +
           'Run from within a project directory, or pass --cwd to an initialized project.',
-        { code: 'CONFIGURATION.REQUIRES_PROJECT' },
+        {
+          code: PROJECT_REQUIRED.code,
+          definition: PROJECT_REQUIRED,
+          metadata: { condition: 'requires-project' },
+        },
       );
     }
     throw error;

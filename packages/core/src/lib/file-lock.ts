@@ -30,6 +30,7 @@ import { hostname } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
 import { SystemError, TimeoutError } from './errors.js';
 import {
   createSafetyBiasedProcessInspector,
@@ -122,6 +123,20 @@ function sleepSync(ms: number): void {
     }
   }
 }
+
+// Registered lock definitions, bound once at module load so a typo fails the import rather
+// than a code path that only runs when a lock is already contended. These replace
+// `SYSTEM.LOCK.*` / `TIMEOUT.STATE_LOCK` literals that had no catalog entry and inherited
+// generic SYSTEM_ERROR / TIMEOUT axes — so an acquisition timeout told the operator to
+// "increase the deadline" when the real answer was "another opensip run owns this lock".
+const LOCK_METADATA_TOO_LARGE = coreErrorCatalog.require('CORE.LOCK.METADATA_TOO_LARGE');
+const LOCK_UNSAFE_MODE = coreErrorCatalog.require('CORE.LOCK.UNSAFE_MODE');
+const LOCK_WRITE_STALLED = coreErrorCatalog.require('CORE.LOCK.WRITE_STALLED');
+const LOCK_UNSAFE_TEMP = coreErrorCatalog.require('CORE.LOCK.UNSAFE_TEMP');
+const LOCK_UNSAFE_PUBLICATION = coreErrorCatalog.require('CORE.LOCK.UNSAFE_PUBLICATION');
+const LOCK_INVALID_POLICY = coreErrorCatalog.require('CORE.LOCK.INVALID_POLICY');
+const LOCK_MALFORMED = coreErrorCatalog.require('CORE.LOCK.MALFORMED');
+const LOCK_ACQUIRE_TIMEOUT = coreErrorCatalog.require('CORE.LOCK.ACQUIRE_TIMEOUT');
 
 const MAX_LOCKFILE_BYTES = 4096;
 const LOCKFILE_MODE = 0o600;
@@ -474,7 +489,8 @@ function serializeLockMetadata(metadata: FileLockMetadata): Buffer {
   const bytes = Buffer.from(JSON.stringify(metadata), 'utf8');
   if (bytes.length > MAX_LOCKFILE_BYTES) {
     throw new SystemError(`Lock metadata exceeds the ${MAX_LOCKFILE_BYTES}-byte limit`, {
-      code: 'SYSTEM.LOCK.METADATA_TOO_LARGE',
+      code: LOCK_METADATA_TOO_LARGE.code,
+      definition: LOCK_METADATA_TOO_LARGE,
     });
   }
   return bytes;
@@ -485,7 +501,8 @@ function hardenLockMode(fd: number): void {
   fchmodSync(fd, LOCKFILE_MODE);
   if (Number(fstatSync(fd, { bigint: true }).mode & 0o777n) !== LOCKFILE_MODE) {
     throw new SystemError('Lockfile mode could not be restricted to 0600', {
-      code: 'SYSTEM.LOCK.UNSAFE_MODE',
+      code: LOCK_UNSAFE_MODE.code,
+      definition: LOCK_UNSAFE_MODE,
     });
   }
 }
@@ -496,7 +513,8 @@ function writeAllAtStart(fd: number, bytes: Buffer): void {
     const count = writeSync(fd, bytes, offset, bytes.length - offset, offset);
     if (count === 0) {
       throw new SystemError('Lock metadata write made no progress', {
-        code: 'SYSTEM.LOCK.WRITE_STALLED',
+        code: LOCK_WRITE_STALLED.code,
+        definition: LOCK_WRITE_STALLED,
       });
     }
     offset += count;
@@ -520,7 +538,8 @@ function createCompletePrivateTemp(path: string, bytes: Buffer): LockFileIdentit
     identity = identityOf(fstatSync(fd, { bigint: true }));
     if (identity.nlink !== 1n || identity.size !== BigInt(bytes.length)) {
       throw new SystemError('Lock temporary record could not be proven complete', {
-        code: 'SYSTEM.LOCK.UNSAFE_TEMP',
+        code: LOCK_UNSAFE_TEMP.code,
+        definition: LOCK_UNSAFE_TEMP,
       });
     }
     closeSync(fd);
@@ -725,13 +744,15 @@ function tryAcquireLock(lockPath: string, metadata: FileLockMetadata): boolean {
       !sameIdentity(targetIdentity, linkedTempIdentity)
     ) {
       throw new SystemError('Published lock record does not match its complete temporary record', {
-        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+        code: LOCK_UNSAFE_PUBLICATION.code,
+        definition: LOCK_UNSAFE_PUBLICATION,
       });
     }
     tempIdentity = linkedTempIdentity;
     if (!unlinkExactPath(tempPath, targetIdentity)) {
       throw new SystemError('Published lock temporary link could not be retired', {
-        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+        code: LOCK_UNSAFE_PUBLICATION.code,
+        definition: LOCK_UNSAFE_PUBLICATION,
       });
     }
     tempIdentity = undefined;
@@ -742,7 +763,8 @@ function tryAcquireLock(lockPath: string, metadata: FileLockMetadata): boolean {
       settled.raw !== bytes.toString('utf8')
     ) {
       throw new SystemError('Published lock record could not be revalidated', {
-        code: 'SYSTEM.LOCK.UNSAFE_PUBLICATION',
+        code: LOCK_UNSAFE_PUBLICATION.code,
+        definition: LOCK_UNSAFE_PUBLICATION,
       });
     }
     return true;
@@ -966,7 +988,7 @@ function throwLockTimeout(lockPath: string, options: WithFileLockOptions): never
   });
   throw new TimeoutError(
     `Timed out waiting for ${options.resource} write lock (${options.operation ?? 'write'}) after ${options.policy.waitMs}ms`,
-    { code: 'TIMEOUT.STATE_LOCK' },
+    { code: LOCK_ACQUIRE_TIMEOUT.code, definition: LOCK_ACQUIRE_TIMEOUT },
   );
 }
 
@@ -996,7 +1018,7 @@ function normalizePolicyDuration(value: number, name: string): number {
   if (!Number.isFinite(value) || value < 0 || value > MAX_TIMER_MS) {
     throw new SystemError(
       `${name} must be a finite non-negative duration no greater than ${MAX_TIMER_MS}ms`,
-      { code: 'SYSTEM.LOCK.INVALID_POLICY' },
+      { code: LOCK_INVALID_POLICY.code, definition: LOCK_INVALID_POLICY },
     );
   }
   return Math.floor(value);
@@ -1012,7 +1034,7 @@ function normalizeLockPolicy(policy: StateLockPolicy): StateLockPolicy {
   if (staleMs > MAX_TIMER_MS) {
     throw new SystemError(
       `staleMs must remain no greater than ${MAX_TIMER_MS}ms after heartbeat safety normalization`,
-      { code: 'SYSTEM.LOCK.INVALID_POLICY' },
+      { code: LOCK_INVALID_POLICY.code, definition: LOCK_INVALID_POLICY },
     );
   }
   const waitMs = normalizePolicyDuration(policy.waitMs, 'waitMs');
@@ -1081,7 +1103,8 @@ export function withFileLock<T>(lockPath: string, options: WithFileLockOptions, 
     }
     if (outcome === 'malformed') {
       throw new SystemError(`Malformed lockfile at ${lockPath}`, {
-        code: 'SYSTEM.LOCK.MALFORMED',
+        code: LOCK_MALFORMED.code,
+        definition: LOCK_MALFORMED,
       });
     }
     if (outcome === 'timeout') break;
@@ -1173,7 +1196,8 @@ export async function withFileLockAsync<T>(
     }
     if (outcome === 'malformed') {
       throw new SystemError(`Malformed lockfile at ${lockPath}`, {
-        code: 'SYSTEM.LOCK.MALFORMED',
+        code: LOCK_MALFORMED.code,
+        definition: LOCK_MALFORMED,
       });
     }
     if (outcome === 'timeout') break;

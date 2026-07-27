@@ -112,7 +112,7 @@ describe('runtime lease action lifetime', () => {
         cwdBasename: 'runtime-action-e2e',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
 
     const closed = waitForClose(child);
     child.stdin?.end();

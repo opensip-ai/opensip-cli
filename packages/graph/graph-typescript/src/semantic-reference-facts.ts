@@ -370,6 +370,7 @@ function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
   try {
     symbol = file.checker.getSymbolAtLocation(id);
   } catch {
+    // @swallow-ok the TypeScript checker throws on some synthetic nodes; no symbol means no semantic fact, and the occurrence is still recorded from syntax
     symbol = undefined;
   }
   if (symbol === undefined) {
@@ -782,6 +783,7 @@ function symbolOfDeclaration(node: ts.Node, checker: ts.TypeChecker): ts.Symbol 
   try {
     symbol = checker.getSymbolAtLocation(declarationNameNode(node) ?? node);
   } catch {
+    // @swallow-ok same checker hazard on the declaration path; absence of a symbol is a valid answer here, not a failure
     symbol = undefined;
   }
   return symbol;

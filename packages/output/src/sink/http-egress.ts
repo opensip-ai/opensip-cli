@@ -15,6 +15,9 @@
  */
 import {
   NetworkError,
+  SystemError,
+  ValidationError,
+  coreSystemErrorCatalog,
   logger,
   normalizeFailure,
   scrubText,
@@ -22,9 +25,14 @@ import {
   withRetry,
 } from '@opensip-cli/core';
 
+import { outputErrorCatalog } from '../errors/output-error-catalog.js';
+
 import { isHttpsUrl } from './https-url.js';
 
 import type { EgressResult, PostChunkedArgs } from './http-egress-types.js';
+
+const EGRESS_REQUEST_INVALID = outputErrorCatalog.require('OUTPUT.EGRESS.REQUEST_INVALID');
+const DEADLINE_EXCEEDED = coreSystemErrorCatalog.require('CORE.SYSTEM.DEADLINE_EXCEEDED');
 
 export type { EgressResult, PostChunkedArgs, RetryPolicy } from './http-egress-types.js';
 
@@ -209,7 +217,11 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     for (let ordinal = 0; ordinal < chunks.length; ordinal += 1) {
       const key = args.idempotencyKeyFor(ordinal);
       if (typeof key !== 'string' || key.length === 0 || key.length > 256) {
-        throw new Error('invalid idempotency key');
+        throw new ValidationError('invalid idempotency key', {
+          code: EGRESS_REQUEST_INVALID.code,
+          definition: EGRESS_REQUEST_INVALID,
+          metadata: { field: 'idempotencyKey' },
+        });
       }
       idempotencyKeys.push(key);
     }
@@ -249,7 +261,15 @@ export async function postChunked(args: PostChunkedArgs): Promise<EgressResult> 
     try {
       const responseStatus = await withRetry(
         async () => {
-          if (deadlineLeft() <= 0) throw new Error('egress deadline exceeded');
+          if (deadlineLeft() <= 0) {
+            // The registered deadline code, so a caller can tell an exhausted egress budget
+            // from a transport fault: `withRetry` treats them differently and so does an
+            // operator reading the exit class.
+            throw new SystemError('egress deadline exceeded', {
+              code: DEADLINE_EXCEEDED.code,
+              definition: DEADLINE_EXCEEDED,
+            });
+          }
           const requestTimeoutMs = Math.min(
             args.timeoutFor(chunks[ci], ci),
             Math.max(0, deadlineLeft()),

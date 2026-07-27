@@ -348,7 +348,7 @@ describe('getCurrentProjectRoot / entered scope', () => {
     vi.resetModules();
     const mod = await import('../cli-context.js');
     expect(() => mod.getCurrentProjectRoot()).toThrow(
-      /pre-action-hook constructed and entered it|SYSTEM.SCOPE.NOT_ENTERED/,
+      /pre-action-hook constructed and entered it|CORE.SCOPE.NOT_ENTERED/,
     );
   });
 

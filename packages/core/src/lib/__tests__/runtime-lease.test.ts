@@ -301,7 +301,7 @@ describe('runtime lease coordination', () => {
     expect(identity.cacheKey).not.toBe(identity.coordinationKey);
     expect(() => paths.forProject('../escape')).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+        code: 'CORE.RUNTIME_COORDINATION.INVALID_KEY',
       }),
     );
   });
@@ -375,7 +375,7 @@ describe('runtime lease coordination', () => {
     await createScaffold();
     const writer = track(await acquireGlobalRuntimeMaintenanceLease({ policy: POLICY }));
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CONFLICT',
     });
     release(writer);
 
@@ -386,7 +386,7 @@ describe('runtime lease coordination', () => {
       state: 'closed',
     });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CONFLICT',
     });
   });
 
@@ -443,7 +443,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     expect(existsSync(projectPaths.readersDir)).toBe(false);
   });
@@ -460,7 +460,7 @@ describe('runtime lease coordination', () => {
     });
     if (process.platform !== 'win32') chmodSync(malformedReader, 0o600);
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
     });
     rmSync(malformedReader);
 
@@ -473,7 +473,7 @@ describe('runtime lease coordination', () => {
       privateWrite(path, readerFixture('project', ownerToken, sequence));
     }
     await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     for (const path of boundedReaders) rmSync(path);
 
@@ -491,14 +491,14 @@ describe('runtime lease coordination', () => {
     const invalidProjectKey = join(paths.projectsDir, 'invalid-key');
     mkdirSync(invalidProjectKey, { mode: 0o700 });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.INPUT',
     });
     rmSync(invalidProjectKey, { recursive: true });
 
     const unexpectedRootEntry = join(paths.coordinationDir, 'unexpected-root-entry');
     privateWrite(unexpectedRootEntry, { unsafe: true });
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
   });
 
@@ -523,9 +523,9 @@ describe('runtime lease coordination', () => {
         ownerToken: '../invalid-owner',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.INVALID_OWNER' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.INVALID_OWNER' });
     await expect(cleanupEmptyRuntimeLeaseKey('../invalid-key')).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.INVALID_KEY',
+      code: 'CORE.RUNTIME_COORDINATION.INVALID_KEY',
     });
   });
 
@@ -599,7 +599,7 @@ describe('runtime lease coordination', () => {
         privateWrite(statePath, state);
       }
       await expect(inspectRuntimeLeaseState(project), name).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       });
     }
   });
@@ -694,14 +694,14 @@ describe('runtime lease coordination', () => {
         policy: { [field]: value },
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.INVALID_POLICY',
+      code: 'CORE.RUNTIME_LEASE.INVALID_POLICY',
     });
     expect(existsSync(resolveCoordinationPaths().coordinationDir)).toBe(false);
   });
 
   it('rejects empty and already-cancelled composite acquisitions before publication', async () => {
     await expect(acquireRuntimeAccessLease({})).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.EMPTY_ACCESS',
+      code: 'CORE.RUNTIME_LEASE.EMPTY_ACCESS',
     });
     const controller = new AbortController();
     controller.abort();
@@ -710,7 +710,7 @@ describe('runtime lease coordination', () => {
         projectRead: { projectDir: project },
         signal: controller.signal,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.CANCELLED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.CANCELLED' });
   });
 
   it('publishes writer intent before draining readers and blocks later readers', async () => {
@@ -726,7 +726,7 @@ describe('runtime lease coordination', () => {
 
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: SHORT_POLICY }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
 
     release(reader);
     const writer = track(await writerPromise);
@@ -789,7 +789,7 @@ describe('runtime lease coordination', () => {
         ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.DUPLICATE_WRITER' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.DUPLICATE_WRITER' });
     release(writer);
 
     const reader = track(
@@ -819,7 +819,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'removed-writer-owner-0001',
         policy: { ...POLICY, waitMs: 100 },
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.REQUEST_LOST' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.REQUEST_LOST' });
     expect(removed).toBe(true);
     release(reader);
   });
@@ -847,7 +847,7 @@ describe('runtime lease coordination', () => {
     });
 
     expect(() => writer.release()).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
+      expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }),
     );
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toMatchObject({
       writers: [{ pid: 424_242 }],
@@ -1026,7 +1026,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     expect(
       existsSync(
@@ -1140,7 +1140,7 @@ describe('runtime lease coordination', () => {
         });
       if (identityPosture === 'unproven-host') {
         await expect(acquireChild()).rejects.toMatchObject({
-          code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+          code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
         });
       } else {
         const child = track(await acquireChild());
@@ -1199,7 +1199,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(ambiguousParent);
 
@@ -1214,7 +1214,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(additionalUserParent);
 
@@ -1232,7 +1232,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(projectOnlyParent);
 
@@ -1268,7 +1268,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
     release(userOnlyParent);
 
@@ -1313,7 +1313,7 @@ describe('runtime lease coordination', () => {
         policy: POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.PARENT_INHERITANCE_DENIED',
+      code: 'CORE.RUNTIME_LEASE.INHERITANCE_DENIED',
     });
 
     const staleView = syntheticCoordinator({
@@ -1482,14 +1482,14 @@ describe('runtime lease coordination', () => {
         ownerToken: projectWriter.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
     await expect(
       acquireRuntimeReadLease({
         projectDir: otherProject,
         ownerToken: projectWriter.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
 
     const mismatchedCoordinator = createRuntimeLeaseCoordinator({
       hostname,
@@ -1504,7 +1504,7 @@ describe('runtime lease coordination', () => {
         ownerToken: projectWriter.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH' });
     release(projectWriter);
 
     const globalWriter = track(
@@ -1518,7 +1518,7 @@ describe('runtime lease coordination', () => {
         ownerToken: globalWriter.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
     release(globalWriter);
   });
 
@@ -1549,7 +1549,7 @@ describe('runtime lease coordination', () => {
     controller.abort();
 
     await expect(userPromise).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+      code: 'CORE.RUNTIME_LEASE.CANCELLED',
     });
     expect(readdirSync(resolveCoordinationPaths().userReadersDir)).toEqual([]);
     release(projectReader);
@@ -1601,7 +1601,7 @@ describe('runtime lease coordination', () => {
       hostIdentityProven: false,
     });
     expect(() => projectReader.release()).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }),
+      expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }),
     );
     expect(JSON.parse(readFileSync(readerPath, 'utf8'))).toMatchObject({ pid: 424_242 });
 
@@ -1631,7 +1631,7 @@ describe('runtime lease coordination', () => {
     privateWrite(userReaderPath, {});
     expect(() => composite.release()).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       }),
     );
     expect(JSON.parse(readFileSync(projectReaderPath, 'utf8'))).toMatchObject({
@@ -1640,7 +1640,7 @@ describe('runtime lease coordination', () => {
 
     expect(() => composite.release()).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       }),
     );
     expect(JSON.parse(readFileSync(projectReaderPath, 'utf8'))).toMatchObject({
@@ -1749,7 +1749,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { ...POLICY, waitMs: 0, staleMs: 60_000 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(readdirSync(readersDir).filter((entry) => entry.startsWith('reader-'))).toHaveLength(
       128,
     );
@@ -1778,7 +1778,7 @@ describe('runtime lease coordination', () => {
         ownerToken: lease.ownerToken,
         policy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(JSON.parse(readFileSync(recordPath, 'utf8'))).toMatchObject({
       refs: 64,
       references,
@@ -1824,7 +1824,7 @@ describe('runtime lease coordination', () => {
         projectDir: otherProject,
         policy: { ...POLICY, waitMs: 0, staleMs: 60_000 },
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.CAPACITY' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.CAPACITY' });
     expect(existsSync(paths.forProject(nextKey).projectCoordinationDir)).toBe(false);
     expect(readdirSync(paths.projectsDir)).toHaveLength(256);
   });
@@ -1868,14 +1868,14 @@ describe('runtime lease coordination', () => {
         ownerToken: reader.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.OWNER_MISMATCH' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.OWNER_MISMATCH' });
     await expect(
       acquireRuntimeExclusiveLease({
         projectDir: project,
         ownerToken: reader.ownerToken,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE_UPGRADE' });
   });
 
   it('cleans a cancelled writer request without killing or releasing the reader', async () => {
@@ -1892,7 +1892,7 @@ describe('runtime lease coordination', () => {
     });
     controller.abort();
     await expect(writer).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+      code: 'CORE.RUNTIME_LEASE.CANCELLED',
     });
     await waitUntil(async () => {
       const state = await inspectRuntimeLeaseState(project);
@@ -1930,7 +1930,7 @@ describe('runtime lease coordination', () => {
     void writer.catch(() => undefined);
 
     await expect(writer).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.CANCELLED',
+      code: 'CORE.RUNTIME_LEASE.CANCELLED',
     });
     expect(injected).toBe(true);
     await waitUntil(async () => {
@@ -2031,7 +2031,7 @@ describe('runtime lease coordination', () => {
         projectDir: otherProject,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     release(userReader);
     release(projectReader);
     track(await globalPromise);
@@ -2044,7 +2044,7 @@ describe('runtime lease coordination', () => {
       }),
     );
     await expect(acquireUserStateReadLease({ policy: SHORT_POLICY })).rejects.toMatchObject({
-      code: 'TIMEOUT.USER_STATE_READ',
+      code: 'CORE.RUNTIME_LEASE.USER_STATE_READ',
     });
     await expect(
       acquireRuntimeAccessLease({
@@ -2053,7 +2053,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'TIMEOUT.RUNTIME_ACCESS_COMPOSITE',
+      code: 'CORE.RUNTIME_LEASE.ACCESS_COMPOSITE',
     });
     release(global);
 
@@ -2063,7 +2063,7 @@ describe('runtime lease coordination', () => {
         policy: SHORT_POLICY,
       }),
     ).rejects.toMatchObject({
-      code: 'TIMEOUT.RUNTIME_GLOBAL_MAINTENANCE',
+      code: 'CORE.RUNTIME_LEASE.GLOBAL_MAINTENANCE',
     });
     release(user);
   });
@@ -2100,7 +2100,7 @@ describe('runtime lease coordination', () => {
           policy: { ...POLICY, waitMs: 10_000 },
         }),
       ).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_LEASE.CAPACITY',
+        code: 'CORE.RUNTIME_LEASE.CAPACITY',
       });
       const state = JSON.parse(readFileSync(statePath, 'utf8')) as {
         writers: { command: string }[];
@@ -2140,7 +2140,7 @@ describe('runtime lease coordination', () => {
           projectDir: project,
           policy: SHORT_POLICY,
         }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.CAPACITY' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.CAPACITY' });
     } finally {
       for (const controller of controllers) controller.abort();
       await Promise.allSettled(queued);
@@ -2195,7 +2195,7 @@ describe('runtime lease coordination', () => {
       coordinator.acquireGlobalRuntimeMaintenanceLease({
         policy: { waitMs: 0, staleMs: 60_000, heartbeatMs: 10, pollMs: 1 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_GLOBAL_MAINTENANCE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.GLOBAL_MAINTENANCE' });
 
     expect([...inspectionsByPid.values()].reduce((sum, count) => sum + count, 0)).toBe(8);
     // One shared cached observation plus seven fresh destructive proofs.
@@ -2314,7 +2314,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'deterministic-writer-0001',
         policy: { waitMs: 10, staleMs: 50, heartbeatMs: 1000, pollMs: 3 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
 
     expect(now).toBe(1010);
     expect(transitions).toContain('lease.acquire.wait');
@@ -2653,7 +2653,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { ...SHORT_POLICY, pollMs: 10 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
 
     expect(publishedSuccessor).toBe(true);
     expect(JSON.parse(readFileSync(readerPath, 'utf8'))).toEqual(successor);
@@ -2886,7 +2886,7 @@ describe('runtime lease coordination', () => {
             projectDir: project,
             policy: { ...SHORT_POLICY, pollMs: 10 },
           }),
-        ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+        ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
         expect(existsSync(paths.globalMutexFile)).toBe(true);
         rmSync(paths.globalMutexFile);
       }
@@ -2940,7 +2940,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { waitMs: 100, staleMs: 120, heartbeatMs: 30, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
 
     expect(incumbentInspections).toBe(1);
     expect(contenderInspections).toBe(1);
@@ -2986,7 +2986,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(join(readersDir, 'reader-stale-remote-host-0001.json'))).toBe(true);
 
     now = 5100;
@@ -3159,7 +3159,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'mixed-policy-writer-0001',
         policy: contenderPolicy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(remotePath)).toBe(true);
 
     const observedFrom = monotonic;
@@ -3207,7 +3207,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'clock-skew-writer-0001',
         policy: { waitMs: 50, staleMs: 30, heartbeatMs: 10, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(remotePath)).toBe(true);
   });
 
@@ -3241,7 +3241,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3273,7 +3273,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3367,7 +3367,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
     expect(existsSync(readerPath)).toBe(true);
     release(reader);
   });
@@ -3409,7 +3409,7 @@ describe('runtime lease coordination', () => {
         ownerToken: 'foreign-mutex-reader-0001',
         policy: contenderPolicy,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(existsSync(paths.globalMutexFile)).toBe(true);
 
     const observedFrom = monotonic;
@@ -3455,7 +3455,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: { waitMs: 20, staleMs: 30, heartbeatMs: 10, pollMs: 2 },
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(monotonic).toBe(20);
     expect(wallNow).toBeLessThan(10_000);
   });
@@ -3528,7 +3528,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(completed).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(lstatSync(paths.globalMutexFile, { bigint: true }).nlink).toBe(1n);
@@ -3769,7 +3769,7 @@ describe('runtime lease coordination', () => {
         projectDir: project,
         policy: SHORT_POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_READ' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.READ' });
     expect(published).toBe(true);
     expect(existsSync(temporary)).toBe(false);
     expect(lstatSync(paths.globalMutexFile, { bigint: true }).nlink).toBe(1n);
@@ -3906,7 +3906,7 @@ describe('runtime lease coordination', () => {
           projectDir: project,
           policy: { ...POLICY, waitMs: 50 },
         }),
-      ).rejects.toMatchObject({ code: 'TIMEOUT.RUNTIME_EXCLUSIVE' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.EXCLUSIVE' });
 
       child.stdin.write('RELEASE\n');
       await waitForChildOutput(child, 'DONE\n');
@@ -3940,7 +3940,7 @@ describe('recovery barriers', () => {
         projectDir: project,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     rmSync(promotionPath());
     await expect(
       acquireRuntimeExclusiveLease({
@@ -3948,7 +3948,7 @@ describe('recovery barriers', () => {
         posture: 'destructive-discard',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     privateWrite(paths.userUninstallReceiptFile, {
       kind: 'user-uninstall',
@@ -3957,7 +3957,7 @@ describe('recovery barriers', () => {
       state: 'closed',
     });
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     privateWrite(paths.userUninstallReceiptFile, {
       kind: 'user-uninstall',
@@ -3970,7 +3970,7 @@ describe('recovery barriers', () => {
         projectDir: project,
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     rmSync(paths.userUninstallReceiptFile);
     await expect(
       acquireGlobalRuntimeMaintenanceLease({
@@ -3978,7 +3978,7 @@ describe('recovery barriers', () => {
         recoveryOperationId: 'posture-user',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('mutates the fixed promotion journal only under live writer authority', async () => {
@@ -4001,21 +4001,21 @@ describe('recovery barriers', () => {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' });
     await expect(
       mutateRuntimePromotionJournal(writer, {
         operation: 'create',
         content: '{',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' });
     await expect(
       mutateRuntimePromotionJournal(writer, {
         operation: 'unlink',
         expectedContentSha256: 'invalid',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.INPUT' });
     await expect(discardRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
     expect(inspectRuntimePromotionRecoveryHeader(project)).toEqual({
       status: 'absent',
@@ -4035,7 +4035,7 @@ describe('recovery barriers', () => {
         expectedContentSha256: '0'.repeat(64),
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+      code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
     });
 
     const projectPaths = resolveCoordinationPaths().forProject(key);
@@ -4087,7 +4087,7 @@ describe('recovery barriers', () => {
         operation: 'create',
         content: open,
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST' });
     release(successor);
   });
 
@@ -4123,19 +4123,19 @@ describe('recovery barriers', () => {
 
     const forged = Object.freeze({ ...writer });
     await expect(readRuntimePromotionJournal(forged)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     });
     const wrongKey = Object.freeze({
       ...writer,
       coordinationKey: projectCoordinationKey(otherProject),
     });
     await expect(readRuntimePromotionJournal(wrongKey)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     });
 
     release(writer);
     await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     });
   });
 
@@ -4152,7 +4152,7 @@ describe('recovery barriers', () => {
     });
     if (process.platform !== 'win32') chmodSync(promotionPath(), 0o600);
     await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     rmSync(promotionPath());
 
@@ -4161,7 +4161,7 @@ describe('recovery barriers', () => {
       privateWrite(outside, { secret: true });
       symlinkSync(outside, promotionPath());
       await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
       });
       rmSync(promotionPath());
     }
@@ -4191,7 +4191,7 @@ describe('recovery barriers', () => {
         content: oversize,
       }),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_LEASE.CAPACITY',
     });
     expect(existsSync(promotionPath())).toBe(false);
     release(writer);
@@ -4233,7 +4233,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(readRuntimePromotionJournal(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     expect(readFileSync(join(movedParent, RUNTIME_PROMOTION_JOURNAL_FILE), 'utf8')).toBe(content);
     expect(existsSync(promotionPath())).toBe(false);
@@ -4296,7 +4296,7 @@ describe('recovery barriers', () => {
       }),
     );
     await expect(discardUserUninstallReceipt(writer)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
     const open = JSON.stringify({
       kind: 'user-uninstall',
@@ -4360,7 +4360,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: SHORT_POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     const discard = track(
       await acquireRuntimeExclusiveLease({
@@ -4377,18 +4377,18 @@ describe('recovery barriers', () => {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST' });
     await expect(
       mutateRuntimePromotionJournal(discard, {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE' });
     await expect(readRuntimePromotionJournal(discard)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
     await expect(discardRuntimePromotionJournal(new Proxy(discard, {}))).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST',
     });
     await discardRuntimePromotionJournal(discard);
     expect(inspectRuntimePromotionRecoveryHeader(project)).toEqual({
@@ -4410,7 +4410,7 @@ describe('recovery barriers', () => {
       reason: 'oversize',
     });
     await expect(acquireUserStateReadLease({ policy: SHORT_POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
 
     const discard = track(
@@ -4430,13 +4430,13 @@ describe('recovery barriers', () => {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_LOST' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_LOST' });
     await expect(
       mutateUserUninstallReceipt(discard, {
         operation: 'create',
         content: '{}',
       }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE' });
     await discardUserUninstallReceipt(discard);
     expect(inspectUserUninstallRecoveryHeader()).toEqual({ status: 'absent' });
     release(discard);
@@ -4460,7 +4460,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
 
     privateWrite(promotionPath(), {
       kind: 'init-promotion',
@@ -4479,7 +4479,7 @@ describe('recovery barriers', () => {
     });
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('requires matching Init recovery but lets confirmed destructive discard drain any journal', async () => {
@@ -4499,7 +4499,7 @@ describe('recovery barriers', () => {
         recoveryOperationId: 'wrong',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
     const recovery = track(
       await acquireRuntimeExclusiveLease({
         projectDir: project,
@@ -4583,7 +4583,7 @@ describe('recovery barriers', () => {
       state: 'open',
     });
     await expect(acquireUserStateReadLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     const recovery = track(
       await acquireGlobalRuntimeMaintenanceLease({
@@ -4608,7 +4608,7 @@ describe('recovery barriers', () => {
     );
     expect(discard.receiptOnlyDiscard).toBe(true);
     await expect(readUserUninstallReceipt(discard)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+      code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
     });
     privateWrite(receipt, {
       kind: 'user-uninstall',
@@ -4617,7 +4617,7 @@ describe('recovery barriers', () => {
       state: 'closed',
     });
     await expect(discardUserUninstallReceipt(discard)).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
     release(discard);
 
@@ -4627,7 +4627,7 @@ describe('recovery barriers', () => {
         posture: 'receipt-only-discard',
         policy: POLICY,
       }),
-    ).rejects.toMatchObject({ code: 'CONFIGURATION.RECOVERY_REQUIRED' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_RECOVERY.REQUIRED' });
   });
 
   it('combines malformed-receipt discard with automatic foreign-owner expiry', async () => {
@@ -4709,7 +4709,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'CONFIGURATION.RECOVERY_REQUIRED',
+      code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
     });
   });
 
@@ -4723,7 +4723,7 @@ describe('recovery barriers', () => {
     });
 
     await expect(acquireGlobalRuntimeMaintenanceLease({ policy: POLICY })).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
   });
 
@@ -4740,11 +4740,11 @@ describe('recovery barriers', () => {
 
       expect(() => inspectRuntimePromotionRecoveryHeader(project)).toThrow(
         expect.objectContaining({
-          code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+          code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
         }),
       );
       await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-        code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+        code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
       });
     },
   );
@@ -4825,7 +4825,7 @@ describe('recovery barriers', () => {
       status: 'absent',
     });
     await expect(inspectRuntimeLeaseState(project)).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD',
     });
     expect({
       entries: readdirSync(paths.coordinationDir).sort(),
@@ -4847,7 +4847,7 @@ describe('anchored coordination mutation and cleanup', () => {
           parentDir: join(anchor, 'missing-parent'),
           basename: 'missing.json',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.PROBE_FAILED' }));
       expect(() =>
         readAnchoredRecord({
           trustedAnchorDir: anchor,
@@ -4855,7 +4855,7 @@ describe('anchored coordination mutation and cleanup', () => {
           basename: 'missing.json',
           maxBytes: Number.NaN,
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }
@@ -4878,14 +4878,14 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.PROBE_FAILED' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
           operation: 'replace',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
       expect(
         mutateAnchoredRecord({
           ...baseMutation,
@@ -4899,7 +4899,7 @@ describe('anchored coordination mutation and cleanup', () => {
           content: '{}',
           expectedContentSha256: 'invalid',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
@@ -4907,14 +4907,14 @@ describe('anchored coordination mutation and cleanup', () => {
           content: '{}',
           expectedContentSha256: digest,
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         mutateAnchoredRecord({
           ...baseMutation,
           operation: 'unlink',
           createIdentity: '12345678-1234-4234-8234-123456789012',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4923,7 +4923,7 @@ describe('anchored coordination mutation and cleanup', () => {
             expectedContentSha256: 'invalid',
           },
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4932,7 +4932,7 @@ describe('anchored coordination mutation and cleanup', () => {
             expectedContentSha256: digest,
           },
         } as unknown as Parameters<typeof readAnchoredRecord>[0]),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
@@ -4942,7 +4942,7 @@ describe('anchored coordination mutation and cleanup', () => {
             maxEntries: 0,
           },
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(
         readAnchoredRecord({
           ...baseMutation,
@@ -4958,16 +4958,16 @@ describe('anchored coordination mutation and cleanup', () => {
           ...baseMutation,
           permissionPosture: 'invalid',
         } as unknown as Parameters<typeof readAnchoredRecord>[0]),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         readAnchoredRecord({
           ...baseMutation,
           basename: '../record.json',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(() =>
         anchoredRecordTemporaryBasename('é'.repeat(110), '12345678-1234-4234-8234-123456789012'),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.INPUT' }));
       expect(existsSync(join(anchor, 'record.json'))).toBe(false);
     } finally {
       rmSync(anchor, { recursive: true, force: true });
@@ -5051,7 +5051,7 @@ describe('anchored coordination mutation and cleanup', () => {
         }),
       ).toThrow(
         expect.objectContaining({
-          code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+          code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
         }),
       );
     } finally {
@@ -5086,7 +5086,7 @@ describe('anchored coordination mutation and cleanup', () => {
             }),
           ).toThrow(
             expect.objectContaining({
-              code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+              code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
             }),
           );
         }
@@ -5194,7 +5194,7 @@ describe('anchored coordination mutation and cleanup', () => {
     try {
       await waitForChildOutput(child, 'READY\n');
       expect(() => writer.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.MUTEX' }),
       );
       await waitForChildOutput(child, 'DONE\n');
       await waitUntil(() => events.includes('lease.release'));
@@ -5253,10 +5253,10 @@ describe('anchored coordination mutation and cleanup', () => {
     try {
       await waitForChildOutput(child, 'READY\n');
       expect(() => first.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.MUTEX' }),
       );
       expect(() => second.release()).toThrow(
-        expect.objectContaining({ code: 'TIMEOUT.RUNTIME_COORDINATION_MUTEX' }),
+        expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.MUTEX' }),
       );
       await waitForChildOutput(child, 'DONE\n');
       await waitUntil(async () => {
@@ -5290,7 +5290,7 @@ describe('anchored coordination mutation and cleanup', () => {
         content: '{}',
         permissionPosture: 'private',
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE' }));
     expect(existsSync(paths.coordinationDir)).toBe(false);
   });
 
@@ -5323,7 +5323,7 @@ describe('anchored coordination mutation and cleanup', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'SYSTEM.RUNTIME_LEASE.AUTHORITY_SCOPE',
+        code: 'CORE.RUNTIME_LEASE.AUTHORITY_SCOPE',
       }),
     );
     expect(readFileSync(projectPaths.promotionJournalFile, 'utf8')).toBe(content);
@@ -5370,7 +5370,7 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: '{}',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
       expect(existsSync(join(parent, 'record.json'))).toBe(false);
       expect(existsSync(join(replacedParent, 'record.json'))).toBe(false);
     } finally {
@@ -5463,7 +5463,10 @@ describe('anchored coordination mutation and cleanup', () => {
           }),
         ).toThrow(
           expect.objectContaining({
-            code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+            // Parent replaced mid-mutation: a containment finding, so `security` rather than
+            // the record-integrity code — the directory under us was swapped, the record is
+            // not what is wrong.
+            code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
           }),
         );
         expect(readFileSync(join(parent, 'record.json'), 'utf8')).toBe(
@@ -5505,7 +5508,7 @@ describe('anchored coordination mutation and cleanup', () => {
         maxBytes: 4096,
         permissionPosture: 'private',
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.EXISTS' }));
     expect(existsSync(temp)).toBe(false);
     expect(lstatSync(target).nlink).toBe(1);
     rmSync(anchor, { recursive: true, force: true });
@@ -5533,7 +5536,7 @@ describe('anchored coordination mutation and cleanup', () => {
         maxBytes: 4096,
         permissionPosture: 'private',
       }),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.EXISTS' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.EXISTS' }));
     expect(readFileSync(target, 'utf8')).toBe(incumbent);
     expect(existsSync(temporary)).toBe(false);
     expect(lstatSync(target).nlink).toBe(1);
@@ -5557,7 +5560,7 @@ describe('anchored coordination mutation and cleanup', () => {
         maxBytes: 4096,
         linkedTargetCanBeBusy: true,
       } as Parameters<typeof mutateAnchoredRecord>[0]),
-    ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+    ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' }));
     expect(existsSync(target)).toBe(true);
     expect(existsSync(peer)).toBe(true);
     rmSync(anchor, { recursive: true, force: true });
@@ -5568,7 +5571,7 @@ describe('anchored coordination mutation and cleanup', () => {
     symlinkSync(project, paths.coordinationDir);
     await expect(
       acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-    ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+    ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
     rmSync(paths.coordinationDir);
 
     const anchor = mkdtempSync(join(tmpdir(), 'opensip-anchor-symlink-'));
@@ -5589,7 +5592,7 @@ describe('anchored coordination mutation and cleanup', () => {
           operation: 'create',
           content: 'x',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }
@@ -5605,7 +5608,7 @@ describe('anchored coordination mutation and cleanup', () => {
       symlinkSync(project, projectPaths.projectCoordinationDir);
       await expect(
         acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
 
       rmSync(projectPaths.projectCoordinationDir);
       mkdirSync(projectPaths.projectCoordinationDir, { mode: 0o700 });
@@ -5613,7 +5616,7 @@ describe('anchored coordination mutation and cleanup', () => {
       symlinkSync(project, paths.globalMutexFile);
       await expect(
         acquireRuntimeReadLease({ projectDir: project, policy: POLICY }),
-      ).rejects.toMatchObject({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' });
+      ).rejects.toMatchObject({ code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' });
     },
   );
 
@@ -5623,7 +5626,7 @@ describe('anchored coordination mutation and cleanup', () => {
     const paths = resolveCoordinationPaths();
     chmodSync(paths.coordinationDir, 0o755);
     await expect(listActiveRuntimeLeaseKeys()).rejects.toMatchObject({
-      code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+      code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
     });
     chmodSync(paths.coordinationDir, 0o700);
 
@@ -5650,7 +5653,7 @@ describe('anchored coordination mutation and cleanup', () => {
           maxBytes: 4096,
           permissionPosture: 'private',
         }),
-      ).toThrow(expect.objectContaining({ code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' }));
+      ).toThrow(expect.objectContaining({ code: 'CORE.RUNTIME_COORDINATION.CORRUPT_RECORD' }));
     } finally {
       rmSync(anchor, { recursive: true, force: true });
     }

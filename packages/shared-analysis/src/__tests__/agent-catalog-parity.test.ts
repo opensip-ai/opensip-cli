@@ -82,7 +82,7 @@ describe('agent-catalog parity contract', () => {
       });
     } catch (error) {
       expect(error).toBeInstanceOf(ValidationError);
-      expect((error as ValidationError).code).toBe('AGENT_CATALOG.STALE_TOOL_OVERLAY');
+      expect((error as ValidationError).code).toBe('CORE.AGENT_CATALOG.UNPUBLISHABLE');
     }
   });
 

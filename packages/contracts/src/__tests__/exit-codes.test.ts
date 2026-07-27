@@ -237,7 +237,7 @@ describe('mapToolErrorToExitCode (Tool error contract — audit-round-2 Finding 
     expect(
       mapToolErrorToExitCode(
         new ConfigurationError('recovery required', {
-          code: 'CONFIGURATION.RECOVERY_REQUIRED',
+          code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
         }),
       ),
     ).toBe(EXIT_CODES.CONFIGURATION_ERROR);

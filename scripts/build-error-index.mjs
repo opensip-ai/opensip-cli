@@ -7,11 +7,22 @@
  *   node scripts/extract-error-catalog-metadata.mjs | node scripts/build-error-index.mjs - --check
  */
 
-import { promises as fs } from 'node:fs';
+import { promises as fs, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
+/**
+ * The version this doc is generated against, read rather than hardcoded.
+ *
+ * It was a literal `v0.8.4`, so every regeneration re-asserted a stale release and the
+ * version-surface gate drifted the moment core moved on — a generated file cannot be the thing
+ * that goes out of date.
+ */
+function coreVersion() {
+  return JSON.parse(readFileSync(join(REPO_ROOT, 'packages/core/package.json'), 'utf8')).version;
+}
+
 const INDEX_DOC = join(REPO_ROOT, 'docs/public/70-reference/18-error-code-index.md');
 
 function escapeMd(s) {
@@ -35,7 +46,7 @@ function buildMarkdown(payload) {
     '---',
     'status: current',
     `last_verified: ${new Date().toISOString().slice(0, 10)}`,
-    'release: v0.8.4',
+    `release: v${coreVersion()}`,
     'title: "Error code index"',
     'audience: [contributors, operators, agents]',
     'purpose: "Generated registry of registered OpenSIP error codes with axes and operator actions."',

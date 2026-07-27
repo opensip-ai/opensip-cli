@@ -208,6 +208,7 @@ export class LoggerImpl implements Logger {
       this.logFilePath = join(dir, `${today}.jsonl`);
       pruneOldLogs(dir);
     } catch {
+      // @swallow-ok best-effort log setup: an unwritable log directory disables file logging, and crashing the run because we cannot LOG would invert the priority
       // Best effort — don't crash if we can't create the log directory
       this.logFilePath = undefined;
     }

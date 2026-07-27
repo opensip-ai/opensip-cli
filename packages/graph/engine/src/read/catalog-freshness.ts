@@ -29,7 +29,7 @@ import type {
   FreshnessReasonCode,
   FreshnessVerification,
 } from './query-contracts.js';
-import type { GraphAdapterRegistryReader, GraphReadError } from './types.js';
+import type { GraphAdapterRegistryReader, GraphReadError, GraphReadReason } from './types.js';
 import type { DiscoverOutput, GraphLanguageAdapter } from '../lang-adapter/types.js';
 import type {
   AdapterSelectionEvidence,
@@ -38,6 +38,8 @@ import type {
   GraphConfig,
 } from '../types.js';
 
+/** Registered replacement for the un-catalogued `GRAPH.READ.VERIFY_FAILED` reason code. */
+
 const MAX_ADAPTERS = 64;
 const MAX_DISCOVERED_FILES = 1_000_000;
 const MAX_CACHE_KEY_LEN = 1024;
@@ -45,8 +47,8 @@ const MAX_CHANGE_SAMPLES = 50;
 const MAX_DISCOVERY_PATH_LEN = 4096;
 const MAX_SHARD_INPUTS = 10_000;
 const MAX_SHARD_ID_LEN = 256;
-const VERIFY_CACHE_KEY_ERROR = 'GRAPH.READ.VERIFY_CACHE_KEY';
-const VERIFY_DISCOVERY_ERROR = 'GRAPH.READ.VERIFY_DISCOVERY';
+const VERIFY_CACHE_KEY_ERROR = 'verify-cache-key';
+const VERIFY_DISCOVERY_ERROR = 'verify-discovery';
 
 /** Inputs used to verify that a persisted catalog still matches current graph inputs. */
 export interface VerifyCatalogInputsInput {
@@ -57,7 +59,7 @@ export interface VerifyCatalogInputsInput {
   readonly graphConfig?: GraphConfig;
 }
 
-function graphReadError(code: string, message: string): GraphReadError {
+function graphReadError(code: GraphReadReason, message: string): GraphReadError {
   const bounded = message.length > 160 ? `${message.slice(0, 157)}...` : message;
   return { code, operation: 'catalog-generation', message: bounded };
 }
@@ -102,9 +104,7 @@ function snapshotRegistry(
 ): Result<GraphAdapterRegistryReader, GraphReadError> {
   const entries = source.getAll();
   if (entries.length > MAX_ADAPTERS || source.size !== entries.length) {
-    return err(
-      graphReadError('GRAPH.READ.VERIFY_REGISTRY', 'Adapter registry snapshot is inconsistent'),
-    );
+    return err(graphReadError('verify-registry', 'Adapter registry snapshot is inconsistent'));
   }
   const map = new Map<string, GraphLanguageAdapter>();
   for (const entry of entries) {
@@ -115,7 +115,7 @@ function snapshotRegistry(
     ) {
       return err(
         graphReadError(
-          'GRAPH.READ.VERIFY_DESCRIPTOR',
+          'verify-descriptor',
           'Adapter registry contains a hostile or inconsistent descriptor',
         ),
       );
@@ -216,7 +216,7 @@ export async function verifyCatalogInputs(
   } catch {
     return err(
       graphReadError(
-        'GRAPH.READ.VERIFY_FAILED',
+        'catalog-unreadable',
         'Catalog input verification failed due to infrastructure error',
       ),
     );
@@ -353,10 +353,7 @@ function selectAdapter(
     );
   } catch {
     return err(
-      graphReadError(
-        'GRAPH.READ.VERIFY_SELECTION',
-        'Adapter selection failed during catalog verification',
-      ),
+      graphReadError('verify-selection', 'Adapter selection failed during catalog verification'),
     );
   }
 }

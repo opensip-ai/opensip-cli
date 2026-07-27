@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { hasErrorCode } from './error-code.js';
 import { RuntimeManifestError, runtimeManifestIdentityEqual } from './runtime-manifest.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
+import { JOURNAL_ERROR_CODE } from './runtime-promotion-journal-controller-validation.js';
 import { canonicalRuntimePromotionCacheChild } from './runtime-promotion-preflight-fs.js';
 import {
   RuntimePromotionDatastoreError,
@@ -67,13 +68,13 @@ export function recoveryFailureReason(
     if (
       message.includes('malformed') ||
       message.includes('canonically encoded') ||
-      hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')
+      hasErrorCode(error, JOURNAL_ERROR_CODE)
     ) {
       return 'journal-malformed';
     }
     return 'state-ambiguous';
   }
-  if (hasErrorCode(error, 'SYSTEM.INIT.PROMOTION_JOURNAL')) {
+  if (hasErrorCode(error, JOURNAL_ERROR_CODE)) {
     return 'journal-phase-invalid';
   }
   if (

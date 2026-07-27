@@ -12,6 +12,7 @@ import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
 import { ConfigurationError, currentScope, type ProjectContext } from '@opensip-cli/core';
 
 import { policyFromCurrentScope } from '../../bootstrap/policy-pep.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import {
   defineHostCommand as defineCommand,
   type HostRuntimeCommandSpec,
@@ -29,6 +30,10 @@ import { runToolValidation } from './validate.js';
 
 import type { CliCommandsContext } from '../shared.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 type HostSpec = HostRuntimeCommandSpec<unknown, CliCommandsContext>;
 const COMMAND_RESULT_OUTPUT = 'command-result';
@@ -57,7 +62,9 @@ function effectiveCwd(opts: ScopeFilterOpts): string {
 function assertExclusiveScope(opts: ScopeFilterOpts): void {
   if (opts.global === true && opts.project === true) {
     throw new ConfigurationError('--global and --project are mutually exclusive', {
-      code: 'CONFIG.TOOLS.SCOPE_CONFLICT',
+      code: OPTION_INVALID.code,
+      definition: OPTION_INVALID,
+      metadata: { condition: 'tools-scope-conflict' },
     });
   }
 }

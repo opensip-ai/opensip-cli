@@ -101,50 +101,137 @@ export function validateToolErrorCatalogContribution(
       ? {}
       : { packageName: owner.packageName ?? declaredPackageName }),
   };
+  // No `allowLegacyCodes` here, deliberately: a third-party tool's catalog is held to the same
+  // grammar and one-head-per-owner rule as a first-party one. Exempting the tools we do NOT
+  // control, while binding the ones we do, would invert the point of the guardrail.
   const catalog = defineErrorCatalog(
     effectiveOwner,
     definitions as Parameters<typeof defineErrorCatalog>[1],
-    { allowLegacyCodes: true },
   );
   return { schemaVersion: ERROR_CATALOG_SCHEMA_VERSION, catalog };
 }
 
 /**
- * Merge core system catalog with loaded tool catalogs; fail on code collisions
- * across tools (same code, different owner).
+ * A catalog owned by a non-Tool package (Plan 01 ruling D1).
+ *
+ * Before this existed the only registration path was `ToolExtensionPoints.errorCatalog`,
+ * so a substrate such as config, datastore, session-store, output, codebase or targeting
+ * had no way to own a code: its failures either normalized at the CLI composition root —
+ * making the host the recorded owner of failures it never raised — or fell back to a
+ * legacy family, which erases the axes that make a code useful. `DataStoreVersionError`
+ * is the worked example: its message IS the user's upgrade instruction, yet a
+ * `SYSTEM_ERROR` fallback carries `exposure: 'redacted'` and hides it.
+ *
+ * Ownership is keyed on the package name, so attribution stays honest and the generated
+ * code index stays complete.
+ */
+export interface SubstrateErrorCatalogContribution {
+  /** npm package name; must equal every contributed definition's `owner.id`. */
+  readonly packageName: string;
+  readonly catalog: ErrorCatalog;
+}
+
+/**
+ * Merge the core system catalog with loaded tool catalogs and substrate catalogs; fail on
+ * code collisions across owners (same code, different owner).
+ *
+ * Substrates are folded in BEFORE tools so that a tool contributing a code a substrate
+ * already owns is reported as a collision rather than silently taking ownership.
  */
 export function aggregateErrorCatalogs(
   toolCatalogs: readonly { toolName: string; toolId: string; catalog: ErrorCatalog }[],
+  substrateCatalogs: readonly SubstrateErrorCatalogContribution[] = [],
 ): {
   readonly byCode: ReadonlyMap<string, ErrorDefinition & { readonly toolName?: string }>;
   readonly collisions: readonly { code: string; owners: readonly string[] }[];
 } {
-  const byCode = new Map<string, ErrorDefinition & { toolName?: string }>();
-  const collisions: { code: string; owners: string[] }[] = [];
+  const fold = new CatalogFold();
 
-  for (const def of coreSystemErrorCatalog.list) {
-    byCode.set(def.code, def);
+  for (const def of coreSystemErrorCatalog.list) fold.seedCore(def);
+  // Substrates before tools: see the doc comment above.
+  for (const entry of substrateCatalogs) fold.admit(entry.catalog, entry.packageName);
+  for (const entry of toolCatalogs) fold.admit(entry.catalog, entry.toolId, entry.toolName);
+
+  return fold.result();
+}
+
+/**
+ * One pass of catalog admission, extracted so substrates and tools share it rather than
+ * running two near-identical loops whose only real difference is the `toolName` stamp.
+ */
+class CatalogFold {
+  private readonly byCode = new Map<string, ErrorDefinition & { toolName?: string }>();
+  private readonly collisions: { code: string; owners: string[] }[] = [];
+
+  /**
+   * head → the owner that claimed it.
+   *
+   * `defineErrorCatalog` already guarantees one head PER catalog; this is the other half of
+   * the same invariant — one owner per head ACROSS catalogs. Together they are what makes a
+   * code globally unique without a central allocator: an owner cannot mint outside its head,
+   * and no two owners share one. Without this half, two packages could each be internally
+   * consistent under `X.` and still collide on `X.CONFIG.INVALID`.
+   */
+  private readonly headClaims = new Map<string, string>();
+
+  seedCore(def: ErrorDefinition): void {
+    this.byCode.set(def.code, def);
   }
 
-  for (const entry of toolCatalogs) {
-    for (const def of entry.catalog.list) {
-      const existing = byCode.get(def.code);
-      if (
-        def.owner.id !== entry.toolId ||
-        (existing !== undefined &&
-          (existing.owner.id !== def.owner.id || existing.toolName !== entry.toolName))
-      ) {
-        collisions.push({
+  /** Fold one catalog in, recording every collision it causes rather than throwing. */
+  admit(catalog: ErrorCatalog, ownerId: string, toolName?: string): void {
+    this.claimHead(catalog, ownerId);
+    for (const def of catalog.list) {
+      const existing = this.byCode.get(def.code);
+      if (def.owner.id !== ownerId || this.isTaken(existing, def, toolName)) {
+        this.collisions.push({
           code: def.code,
-          owners: [existing?.owner.id ?? entry.toolId, def.owner.id],
+          owners: [existing?.owner.id ?? ownerId, def.owner.id],
         });
         continue;
       }
-      byCode.set(def.code, Object.freeze({ ...def, toolName: entry.toolName }));
+      this.byCode.set(
+        def.code,
+        Object.freeze({ ...def, ...(toolName === undefined ? {} : { toolName }) }),
+      );
     }
   }
 
-  return { byCode, collisions };
+  result(): {
+    readonly byCode: ReadonlyMap<string, ErrorDefinition & { readonly toolName?: string }>;
+    readonly collisions: readonly { code: string; owners: readonly string[] }[];
+  } {
+    return { byCode: this.byCode, collisions: this.collisions };
+  }
+
+  /**
+   * A substrate may not overwrite ANY code already present. A tool may re-register its own
+   * code under its own name — one owner is allowed more than one catalog — but not a code
+   * another owner holds.
+   */
+  private isTaken(
+    existing: (ErrorDefinition & { toolName?: string }) | undefined,
+    def: ErrorDefinition,
+    toolName: string | undefined,
+  ): boolean {
+    if (existing === undefined) return false;
+    if (toolName === undefined) return true;
+    return existing.owner.id !== def.owner.id || existing.toolName !== toolName;
+  }
+
+  /** Record a head conflict WITHOUT skipping the catalog, so per-code clashes still surface. */
+  private claimHead(catalog: ErrorCatalog, ownerId: string): void {
+    const head = catalog.codeHead;
+    // `undefined` head = the legacy class-default catalog, whose codes are un-dotted and
+    // therefore cannot collide with an owner-scoped one.
+    if (head === undefined) return;
+    const claimed = this.headClaims.get(head);
+    if (claimed !== undefined && claimed !== ownerId) {
+      this.collisions.push({ code: `${head}.*`, owners: [claimed, ownerId] });
+      return;
+    }
+    this.headClaims.set(head, ownerId);
+  }
 }
 
 export { coreSystemErrorCatalog, ERROR_CATALOG_SCHEMA_VERSION } from '../lib/error-definition.js';

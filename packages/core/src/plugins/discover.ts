@@ -28,8 +28,10 @@ import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join, extname, relative, sep } from 'node:path';
 
 import { resolveProjectConfigPath } from '../config-resolution.js';
+import { normalizeFailure } from '../lib/failure-envelope.js';
 import { logger } from '../lib/logger.js';
 import { isPathInside, resolveProjectPaths } from '../lib/paths.js';
+import { currentLogger } from '../lib/run-scope.js';
 import { readYamlFile } from '../lib/yaml.js';
 
 import { resolvePackageEntryPoint } from './package-entry.js';
@@ -59,6 +61,33 @@ const DISCOVER_SKIP_EVENT = 'plugin.loader.discover.skip';
  *                    fallback. Pass undefined to discover nothing
  *                    (used by callers that don't have a project
  *                    context yet).
+ */
+/**
+ * Surface a discovery probe that could not read a directory.
+ *
+ * Best-effort by construction: a diagnostic must never be able to fail the discovery it is
+ * describing, so a missing logger is simply silence.
+ */
+function reportDiscoveryProbeFailure(dir: string, error: unknown): void {
+  try {
+    const failure = normalizeFailure(error);
+    currentLogger().warn({
+      evt: 'core.plugins.discovery_probe_failed',
+      code: failure.code,
+      errno: failure.metadata.errno,
+      dir,
+      msg: 'A plugin directory could not be read; plugins under it are missing from this run',
+    });
+  } catch {
+    // @swallow-ok a diagnostic must not fail the discovery path it exists to explain
+  }
+}
+
+/**
+ * Enumerate the plugins present under `layout` for `projectDir`.
+ *
+ * Total by design: an unreadable directory yields no plugins for that layout and is reported
+ * through the discovery-probe diagnostic rather than failing the run.
  */
 export function discoverPlugins(layout: PluginLayout, projectDir?: string): DiscoveredPlugin[] {
   if (!projectDir) return [];
@@ -261,7 +290,14 @@ function discoverLooseFilesInDir(
   let entries: string[];
   try {
     entries = readdirSync(dir);
-  } catch {
+    // @swallow-ok degradation is now REPORTED (core.plugins.discovery_probe_failed) rather than
+    // silent; discovery must not fail a run, so the empty result stays but is no longer invisible.
+  } catch (error) {
+    // Returning the accumulator made an unreadable plugin directory indistinguishable from an
+    // empty one: under EACCES or EMFILE the walk reported ZERO user-authored checks and the run
+    // proceeded on a silently smaller analyzed surface. Degradation is still the behaviour —
+    // discovery must not fail a run — but it is now visible (ruling D7).
+    reportDiscoveryProbeFailure(dir, error);
     return plugins;
   }
 

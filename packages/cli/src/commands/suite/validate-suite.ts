@@ -9,9 +9,15 @@ import {
 } from '@opensip-cli/core';
 
 import { isExternalToolProvenance } from '../../bootstrap/tool-provenance.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { assembleOptsFromSpec } from '../assemble-opts.js';
 
 import type { SuiteDefinition, SuiteStep } from '@opensip-cli/config';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const SUITE_INVALID = hostErrorCatalog.require('CLI.SUITE.INVALID');
+const SUITE_UNKNOWN_REFERENCE = hostErrorCatalog.require('CLI.SUITE.UNKNOWN_REFERENCE');
 
 const RUN_SCOPE_ARG_KEYS = new Set([
   'cwd',
@@ -67,7 +73,9 @@ export function validateSuite(args: {
   });
   if (errors.length > 0) {
     throw new ConfigurationError(errors.join('\n'), {
-      code: 'CONFIG.SUITE.INVALID',
+      code: SUITE_INVALID.code,
+      definition: SUITE_INVALID,
+      metadata: { condition: 'shape' },
     });
   }
   return {
@@ -87,14 +95,22 @@ function validateSuiteStep(
   if (tool === undefined) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} references unknown tool UUID '${step.tool}'.`,
-      { code: 'CONFIG.SUITE.UNKNOWN_TOOL' },
+      {
+        code: SUITE_UNKNOWN_REFERENCE.code,
+        definition: SUITE_UNKNOWN_REFERENCE,
+        metadata: { condition: 'unknown-tool' },
+      },
     );
   }
   const spec = (tool.commandSpecs ?? []).find((candidate) => candidate.name === step.command);
   if (spec === undefined) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} references unknown command '${step.command}' for tool '${tool.metadata.name}'.`,
-      { code: 'CONFIG.SUITE.UNKNOWN_COMMAND' },
+      {
+        code: SUITE_UNKNOWN_REFERENCE.code,
+        definition: SUITE_UNKNOWN_REFERENCE,
+        metadata: { condition: 'unknown-command' },
+      },
     );
   }
   const kind = validateStepCapability(suiteName, step, index, tool, spec);
@@ -121,7 +137,11 @@ function validateStepCapability(
   if (spec.output === 'live-view') {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' is a live-view command; suites require non-interactive commands in v1.`,
-      { code: 'CONFIG.SUITE.LIVE_VIEW_UNSUPPORTED' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'live-view-unsupported' },
+      },
     );
   }
   const producesVerdict = commandProducesVerdict(spec);
@@ -129,20 +149,32 @@ function validateStepCapability(
   if (producesVerdict && producesEvidence) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' declares both verdict and evidence snapshot capabilities. Combined semantics are unsupported in v1.`,
-      { code: 'CONFIG.SUITE.AMBIGUOUS_CAPABILITY' },
+      {
+        code: SUITE_UNKNOWN_REFERENCE.code,
+        definition: SUITE_UNKNOWN_REFERENCE,
+        metadata: { condition: 'ambiguous-capability' },
+      },
     );
   }
   if (!producesVerdict && !producesEvidence) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} command '${step.command}' does not produce a gate verdict. ` +
         `Suite steps must produce a verdict or an evidence snapshot. Remove this step or point it at a run/evidence command.`,
-      { code: 'CONFIG.SUITE.NOT_A_RUN_COMMAND' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'not-a-run-command' },
+      },
     );
   }
   if (producesEvidence && isExternalToolProvenance(tool, currentScope()?.toolProvenance ?? [])) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} evidence command '${step.command}' would use the external worker transport, which does not carry evidence snapshots in v1.`,
-      { code: 'CONFIG.SUITE.EVIDENCE_EXTERNAL_UNSUPPORTED' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'evidence-external' },
+      },
     );
   }
   return producesEvidence ? 'evidence' : 'verdict';
@@ -160,7 +192,11 @@ function validateStepArguments(
   if (step.cwd !== undefined) {
     throw new ConfigurationError(
       `Suite '${suiteName}' step ${index + 1} declares reserved per-step cwd. Put run-scope flags on 'suite run' instead.`,
-      { code: 'CONFIG.SUITE.RESERVED_CWD' },
+      {
+        code: SUITE_INVALID.code,
+        definition: SUITE_INVALID,
+        metadata: { condition: 'reserved-cwd' },
+      },
     );
   }
 
@@ -169,7 +205,11 @@ function validateStepArguments(
     if (RUN_SCOPE_ARG_KEYS.has(key)) {
       throw new ConfigurationError(
         `Suite '${suiteName}' step ${index + 1} uses run-scope arg '${key}'. Put run-scope flags on 'suite run' instead.`,
-        { code: 'CONFIG.SUITE.RUN_SCOPE_ARG' },
+        {
+          code: SUITE_INVALID.code,
+          definition: SUITE_INVALID,
+          metadata: { condition: 'run-scope-arg' },
+        },
       );
     }
   }
@@ -184,7 +224,11 @@ function validateStepArguments(
     if (!knownKeys.has(key)) {
       throw new ConfigurationError(
         `Suite '${suiteName}' step ${index + 1} arg '${key}' is not an option on '${step.command}'.`,
-        { code: 'CONFIG.SUITE.UNKNOWN_ARG' },
+        {
+          code: SUITE_INVALID.code,
+          definition: SUITE_INVALID,
+          metadata: { condition: 'unknown-arg' },
+        },
       );
     }
   }

@@ -69,18 +69,29 @@ export function findNearDuplicates(
 
   const { edges, cappedBuckets } = buildNearEdges(eligible, minSimilarity, bands, rows);
   const components = clusterComponents(eligible.length, edges);
+  const { clusters, cappedClusters } = emitComponentClusters(eligible, components, edges);
+  const reasons: string[] = [];
+  if (cappedBuckets > 0) reasons.push('lsh-bucket-cap');
+  if (cappedClusters > 0) reasons.push('cluster-size-cap');
   return {
-    clusters: emitComponentClusters(eligible, components, edges),
+    clusters,
     coverage: {
-      complete: cappedBuckets === 0,
-      reasons: cappedBuckets === 0 ? [] : ['lsh-bucket-cap'],
+      // Both caps bound the walk, so both must clear `complete`. Accounting only for
+      // the bucket cap reported a truncated pass as exhaustive — a consumer branching
+      // on `!coverage.complete` could not tell a bounded run from a clean one.
+      complete: cappedBuckets === 0 && cappedClusters === 0,
+      reasons,
       cappedBuckets,
+      cappedClusters,
     },
   };
 }
 
 function emptyResult(): NearDuplicateResult {
-  return { clusters: [], coverage: { complete: true, reasons: [], cappedBuckets: 0 } };
+  return {
+    clusters: [],
+    coverage: { complete: true, reasons: [], cappedBuckets: 0, cappedClusters: 0 },
+  };
 }
 
 function collectEligible(
@@ -202,10 +213,14 @@ function emitComponentClusters(
   eligible: readonly CloneCandidate[],
   components: readonly number[][],
   edges: readonly NearEdge[],
-): NearDuplicateCluster[] {
+): { clusters: NearDuplicateCluster[]; cappedClusters: number } {
   const edgesByComponent = indexEdgesByComponent(components, edges);
   const clusters: NearDuplicateCluster[] = [];
+  // Counted here rather than inside buildComponentCluster so the tally reflects
+  // COMPONENTS that were truncated, independent of how many clusters each yields.
+  let cappedClusters = 0;
   for (const [index, component] of components.entries()) {
+    if (component.length > MAX_CLUSTER_SIZE) cappedClusters += 1;
     const cluster = buildComponentCluster(
       eligible,
       component,
@@ -213,7 +228,7 @@ function emitComponentClusters(
     );
     if (cluster) clusters.push(cluster);
   }
-  return clusters;
+  return { clusters, cappedClusters };
 }
 
 const EMPTY_EDGES: readonly NearEdge[] = [];

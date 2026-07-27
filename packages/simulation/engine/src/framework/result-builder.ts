@@ -7,6 +7,11 @@
 
 import { createSignal, isErrorSignal, ValidationError } from '@opensip-cli/core';
 
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
+
+/** Builder-ordering invariant: `withMetrics` must run before assertions are evaluated. */
+const METRICS_REQUIRED = simulationErrorCatalog.require('SIMULATION.METRICS.REQUIRED');
+
 import { evaluateAssertion } from './assertions.js';
 import { resolveMetric } from './resolve-metric.js';
 
@@ -119,7 +124,7 @@ export class ScenarioResultBuilder {
     if (!this._metrics) {
       throw new ValidationError(
         'Metrics must be set before evaluating assertions. Call withMetrics() first.',
-        { code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED' },
+        { code: METRICS_REQUIRED.code, definition: METRICS_REQUIRED },
       );
     }
 
@@ -159,7 +164,8 @@ export class ScenarioResultBuilder {
   build(): LoadResultPayload {
     if (!this._metrics) {
       throw new ValidationError('Metrics are required. Call withMetrics() before build().', {
-        code: 'VALIDATION.RESULT_BUILDER.METRICS_REQUIRED',
+        code: METRICS_REQUIRED.code,
+        definition: METRICS_REQUIRED,
       });
     }
 

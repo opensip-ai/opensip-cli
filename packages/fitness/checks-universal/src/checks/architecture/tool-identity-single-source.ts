@@ -165,6 +165,7 @@ export async function analyzeAllToolIdentityManifests(
     try {
       pkg = JSON.parse(await files.read(filePath)) as PackageJson;
     } catch {
+      // @swallow-ok a malformed package.json is another check’s subject; this one reports on identity fields it could parse
       continue;
     }
     violations.push(...analyzeToolIdentitySingleSource(pkg, filePath));

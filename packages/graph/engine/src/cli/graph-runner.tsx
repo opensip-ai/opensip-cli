@@ -12,7 +12,7 @@ import {
   type ProgressEvent,
   type ProgressSurface,
 } from '@opensip-cli/cli-ui';
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { mapFailureToExitCode } from '@opensip-cli/contracts';
 import {
   runOffThreadOrInProcess,
   currentScope,
@@ -223,7 +223,12 @@ export async function renderGraphLive(
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
-          return { kind: 'error', message, exitCode: EXIT_CODES.RUNTIME_ERROR };
+          // The failure's own exit class, not a hardcoded 1. The default interactive `graph`
+          // path reported every produce() failure as a runtime error, so a ConfigurationError
+          // from the build — an unknown recipe, an unsupported --language — exited 1 where the
+          // same condition exits 2 through `--json`. `mapFailureToExitCode` is total: an
+          // untyped throw still lands on RUNTIME_ERROR.
+          return { kind: 'error', message, exitCode: mapFailureToExitCode(error) };
         }
       },
     },

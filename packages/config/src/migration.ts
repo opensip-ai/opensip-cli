@@ -7,6 +7,14 @@ import {
 } from '@opensip-cli/core';
 import { isMap, isScalar, parseDocument, type Document as YAMLDocument, type YAMLMap } from 'yaml';
 
+import { configErrorCatalog } from './errors/config-error-catalog.js';
+
+// Plan 01: nine `CONFIG.MIGRATION.*` literals with no catalog entry become three registered
+// definitions (D9) — the three answers a user can act on — with the branch in metadata.
+const UNMIGRATABLE = configErrorCatalog.require('CONFIG.MIGRATION.UNMIGRATABLE_DOCUMENT');
+const UNREADABLE = configErrorCatalog.require('CONFIG.MIGRATION.UNREADABLE');
+const VERSION_UNSUPPORTED = configErrorCatalog.require('CONFIG.MIGRATION.VERSION_UNSUPPORTED');
+
 /** Maximum project-config size accepted by the migration command. */
 export const MAX_CONFIG_MIGRATION_BYTES = 1_048_576;
 
@@ -66,7 +74,11 @@ function validateTargetVersion(targetVersion: number): void {
   if (!Number.isInteger(targetVersion) || targetVersion < 1) {
     throw new ConfigurationError(
       `Cannot migrate config: target schema version must be a positive integer.`,
-      { code: 'CONFIG.MIGRATION.INVALID_TARGET_VERSION' },
+      {
+        code: VERSION_UNSUPPORTED.code,
+        definition: VERSION_UNSUPPORTED,
+        metadata: { condition: 'invalid-target-version' },
+      },
     );
   }
 }
@@ -88,7 +100,9 @@ function parseConfigDocument(text: string, configPath: string | undefined) {
   if (doc.errors.length > 0) {
     const first = doc.errors[0]?.message ?? 'unknown YAML error';
     throw new ConfigurationError(`Cannot migrate ${configLabel(configPath)}: ${first}.`, {
-      code: 'CONFIG.MIGRATION.MALFORMED_YAML',
+      code: UNMIGRATABLE.code,
+      definition: UNMIGRATABLE,
+      metadata: { condition: 'malformed-yaml' },
     });
   }
   return doc;
@@ -99,7 +113,7 @@ function ensureRootMap(doc: YAMLDocument, configPath: string | undefined): YAMLM
   if (!isMap(doc.contents)) {
     throw new ConfigurationError(
       `Cannot migrate ${configLabel(configPath)}: opensip-cli.config.yml must start with a YAML map.`,
-      { code: 'CONFIG.MIGRATION.NON_MAP_CONFIG' },
+      { code: UNMIGRATABLE.code, definition: UNMIGRATABLE, metadata: { condition: 'non-map' } },
     );
   }
   return doc.contents;
@@ -149,7 +163,11 @@ export function migrateConfigText(input: MigrateConfigTextInput): MigrateConfigT
   if (read.version > targetVersion) {
     throw new ConfigurationError(
       `Cannot migrate ${configLabel(input.configPath)}: schemaVersion ${String(read.version)} is newer than this CLI supports (${String(targetVersion)}). Update OpenSIP CLI before editing this config.`,
-      { code: 'CONFIG.MIGRATION.CLI_TOO_OLD' },
+      {
+        code: VERSION_UNSUPPORTED.code,
+        definition: VERSION_UNSUPPORTED,
+        metadata: { condition: 'cli-too-old' },
+      },
     );
   }
   const operation = migrationOperation(read, targetVersion);
@@ -181,7 +199,9 @@ export function migrateConfigText(input: MigrateConfigTextInput): MigrateConfigT
 export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigFileResult {
   if (!existsSync(input.configPath)) {
     throw new ConfigurationError(`Cannot migrate ${input.configPath}: file does not exist.`, {
-      code: 'CONFIG.MIGRATION.NOT_FOUND',
+      code: UNREADABLE.code,
+      definition: UNREADABLE,
+      metadata: { condition: 'not-found' },
     });
   }
   const maxBytes = input.maxBytes ?? MAX_CONFIG_MIGRATION_BYTES;
@@ -191,7 +211,7 @@ export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigF
     if (!stat.isFile()) {
       throw new ConfigurationError(
         `Cannot migrate ${input.configPath}: path is not a regular file.`,
-        { code: 'CONFIG.MIGRATION.NOT_A_FILE' },
+        { code: UNREADABLE.code, definition: UNREADABLE, metadata: { condition: 'not-a-file' } },
       );
     }
     size = stat.size;
@@ -199,13 +219,18 @@ export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigF
     if (error instanceof ConfigurationError) throw error;
     throw new ConfigurationError(
       `Cannot migrate ${input.configPath}: ${error instanceof Error ? error.message : String(error)}`,
-      { code: 'CONFIG.MIGRATION.STAT_FAILED', cause: error },
+      {
+        code: UNREADABLE.code,
+        definition: UNREADABLE,
+        metadata: { condition: 'stat-failed' },
+        cause: error,
+      },
     );
   }
   if (size > maxBytes) {
     throw new ConfigurationError(
       `Cannot migrate ${input.configPath}: file is larger than ${String(maxBytes)} bytes.`,
-      { code: 'CONFIG.MIGRATION.CONFIG_TOO_LARGE' },
+      { code: UNMIGRATABLE.code, definition: UNMIGRATABLE, metadata: { condition: 'too-large' } },
     );
   }
   let text: string;
@@ -214,7 +239,12 @@ export function migrateConfigFile(input: MigrateConfigFileInput): MigrateConfigF
   } catch (error) {
     throw new ConfigurationError(
       `Cannot migrate ${input.configPath}: ${error instanceof Error ? error.message : String(error)}`,
-      { code: 'CONFIG.MIGRATION.READ_FAILED', cause: error },
+      {
+        code: UNREADABLE.code,
+        definition: UNREADABLE,
+        metadata: { condition: 'read-failed' },
+        cause: error,
+      },
     );
   }
   const result = migrateConfigText({

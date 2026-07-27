@@ -122,8 +122,8 @@ function assertAdhocSelectorMatched(
   if (recipe.checks.type === 'explicit') message = `Unknown check '${requested}'.`;
   if (recipe.checks.type === 'pattern') message = `No checks match pattern '${requested}'.`;
   throw new ConfigurationError(message, {
-    code: 'CONFIG.UNKNOWN_CHECK',
-    definition: fitnessErrorCatalog.require('CONFIG.UNKNOWN_CHECK'),
+    code: 'FIT.CHECK.UNKNOWN',
+    definition: fitnessErrorCatalog.require('FIT.CHECK.UNKNOWN'),
     metadata: { check: requested },
   });
 }

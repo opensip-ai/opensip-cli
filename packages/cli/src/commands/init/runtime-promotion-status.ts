@@ -260,14 +260,14 @@ function projectStableHeader(input: {
   if (read.error !== undefined) {
     const code = getErrorCode(read.error);
     if (
-      code === 'SYSTEM.RUNTIME_COORDINATION.BUSY' ||
-      code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH'
+      code === 'CORE.RUNTIME_COORDINATION.BUSY' ||
+      code === 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH'
     ) {
       return { status: 'busy' };
     }
     if (before.state === 'closed') return cleanupPending();
     return recoveryRequired(
-      code === 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' ? 'state-ambiguous' : 'journal-malformed',
+      code === 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE' ? 'state-ambiguous' : 'journal-malformed',
     );
   }
   if (read.observed === undefined) {

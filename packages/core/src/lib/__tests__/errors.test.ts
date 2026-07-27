@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
 
+import { LanguageRegistry } from '../../languages/registry.js';
 import { coreSystemErrorCatalog } from '../../lib/error-definition.js';
 import {
   ToolError,
@@ -22,9 +23,13 @@ import {
   err,
   tryCatch,
   tryCatchAsync,
+  resetLegacyOptionBagWarnings,
 } from '../../lib/errors.js';
+import { RunScope, runWithScope } from '../../lib/run-scope.js';
+import { ToolRegistry } from '../../tools/registry.js';
 
 import type { Result } from '../../lib/errors.js';
+import type { Logger } from '../../lib/logger.js';
 
 describe('ToolError', () => {
   it('sets message, code, and name', () => {
@@ -339,6 +344,10 @@ describe('definition-backed subcodes keep family exit classes', () => {
   });
 
   it('does not demote ConfigurationError recovery subcodes to UNKNOWN_FAILURE', () => {
+    // The UNREGISTERED legacy literal on purpose — the point is the family fallback, which is
+    // what keeps a third-party code under a mapped head from becoming an operator-only fatal.
+    // The production recovery site moved to CORE.RUNTIME_RECOVERY.REQUIRED in Plan 01 and is
+    // covered by its own catalog test; this one guards the path that has no catalog entry.
     const err = new ConfigurationError('recovery required', {
       code: 'CONFIGURATION.RECOVERY_REQUIRED',
     });
@@ -420,5 +429,61 @@ describe('toolErrorFromCanonicalCode', () => {
   it('returns undefined for an unrecognized code (caller falls through to its default)', () => {
     expect(toolErrorFromCanonicalCode('NOT_A_REAL_CODE', 'm')).toBeUndefined();
     expect(toolErrorFromCanonicalCode('CONFIGURATION.GATE.BASELINE_MISSING', 'm')).toBeUndefined();
+  });
+});
+
+describe('legacy option-bag warning (Plan 01 Task 1.3)', () => {
+  beforeEach(() => {
+    resetLegacyOptionBagWarnings();
+  });
+
+  it('warns once per code and key-set, not once per construction', async () => {
+    // These constructions sit on hot paths — a per-file walk can raise thousands — and an
+    // unbounded warn stream is indistinguishable from noise, which is how a migration signal
+    // gets ignored rather than acted on.
+    const warn = vi.fn();
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger,
+    });
+    const built: ToolError[] = [];
+    await runWithScope(scope, () => {
+      for (let i = 0; i < 5; i++) {
+        built.push(
+          new ToolError('x', 'SYSTEM_ERROR', { operation: 'resolve', loader: 'project-config' }),
+        );
+      }
+      return Promise.resolve();
+    });
+    expect(built).toHaveLength(5);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn.mock.calls[0]?.[0]).toMatchObject({
+      evt: 'core.error.legacy_option_bag',
+      keys: ['loader', 'operation'],
+    });
+  });
+
+  it('still preserves the legacy values it warned about', () => {
+    // Warning is not deletion: the field stays until the last caller migrates, so nothing
+    // that was being captured for triage is silently dropped in the meantime.
+    const error = new ToolError('x', 'SYSTEM_ERROR', { operation: 'resolve' });
+    expect(error.legacyCompatibility?.operation).toBe('resolve');
+  });
+
+  it('does not warn when only documented options are used', async () => {
+    const warn = vi.fn();
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+      logger: { debug: vi.fn(), info: vi.fn(), warn, error: vi.fn() } as unknown as Logger,
+    });
+    let built: ToolError | undefined;
+    await runWithScope(scope, () => {
+      built = new ToolError('x', 'SYSTEM_ERROR', { metadata: { a: 1 }, stderrTail: 'tail' });
+      return Promise.resolve();
+    });
+    expect(built?.legacyCompatibility).toBeUndefined();
+    expect(warn).not.toHaveBeenCalled();
   });
 });

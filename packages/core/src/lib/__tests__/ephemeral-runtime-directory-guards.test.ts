@@ -8,7 +8,9 @@ import {
   ensureEphemeralRuntimeDirectory,
   ensureEphemeralRuntimeRoot,
 } from '../ephemeral-runtime-directory.js';
+import { coreErrorCatalog } from '../errors/core-error-catalog.js';
 
+import type { ToolError } from '../errors.js';
 import type * as PathsModule from '../paths.js';
 import type { EphemeralProjectPaths, UserPaths } from '../paths.js';
 import type * as NodeFs from 'node:fs';
@@ -123,11 +125,22 @@ describe('ephemeral runtime directory guards', () => {
     );
   });
 
-  it('propagates a non-existence-independent mkdir failure', () => {
+  it('propagates a non-existence-independent mkdir failure, now classified', () => {
     const paths = userPathsFor(root);
     directoryProbe.mkdirErrorPath = paths.userHomeDir;
 
+    // The platform message is RETAINED — classification is additive. Collapsing it into a
+    // generic sentence would make the failure less diagnosable than before it was classified.
     expect(() => ensureEphemeralRuntimeRoot()).toThrow('injected mkdir failure');
+    try {
+      ensureEphemeralRuntimeRoot();
+      expect.unreachable('an EACCES during cache creation must throw');
+    } catch (error) {
+      // WAS: an unclassified errno reaching the CLI boundary as SYSTEM_ERROR/unknown, so a
+      // permission denial, a full disk and a genuinely unsafe cache posture were one failure.
+      expect((error as ToolError).code).toBe('CORE.SYSTEM.PERMISSION');
+      expect((error as ToolError).metadata).toMatchObject({ hop: 'home', errno: 'EACCES' });
+    }
   });
 
   it('closes and rejects a child whose descriptor identity differs from lstat', () => {
@@ -160,5 +173,40 @@ describe('ephemeral runtime directory guards', () => {
     expect(() => ensureEphemeralRuntimeDirectory(invalid)).toThrow(
       'Ephemeral runtime path does not match its cache identity',
     );
+  });
+});
+
+describe('ephemeral cache refusals are classified (Plan 01 Task 1.4)', () => {
+  it('separates an unsafe posture from a containment escape from an I/O fault', () => {
+    // All six refusals on this path were bare `new Error`, so they normalized to
+    // SYSTEM_ERROR / known:'unknown'. A hostile ownership finding, a TOCTOU race and a full
+    // disk were one failure to an operator and to --json — and only one of the three is worth
+    // inspecting the cache directory over.
+    const posture = coreErrorCatalog.require('CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE');
+    const identity = coreErrorCatalog.require('CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED');
+    expect(posture.kind).toBe('security');
+    expect(identity.kind).toBe('integrity');
+    expect(posture.kind).not.toBe(identity.kind);
+    for (const definition of [posture, identity]) {
+      expect(definition.exposure).toBe('public');
+      expect(definition.exitClass).toBe('configuration');
+      expect(definition.defaultResponsibility).toBe('environment');
+    }
+  });
+
+  it('publishes the hop but never the absolute path', () => {
+    // These definitions are `exposure: 'public'` so the refusal is actionable. A public field
+    // carrying $HOME is exactly how a public exposure becomes a leak, so the location detail
+    // that travels is the hop name only.
+    for (const code of [
+      'CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE',
+      'CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED',
+      'CORE.EPHEMERAL_CACHE.PREPARE_FAILED',
+    ] as const) {
+      const keys = coreErrorCatalog.require(code).publicMetadataKeys ?? [];
+      expect(keys, code).toContain('hop');
+      expect(keys, code).not.toContain('path');
+      expect(keys, code).not.toContain('directory');
+    }
   });
 });

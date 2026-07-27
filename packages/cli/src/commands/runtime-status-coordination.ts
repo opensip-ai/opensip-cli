@@ -2,6 +2,8 @@
  * Lease-stable orchestration for the read-only runtime-status projection.
  */
 
+import { isRuntimeCoordinationFailureCode } from '@opensip-cli/core';
+
 import { getErrorCode } from './init/error-code.js';
 import {
   buildRuntimeStatusContext,
@@ -78,18 +80,19 @@ function samePromotionProjection(
   );
 }
 
+/**
+ * Is this a bounded, expected coordination failure rather than a real fault?
+ *
+ * The membership list lives in core (`RUNTIME_COORDINATION_FAILURE_CODES`) rather than being
+ * restated here. This function previously hard-coded eight literals, and when Plan 01 split
+ * the two legacy coordination codes into their honest set, every one of those comparisons
+ * would have silently stopped matching — a dead branch no test catches, because the tests
+ * hard-code the same literals. `TIMEOUT.RUNTIME_READ` stays local: it is this command's own
+ * read deadline, not something the coordination substrate raises.
+ */
 function isBoundedCoordinationFailure(error: unknown): boolean {
   const code = getErrorCode(error);
-  return (
-    code === 'CONFIGURATION.RECOVERY_REQUIRED' ||
-    code === 'SYSTEM.RUNTIME_COORDINATION.BUSY' ||
-    code === 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH' ||
-    code === 'SYSTEM.RUNTIME_COORDINATION.EXISTS' ||
-    code === 'SYSTEM.RUNTIME_COORDINATION.UNSAFE' ||
-    code === 'SYSTEM.RUNTIME_LEASE.CAPACITY' ||
-    code === 'SYSTEM.RUNTIME_LEASE.CLEANUP_CAPACITY' ||
-    code === 'TIMEOUT.RUNTIME_READ'
-  );
+  return isRuntimeCoordinationFailureCode(code) || code === 'CORE.RUNTIME_LEASE.READ';
 }
 
 async function inspectCoordination(

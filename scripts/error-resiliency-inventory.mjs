@@ -43,6 +43,12 @@ import {
   sortByKey,
 } from './lib/error-resiliency-inventory.mjs';
 import {
+  codeHeadKey,
+  diffAgainstBaseline,
+  findUnmappedCodeHeads,
+  formatCodeHeadViolations,
+} from './lib/error-code-heads.mjs';
+import {
   extractStructuralSites,
   getDetectorCoverageManifest,
   isStructurallySupportedPath,
@@ -51,6 +57,8 @@ import {
 const require = createRequire(import.meta.url);
 const { readWorkspacePackageManifests } = require('./lib/workspace-package-manifests.cjs');
 
+/** Tracked D11 ratchet baseline. PERMANENT rule state, not campaign state. */
+const CODE_HEAD_BASELINE_REL = '.config/error-code-head-baseline.json';
 const REVIEW_POLICY_REL = `${INVENTORY_COOP_DIR}/review-policy.json`;
 
 /**
@@ -90,6 +98,9 @@ export async function main(argv = process.argv.slice(2), env = {}) {
       case 'ratchet': {
         return runRatchet(repoRoot, flags, stdout);
       }
+      case 'code-heads': {
+        return runCodeHeads(repoRoot, flags, stdout, stderr);
+      }
       default: {
         stderr(`Unknown command: ${command}\n${usage()}\n`);
         return 2;
@@ -126,6 +137,8 @@ Commands:
   status                    Coverage/progress summary for a snapshot
   reconcile --from pre-infra --to post-infra
   ratchet                   Temporary no-new-debt check vs C5 baseline (Plan 01)
+  code-heads                D11: fail on a constructed error code that no catalog
+                            registers (permanent rule, not campaign state)
 
 Options:
   --commit <sha>   Freeze inventory to this git commit (default HEAD)
@@ -494,6 +507,65 @@ function runCheck(repoRoot, flags, stdout) {
  * Compares structural fingerprints in changed production files against
  * ratchet-baseline.json. Unrelated blob churn without new sites is OK.
  */
+/**
+ * D11 permanent rule. Unlike every other command here this is NOT campaign state: it stays
+ * after the inventory artifacts are retired, because the demotion it prevents is a property
+ * of the runtime, not of the migration.
+ *
+ * @param {string} repoRoot
+ * @param {(s: string) => void} stdout
+ * @param {(s: string) => void} stderr
+ * @returns {number}
+ */
+function runCodeHeads(repoRoot, flags, stdout, stderr) {
+  const files = listTrackedFiles(repoRoot, 'HEAD')
+    .map((entry) => entry.path)
+    .filter(
+      (rel) =>
+        rel.startsWith('packages/') &&
+        rel.includes('/src/') &&
+        rel.endsWith('.ts') &&
+        !rel.endsWith('.test.ts') &&
+        !rel.includes('/__tests__/') &&
+        // Check fixtures are excluded for the same reason test files are: a `violation` fixture
+        // exists precisely to contain an UNREGISTERED code, so demanding it be registered would
+        // make it impossible to test the check that finds unregistered codes.
+        !rel.includes('/__fixtures__/') &&
+        !rel.includes('/fixtures/'),
+    );
+  const violations = findUnmappedCodeHeads(repoRoot, files);
+  const baselinePath = join(repoRoot, CODE_HEAD_BASELINE_REL);
+
+  if (flags.save) {
+    const keys = [...new Set(violations.map((v) => codeHeadKey(v)))].sort(compareByCodePointLocal);
+    atomicWriteJson(baselinePath, {
+      note:
+        'Ruling D11 ratchet. Every entry is a constructed error code whose head resolves to ' +
+        'CORE.SYSTEM.UNKNOWN_FAILURE at runtime. This file only shrinks: each Plan 01 wave ' +
+        'removes its own entries. Adding one requires registering the code instead.',
+      entries: keys,
+    });
+    stdout(`error-code-heads: baseline saved with ${keys.length} entr(ies)\n`);
+    return 0;
+  }
+
+  const baseline = existsSync(baselinePath)
+    ? (parseJsonSafe(readFileSync(baselinePath, 'utf8'), CODE_HEAD_BASELINE_REL).entries ?? [])
+    : [];
+  const { added, resolved } = diffAgainstBaseline(violations, baseline);
+
+  if (added.length > 0) {
+    stderr(`${formatCodeHeadViolations(added)}\n`);
+    return 1;
+  }
+  stdout(
+    `error-code-heads: ok — ${violations.length} known, 0 net-new` +
+      (resolved.length > 0 ? `, ${resolved.length} resolved (re-run with --save)` : '') +
+      `\n`,
+  );
+  return 0;
+}
+
 function runRatchet(repoRoot, flags, stdout) {
   const inventoryRoot = resolveInventoryRoot(repoRoot);
   const baselinePath = join(inventoryRoot, 'ratchet-baseline.json');

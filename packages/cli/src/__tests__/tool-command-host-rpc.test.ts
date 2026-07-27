@@ -19,6 +19,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { handleHostRpc } from '../bootstrap/dispatch-host-rpc-handler.js';
 import { createWorkerRpcClient } from '../bootstrap/tool-command-worker-rpc.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import { makeDispatchHostCtx } from './harness/dispatch-host-ctx.js';
 
@@ -28,6 +29,10 @@ import type {
   RpcReply,
 } from '../bootstrap/tool-command-dispatch-types.js';
 import type { WorkerMessage } from '@opensip-cli/core';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const GATE_BASELINE_INVALID = hostErrorCatalog.require('CLI.GATE.BASELINE_INVALID');
 
 type Outbound = WorkerMessage<DispatchProgressEvent, unknown>;
 
@@ -322,7 +327,9 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
       compareBaseline: () =>
         Promise.reject(
           new ConfigurationError("No baseline found for 'gitleaks'", {
-            code: 'CONFIGURATION.GATE.BASELINE_MISSING',
+            code: GATE_BASELINE_INVALID.code,
+            definition: GATE_BASELINE_INVALID,
+            metadata: { condition: 'baseline-missing' },
           }),
         ),
     } as unknown as Parameters<typeof handleHostRpc>[1];
@@ -333,7 +340,7 @@ describe('handleHostRpc — host-side RPC seam dispatch', () => {
     )) as Extract<RpcReply, { ok: false }>;
     expect(reply.ok).toBe(false);
     expect(reply.error.toolErrorCode).toBe('CONFIGURATION_ERROR');
-    expect(reply.error.code).toBe('CONFIGURATION.GATE.BASELINE_MISSING');
+    expect(reply.error.code).toBe('CLI.GATE.BASELINE_INVALID');
   });
 
   it('returns a bounded generic message for a non-Error host fault', async () => {

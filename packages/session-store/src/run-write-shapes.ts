@@ -1,5 +1,6 @@
 import { isPlainRecord, tryCatch, ValidationError } from '@opensip-cli/core';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { runs, runSteps } from './schema/runs.js';
 import {
   isFiniteNonNegativeNumber,
@@ -14,6 +15,9 @@ import {
 
 import type { StoredRun, StoredRunStep } from '@opensip-cli/contracts';
 import type { DrizzleHandle } from '@opensip-cli/datastore/internal';
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 
 const MAX_OPAQUE_RUN_CONTEXT_BYTES = 64 * 1024;
 const STORED_RUN_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/u;
@@ -150,13 +154,17 @@ function validateRun(run: StoredRun): void {
     throw new ValidationError(
       'Run ID must contain 1-128 letters, numbers, underscores, or hyphens.',
       {
-        code: 'VALIDATION.RUN.INVALID_ID',
+        code: WRITE_INVALID.code,
+        definition: WRITE_INVALID,
+        metadata: { field: 'run-id' },
       },
     );
   }
   if (!runRowShapeIsValid(run)) {
     throw new ValidationError('Invalid required Run row shape.', {
-      code: 'VALIDATION.RUN.INVALID_SHAPE',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'run-shape' },
     });
   }
   const startedMs = new Date(run.startedAt).getTime();
@@ -164,12 +172,14 @@ function validateRun(run: StoredRun): void {
   if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs)) {
     throw new ValidationError(
       `Invalid run timing for run ${run.id}: startedAt=${JSON.stringify(run.startedAt)} completedAt=${JSON.stringify(run.completedAt)}`,
-      { code: 'VALIDATION.RUN.INVALID_TIMESTAMP' },
+      { code: WRITE_INVALID.code, definition: WRITE_INVALID, metadata: { field: 'run-timestamp' } },
     );
   }
   if (run.contextManifest !== undefined && !opaqueRunContextIsBounded(run.contextManifest)) {
     throw new ValidationError(`Invalid bounded run context for run ${run.id}.`, {
-      code: 'VALIDATION.RUN.INVALID_CONTEXT_MANIFEST',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'context-manifest' },
     });
   }
 }
@@ -177,17 +187,23 @@ function validateRun(run: StoredRun): void {
 function validateStep(step: StoredRunStep): void {
   if (!runStepRowShapeIsValid(step)) {
     throw new ValidationError('Invalid required RunStep row shape.', {
-      code: 'VALIDATION.RUN_STEP.INVALID_SHAPE',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'step-shape' },
     });
   }
   if (!Number.isInteger(step.ordinal) || step.ordinal < 0) {
     throw new ValidationError(`Invalid ordinal for run step ${step.id}: ${step.ordinal}`, {
-      code: 'VALIDATION.RUN_STEP.INVALID_ORDINAL',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'step-ordinal' },
     });
   }
   if (!Number.isInteger(step.attempt) || step.attempt < 1) {
     throw new ValidationError(`Invalid attempt for run step ${step.id}: ${step.attempt}`, {
-      code: 'VALIDATION.RUN_STEP.INVALID_ATTEMPT',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'step-attempt' },
     });
   }
 }

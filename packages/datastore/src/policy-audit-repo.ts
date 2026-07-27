@@ -2,7 +2,12 @@ import { logger, ValidationError } from '@opensip-cli/core';
 import { desc, sql } from 'drizzle-orm';
 
 import { requireDrizzleHandle, type DataStore, type DrizzleDataStore } from './data-store.js';
+import { datastoreErrorCatalog } from './errors/datastore-error-catalog.js';
 import { policyAuditEvents } from './schema/policy-audit.js';
+
+// Plan 01: registered replacements for literals that only resolved through head-guessing.
+const READ_BOUND_INVALID = datastoreErrorCatalog.require('DATASTORE.READ.BOUND_INVALID');
+const RECORD_TOO_LARGE = datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE');
 
 const MODULE_NAME = 'datastore:policy-audit-repo';
 
@@ -101,7 +106,9 @@ function clampPolicyAuditLimit(limit: number | undefined): number {
     throw new ValidationError(
       `Invalid policy audit limit '${String(limit)}'. Must be a positive integer.`,
       {
-        code: 'VALIDATION.POLICY_AUDIT.LIMIT_INVALID',
+        code: READ_BOUND_INVALID.code,
+        definition: READ_BOUND_INVALID,
+        metadata: { field: 'limit' },
       },
     );
   }
@@ -130,7 +137,11 @@ function boundedString(value: string, field: string): string {
   if (bytes > POLICY_AUDIT_MAX_STRING_BYTES) {
     throw new ValidationError(
       `policy audit ${field} is ${bytes} bytes; max is ${POLICY_AUDIT_MAX_STRING_BYTES}`,
-      { code: 'VALIDATION.POLICY_AUDIT.FIELD_TOO_LARGE' },
+      {
+        code: RECORD_TOO_LARGE.code,
+        definition: RECORD_TOO_LARGE,
+        metadata: { field: 'policy-audit-field' },
+      },
     );
   }
   return value;
@@ -141,7 +152,11 @@ function boundedJson(value: unknown, field: string): unknown {
   if (bytes > POLICY_AUDIT_MAX_JSON_BYTES) {
     throw new ValidationError(
       `policy audit ${field} is ${bytes} bytes; max is ${POLICY_AUDIT_MAX_JSON_BYTES}`,
-      { code: 'VALIDATION.POLICY_AUDIT.JSON_TOO_LARGE' },
+      {
+        code: RECORD_TOO_LARGE.code,
+        definition: RECORD_TOO_LARGE,
+        metadata: { field: 'policy-audit-json' },
+      },
     );
   }
   return value;

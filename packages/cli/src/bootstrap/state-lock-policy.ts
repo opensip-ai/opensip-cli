@@ -16,8 +16,13 @@ import {
 } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import type { DataStoreLockContext } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 const DEFAULT_LOCAL_WAIT_MS = 30_000;
 const DEFAULT_CI_WAIT_MS = 5000;
@@ -33,7 +38,9 @@ function parseNonNegativeLockOverride(raw: string, name: string): number {
   // other non-decimal form is rejected loudly here.
   if (!/^\d+$/.test(raw)) {
     throw new ConfigurationError(`${name} must be a non-negative integer`, {
-      code: 'CONFIGURATION.STATE_LOCK.INVALID_OVERRIDE',
+      code: OPTION_INVALID.code,
+      definition: OPTION_INVALID,
+      metadata: { condition: 'state-lock-override' },
     });
   }
   return Number(raw);

@@ -116,7 +116,7 @@ export function readYamlFileOrThrow(
     const stats = statSync(filePath);
     if (stats.size > maxBytes) {
       throw new SystemError(`File too large (${stats.size} bytes, max ${maxBytes}): ${filePath}`, {
-        code: 'SYSTEM.FILE.TOO_LARGE',
+        code: 'CORE.FILE.TOO_LARGE',
         operation: 'read',
         loader,
         filePath,

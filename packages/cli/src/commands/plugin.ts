@@ -315,6 +315,9 @@ export async function pluginSync(
       }
       try {
         execFileSync('npm', ['install', '--ignore-scripts', spec], {
+          // Bounded (Plan 01): package management against a possibly-wedged registry.
+          timeout: 5 * 60_000,
+          maxBuffer: 32 * 1024 * 1024,
           cwd: dir,
           stdio: ['ignore', process.stderr, process.stderr],
         });

@@ -1,0 +1,33 @@
+# Fixture-only fit config for the error-silent-empty-result dogfood check.
+#
+# The repo-level config excludes `**/__fixtures__/**`, so this fixture config
+# deliberately re-includes only this check's synthetic pass/fail tree. The tree
+# mirrors a real `packages/<pkg>/src/**` layout because the check path-gates to
+# first-party OpenSIP evidence-producing source.
+#
+# Run from the repo root:
+#   node packages/cli/dist/index.js fit \
+#     --check error-silent-empty-result \
+#     --config opensip-cli/fit/checks/__fixtures__/error-silent-empty-result/fit.fixture.config.yml
+#
+# Expected result: exactly FOUR findings, all under violation/ —
+#   R1 violation/packages/core/src/plugins/discover.ts            (return plugins)
+#   R2 violation/packages/fitness/engine/src/framework/file-cache.ts (allSettled)
+#   R3 violation/packages/graph/engine/src/read/coverage-view.ts  (x2: catch + cap branch)
+# and ZERO findings anywhere under clean/.
+
+globalExcludes: []
+
+targets:
+  fixtures:
+    description: error-silent-empty-result fixtures
+    languages: [typescript]
+    concerns: [backend]
+    include:
+      - 'opensip-cli/fit/checks/__fixtures__/error-silent-empty-result/**/*.ts'
+    exclude:
+      - '**/node_modules/**'
+      - '**/dist/**'
+
+checkOverrides:
+  error-silent-empty-result: [fixtures]

@@ -5,7 +5,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { resolveProjectConfigPath, PROJECT_CONFIG_FILENAME } from '../config-resolution.js';
-import { ValidationError } from '../lib/errors.js';
+import { ToolError } from '../lib/errors.js';
+import { normalizeFailure } from '../lib/failure-envelope.js';
+import { toPublicFailureProjection } from '../lib/failure-projection.js';
 
 let testDir: string;
 
@@ -24,14 +26,38 @@ describe('resolveProjectConfigPath', () => {
     expect(resolveProjectConfigPath(testDir)).toBe(defaultPath);
   });
 
-  it('throws ValidationError when no config exists anywhere', () => {
-    expect(() => resolveProjectConfigPath(testDir)).toThrow(ValidationError);
+  it('throws the registered not-found code when no config exists anywhere', () => {
+    // WAS: code 'ERRORS.CONFIG.NOT_FOUND'. The head `ERRORS` is unmapped, so
+    // definitionFromLegacyCode demoted the product's most common first-run failure to
+    // CORE.SYSTEM.UNKNOWN_FAILURE — severity fatal, responsibility unknown.
+    expect(() => resolveProjectConfigPath(testDir)).toThrow(ToolError);
+    try {
+      resolveProjectConfigPath(testDir);
+      expect.unreachable('resolveProjectConfigPath must throw when no config exists');
+    } catch (error) {
+      expect((error as Error).message).toContain('No opensip-cli.config.yml found');
+      expect((error as ToolError).code).toBe('CORE.CONFIG.NOT_FOUND');
+      expect((error as ToolError).definition.defaultResponsibility).toBe('user');
+      expect((error as ToolError).definition.severity).toBe('error');
+    }
+  });
+
+  it('keeps the enumerated search paths in the PUBLIC projection', () => {
+    // This is the assertion that actually proves the fix. Under the old operator-only
+    // exposure, outwardMessage replaced the entire attempt list with the fixed string
+    // "An unexpected internal failure occurred." — so the user learned nothing about where
+    // opensip had looked. A public definition is what keeps the list.
+    let thrown: unknown;
     try {
       resolveProjectConfigPath(testDir);
     } catch (error) {
-      expect((error as Error).message).toContain('No opensip-cli.config.yml found');
-      expect((error as ValidationError).code).toBe('ERRORS.CONFIG.NOT_FOUND');
+      thrown = error;
     }
+    const projection = toPublicFailureProjection(normalizeFailure(thrown));
+    expect(projection.message).toContain('No opensip-cli.config.yml found');
+    expect(projection.message).toContain(PROJECT_CONFIG_FILENAME);
+    expect(projection.message).not.toContain('An unexpected internal failure occurred');
+    expect(projection.code).toBe('CORE.CONFIG.NOT_FOUND');
   });
 
   describe('explicit --config path', () => {
@@ -48,10 +74,19 @@ describe('resolveProjectConfigPath', () => {
       expect(resolveProjectConfigPath(testDir, 'cfg/custom.yml')).toBe(explicit);
     });
 
-    it('throws when --config points at a non-existent file', () => {
+    it('throws the explicit-path code when --config points at a non-existent file', () => {
       expect(() => resolveProjectConfigPath(testDir, '/nope/missing.yml')).toThrow(
         /does not exist/,
       );
+      try {
+        resolveProjectConfigPath(testDir, '/nope/missing.yml');
+        expect.unreachable('an explicit --config miss must throw');
+      } catch (error) {
+        // Distinct from the discovery-walk miss: the repair is different (fix the flag vs
+        // run init), so collapsing both onto one code would make the operator action wrong
+        // for one of them.
+        expect((error as ToolError).code).toBe('CORE.CONFIG.EXPLICIT_PATH_MISSING');
+      }
     });
 
     it('ignores empty-string explicit paths and falls through to the default', () => {

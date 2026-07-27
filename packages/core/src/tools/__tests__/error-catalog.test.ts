@@ -151,3 +151,152 @@ describe('aggregateErrorCatalogs', () => {
     expect(byCode.get('A.ONLY.ONE')?.toolName).toBe('a');
   });
 });
+
+describe('aggregateErrorCatalogs — substrate catalogs (Plan 01 ruling D1)', () => {
+  const substrateOwner = {
+    id: '@opensip-cli/datastore',
+    displayName: 'Datastore',
+    packageName: '@opensip-cli/datastore',
+  };
+
+  it('registers a code owned by a non-Tool package', () => {
+    // Before D1 the only registration path was ToolExtensionPoints.errorCatalog, so a
+    // substrate had no way to own a code at all.
+    const catalog = defineErrorCatalog(substrateOwner, {
+      'DATASTORE.MIGRATION.FAILED': { ...def, code: 'DATASTORE.MIGRATION.FAILED' },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/datastore', catalog }],
+    );
+    expect(collisions).toEqual([]);
+    expect(byCode.get('DATASTORE.MIGRATION.FAILED')?.owner.id).toBe('@opensip-cli/datastore');
+  });
+
+  it('rejects a substrate registering a code it does not own', () => {
+    // Ownership is the point: a package may not register a code attributed elsewhere.
+    const catalog = defineErrorCatalog(substrateOwner, {
+      'DATASTORE.MIGRATION.OTHER': { ...def, code: 'DATASTORE.MIGRATION.OTHER' },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/output', catalog }],
+    );
+    expect(collisions).toHaveLength(1);
+    expect(byCode.has('DATASTORE.MIGRATION.OTHER')).toBe(false);
+  });
+
+  it('reports a collision rather than letting a substrate overwrite core', () => {
+    // Pick a core code that satisfies the OWNER.DOMAIN.CONDITION grammar, since legacy
+    // single-token codes cannot be re-declared through defineErrorCatalog at all.
+    // Narrow by guard rather than `as string` / `!`: the assertion-style rule rejects the
+    // cast, and this repo's no-non-null-assertions check rejects the bang.
+    const found = coreSystemErrorCatalog.list.find((d) => d.code.split('.').length === 3)?.code;
+    if (found === undefined)
+      throw new Error('expected at least one OWNER.DOMAIN.CONDITION core code');
+    const coreCode: string = found;
+    const catalog = defineErrorCatalog(substrateOwner, {
+      [coreCode]: { ...def, code: coreCode },
+    });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [],
+      [{ packageName: '@opensip-cli/datastore', catalog }],
+    );
+    expect(collisions.some((c) => c.code === coreCode)).toBe(true);
+    expect(byCode.get(coreCode)?.owner.id).not.toBe('@opensip-cli/datastore');
+  });
+
+  it('reports a collision when a tool claims a code a substrate already owns', () => {
+    // Substrates fold in first precisely so this is caught rather than silently
+    // reassigned to whichever contributor happened to be merged last.
+    const shared = 'SHARED.CODE.X';
+    const substrate = defineErrorCatalog(substrateOwner, { [shared]: { ...def, code: shared } });
+    const toolCatalog = defineErrorCatalog(ownerA, { [shared]: { ...def, code: shared } });
+    const { byCode, collisions } = aggregateErrorCatalogs(
+      [{ toolName: 'a', toolId: ownerA.id, catalog: toolCatalog }],
+      [{ packageName: '@opensip-cli/datastore', catalog: substrate }],
+    );
+    expect(collisions.some((c) => c.code === shared)).toBe(true);
+    expect(byCode.get(shared)?.owner.id).toBe('@opensip-cli/datastore');
+  });
+
+  it('omitting substrate catalogs preserves the previous behaviour', () => {
+    const toolCatalog = defineErrorCatalog(ownerA, { 'A.B.C': { ...def, code: 'A.B.C' } });
+    const { byCode, collisions } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: toolCatalog },
+    ]);
+    expect(collisions).toEqual([]);
+    expect(byCode.get('A.B.C')?.toolName).toBe('a');
+  });
+});
+
+describe('one head per owner, one owner per head', () => {
+  it('refuses a catalog whose codes do not share one head', () => {
+    expect(() =>
+      defineErrorCatalog(ownerA, {
+        'AAA.CONFIG.INVALID': { ...def, code: 'AAA.CONFIG.INVALID' },
+        'BBB.CONFIG.MISSING': { ...def, code: 'BBB.CONFIG.MISSING' },
+      }),
+    ).toThrow(/catalog head is 'AAA'/u);
+  });
+
+  it('derives the head from the definitions rather than a declared field', () => {
+    const catalog = defineErrorCatalog(ownerA, {
+      'AAA.CONFIG.INVALID': { ...def, code: 'AAA.CONFIG.INVALID' },
+      'AAA.READ.DENIED': { ...def, code: 'AAA.READ.DENIED' },
+    });
+    expect(catalog.codeHead).toBe('AAA');
+  });
+
+  it('reports a collision when a second owner claims a head, even with no shared code', () => {
+    // The point of the cross-owner half: these two catalogs share NO code, so the per-code
+    // collision check passes them. Only the head claim catches the overlap.
+    const a = defineErrorCatalog(ownerA, {
+      'DUP.ONE.X': { ...def, code: 'DUP.ONE.X' },
+    });
+    const b = defineErrorCatalog(ownerB, {
+      'DUP.TWO.Y': { ...def, code: 'DUP.TWO.Y' },
+    });
+    const { collisions } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: a },
+      { toolName: 'b', toolId: ownerB.id, catalog: b },
+    ]);
+    expect(collisions).toEqual([{ code: 'DUP.*', owners: [ownerA.id, ownerB.id] }]);
+  });
+
+  it('lets one owner register the same head from more than one catalog', () => {
+    const first = defineErrorCatalog(ownerA, { 'SAME.ONE.X': { ...def, code: 'SAME.ONE.X' } });
+    const second = defineErrorCatalog(ownerA, { 'SAME.TWO.Y': { ...def, code: 'SAME.TWO.Y' } });
+    const { collisions, byCode } = aggregateErrorCatalogs([
+      { toolName: 'a', toolId: ownerA.id, catalog: first },
+      { toolName: 'a', toolId: ownerA.id, catalog: second },
+    ]);
+    expect(collisions).toEqual([]);
+    expect(byCode.has('SAME.TWO.Y')).toBe(true);
+  });
+
+  it('exempts only the legacy class-default catalog, whose codes are un-dotted', () => {
+    expect(coreSystemErrorCatalog.codeHead).toBeUndefined();
+    // Its keys are the `ToolErrorCode` wire tokens; the codes they resolve to are a mix of
+    // bare class defaults and dotted ones, which is exactly why it is exempt.
+    expect(coreSystemErrorCatalog.require('VALIDATION_ERROR').code).toBe('VALIDATION_ERROR');
+    expect(coreSystemErrorCatalog.require('UNKNOWN_FAILURE').code).toBe(
+      'CORE.SYSTEM.UNKNOWN_FAILURE',
+    );
+  });
+
+  it('holds a third-party tool contribution to the same rule', () => {
+    expect(() =>
+      validateToolErrorCatalogContribution(
+        {
+          schemaVersion: ERROR_CATALOG_SCHEMA_VERSION,
+          definitions: {
+            'XXX.A.B': { ...def, code: 'XXX.A.B' },
+            'YYY.A.B': { ...def, code: 'YYY.A.B' },
+          },
+        },
+        { id: ownerA.id, displayName: 'Tool A' },
+      ),
+    ).toThrow(ErrorDefinitionError);
+  });
+});

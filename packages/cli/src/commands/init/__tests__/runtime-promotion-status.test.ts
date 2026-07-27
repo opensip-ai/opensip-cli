@@ -457,7 +457,7 @@ describe('runtime promotion status projection', () => {
             if (outcome === 'absent') return { status: 'absent' };
             if (outcome === 'unsafe') {
               throw Object.assign(new Error('unsafe'), {
-                code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+                code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
               });
             }
             const foreign = encodeRuntimePromotionJournal(
@@ -506,27 +506,27 @@ describe('runtime promotion status projection', () => {
     });
   });
 
-  it.each([
-    'SYSTEM.RUNTIME_COORDINATION.BUSY',
-    'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
-  ] as const)('maps an anchored publication race (%s) to busy', (code) => {
-    const journal = initialJournal();
-    expect(
-      inspectRuntimePromotionStatus({
-        projectRoot: '/private/project',
-        coordinationKey: PROJECT_KEY,
-        dependencies: {
-          coordinationKeyForProject: () => PROJECT_KEY,
-          inspectHeader: () => header(journal),
-          readJournal: () => {
-            throw Object.assign(new Error('changed'), {
-              code,
-            });
+  it.each(['CORE.RUNTIME_COORDINATION.BUSY', 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH'] as const)(
+    'maps an anchored publication race (%s) to busy',
+    (code) => {
+      const journal = initialJournal();
+      expect(
+        inspectRuntimePromotionStatus({
+          projectRoot: '/private/project',
+          coordinationKey: PROJECT_KEY,
+          dependencies: {
+            coordinationKeyForProject: () => PROJECT_KEY,
+            inspectHeader: () => header(journal),
+            readJournal: () => {
+              throw Object.assign(new Error('changed'), {
+                code,
+              });
+            },
           },
-        },
-      }),
-    ).toEqual({ status: 'busy' });
-  });
+        }),
+      ).toEqual({ status: 'busy' });
+    },
+  );
 
   it('maps an anchored unsafe read to ambiguous state for open recovery', () => {
     const journal = initialJournal();
@@ -539,7 +539,7 @@ describe('runtime promotion status projection', () => {
           inspectHeader: () => header(journal),
           readJournal: () => {
             throw Object.assign(new Error('unsafe'), {
-              code: 'SYSTEM.RUNTIME_COORDINATION.UNSAFE',
+              code: 'CORE.RUNTIME_COORDINATION.UNSAFE_STATE',
             });
           },
         },

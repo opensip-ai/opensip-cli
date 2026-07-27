@@ -68,6 +68,7 @@ function assertTargetsContained(projectDir: string, targets: readonly Target[]):
     try {
       real = realpathSync(target.path);
     } catch {
+      // @swallow-ok fail-closed containment: a target whose realpath cannot be resolved is SKIPPED rather than deleted, which is the safe direction for a removal path
       continue;
     }
     if (!isPathInside(real, projectReal) && !isPathInside(real, cacheRootReal)) {
@@ -185,6 +186,7 @@ export function performProjectDeletion(
     try {
       if (lstatSync(target.path).isSymbolicLink()) continue;
     } catch {
+      // @swallow-ok fail-closed containment: a target that cannot be lstat-ed is skipped rather than removed
       continue;
     }
     rmSync(target.path, { recursive: true, force: true });

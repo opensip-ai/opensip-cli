@@ -58,6 +58,9 @@ export function npmInstallIntoHost(dir: string, packageName: string): InstallOut
   const depsBefore = readHostDependencies(dir);
   try {
     execFileSync('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', packageName], {
+      // Bounded (Plan 01): a package install legitimately takes minutes; five is past any healthy registry.
+      timeout: 5 * 60_000,
+      maxBuffer: 32 * 1024 * 1024,
       cwd: dir,
       stdio: ['ignore', process.stderr, process.stderr],
     });
@@ -111,6 +114,9 @@ export function addToolPlugin(packageName: string, cwd: string, project: boolean
 export function npmUninstallFromHost(dir: string, packageName: string): boolean {
   try {
     execFileSync('npm', ['uninstall', '--ignore-scripts', '--no-audit', '--no-fund', packageName], {
+      // Bounded (Plan 01): uninstall touches no network beyond the lockfile.
+      timeout: 2 * 60_000,
+      maxBuffer: 32 * 1024 * 1024,
       cwd: dir,
       stdio: ['ignore', process.stderr, process.stderr],
     });

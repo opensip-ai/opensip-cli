@@ -1,24 +1,24 @@
 /**
  * AsyncLocalStorage seam for {@link RunScope} — extracted from run-scope.ts
  * to keep the RunScope module under the file-length soft gate.
+ *
+ * The scope WRITERS live here because their guards throw typed errors. The reader
+ * (`currentScope`) and the ALS container itself live in `scope-storage-read.ts`, which imports
+ * nothing, so the error kernel can resolve a definition against the per-run catalog registry
+ * without a cycle. `currentScope` is re-exported below so existing importers are untouched.
  */
 
-import { AsyncLocalStorage } from 'node:async_hooks';
-
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
 import { SystemError } from './errors.js';
+import { currentScope, scopeStorage } from './scope-storage-read.js';
 
 import type { RunScope } from './run-scope-class.js';
+import type { AsyncLocalStorage } from 'node:async_hooks';
 
-const SCOPE_STORAGE_KEY = Symbol.for('@opensip-cli/core/scopeStorage');
+export { currentScope } from './scope-storage-read.js';
 
-/** Process-global ALS singleton — survives duplicate @opensip-cli/core copies. */
-function scopeStorage(): AsyncLocalStorage<RunScope> {
-  const slot = globalThis as {
-    [SCOPE_STORAGE_KEY]?: AsyncLocalStorage<RunScope>;
-  };
-  slot[SCOPE_STORAGE_KEY] ??= new AsyncLocalStorage<RunScope>();
-  return slot[SCOPE_STORAGE_KEY];
-}
+/** Registered replacement for the un-catalogued `CORE.SCOPE.REENTRANT` literal. */
+const SCOPE_REENTRANT = coreErrorCatalog.require('CORE.SCOPE.REENTRANT');
 
 /**
  * Run `fn` with `scope` bound as the current scope for everything in its
@@ -38,12 +38,12 @@ export function runWithScopeSync<T>(scope: RunScope, fn: () => T): T {
 
 /** Bind `scope` via `enterWith` for the Commander single-command pre-action path only. */
 export function enterScope(scope: RunScope): void {
-  const current = scopeStorage().getStore();
+  const current = currentScope();
   if (current !== undefined && current !== scope) {
     throw new SystemError(
       'enterScope called while a different scope is already current. ' +
         'Concurrent or nested work must use runWithScope(scope, fn), not a shared enterScope.',
-      { code: 'SYSTEM.SCOPE.REENTRANT' },
+      { code: SCOPE_REENTRANT.code, definition: SCOPE_REENTRANT },
     );
   }
   scopeStorage().enterWith(scope);
@@ -57,9 +57,4 @@ export function exitScope(): void {
   // "store may be undefined" contract to reset the slot.
 
   (scopeStorage() as AsyncLocalStorage<RunScope | undefined>).enterWith(undefined);
-}
-
-/** Read the current scope. Returns undefined when called outside a runWithScope. */
-export function currentScope(): RunScope | undefined {
-  return scopeStorage().getStore();
 }

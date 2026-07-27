@@ -1502,7 +1502,7 @@ describe('fresh runtime promotion coordinator', () => {
       acquireLease: () =>
         Promise.reject(
           Object.assign(new Error('busy'), {
-            code: 'TIMEOUT.RUNTIME_EXCLUSIVE',
+            code: 'CORE.RUNTIME_LEASE.EXCLUSIVE',
           }),
         ),
     });

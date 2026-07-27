@@ -179,7 +179,7 @@ describe('resolveSelector — guards', () => {
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.CORE.SELECTOR_NO_MATCHER');
+      expect((error as SystemError).code).toBe('CORE.SELECTOR.INVALID');
     }
   });
 
@@ -189,7 +189,7 @@ describe('resolveSelector — guards', () => {
       expect.unreachable('should have thrown');
     } catch (error) {
       expect(error).toBeInstanceOf(SystemError);
-      expect((error as SystemError).code).toBe('SYSTEM.CORE.UNKNOWN_SELECTOR');
+      expect((error as SystemError).code).toBe('CORE.SELECTOR.INVALID');
     }
   });
 });

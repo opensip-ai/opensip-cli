@@ -72,11 +72,13 @@ export function listPruneEntries(root: string): string[] | undefined {
       if (entry.isDirectory()) entries.push(entry.name);
     }
   } catch {
+    // @swallow-ok the flag IS the surfaced degradation — an incomplete listing returns `undefined`, and prune treats that as "do not prune" rather than "nothing to prune"
     complete = false;
   }
   try {
     directory.closeSync();
   } catch {
+    // @swallow-ok same: a close failure makes the listing untrustworthy, and the caller must not prune on it
     complete = false;
   }
   return complete ? entries : undefined;

@@ -18,7 +18,7 @@ describe('assertShardedBuildComplete', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'GRAPH.SHARD.FAILURES',
+        code: 'GRAPH.BUILD.INCOMPLETE',
         message: expect.stringContaining('fitness/checks-dogfood, graph/engine'),
       }),
     );
@@ -41,7 +41,7 @@ describe('assertShardedBuildComplete', () => {
     };
 
     expect(() => requireCompleteShardedCatalog(partial)).toThrow(
-      expect.objectContaining({ code: 'GRAPH.SHARD.FAILURES' }),
+      expect.objectContaining({ code: 'GRAPH.BUILD.INCOMPLETE' }),
     );
   });
 
@@ -62,7 +62,7 @@ describe('assertShardedBuildComplete', () => {
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'GRAPH.SHARD.FAILURES',
+        code: 'GRAPH.BUILD.INCOMPLETE',
         failureClass: 'exit_nonzero',
         stderrTail: expect.stringContaining('worker root cause'),
         message: expect.stringContaining('graph/graph-java (exit_nonzero, exit 1, signal SIGKILL)'),

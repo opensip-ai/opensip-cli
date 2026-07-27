@@ -451,7 +451,7 @@ describe('runtime promotion journal controller', () => {
     harness.corruptNextReadDigest();
 
     await expect(harness.controller.create(allocation)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
     expect(harness.getContent()).toBeDefined();
     expect(harness.mutations).toHaveLength(1);
@@ -463,7 +463,7 @@ describe('runtime promotion journal controller', () => {
     const receipt = await harness.controller.create(allocation);
 
     await expect(harness.controller.create(allocation)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
     await harness.controller.verifyOpen(receipt);
     harness.faults.push('throw-before', 'throw-before');
@@ -479,10 +479,10 @@ describe('runtime promotion journal controller', () => {
         },
       })),
     ).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
     await expect(harness.controller.verifyOpen(receipt)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
   });
 
@@ -492,7 +492,7 @@ describe('runtime promotion journal controller', () => {
     const second = harness.controller.allocate((identity) => initialJournal(identity));
 
     await expect(harness.controller.create(first)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
     await expect(harness.controller.create(second)).resolves.toMatchObject({
       state: 'open',
@@ -537,7 +537,7 @@ describe('runtime promotion journal controller', () => {
     const harness = createHarness(existing);
 
     await expect(createOpen(harness)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
     expect(harness.getContent()).toBe(existing);
     expect(harness.mutations).toHaveLength(1);
@@ -556,7 +556,7 @@ describe('runtime promotion journal controller', () => {
       state: 'open',
     });
     await expect(harness.controller.claim('wrong-operation-000000000001')).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
   });
 
@@ -579,7 +579,7 @@ describe('runtime promotion journal controller', () => {
   ])('fails closed on %s journal bytes', async (_name, content) => {
     const harness = createHarness(content);
     await expect(harness.controller.claim()).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
   });
 
@@ -600,7 +600,7 @@ describe('runtime promotion journal controller', () => {
       },
     });
     await expect(harness.controller.verifyOpen(receipt)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
   });
 
@@ -631,7 +631,7 @@ describe('runtime promotion journal controller', () => {
       },
     });
     await expect(harness.controller.verifyReceipt(receipt)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
   });
 
@@ -920,7 +920,7 @@ describe('runtime promotion journal controller', () => {
     ).toThrow(/stale|foreign/iu);
     await expect(
       harness.controller.authorizeRuntimeStage(receipt, stageIntent.owned.authoredStage.basename),
-    ).rejects.toMatchObject({ code: 'SYSTEM.INIT.PROMOTION_JOURNAL' });
+    ).rejects.toMatchObject({ code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID' });
   });
 
   it('keeps one current receipt and invalidates derived authority on a later claim', async () => {
@@ -940,7 +940,7 @@ describe('runtime promotion journal controller', () => {
     const second = await harness.controller.claim(stageIntent.operationId);
 
     await expect(harness.controller.verifyOpen(first)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
     expect(() =>
       harness.controller.assertRuntimeStageAuthority(
@@ -990,7 +990,7 @@ describe('runtime promotion journal controller', () => {
     const current = await harness.controller.verifyOpen(receipt);
     await expect(
       harness.controller.authorizeRuntimeStage(receipt, current.owned.runtimeStage.basename),
-    ).rejects.toMatchObject({ code: 'SYSTEM.INIT.PROMOTION_JOURNAL' });
+    ).rejects.toMatchObject({ code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID' });
   });
 
   it('closes monotonically and unlinks with one durable mutation on success', async () => {
@@ -1048,7 +1048,7 @@ describe('runtime promotion journal controller', () => {
     }
 
     await expect(harness.controller.unlinkClosed(receipt)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_JOURNAL',
+      code: 'CLI.INIT.PROMOTION_JOURNAL_INVALID',
     });
     expect(harness.mutations).toEqual([]);
     await expect(harness.controller.verifyReceipt(receipt)).resolves.toEqual(closed);
@@ -1153,7 +1153,7 @@ describe('runtime promotion journal controller', () => {
     harness.faults.push('throw-before', 'throw-before');
 
     await expect(createOpen(harness)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
     expect(harness.mutations).toHaveLength(2);
   });
@@ -1174,7 +1174,7 @@ describe('runtime promotion journal controller', () => {
     harness.faults.push('throw-before', 'throw-before');
 
     await expect(harness.controller.unlinkClosed(receipt)).rejects.toMatchObject({
-      code: 'SYSTEM.INIT.PROMOTION_RECOVERY_REQUIRED',
+      code: 'CLI.INIT.PROMOTION_RECOVERY_REQUIRED',
     });
     expect(harness.getContent()).toBe(encodeRuntimePromotionJournal(closed));
     expect(harness.mutations).toHaveLength(2);

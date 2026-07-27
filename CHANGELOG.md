@@ -34,6 +34,71 @@ All notable changes to OpenSIP CLI are documented here.
   **130** (cancelled) instead of `1`, and a missing or unresolved external
   scanner binary now exits **2** (configuration) instead of `1`.
 
+#### Behaviour changes: exit codes (Plan 01 migration, ruling D13)
+
+Registering a previously-unregistered failure gives it an honest `exitClass`, and for some
+conditions that differs from the one the legacy class ladder produced. These are collected in
+**one** table rather than dribbled out per commit, and land together at the next minor. A
+condition is listed only when its numeric exit actually moves; migrations that preserve the
+exit code are deliberately absent.
+
+| Condition                                                             | Before | After | Why                                                                                                                                                                                      |
+| --------------------------------------------------------------------- | -----: | ----: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Ephemeral user-cache refuses an unsafe ownership/permission posture   |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE` (`security`, `configuration`): the operator fixes the directory, so this is a configuration failure, not a runtime fault.                      |
+| Ephemeral user-cache detects an identity change or containment escape |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED` (`integrity`, `configuration`). Same reasoning.                                                                                              |
+| Ephemeral user-cache root cannot be prepared                          |      1 |     2 | Now `CORE.EPHEMERAL_CACHE.PREPARE_FAILED`.                                                                                                                                               |
+| Runtime coordination refuses an unsafe containment state              |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.UNSAFE_STATE` (`security`, `configuration`): a foreign entry or symlinked segment in the coordination root is fixed by the operator.                      |
+| Runtime coordination record is structurally corrupt                   |      1 |     2 | Now `CORE.RUNTIME_COORDINATION.CORRUPT_RECORD` (`integrity`, `configuration`): remove the named record. Distinct from the containment case above.                                        |
+| Runtime-promotion journal is unreadable or names an invalid phase     |      1 |     2 | Now `CLI.INIT.PROMOTION_JOURNAL_INVALID` (`integrity`, `configuration`). The recovery path already BRANCHED on this condition; it previously reported as an unknown internal failure.    |
+| Runtime promotion stopped in a state needing recovery                 |      1 |     2 | Now `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` (`conflict`, `configuration`): the operator re-runs `opensip init` to resume, so this is a configuration failure rather than a runtime fault. |
+
+#### Behaviour changes: MCP error codes are uniform (Plan 01)
+
+Four MCP error codes were emitted in the registered-error-code dialect while every other code
+on that surface was lowercase-kebab. They are now kebab like the rest:
+
+| Before                          | After                |
+| ------------------------------- | -------------------- |
+| `GRAPH.READ.CATALOG_IDENTITY`   | `catalog-identity`   |
+| `GRAPH.READ.CATALOG_GENERATION` | `catalog-generation` |
+| `GRAPH.READ.REBUILD_EMPTY`      | `rebuild-empty`      |
+| `GRAPH.READ.REBUILD_FAILED`     | `rebuild-failed`     |
+
+They were graph's internal `Result` reasons, forwarded onto the wire unchanged. A consumer
+matching on them saw four `SCREAMING_DOT` strings among twenty kebab ones, with nothing to say
+which convention was authoritative. `fromGraphReadError` now maps every graph reason explicitly
+instead of forwarding, so graph's internal vocabulary is no longer part of MCP's public surface.
+
+The `mcp.graph.freshness.failed` log event's `reasonCode` field likewise carries the read reason
+(`catalog-unreadable`) rather than the registered code.
+
+Reason vocabularies are now closed unions rather than `string` — `GraphReadReason`,
+`McpReadReason`, `SessionReplayReason`, `SessionResolveReason` — so a new producer cannot put an
+unreviewed token in front of an agent. `GraphReadError` and `McpReadError` remain plain-data
+DTOs (ADR-0147); where a reason corresponds 1:1 to a registered code, the definition declares
+the link via `publicPresentationKey`.
+
+#### Behaviour changes: error codes are now owner-scoped (Plan 01)
+
+Every error code now begins with a segment naming the package or tool that owns it — `CORE.`,
+`CLI.`, `FIT.`, `GRAPH.`, `SESSION.`, `DATASTORE.`, `CONFIG.`, `MCP.`, `SIMULATION.`,
+`EXTERNAL.`, `CODEBASE.`, `TREESITTER.`. 102 codes are renamed.
+
+Heads previously described the failure KIND (`VALIDATION.`, `SYSTEM.`, `TIMEOUT.`), which was
+both redundant — `kind`, `severity`, `source` and `exitClass` are structured fields on every
+definition — and free to contradict those fields. Ownership is the one thing a code string could
+not otherwise tell you, and scoping heads to owners makes codes collision-proof across packages
+without a central allocator.
+
+The full mapping is the generated index at
+`docs/public/70-reference/18-error-code-index.md`. Consumers matching on a leading `VALIDATION.`
+/ `SYSTEM.` / `CONFIGURATION.` / `TIMEOUT.` / `PLUGIN.` / `CAPABILITY.` segment must update;
+matching on the trailing `DOMAIN.CONDITION` segments is unaffected.
+
+Unchanged on purpose: the missing-config failure keeps exit **2** — `CORE.CONFIG.NOT_FOUND`
+declares `exitClass: 'configuration'`, reproducing exactly what the `ValidationError` subclass
+ladder returned, so the most common first-run failure in the product did not move.
+
 ## [0.8.5] - 2026-07-23
 
 Qualifies a **preview** Linux support tuple and generalizes the host-support
@@ -210,7 +275,7 @@ off 0.7.0 as a coherent set.
   the CLI install tree, keeping `fit --json` output pure under a PTY. The
   monorepo keeps dogfood trust-admitted when present.
 - **node_modules probes fail loud on resource-class errors**: `EMFILE`/`EIO`
-  during pack resolution now throw `SYSTEM.PLUGINS.FS_PROBE_FAILED` instead of
+  during pack resolution now throw `CORE.PLUGINS.FS_PROBE_FAILED` instead of
   silently reading as "package not installed" — under load that silently
   shrank the seeded check surface. Absence (`ENOENT`/`ENOTDIR`) and
   permission-denied ancestors still read as not-installed.
@@ -631,7 +696,7 @@ evidence so reports and MCP reads stay project-scoped and stable.
   `tool-spotbugs`, `tool-pmd`, `tool-dependency-check`, `tool-cppcheck`) with
   coverage-gated acceptance suites.
 - Adapter-language metadata on tool manifests and `opensip tools list
-  --available` discovery (optional `--lang` filter).
+--available` discovery (optional `--lang` filter).
 - Unified suite/single-run result summaries with explicit fault verdicts and
   attention bullets in live output.
 - Suite live view: one banner, headless step execution, compact aggregate
@@ -1354,7 +1419,7 @@ language layers become layout- and language-agnostic.
   tool's own schema inside the worker.
 - Third-party tools gained session/persistence parity — their runs save, list, and
   replay through the same machinery as the bundled tools (`sessions list --tool
-  <id>` accepts any registered tool id).
+<id>` accepts any registered tool id).
 - Graph cross-package resolution is now layout-agnostic: package attribution
   derives from each file's nearest `package.json`, so coupling and cross-package
   edges resolve correctly on any repository layout, not only `packages/<name>/`.

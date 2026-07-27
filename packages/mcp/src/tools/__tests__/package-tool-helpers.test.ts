@@ -33,7 +33,7 @@ describe('package-tool-helpers', () => {
     expect(JSON.parse(text)).toEqual({ rows: [] });
 
     const failOut = await packageToolResult(
-      Promise.resolve(err({ code: 'catalog-missing', message: 'none' })),
+      Promise.resolve(err({ code: 'graph-catalog-unavailable', message: 'none' })),
     );
     expect(failOut.isError).toBe(true);
   });

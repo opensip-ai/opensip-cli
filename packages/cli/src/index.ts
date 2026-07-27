@@ -56,6 +56,7 @@ import {
   acquireStartupRuntimeLease,
   type StartupRuntimeLeaseHandoff,
 } from './bootstrap/startup-runtime-lease.js';
+import { HOST_SUBSTRATE_ERROR_CATALOGS } from './bootstrap/substrate-error-catalogs.js';
 import { buildToolCliContext, createLiveViewRegistry, getOrOpenDatastore } from './cli-context.js';
 import { buildCommandScopeIndex } from './commands/command-scope-index.js';
 import {
@@ -190,6 +191,13 @@ async function main(): Promise<void> {
     // `cli.scope.languages` / `cli.scope.tools`; bootstrap populates them here.
     const langRegistry = new LanguageRegistry();
     const toolRegistry = new ToolRegistry();
+    // Ruling D1: substrate packages own error codes but are not Tools, so the composition
+    // root is the only place that can declare them. Registering BEFORE any tool loads is
+    // what makes a third-party tool claiming a substrate-owned code a refusal rather than a
+    // silent reassignment to whichever contributor happened to be merged last.
+    for (const contribution of HOST_SUBSTRATE_ERROR_CATALOGS) {
+      toolRegistry.registerSubstrateCatalog(contribution);
+    }
 
     // Persistence: datastore is opened LAZILY in cli-context.ts on
     // first access via getOrOpenDatastore. bootstrapCli just registers

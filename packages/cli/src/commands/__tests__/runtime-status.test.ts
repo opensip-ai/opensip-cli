@@ -781,11 +781,11 @@ describe('executeRuntimeStatus', () => {
   });
 
   it.each([
-    'TIMEOUT.RUNTIME_READ',
-    'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
-    'SYSTEM.RUNTIME_COORDINATION.EXISTS',
-    'SYSTEM.RUNTIME_LEASE.CAPACITY',
-    'SYSTEM.RUNTIME_LEASE.CLEANUP_CAPACITY',
+    'CORE.RUNTIME_LEASE.READ',
+    'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
+    'CORE.RUNTIME_COORDINATION.EXISTS',
+    'CORE.RUNTIME_LEASE.CAPACITY',
+    'CORE.RUNTIME_LEASE.CAPACITY',
   ])('maps bounded lease unavailability %s to busy without reading storage', async (code) => {
     const project = makeProject('lease-timeout');
     const cache = resolveEphemeralProjectPaths(project);
@@ -847,7 +847,7 @@ describe('executeRuntimeStatus', () => {
         inspect: () =>
           Promise.reject(
             Object.assign(new Error('private snapshot detail'), {
-              code: 'SYSTEM.RUNTIME_COORDINATION.CAS_MISMATCH',
+              code: 'CORE.RUNTIME_COORDINATION.CAS_MISMATCH',
             }),
           ),
         acquireRead: () => {

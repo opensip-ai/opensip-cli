@@ -46,3 +46,7 @@ export type {
   PolicyAuditStoredEvent,
 } from './policy-audit-repo.js';
 export type { DataStoreLockContext } from './data-store.js';
+export {
+  datastoreErrorCatalog,
+  DATASTORE_ERROR_OWNER_ID,
+} from './errors/datastore-error-catalog.js';

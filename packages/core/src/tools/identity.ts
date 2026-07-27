@@ -5,7 +5,15 @@
  * plugin layout domain, session discriminant, and manifest human key.
  */
 
+import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { ValidationError } from '../lib/errors.js';
+
+// Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
+// mapped — every one of these reported as an operator-only internal fatal.
+const IDENTITY_DUPLICATE_ALIAS = coreErrorCatalog.require('CORE.TOOL_IDENTITY.DUPLICATE_ALIAS');
+const IDENTITY_INVALID_NAME = coreErrorCatalog.require('CORE.TOOL_IDENTITY.INVALID_NAME');
+const IDENTITY_NAME_IN_ALIASES = coreErrorCatalog.require('CORE.TOOL_IDENTITY.NAME_IN_ALIASES');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.REQUIRED');
 
 /** Author-facing tool naming — one declaration, host-derived everywhere else. */
 export interface ToolIdentity {
@@ -35,7 +43,7 @@ function validateIdentityName(value: string, field: 'name' | 'layoutKey'): void 
   if (value.trim() === '' || !IDENTITY_NAME_PATTERN.test(value)) {
     throw new ValidationError(
       `Tool identity ${field} '${value}' must be a non-empty kebab-case or single lowercase word.`,
-      { code: 'TOOL.IDENTITY.INVALID_NAME' },
+      { code: IDENTITY_INVALID_NAME.code, definition: IDENTITY_INVALID_NAME },
     );
   }
 }
@@ -48,14 +56,16 @@ export function validateToolIdentity(identity: ToolIdentity): {
 } {
   if (identity === undefined || identity === null || typeof identity !== 'object') {
     throw new ValidationError('Tool identity is required.', {
-      code: 'TOOL.IDENTITY.REQUIRED',
+      code: IDENTITY_REQUIRED.code,
+      definition: IDENTITY_REQUIRED,
     });
   }
 
   const name = identity.name;
   if (typeof name !== 'string') {
     throw new ValidationError('Tool identity is required.', {
-      code: 'TOOL.IDENTITY.REQUIRED',
+      code: IDENTITY_REQUIRED.code,
+      definition: IDENTITY_REQUIRED,
     });
   }
   validateIdentityName(name, 'name');
@@ -63,7 +73,8 @@ export function validateToolIdentity(identity: ToolIdentity): {
   const aliases = identity.aliases ?? [];
   if (!Array.isArray(aliases)) {
     throw new ValidationError('Tool identity aliases must be an array.', {
-      code: 'TOOL.IDENTITY.DUPLICATE_ALIAS',
+      code: IDENTITY_DUPLICATE_ALIAS.code,
+      definition: IDENTITY_DUPLICATE_ALIAS,
     });
   }
 
@@ -71,18 +82,21 @@ export function validateToolIdentity(identity: ToolIdentity): {
   for (const alias of aliases) {
     if (typeof alias !== 'string' || alias.trim() === '') {
       throw new ValidationError('Tool identity aliases must be non-empty strings.', {
-        code: 'TOOL.IDENTITY.DUPLICATE_ALIAS',
+        code: IDENTITY_DUPLICATE_ALIAS.code,
+        definition: IDENTITY_DUPLICATE_ALIAS,
       });
     }
     validateIdentityName(alias, 'name');
     if (alias === name) {
       throw new ValidationError(`Tool identity name '${name}' must not appear in aliases.`, {
-        code: 'TOOL.IDENTITY.NAME_IN_ALIASES',
+        code: IDENTITY_NAME_IN_ALIASES.code,
+        definition: IDENTITY_NAME_IN_ALIASES,
       });
     }
     if (seenAliases.has(alias)) {
       throw new ValidationError(`Duplicate tool identity alias '${alias}'.`, {
-        code: 'TOOL.IDENTITY.DUPLICATE_ALIAS',
+        code: IDENTITY_DUPLICATE_ALIAS.code,
+        definition: IDENTITY_DUPLICATE_ALIAS,
       });
     }
     seenAliases.add(alias);
@@ -91,7 +105,8 @@ export function validateToolIdentity(identity: ToolIdentity): {
   const layoutKey = identity.layoutKey ?? name;
   if (typeof layoutKey !== 'string') {
     throw new ValidationError('Tool identity layoutKey must be a string.', {
-      code: 'TOOL.IDENTITY.INVALID_NAME',
+      code: IDENTITY_INVALID_NAME.code,
+      definition: IDENTITY_INVALID_NAME,
     });
   }
   validateIdentityName(layoutKey, 'layoutKey');

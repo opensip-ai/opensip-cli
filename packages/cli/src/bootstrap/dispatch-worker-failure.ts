@@ -8,9 +8,15 @@ import {
   type ToolError,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { BOOTSTRAP_MODULE } from './constants.js';
 
 import type { ToolCommandWorkerSpec } from './tool-command-dispatch-types.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
 
 const MAX_WORKER_DETAIL_CODE_LENGTH = 128;
 const ALLOWED_WORKER_DETAIL_CODES = new Set(['PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS']);
@@ -90,7 +96,9 @@ export function dispatchError({
   });
   if (rebuilt !== undefined) return rebuilt;
   return new SystemError(`external tool '${spec.toolId}' ${label} failed: ${message}`, {
-    code: 'SYSTEM.DISPATCH.WORKER_FAILED',
+    code: DISPATCH_FAILED.code,
+    definition: DISPATCH_FAILED,
+    metadata: { condition: 'worker-failed' },
     failureClass,
     stderrTail,
   });

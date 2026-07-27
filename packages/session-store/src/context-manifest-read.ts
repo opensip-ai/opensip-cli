@@ -28,8 +28,18 @@ export type TaskContextRunReadReason =
   | 'invalid-manifest'
   | 'storage-failed';
 
+/**
+ * A `Result` failure, NOT a thrown error (ruling D3): reason codes on a `Result` stay
+ * un-thrown and are deliberately outside the registered error catalog.
+ *
+ * `reason` IS the discriminant. There used to be a derived `code` field holding
+ * `CONTEXT.RUN.<REASON>` — a string in the registered-error-code dialect that no consumer ever
+ * read, and that could never be registered because it was minted from a template literal. Its
+ * only effect was to make a Result reason look like a catalogued error code to anyone reading
+ * the JSON. The other Result types in this codebase use the lowercase-kebab reason dialect
+ * precisely so the two can never be confused.
+ */
 export interface TaskContextRunReadError {
-  readonly code: string;
   readonly reason: TaskContextRunReadReason;
   readonly message: string;
 }
@@ -41,11 +51,7 @@ export interface StoredTaskContextRun {
 }
 
 function readError(reason: TaskContextRunReadReason, message: string): TaskContextRunReadError {
-  return {
-    code: `CONTEXT.RUN.${reason.replaceAll('-', '_').toUpperCase()}`,
-    reason,
-    message,
-  };
+  return { reason, message };
 }
 
 function manifestCreatedWithinRun(run: StoredRun, manifest: TaskContextManifest): boolean {

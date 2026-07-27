@@ -12,8 +12,13 @@
  * tool-agnostic.
  */
 
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
 import { ValidationError } from './errors.js';
 import { logger as defaultLogger, type Logger } from './logger.js';
+
+// Registered replacements for the legacy-grammar `VALIDATION.REGISTRY.*` literals.
+const REGISTRY_DUPLICATE = coreErrorCatalog.require('CORE.REGISTRY.DUPLICATE');
+const REGISTRY_NAME_COLLISION = coreErrorCatalog.require('CORE.REGISTRY.NAME_COLLISION');
 
 /**
  * Closed union of duplicate-handling policies.
@@ -123,7 +128,10 @@ export class Registry<T extends Registerable> {
     ) {
       throw new ValidationError(
         `${this.module} registry: name collision — '${item.name}' is already registered with id '${nameIncumbent.id}', cannot register id '${item.id}' with the same name`,
-        { code: this.validationCode ?? 'VALIDATION.REGISTRY.NAME_COLLISION' },
+        {
+          code: this.validationCode ?? REGISTRY_NAME_COLLISION.code,
+          definition: REGISTRY_NAME_COLLISION,
+        },
       );
     }
 
@@ -153,7 +161,10 @@ export class Registry<T extends Registerable> {
         case 'throw': {
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered`,
-            { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },
+            {
+              code: this.validationCode ?? REGISTRY_DUPLICATE.code,
+              definition: REGISTRY_DUPLICATE,
+            },
           );
         }
         case 'overwrite': {
@@ -177,7 +188,10 @@ export class Registry<T extends Registerable> {
           }
           throw new ValidationError(
             `${this.module}: '${item.name}' (${item.id}) already registered (allow-internal: only the first write is permitted without { internal: true })`,
-            { code: this.validationCode ?? 'VALIDATION.REGISTRY.DUPLICATE' },
+            {
+              code: this.validationCode ?? REGISTRY_DUPLICATE.code,
+              definition: REGISTRY_DUPLICATE,
+            },
           );
         }
       }

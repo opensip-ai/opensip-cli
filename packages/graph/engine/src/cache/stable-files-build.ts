@@ -1,6 +1,12 @@
 import { SystemError } from '@opensip-cli/core';
 
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
+
 import { computeFilesFingerprint } from './invalidate.js';
+
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+const BUILD_INCOMPLETE = graphErrorCatalog.require('GRAPH.BUILD.INCOMPLETE');
 
 const MAX_BUILD_ATTEMPTS = 2;
 
@@ -21,7 +27,9 @@ export interface StableFilesBuildOutput<T> {
 
 export function sourceFilesChangedDuringBuildError(): SystemError {
   return new SystemError('Source files changed repeatedly while the graph catalog was building', {
-    code: 'GRAPH.CATALOG.SOURCE_CHANGED_DURING_BUILD',
+    code: BUILD_INCOMPLETE.code,
+    definition: BUILD_INCOMPLETE,
+    metadata: { view: 'source-changed' },
   });
 }
 

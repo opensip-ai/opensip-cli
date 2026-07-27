@@ -9,14 +9,14 @@ describe('startup failure presentation', () => {
     [
       'configuration',
       new ConfigurationError('recovery required', {
-        code: 'CONFIGURATION.RECOVERY_REQUIRED',
+        code: 'CORE.RUNTIME_RECOVERY.REQUIRED',
       }),
       EXIT_CODES.CONFIGURATION_ERROR,
     ],
     [
       'timeout',
       new TimeoutError('runtime lease timed out', {
-        code: 'TIMEOUT.RUNTIME_ACCESS_COMPOSITE',
+        code: 'CORE.RUNTIME_LEASE.ACCESS_COMPOSITE',
       }),
       EXIT_CODES.RUNTIME_ERROR,
     ],

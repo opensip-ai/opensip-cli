@@ -601,7 +601,8 @@ describe('graph context producer bindings', () => {
     (
       loadFailed.cli.scope.graph as { contextCatalog: { load: () => ReturnType<typeof err> } }
     ).contextCatalog = {
-      load: () => err({ code: 'GRAPH.READ.CATALOG_GENERATION', message: 'boom' }),
+      load: () =>
+        err({ code: 'catalog-generation', operation: 'catalog-generation', message: 'boom' }),
     };
     const failedLoad = await produceContextTestSelection(
       { cwd: '/repo', files: ['src/work.ts'] },
@@ -727,7 +728,12 @@ describe('graph context producer bindings', () => {
               latest: () => null,
             },
             contextCatalog: {
-              load: () => err({ code: 'GRAPH.READ.CATALOG_GENERATION', message: 'missing' }),
+              load: () =>
+                err({
+                  code: 'catalog-generation',
+                  operation: 'catalog-generation',
+                  message: 'missing',
+                }),
               replace: vi.fn(() => ok(undefined)),
             },
           },

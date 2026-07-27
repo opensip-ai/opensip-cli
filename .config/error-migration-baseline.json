@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "tool": "fitness",
+  "lane": "error-migration",
+  "note": "Ratchet baseline for the Plan 01 migration lane. Fingerprints are fitness-stamped sha256(filePath\\nruleId\\nmessage) — line-shift tolerant, so refactors that move code do not flap the ratchet. Shrinks as waves land; only an explicit --update rewrites it.",
+  "capturedAtCommit": "7bb31500aa0cbd0885cece2c3910797587bd76b2",
+  "signalCount": 3,
+  "fingerprints": [
+    "423e4c73ac109671cb3991a9503e9359e304aeaabac8da69c68c8a4860ed3b9e",
+    "adb7811ec4d830e723b8815a90486c0f8e7467abc9c06c89a5aa0432f3add355",
+    "b932f26728876d605bad0fbf56f6f3b1278901a61a3b11cb4549b674d6be19c1"
+  ]
+}

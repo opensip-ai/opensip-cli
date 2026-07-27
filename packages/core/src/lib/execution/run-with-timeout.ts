@@ -127,6 +127,12 @@ export async function runWithTimeout<R>(
         if (controller.signal.aborted && !parentSignal?.aborted) {
           return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
         }
+        // A completed result outlives a concurrent parent cancellation (see the
+        // non-retry branch below): cancellation is only the outcome when the retry
+        // chain produced nothing.
+        if (retry.result !== undefined) {
+          return { status: 'ok', result: retry.result, durationMs };
+        }
         if (parentSignal?.aborted) {
           return {
             status: 'error',
@@ -134,10 +140,7 @@ export async function runWithTimeout<R>(
             durationMs,
           };
         }
-        if (retry.result === undefined) {
-          return { status: 'error', error: retry.lastError, durationMs };
-        }
-        return { status: 'ok', result: retry.result, durationMs };
+        return { status: 'error', error: retry.lastError, durationMs };
       }
 
       const result = await opts.run(controller.signal);
@@ -147,13 +150,12 @@ export async function runWithTimeout<R>(
       if (controller.signal.aborted && !parentSignal?.aborted) {
         return { status: 'timeout', durationMs, timeoutMs: opts.timeoutMs };
       }
-      if (parentSignal?.aborted) {
-        return {
-          status: 'error',
-          error: parentSignal.reason ?? new Error('Parent signal aborted'),
-          durationMs,
-        };
-      }
+      // A COMPLETED result outlives a concurrent parent cancellation. The unit really
+      // did finish, so reporting it as cancelled would destroy observed evidence — the
+      // run-level stop belongs to the scheduler, which stops launching further units.
+      // This branch only became reachable in practice once parentSignal started
+      // defaulting to the ambient scope signal, at which point discarding the result
+      // would have silently erased a credible verdict on every interrupt.
       return { status: 'ok', result, durationMs };
     } catch (error) {
       const durationMs = finish();
@@ -186,19 +188,33 @@ export async function runWithTimeout<R>(
   // it; without this arm an OS interrupt can remain stuck until the unit timeout.
   const hardParentAbort = new Promise<UnitRunOutcome<R>>((resolve) => {
     if (parentSignal === undefined) return;
+    let deferred: ReturnType<typeof setImmediate> | undefined;
     const onAbort = () => {
-      resolve({
-        status: 'error',
-        error: parentSignal.reason ?? new Error('Parent signal aborted'),
-        durationMs: Date.now() - startTime,
+      // Defer one MACROTASK before conceding the race. A unit that is already
+      // settling resolves on the microtask queue, which drains before the check
+      // phase, so its result wins and the evidence it produced survives the
+      // interrupt (ruling D7: never destroy a credible verdict). Resolving
+      // synchronously here beat every in-flight unit, so an interrupt discarded
+      // work that had in fact completed. A genuinely non-cooperative domain — the
+      // case this arm exists for — is unaffected beyond one macrotask.
+      deferred = setImmediate(() => {
+        resolve({
+          status: 'error',
+          error: parentSignal.reason ?? new Error('Parent signal aborted'),
+          durationMs: Date.now() - startTime,
+        });
       });
+      deferred.unref?.();
     };
     if (parentSignal.aborted) {
       onAbort();
       return;
     }
     parentSignal.addEventListener('abort', onAbort, { once: true });
-    detachParentRace = () => parentSignal.removeEventListener('abort', onAbort);
+    detachParentRace = () => {
+      parentSignal.removeEventListener('abort', onAbort);
+      if (deferred !== undefined) clearImmediate(deferred);
+    };
   });
 
   // Race so a non-settling domain cannot hang the scheduler/recipe.

@@ -9,6 +9,7 @@
 
 import { ConfigurationError, type ProjectContext } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 import { composeAndWriteReport } from '../report-compose.js';
 
 import { executeAgentCatalog } from './agent-catalog.js';
@@ -19,6 +20,10 @@ import { executeUninstall } from './uninstall.js';
 
 import type { HostRuntimeCommandSpec } from './host-runtime-access.js';
 import type { CliCommandsContext } from './shared.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 type HostSpec = HostRuntimeCommandSpec<unknown, CliCommandsContext>;
 
@@ -107,14 +112,22 @@ function parseMaxCatalogMb(raw: string | undefined): number | undefined {
   if (!Number.isFinite(mb) || mb <= 0) {
     throw new ConfigurationError(
       `report: --max-catalog-mb must be a positive number of megabytes (got '${raw}').`,
-      { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
+      {
+        code: OPTION_INVALID.code,
+        definition: OPTION_INVALID,
+        metadata: { condition: 'catalog-budget' },
+      },
     );
   }
   const bytes = Math.floor(mb * 1024 * 1024);
   if (!Number.isSafeInteger(bytes) || bytes <= 0) {
     throw new ConfigurationError(
       `report: --max-catalog-mb must be a positive number of megabytes (got '${raw}').`,
-      { code: 'CONFIG.REPORT.INVALID_CATALOG_BUDGET' },
+      {
+        code: OPTION_INVALID.code,
+        definition: OPTION_INVALID,
+        metadata: { condition: 'catalog-budget' },
+      },
     );
   }
   return bytes;

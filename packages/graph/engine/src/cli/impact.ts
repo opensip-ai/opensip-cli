@@ -28,6 +28,7 @@ import {
   type ToolCliContext,
   type ToolSessionContribution,
 } from '@opensip-cli/core';
+import { coreErrorCatalog } from '@opensip-cli/core';
 import { computeImpact } from '@opensip-cli/shared-analysis';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
@@ -46,6 +47,9 @@ import { contributionFromGraphPayload } from './graph-session-contribution.js';
 
 import type { Catalog } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+/** Registered replacement for the template-built `CONFIG.GRAPH.${reason}` code. */
+const CHANGED_FILES_UNAVAILABLE = coreErrorCatalog.require('CORE.CHANGED_FILES.BASIS_UNAVAILABLE');
 
 const log = createToolLogger('graph:cli');
 const IMPACT_RULE_ID = 'graph.impact.blast-radius';
@@ -274,8 +278,14 @@ function resolveImpactBasis(opts: ImpactCommandOptions): {
   if (opts.changed === true || opts.since) {
     const resolved = resolveChangedFiles(opts.cwd, { since: opts.since });
     if (!resolved.ok) {
-      const reason = resolved.reason.replaceAll('-', '_').toUpperCase();
-      throw new ConfigurationError(resolved.message, { code: `CONFIG.GRAPH.${reason}` });
+      // The reason is a CLOSED union, so it belongs in bounded metadata rather than in the
+      // code. Building the code from a template made it unregisterable by construction: no
+      // catalog can declare a code that does not exist until runtime.
+      throw new ConfigurationError(resolved.message, {
+        code: CHANGED_FILES_UNAVAILABLE.code,
+        definition: CHANGED_FILES_UNAVAILABLE,
+        metadata: { condition: resolved.reason },
+      });
     }
     return {
       changedFiles: resolved.files,

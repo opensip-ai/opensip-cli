@@ -1,10 +1,14 @@
 import { ValidationError } from '@opensip-cli/core';
 import { eq, inArray } from 'drizzle-orm';
 
+import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.js';
 import { sessionHostMetrics } from './schema/sessions.js';
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
 import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
+
+// Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
+const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
 
 const HOST_METRIC_KEYS = [
   'ttyBusyMs',
@@ -32,7 +36,9 @@ export function prepareHostMetricsWrite(
     sessionId.length === 0
   ) {
     throw new ValidationError('Invalid host metrics input.', {
-      code: 'VALIDATION.SESSION.INVALID_HOST_METRICS',
+      code: WRITE_INVALID.code,
+      definition: WRITE_INVALID,
+      metadata: { field: 'host-metrics' },
     });
   }
   for (const key of HOST_METRIC_KEYS) {
@@ -42,7 +48,9 @@ export function prepareHostMetricsWrite(
       (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     ) {
       throw new ValidationError(`Invalid host metric ${key} for session ${sessionId}.`, {
-        code: 'VALIDATION.SESSION.INVALID_HOST_METRICS',
+        code: WRITE_INVALID.code,
+        definition: WRITE_INVALID,
+        metadata: { field: 'host-metrics' },
       });
     }
   }

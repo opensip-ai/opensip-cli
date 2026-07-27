@@ -253,3 +253,102 @@ describe('failure projection golden fixtures (Plan 00 versioned wire)', () => {
     });
   });
 });
+
+describe('fromNativeError classification (Plan 01 Task 1.3)', () => {
+  it('classifies an AbortError as cancellation, not an internal invariant', () => {
+    // WAS BROKEN: AbortSignal.throwIfAborted() and new DOMException(…, 'AbortError') are
+    // instanceof Error but carry a NUMERIC code (20), so the `typeof code === 'string'`
+    // errno guard rejected them and every cancellation degraded to SYSTEM_ERROR with
+    // known:'unknown' — a cancelled run looked exactly like an internal invariant violation.
+    const controller = new AbortController();
+    controller.abort();
+    let thrown: unknown;
+    try {
+      controller.signal.throwIfAborted();
+    } catch (error) {
+      thrown = error;
+    }
+    const envelope = normalizeFailure(thrown);
+    expect(envelope.code).toBe('CORE.SYSTEM.CANCELLED');
+    expect(envelope.known).toBe('known');
+    expect(envelope.definition.kind).toBe('cancelled');
+    expect(envelope.definition.exitClass).toBe('cancelled');
+  });
+
+  it('separates a deadline from a user cancellation', () => {
+    // Both are aborts, but only one is retryable: a caller may retry a deadline; retrying a
+    // user's Ctrl-C is wrong.
+    const timeoutAbort = new DOMException('The operation timed out.', 'TimeoutError');
+    expect(normalizeFailure(timeoutAbort).code).toBe('CORE.SYSTEM.DEADLINE_EXCEEDED');
+    const userAbort = new DOMException('This operation was aborted', 'AbortError');
+    expect(normalizeFailure(userAbort).code).toBe('CORE.SYSTEM.CANCELLED');
+  });
+
+  it('routes network errnos to the registered NETWORK_ERROR definition', () => {
+    // NETWORK_ERROR was registered all along — retry 'transient', exitClass 'report-failed' —
+    // and nothing routed to it, so a refused connection during report egress was reported as
+    // an internal invariant that must not be retried.
+    for (const errno of ['ECONNREFUSED', 'ECONNRESET', 'EAI_AGAIN', 'ENOTFOUND', 'EPIPE']) {
+      const error = Object.assign(new Error(`connect ${errno}`), { code: errno });
+      const envelope = normalizeFailure(error);
+      expect(envelope.definition.kind, errno).toBe('network');
+      expect(envelope.definition.retry, errno).toBe('transient');
+      expect(envelope.known, errno).toBe('known');
+    }
+  });
+
+  it('classifies ETIMEDOUT as a deadline rather than a network fault', () => {
+    // Listed under both families in the ledger; timeout is the more actionable reading.
+    const error = Object.assign(new Error('connect ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    expect(normalizeFailure(error).code).toBe('CORE.SYSTEM.DEADLINE_EXCEEDED');
+  });
+
+  it('still reports a genuinely unclassifiable error as unknown', () => {
+    // The classifier must not manufacture confidence it does not have.
+    const envelope = normalizeFailure(new Error('something went sideways'));
+    expect(envelope.known).toBe('unknown');
+    expect(envelope.definition.code).toBe('SYSTEM_ERROR');
+  });
+
+  it('publishes the errno it captured', () => {
+    // publicMetadataKeys was absent on these definitions, so allowlistedMetadata discarded
+    // the single machine-classification datum fromNativeError had recorded.
+    const error = Object.assign(new Error('nope'), { code: 'EACCES' });
+    const envelope = normalizeFailure(error);
+    expect(envelope.metadata.errno).toBe('EACCES');
+    expect(envelope.definition.publicMetadataKeys).toContain('errno');
+  });
+
+  it('scrubs credentials out of operator detail', () => {
+    // operatorDetail is assembled from raw error text, which routinely carries a URL with an
+    // embedded token. D8: the host redacts at one choke point.
+    const error = new Error('fatal: could not read from https://user:sup3rsecret@example.com/x');
+    const envelope = normalizeFailure(error);
+    expect(envelope.operatorDetail ?? '').not.toContain('sup3rsecret');
+  });
+});
+
+describe('fromToolError known-status honesty (Plan 01 Task 1.3)', () => {
+  it('reports a ToolError whose code resolved to nothing as unknown', () => {
+    // WAS BROKEN: hardcoded known:'known' for every ToolError-like value, which contradicted
+    // the FailureKnownStatus contract AND hid Task 1.2's entire defect class — a code with an
+    // unmapped head fell through to UNKNOWN_FAILURE yet was still reported as confidently
+    // classified.
+    const envelope = normalizeFailure(new ToolError('boom', 'NOSUCH.HEAD.ANYWHERE'));
+    expect(envelope.definition.code).toBe('CORE.SYSTEM.UNKNOWN_FAILURE');
+    expect(envelope.known).toBe('unknown');
+  });
+
+  it('still reports a resolved ToolError as known', () => {
+    const envelope = normalizeFailure(new ToolError('bad input', 'VALIDATION_ERROR'));
+    expect(envelope.known).toBe('known');
+  });
+
+  it('scrubs credentials out of a stderr tail', () => {
+    const error = new ToolError('scanner failed', 'SYSTEM_ERROR', {
+      stderrTail: 'remote: https://x-access-token:ghp_deadbeefdeadbeef@github.com/a/b',
+    });
+    expect(error.stderrTail ?? '').not.toContain('ghp_deadbeefdeadbeef');
+    expect(normalizeFailure(error).operatorDetail ?? '').not.toContain('ghp_deadbeefdeadbeef');
+  });
+});

@@ -19,6 +19,8 @@ import {
   currentScope,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
 import {
   getAnalysisMode,
   isAnalyzeConfig,
@@ -27,7 +29,11 @@ import {
   validateCheckConfig,
 } from './check-config.js';
 import { executeCommand } from './command-executor.js';
-import { CheckAbortedError, createExecutionContext } from './execution-context.js';
+import {
+  CheckAbortedError,
+  CheckDeadlineExceededError,
+  createExecutionContext,
+} from './execution-context.js';
 import { createFileAccessor } from './file-accessor.js';
 import { filterFilesByType } from './file-type-filter.js';
 import { filterSignalsByDirectives, buildFilteredResult } from './ignore-processing.js';
@@ -46,6 +52,10 @@ import type { Check } from './check-types.js';
 import type { ExecutionContext, RunOptions } from './execution-context.js';
 import type { CheckResult } from '../types/findings.js';
 import type { Signal, SignalRepair } from '@opensip-cli/core';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
 
 // =============================================================================
 // VIOLATION → SIGNAL CONVERSION
@@ -143,7 +153,7 @@ async function analyzeSingleFile(
     // analyze-mode check with no visible trace). Surface it at warn, and
     // through the per-run diagnostics bus (the same channel `service.ts`
     // uses for run-lifecycle events) so a `--json` consumer sees it too.
-    if (error instanceof SystemError && error.code === 'SYSTEM.FITNESS.FILE_TOO_LARGE') {
+    if (error instanceof SystemError && error.code === 'FIT.FITNESS.FILE_TOO_LARGE') {
       logger.warn('Skipping oversized file', {
         evt: 'fitness.check.file.skip.too_large',
         module: 'fitness:framework',
@@ -325,6 +335,12 @@ async function executeCommandMode(
 
   /* v8 ignore start -- defensive: command-mode tests cover the non-aborted path; abort during external command execution requires a long-running subprocess that's intentionally not unit-testable */
   if (result.aborted) {
+    // A timeout is NOT a cancellation. Both used to raise `CheckAbortedError`, so a check whose
+    // command ran past its budget reported "the check was cancelled — re-run if the work is
+    // still needed" and exited 130. ADR-0183 requires the two to stay distinguishable.
+    if (result.abortReason === 'deadline-exceeded') {
+      throw new CheckDeadlineExceededError(config.slug, config.timeout);
+    }
     throw new CheckAbortedError(config.slug);
   }
   /* v8 ignore stop */
@@ -537,7 +553,9 @@ async function executeUnifiedCheck(
   /* v8 ignore start -- exhaustive check: all UnifiedCheckConfig variants are handled above; this throw fires only if someone introduces a new variant without updating this switch */
   const _exhaustiveCheck: never = config;
   throw new SystemError(`Unknown analysis mode: ${JSON.stringify(_exhaustiveCheck)}`, {
-    code: 'SYSTEM.FITNESS.UNKNOWN_MODE',
+    code: ENGINE_STATE.code,
+    definition: ENGINE_STATE,
+    metadata: { condition: 'unknown-mode' },
   });
   /* v8 ignore stop */
 }

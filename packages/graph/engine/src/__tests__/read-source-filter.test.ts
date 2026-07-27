@@ -221,7 +221,7 @@ describe('compileSourceRoleMatcher (P2 Phase 1.4)', () => {
     expect(compileSourceRoleMatcher(globs, files3, limit(3)).ok).toBe(true);
     const over = compileSourceRoleMatcher(globs, files3, limit(2));
     expect(over.ok).toBe(false);
-    if (!over.ok) expect(over.error.code).toBe('GRAPH.READ.SOURCE_ROLE_LIMIT');
+    if (!over.ok) expect(over.error.code).toBe('query-invalid');
     const files4 = ['packages/a.ts', 'packages/b.ts', 'packages/c.ts', 'packages/d.ts'];
     expect(compileSourceRoleMatcher(globs, files4, limit(4)).ok).toBe(true);
     expect(compileSourceRoleMatcher(globs, files4, limit(3)).ok).toBe(false);

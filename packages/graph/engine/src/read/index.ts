@@ -89,6 +89,7 @@ export {
 
 export type {
   GraphReadError,
+  GraphReadReason,
   GraphReadOperation,
   CatalogIdentity,
   RebuildCatalogInput,
@@ -186,3 +187,11 @@ export type {
 export type { GraphImpactView, ImpactViewOptions } from './impact-view.js';
 export type { GraphEntityDetail, GraphEntityParameter } from './entity-detail-view.js';
 export type { StaticTestSelectionOptions, StaticTestSelectionView } from './test-selection-view.js';
+
+/**
+ * The graph catalog is served to MCP through THIS surface, so the codes describing a failed
+ * read have to be reachable from it too. Without this, a consumer bound to `/read` (as MCP is,
+ * by the `mcp-graph-root-registrar-only` architecture rule) had to reach the root barrel just
+ * to name the failure it was already allowed to encounter.
+ */
+export { graphErrorCatalog } from '../errors/graph-error-catalog.js';

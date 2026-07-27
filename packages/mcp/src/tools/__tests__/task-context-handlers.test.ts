@@ -1,4 +1,4 @@
-import { err, ok } from '@opensip-cli/core';
+import { err, ok, type Result } from '@opensip-cli/core';
 import { describe, expect, it, vi } from 'vitest';
 
 import { registerGetContextStatus } from '../get-context-status.js';
@@ -8,6 +8,7 @@ import { registerImpactFiles } from '../impact-files.js';
 import { registerSelectTests } from '../select-tests.js';
 
 import type { GraphReadPort, ImpactFilesDto } from '../../graph-read-port.js';
+import type { McpReadReason, McpReadError } from '../../mcp-error.js';
 import type { CallToolResult, McpStdioServer } from '../../server.js';
 import type { GraphToolResult, SymbolRef } from '../../symbol-dto.js';
 import type { McpToolDeps } from '../types.js';
@@ -354,7 +355,7 @@ describe('task-context MCP handlers', () => {
 
   it('surfaces inventory and graph failures from select_tests', async () => {
     {
-      const inventoryStatus = vi.fn(() =>
+      const inventoryStatus = vi.fn((): Promise<Result<never, McpReadError>> =>
         Promise.resolve(err({ code: 'cancelled', message: 'stopped' })),
       );
       const selectTests = vi.fn();
@@ -389,7 +390,7 @@ describe('task-context MCP handlers', () => {
           }),
         ),
       );
-      const selectTests = vi.fn(() =>
+      const selectTests = vi.fn((): Promise<Result<never, McpReadError>> =>
         Promise.resolve(err({ code: 'test-selection-failed', message: 'nope' })),
       );
       const { handlers, server } = capture();
@@ -426,7 +427,7 @@ describe('task-context MCP handlers', () => {
   });
 
   it('surfaces get_file_context port errors', async () => {
-    const fileContext = vi.fn(() =>
+    const fileContext = vi.fn((): Promise<Result<never, McpReadError>> =>
       Promise.resolve(err({ code: 'invalid-input', message: 'bad path' })),
     );
     const { handlers, server } = capture();
@@ -437,7 +438,9 @@ describe('task-context MCP handlers', () => {
 
   it('surfaces get_context_status port errors', async () => {
     const contextStatus = vi.fn(() =>
-      Promise.resolve(err({ code: 'context-read-failed', message: 'unavailable' })),
+      Promise.resolve(
+        err({ code: 'context-read-failed' as McpReadReason, message: 'unavailable' }),
+      ),
     );
     const { handlers, server } = capture();
     registerGetContextStatus(server, deps({ context: { contextStatus } }));

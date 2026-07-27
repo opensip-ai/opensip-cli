@@ -34,7 +34,15 @@ export {
   MACHINE_CONSUMER_COMPATIBILITY,
   MAX_DEFINITIONS_PER_CATALOG,
   ErrorDefinitionError,
+  isErrorDefinitionErrorLike,
+  ERROR_DEFINITION_ERROR_BRAND,
 } from './lib/error-definition.js';
+// Plan 01 Wave 1 — the codes core owns beyond the legacy adapter catalog.
+export {
+  coreErrorCatalog,
+  RUNTIME_COORDINATION_FAILURE_CODES,
+  isRuntimeCoordinationFailureCode,
+} from './lib/errors/core-error-catalog.js';
 export type {
   ErrorDefinition,
   ErrorCatalog,

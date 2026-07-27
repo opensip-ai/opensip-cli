@@ -45,6 +45,9 @@ import type {
   Indexes,
 } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 export interface PackageEvidenceQuery {
   readonly edgeKind: PackageEdgeKind;
   readonly filter: GraphSourceFilter;
@@ -195,7 +198,7 @@ function addReason(reasons: Set<string>, reason: string): void {
 
 function peError(message: string): GraphReadError {
   return {
-    code: 'GRAPH.READ.PACKAGE_EVIDENCE',
+    code: 'query-invalid',
     operation: 'analysis',
     message,
   };

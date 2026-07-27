@@ -19,7 +19,11 @@
 import { ErrorDefinitionError } from '../lib/error-definition.js';
 import { Registry, type Registerable } from '../lib/registry.js';
 
-import { aggregateErrorCatalogs, validateToolErrorCatalogContribution } from './error-catalog.js';
+import {
+  aggregateErrorCatalogs,
+  validateToolErrorCatalogContribution,
+  type SubstrateErrorCatalogContribution,
+} from './error-catalog.js';
 
 import type { Tool } from './types.js';
 import type { ErrorCatalog, ErrorDefinition } from '../lib/error-definition.js';
@@ -40,6 +44,35 @@ export class ToolRegistry {
 
   /** Per-invocation index of tool error catalogs (rebuilt on register). */
   private catalogIndex: ReturnType<typeof aggregateErrorCatalogs> | undefined;
+
+  /**
+   * Substrate catalogs supplied by the composition root (Plan 01 ruling D1).
+   *
+   * Substrate packages are not Tools, so they have no `ToolExtensionPoints.errorCatalog` to
+   * contribute through — yet they own codes, and a third-party tool claiming one of those
+   * codes must be refused. Only the composition root knows which substrates are loaded, so
+   * it supplies the list; the registry keeps the aggregate and the collision semantics.
+   */
+  private readonly substrateCatalogs: SubstrateErrorCatalogContribution[] = [];
+
+  /**
+   * Register a substrate package's error catalog.
+   *
+   * Idempotent per package name: the composition root may build more than one scope in a
+   * process (the lightweight command probe does), and re-registering the same substrate must
+   * not manufacture a self-collision.
+   *
+   * @throws {ErrorDefinitionError} When the substrate's codes collide with an already-known owner.
+   */
+  registerSubstrateCatalog(contribution: SubstrateErrorCatalogContribution): void {
+    const existing = this.substrateCatalogs.findIndex(
+      (c) => c.packageName === contribution.packageName,
+    );
+    if (existing >= 0) return;
+    this.substrateCatalogs.push(contribution);
+    this.catalogIndex = undefined;
+    this.getErrorCatalogIndex();
+  }
 
   /**
    * Register a tool. **First writer wins** — re-registering the same
@@ -79,14 +112,17 @@ export class ToolRegistry {
           errorCatalog: validated.catalog,
         },
       };
-      const provisional = aggregateErrorCatalogs([
-        ...this.collectToolCatalogs(),
-        {
-          toolName: tool.metadata.name,
-          toolId: tool.metadata.id,
-          catalog: validated.catalog,
-        },
-      ]);
+      const provisional = aggregateErrorCatalogs(
+        [
+          ...this.collectToolCatalogs(),
+          {
+            toolName: tool.metadata.name,
+            toolId: tool.metadata.id,
+            catalog: validated.catalog,
+          },
+        ],
+        this.substrateCatalogs,
+      );
       if (provisional.collisions.length > 0) {
         const first = provisional.collisions[0];
         throw new ErrorDefinitionError(
@@ -140,7 +176,7 @@ export class ToolRegistry {
       return this.catalogIndex;
     }
 
-    this.catalogIndex = aggregateErrorCatalogs(this.collectToolCatalogs());
+    this.catalogIndex = aggregateErrorCatalogs(this.collectToolCatalogs(), this.substrateCatalogs);
     if (this.catalogIndex.collisions.length > 0) {
       const first = this.catalogIndex.collisions[0];
       throw new ErrorDefinitionError(

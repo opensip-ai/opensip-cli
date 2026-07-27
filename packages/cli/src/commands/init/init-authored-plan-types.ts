@@ -3,6 +3,8 @@ import { posix } from 'node:path';
 
 import { ConfigurationError } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import {
   RUNTIME_PROMOTION_AUTHORED_MODES,
   RUNTIME_PROMOTION_JOURNAL_CAPS,
@@ -15,6 +17,10 @@ import type {
   RuntimePromotionLanguage,
 } from './runtime-promotion-journal-types.js';
 import type { AgentGuidanceResult, PreExistingFile } from '@opensip-cli/contracts';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 export const AUTHORED_REPLAY_MANIFEST_KIND = 'opensip-init-authored-replay' as const;
 export const AUTHORED_REPLAY_MANIFEST_VERSION = 1 as const;
@@ -209,7 +215,9 @@ export interface CreateInitAuthoredPlanInput {
  */
 export function authoredPlanFailure(message: string): never {
   throw new ConfigurationError(`Invalid Init authored plan: ${message}`, {
-    code: 'CONFIG.INIT.AUTHORED_PLAN_INVALID',
+    code: OPTION_INVALID.code,
+    definition: OPTION_INVALID,
+    metadata: { condition: 'authored-plan' },
   });
 }
 

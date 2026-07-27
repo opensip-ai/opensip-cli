@@ -44,7 +44,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@opensip-cli/codebase": "workspace:*",
     "@opensip-cli/checks-cpp": "workspace:*",
     "@opensip-cli/checks-go": "workspace:*",
     "@opensip-cli/checks-java": "workspace:*",
@@ -54,6 +53,7 @@
     "@opensip-cli/checks-universal": "workspace:*",
     "@opensip-cli/cli-live": "workspace:*",
     "@opensip-cli/cli-ui": "workspace:*",
+    "@opensip-cli/codebase": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
@@ -61,6 +61,7 @@
     "@opensip-cli/datastore": "workspace:*",
     "@opensip-cli/external-tool-adapter": "workspace:*",
     "@opensip-cli/fitness": "workspace:*",
+    "@opensip-cli/format": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/graph-go": "workspace:*",
     "@opensip-cli/graph-java": "workspace:*",
@@ -78,13 +79,14 @@
     "@opensip-cli/session-store": "workspace:*",
     "@opensip-cli/shared-analysis": "workspace:*",
     "@opensip-cli/simulation": "workspace:*",
-    "@opensip-cli/yagni": "workspace:*",
     "@opensip-cli/targeting": "workspace:*",
+    "@opensip-cli/tree-sitter": "workspace:*",
+    "@opensip-cli/yagni": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/context-async-hooks": "^2.9.0",
     "@opentelemetry/core": "^2.9.0",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.220.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.220.0",
     "@opentelemetry/resources": "^2.9.0",
     "@opentelemetry/sdk-metrics": "^2.9.0",
     "@opentelemetry/sdk-trace-node": "^2.9.0",
@@ -95,8 +97,7 @@
     "react": "^19.2.7",
     "semver": "^7.7.4",
     "update-notifier": "^7.3.1",
-    "yaml": "^2.9.0",
-    "@opensip-cli/format": "workspace:*"
+    "yaml": "^2.9.0"
   },
   "devDependencies": {
     "@opensip-cli/checks-dogfood": "workspace:*",

@@ -5,7 +5,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 import { catalogGenerationKey } from './catalog-generation-model.js';
 import { fromGraphReadError, readError, type McpReadError } from './mcp-error.js';
 
-import type { Catalog, CatalogIdentity } from '@opensip-cli/graph/read';
+import type { Catalog, CatalogIdentity, GraphReadReason } from '@opensip-cli/graph/read';
 
 const MAX_IDENTITY_LANGUAGE = 64;
 const MAX_IDENTITY_CACHE_KEY = 8192;
@@ -77,7 +77,10 @@ export function safeCatalogGenerationKey(identity: CatalogIdentity): Result<stri
   return ok(catalogGenerationKey(identity));
 }
 
-export function mapCatalogIdentityError(error: { code: string; message: string }): McpReadError {
+export function mapCatalogIdentityError(error: {
+  code: GraphReadReason;
+  message: string;
+}): McpReadError {
   return fromGraphReadError({
     code: error.code,
     operation: 'catalog-identity',

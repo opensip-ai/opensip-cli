@@ -21,6 +21,14 @@ import {
   type RuntimeLeaseEvent,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
+const PROJECT_REQUIRED = hostErrorCatalog.require('CLI.HOST.PROJECT_REQUIRED');
+const STARTUP_LEASE = hostErrorCatalog.require('CLI.HOST.STARTUP_LEASE');
+
 export interface StartupProjectSelection {
   readonly cwd: string;
   readonly cwdExplicit: boolean;
@@ -30,7 +38,9 @@ export interface StartupProjectSelection {
 
 function invalidStartupOption(message: string): never {
   throw new ConfigurationError(message, {
-    code: 'CONFIGURATION.STARTUP_OPTION_INVALID',
+    code: OPTION_INVALID.code,
+    definition: OPTION_INVALID,
+    metadata: { condition: 'startup-option' },
   });
 }
 
@@ -112,7 +122,9 @@ export function resolveStartupProjectSelection(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new ConfigurationError(message, {
-      code: 'CONFIGURATION.STARTUP_PROJECT_UNRESOLVED',
+      code: PROJECT_REQUIRED.code,
+      definition: PROJECT_REQUIRED,
+      metadata: { condition: 'unresolved' },
       cause: error,
     });
   }
@@ -181,14 +193,20 @@ function createStartupRuntimeLeaseHandoff(
       ) {
         throw new ConfigurationError(
           'Dynamic Tool discovery requires a live project and user-state startup lease.',
-          { code: 'CONFIGURATION.RUNTIME_STARTUP_LEASE_REQUIRED' },
+          {
+            code: STARTUP_LEASE.code,
+            definition: STARTUP_LEASE,
+            metadata: { condition: 'required' },
+          },
         );
       }
     },
     claimForCommand: (projectRoot: string): RuntimeAccessLease => {
       if (state !== 'startup') {
         throw new ConfigurationError('The startup runtime lease was already consumed.', {
-          code: 'CONFIGURATION.RUNTIME_STARTUP_LEASE_CONSUMED',
+          code: STARTUP_LEASE.code,
+          definition: STARTUP_LEASE,
+          metadata: { condition: 'consumed' },
         });
       }
       if (
@@ -197,7 +215,11 @@ function createStartupRuntimeLeaseHandoff(
       ) {
         throw new ConfigurationError(
           'The canonical OpenSIP project root changed during startup. Retry after concurrent Init or project movement completes.',
-          { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
+          {
+            code: PROJECT_REQUIRED.code,
+            definition: PROJECT_REQUIRED,
+            metadata: { condition: 'context-unstable' },
+          },
         );
       }
       state = 'command';
@@ -233,7 +255,11 @@ async function acquireStabilizedStartupRuntimeLease(
   if (state.attempt >= MAX_STARTUP_PROJECT_STABILIZATION_ATTEMPTS) {
     throw new ConfigurationError(
       'The canonical OpenSIP project root changed repeatedly during startup. Stop concurrent project moves or Init operations and retry.',
-      { code: 'CONFIGURATION.RUNTIME_CONTEXT_UNSTABLE' },
+      {
+        code: PROJECT_REQUIRED.code,
+        definition: PROJECT_REQUIRED,
+        metadata: { condition: 'context-unstable' },
+      },
     );
   }
 

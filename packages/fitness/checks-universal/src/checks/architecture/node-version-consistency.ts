@@ -251,7 +251,20 @@ export const nodeVersionConsistency = defineCheck({
     let rootPkg: RootPackageJson;
     try {
       rootPkg = JSON.parse(rootContent) as RootPackageJson;
+      // @swallow-ok the empty result is no longer honest-by-omission: an unparsable root
+      // package.json is now REPORTED as a violation rather than passing silently.
     } catch {
+      // Returning the accumulator reported a CLEAN PASS for a check that never ran: the root
+      // package.json is this check's entire basis, so failing to parse it means "unknown", not
+      // "consistent". Reporting it as a violation is what keeps a green result honest.
+      violations.push({
+        line: 1,
+        filePath: rootPkgPath,
+        message:
+          'Root package.json could not be parsed, so Node version consistency could not be verified.',
+        severity: 'error',
+        suggestion: 'Fix the JSON syntax in the root package.json so version checks can run.',
+      });
       return violations;
     }
     const rootConstraint = rootPkg.engines?.node;

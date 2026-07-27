@@ -17,6 +17,13 @@ import {
   type ToolPluginManifest,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const DISPATCH_FAILED = hostErrorCatalog.require('CLI.HOST.DISPATCH_FAILED');
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
+
 function externalDispatchStub(
   commandName: string,
 ): CommandSpec<unknown, ToolCliContext>['handler'] {
@@ -25,7 +32,11 @@ function externalDispatchStub(
       `external tool command '${commandName}' handler was invoked in the host process; ` +
         'external commands dispatch to a worker (ADR-0054). This indicates the ' +
         'maybeDispatchExternal hook was bypassed — refusing to run untrusted code in-host.',
-      { code: 'SYSTEM.DISPATCH.EXTERNAL_HANDLER_UNREACHABLE' },
+      {
+        code: DISPATCH_FAILED.code,
+        definition: DISPATCH_FAILED,
+        metadata: { condition: 'handler-unreachable' },
+      },
     );
   };
 }
@@ -75,7 +86,9 @@ export function synthesizeExternalTool(
 ): ReturnType<typeof defineTool> {
   if (manifest.identity === undefined) {
     throw new SystemError(`external tool manifest '${manifest.id}' is missing required identity`, {
-      code: 'SYSTEM.EXTERNAL_TOOL.IDENTITY_MISSING',
+      code: WIRING_INVALID.code,
+      definition: WIRING_INVALID,
+      metadata: { condition: 'external-tool-identity' },
     });
   }
 

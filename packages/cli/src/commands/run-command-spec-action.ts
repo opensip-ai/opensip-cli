@@ -12,6 +12,7 @@ import {
 import { RunRepo } from '@opensip-cli/session-store';
 
 import { currentSuiteRunContext, type RunActionHooks } from '../bootstrap/run-plane.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import { emitCommandResult } from './mount-result-command.js';
 import {
@@ -21,6 +22,10 @@ import {
 } from './run-ledger-standalone.js';
 
 import type { DataStore } from '@opensip-cli/datastore';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export async function runCommandSpecAction<TCtx extends CommandMountContext>(
   spec: CommandSpec<unknown, TCtx>,
@@ -163,6 +168,7 @@ function hasProvenDelegatedChild<TCtx extends CommandMountContext>(input: {
       delegatedAt !== undefined &&
       new RunRepo(datastore).hasImplicitRunForCommand(correlationRunId, tool, command, delegatedAt);
   } catch {
+    // @swallow-ok fail-closed: an unprovable implicit-run link must read as unproven, and this is a correlation nicety that must never fail the command
     proven = false;
   }
   if (proven) {
@@ -227,7 +233,11 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       if (result === undefined) {
         throw new SystemError(
           `mountCommandSpec: command '${spec.name}' declares output 'command-result' but its handler returned undefined. Return a CommandResult, throw a ToolError, or call reportFailure and return.`,
-          { code: 'SYSTEM.COMMAND_RESULT.UNDEFINED' },
+          {
+            code: WIRING_INVALID.code,
+            definition: WIRING_INVALID,
+            metadata: { condition: 'command-result-undefined' },
+          },
         );
       }
       await emitCommandResult(result as CommandResult, {

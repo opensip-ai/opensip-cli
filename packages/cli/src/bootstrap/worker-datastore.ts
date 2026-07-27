@@ -11,7 +11,13 @@
 
 import { PluginIncompatibleError, SystemError, type Logger } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import type { DatastoreThunk } from './scope-access.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 const DENIED_CODE = 'PLUGIN.WORKER.DATASTORE_DIRECT_ACCESS' as const;
 
@@ -37,14 +43,20 @@ function resolveExecutionMode(
     if (isWorkerEnv) {
       throw new SystemError(
         'OPENSIP_CLI_IN_TOOL_WORKER=1 without an authorized internal worker command path',
-        { code: 'SYSTEM.WORKER.MODE_MISMATCH' },
+        {
+          code: WIRING_INVALID.code,
+          definition: WIRING_INVALID,
+          metadata: { condition: 'worker-mode-mismatch' },
+        },
       );
     }
     return 'host';
   }
   if (isWorkerEnv) return workerMode;
   throw new SystemError('Worker command path without OPENSIP_CLI_IN_TOOL_WORKER=1', {
-    code: 'SYSTEM.WORKER.MODE_MISMATCH',
+    code: WIRING_INVALID.code,
+    definition: WIRING_INVALID,
+    metadata: { condition: 'worker-mode-mismatch' },
   });
 }
 

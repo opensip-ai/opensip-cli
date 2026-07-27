@@ -10,7 +10,13 @@
 
 import { PluginIncompatibleError, type Tool, type ToolCliContext } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { toolOwnedKeys } from './tool-owned-keys.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED');
 
 export { toolOwnedKeys } from './tool-owned-keys.js';
 
@@ -35,7 +41,9 @@ function assertOwnToolKey(
     `tool '${describeTool(tool)}' attempted to use ${seam} for tool namespace '${requested}'. ` +
       `Allowed namespaces: ${[...allowed].sort().join(', ')}.`,
     {
-      code: 'PLUGIN.IDENTITY_NAMESPACE_MISMATCH',
+      code: HOST_IDENTITY_RESERVED.code,
+      definition: HOST_IDENTITY_RESERVED,
+      metadata: { condition: 'namespace-mismatch' },
       diagnostic: `cross-tool ${seam} namespace '${requested}'`,
     },
   );

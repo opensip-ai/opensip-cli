@@ -4,6 +4,7 @@
  * plugin layout domain, and session replay discriminant.
  */
 
+import { coreErrorCatalog } from '../lib/errors/core-error-catalog.js';
 import { ValidationError } from '../lib/errors.js';
 
 import {
@@ -26,6 +27,14 @@ import type { ToolIdentity } from './identity.js';
 import type { ToolSessionReplayContribution } from './tool-sessions.js';
 import type { ToolCliContext, Tool, ToolExtensionPoints, ToolMetadata } from './types.js';
 import type { PluginLayout } from '../plugins/types.js';
+
+// Plan 01: registered replacements for the `TOOL.` head, which legacyFamilyCode never
+// mapped — every one of these reported as an operator-only internal fatal.
+const IDENTITY_ALIAS_DRIFT = coreErrorCatalog.require('CORE.TOOL_IDENTITY.ALIAS_DRIFT');
+const IDENTITY_PARENT_MISMATCH = coreErrorCatalog.require('CORE.TOOL_IDENTITY.PARENT_MISMATCH');
+const IDENTITY_PRIMARY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.PRIMARY_REQUIRED');
+const IDENTITY_REQUIRED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.REQUIRED');
+const IDENTITY_RESERVED = coreErrorCatalog.require('CORE.TOOL_IDENTITY.RESERVED');
 
 /** Input to {@link defineTool} — the small author surface. */
 export interface DefineToolInput {
@@ -82,14 +91,14 @@ function normalizeCommandSpecs(
     if (named.parent !== undefined && named.parent !== identity.name) {
       throw new ValidationError(
         `Command '${named.name}' declares parent '${named.parent}' but tool identity name is '${identity.name}'.`,
-        { code: 'TOOL.IDENTITY.PARENT_MISMATCH' },
+        { code: IDENTITY_PARENT_MISMATCH.code, definition: IDENTITY_PARENT_MISMATCH },
       );
     }
     if (named.parent === undefined && named.name === identity.name) {
       if (!aliasesEqual(named.aliases, [...identity.aliases])) {
         throw new ValidationError(
           `Primary command '${named.name}' aliases must match identity.aliases exactly.`,
-          { code: 'TOOL.IDENTITY.ALIAS_DRIFT' },
+          { code: IDENTITY_ALIAS_DRIFT.code, definition: IDENTITY_ALIAS_DRIFT },
         );
       }
       primaryCount += 1;
@@ -101,7 +110,7 @@ function normalizeCommandSpecs(
   if (primaryCount !== 1) {
     throw new ValidationError(
       `Tool '${identity.name}' must declare exactly one primary command (got ${primaryCount}).`,
-      { code: 'TOOL.IDENTITY.PRIMARY_REQUIRED' },
+      { code: IDENTITY_PRIMARY_REQUIRED.code, definition: IDENTITY_PRIMARY_REQUIRED },
     );
   }
 
@@ -128,7 +137,11 @@ function assertNoDerivedExtensionInputs(input: DefineToolInput): void {
   if (input.extensionPoints?.config !== undefined && 'namespace' in input.extensionPoints.config) {
     throw new ValidationError(
       'config.namespace must not be hand-written when using identity — it is derived from identity.name.',
-      { code: 'TOOL.IDENTITY.NAMESPACE_FORBIDDEN' },
+      {
+        code: IDENTITY_RESERVED.code,
+        definition: IDENTITY_RESERVED,
+        metadata: { field: 'namespace' },
+      },
     );
   }
   if (
@@ -137,13 +150,21 @@ function assertNoDerivedExtensionInputs(input: DefineToolInput): void {
   ) {
     throw new ValidationError(
       'sessionReplay.tool must not be hand-written when using identity — it is derived from layoutKey.',
-      { code: 'TOOL.IDENTITY.SESSION_TOOL_FORBIDDEN' },
+      {
+        code: IDENTITY_RESERVED.code,
+        definition: IDENTITY_RESERVED,
+        metadata: { field: 'session-tool' },
+      },
     );
   }
   if (input.pluginLayout !== undefined && 'domain' in input.pluginLayout) {
     throw new ValidationError(
       'pluginLayout.domain must not be hand-written when using identity — it is derived from layoutKey.',
-      { code: 'TOOL.IDENTITY.LAYOUT_DOMAIN_FORBIDDEN' },
+      {
+        code: IDENTITY_RESERVED.code,
+        definition: IDENTITY_RESERVED,
+        metadata: { field: 'layout-domain' },
+      },
     );
   }
 }
@@ -154,7 +175,8 @@ function assertNoDerivedExtensionInputs(input: DefineToolInput): void {
 export function defineTool(input: DefineToolInput): Tool {
   if (input.identity === undefined) {
     throw new ValidationError('Tool identity is required.', {
-      code: 'TOOL.IDENTITY.REQUIRED',
+      code: IDENTITY_REQUIRED.code,
+      definition: IDENTITY_REQUIRED,
     });
   }
 

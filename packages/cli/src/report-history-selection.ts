@@ -4,9 +4,13 @@ import {
   resolveParentRunEvidence,
 } from '@opensip-cli/session-store';
 
+import { hostErrorCatalog } from './errors/host-error-catalog.js';
+
 import type { StoredRun, StoredRunStep, StoredSession } from '@opensip-cli/contracts';
 import type { ReportSelectionEvidence } from '@opensip-cli/dashboard';
 import type { DataStore } from '@opensip-cli/datastore';
+
+const REPORT_RUN_UNAVAILABLE = hostErrorCatalog.require('CLI.REPORT.RUN_UNAVAILABLE');
 
 export interface ReportHistorySelection {
   readonly recentRuns: readonly StoredRun[];
@@ -43,14 +47,22 @@ export function resolveReportHistorySelection(
   if (evidence.status === 'not-found') {
     throw new ConfigurationError(
       `No retained parent Run with id '${requestedRunId}'. Inspect with: opensip runs list --json`,
-      { code: 'CONFIGURATION.REPORT.RUN_NOT_FOUND' },
+      {
+        code: REPORT_RUN_UNAVAILABLE.code,
+        definition: REPORT_RUN_UNAVAILABLE,
+        metadata: { condition: 'run-not-found' },
+      },
     );
   }
   const exactRun = evidence.snapshot.run;
   if (exactRun.name !== 'audit' || exactRun.source !== 'built-in-suite') {
     throw new ConfigurationError(
       `Retained parent Run '${requestedRunId}' has no Change Impact model (name=${exactRun.name}, source=${exactRun.source}). Inspect with: opensip runs show ${requestedRunId} --json`,
-      { code: 'CONFIGURATION.REPORT.CHANGE_IMPACT_UNAVAILABLE' },
+      {
+        code: REPORT_RUN_UNAVAILABLE.code,
+        definition: REPORT_RUN_UNAVAILABLE,
+        metadata: { condition: 'change-impact-unavailable' },
+      },
     );
   }
 

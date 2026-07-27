@@ -14,7 +14,12 @@
 import { existsSync, readdirSync, statSync, type Dirent } from 'node:fs';
 import { join } from 'node:path';
 
-import { inspectEphemeralRuntimeCandidates, resolveProjectPaths } from '@opensip-cli/core';
+import {
+  inspectEphemeralRuntimeCandidates,
+  resolveProjectPaths,
+  coreErrorCatalog,
+  createToolError,
+} from '@opensip-cli/core';
 
 import { formatBytes } from '../../format-bytes.js';
 
@@ -166,14 +171,23 @@ function collectProjectTargets(projectDir: string): Target[] {
 /**
  * Enumerate every top-level entry under opensip-cli/ EXCEPT .runtime/.
  * Enumeration is for display; the invariant is "not .runtime/".
+ * @throws {SystemError} When the user source directory cannot be enumerated.
  */
 function collectUserContentTargets(userSourceDir: string): Target[] {
   const out: Target[] = [];
   let entries: Dirent[];
   try {
     entries = readdirSync(userSourceDir, { withFileTypes: true });
-  } catch {
-    return out;
+  } catch (error) {
+    // FAIL CLOSED. Returning the partial accumulator made "this directory could not be read"
+    // indistinguishable from "there is nothing here" — on an UNINSTALL path, where the list is
+    // what the user is shown before deleting. Under-reporting what would be removed is the
+    // dangerous direction, so an unreadable directory refuses rather than under-lists.
+    throw createToolError(
+      coreErrorCatalog.require('CORE.RUNTIME_COORDINATION.PROBE_FAILED'),
+      `Cannot enumerate uninstall targets under ${userSourceDir}`,
+      { cause: error, metadata: { condition: 'uninstall-target-scan' } },
+    );
   }
   for (const entry of entries) {
     if (entry.name === '.runtime') continue;

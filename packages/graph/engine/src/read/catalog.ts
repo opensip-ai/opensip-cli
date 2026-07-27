@@ -6,7 +6,7 @@ import { err, ok, type Result } from '@opensip-cli/core';
 
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 
-import type { Catalog, CatalogIdentity, GraphReadError } from './types.js';
+import type { Catalog, CatalogIdentity, GraphReadError, GraphReadReason } from './types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
 /** Structural RunScope seam used by graph-owned context producer commands. */
@@ -17,7 +17,7 @@ export interface ContextCatalogAccessor {
 }
 
 function readError(
-  code: string,
+  code: GraphReadReason,
   operation: GraphReadError['operation'],
   message: string,
 ): GraphReadError {
@@ -37,11 +37,7 @@ export function readCatalogIdentity(
     return ok(identity);
   } catch {
     return err(
-      readError(
-        'GRAPH.READ.CATALOG_IDENTITY',
-        'catalog-identity',
-        'Failed to read graph catalog identity',
-      ),
+      readError('catalog-identity', 'catalog-identity', 'Failed to read graph catalog identity'),
     );
   }
 }
@@ -57,7 +53,7 @@ export function loadCatalogGeneration(store: DataStore): Result<Catalog | null, 
   } catch {
     return err(
       readError(
-        'GRAPH.READ.CATALOG_GENERATION',
+        'catalog-generation',
         'catalog-generation',
         'Failed to load graph catalog generation',
       ),

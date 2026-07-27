@@ -184,6 +184,7 @@ export const missingTypeExports = defineCheck({
         };
         /* v8 ignore next 1 -- defensive catch: parse failures already handled */
       } catch {
+        // @swallow-ok a file this check cannot parse yields no findings FROM THIS CHECK; parse failures are another check’s subject and double-reporting them would be noise
         continue;
       }
       const name = parsed.name;

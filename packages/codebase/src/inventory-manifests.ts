@@ -8,6 +8,7 @@ import {
   CONTROL_CHARACTER,
   INVENTORY_BATCH_SIZE,
   INVENTORY_CANCELLED_REASON,
+  MANIFEST_VISITOR_FAILED_REASON,
   cancelled,
   yieldToEventLoop,
 } from './inventory-helpers.js';
@@ -234,6 +235,10 @@ async function scanWorkspaceManifests(input: {
     input.state.reasons.add('package-discovery-cap-reached');
   }
   if (walk.readFailed) input.state.reasons.add('manifest-read-failed');
+  // A visitor throw stops the walk the same way a cap does, but it is not a cap: without
+  // its own reason code an internal fault would be published as ordinary bounded
+  // truncation and nobody would ever look for the bug.
+  if (walk.visitorFailed) input.state.reasons.add(MANIFEST_VISITOR_FAILED_REASON);
 }
 
 interface DiscoverManifestRootsInput {

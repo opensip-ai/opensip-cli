@@ -1,3 +1,4 @@
+export { codebaseErrorCatalog } from './errors/codebase-error-catalog.js';
 export { buildProjectInventory } from './inventory.js';
 export { readPackageManifestFacts } from './manifest-facts.js';
 export { classifyFileRoles } from './file-roles.js';

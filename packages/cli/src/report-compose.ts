@@ -98,7 +98,7 @@ function requireReportScope(): NonNullable<ReturnType<typeof currentScope>> {
   // produce a clean, consistent failure instead of a raw Error.
   throw new SystemError(
     'report composition requires an entered RunScope (run inside a CLI action body).',
-    { code: 'SYSTEM.SCOPE.NOT_ENTERED' },
+    { code: 'CORE.SCOPE.NOT_ENTERED' },
   );
 }
 

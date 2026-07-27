@@ -676,7 +676,7 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
       }),
     ).rejects.toMatchObject({
       name: 'SystemError',
-      code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+      code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
     });
   });
 
@@ -700,7 +700,7 @@ describe('discoverCapabilityContributions — per-package isolation', () => {
       }),
     ).rejects.toMatchObject({
       name: 'SystemError',
-      code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+      code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
     });
   });
 

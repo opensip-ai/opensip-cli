@@ -1,5 +1,11 @@
 import { ConfigurationError } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const PROMOTION_UNSAFE = hostErrorCatalog.require('CLI.RUNTIME_PROMOTION.MANIFEST_UNSAFE');
+
 export const RUNTIME_MANIFEST_MAX_ENTRIES = 100_000;
 export const RUNTIME_MANIFEST_MAX_TOTAL_BYTES = 16 * 1024 * 1024 * 1024;
 export const RUNTIME_MANIFEST_MAX_FILE_BYTES = 8 * 1024 * 1024 * 1024;
@@ -78,7 +84,8 @@ export class RuntimeManifestError extends ConfigurationError {
     } = {},
   ) {
     super(`Runtime evidence cannot be promoted safely (${reason}).`, {
-      code: 'CONFIGURATION.RUNTIME_PROMOTION.MANIFEST_UNSAFE',
+      code: PROMOTION_UNSAFE.code,
+      definition: PROMOTION_UNSAFE,
       ...(options.cause === undefined ? {} : { cause: options.cause }),
     });
     this.name = 'RuntimeManifestError';

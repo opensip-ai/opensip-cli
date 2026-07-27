@@ -175,6 +175,7 @@ function walkReExportGraph(publicFiles: Set<string>): void {
     try {
       content = readFileSync(file, 'utf8');
     } catch {
+      // @swallow-ok absence probe over a candidate export graph — an unreadable file contributes no re-exports, and the surface check reports on what it could read
       continue;
     }
     enqueueLocalReExports(content, dirname(file), publicFiles, queue);

@@ -8,12 +8,15 @@
 
 import { ToolError } from '@opensip-cli/core';
 
+import { externalToolErrorCatalog } from './errors/external-tool-error-catalog.js';
 import { safeParseJson } from './ingest-json.js';
 import { acceptSarifDocument, ingestSarif } from './ingest-sarif.js';
 import { redactCredentials } from './redact.js';
 
 import type { AdapterRunContext, ExternalCommandSpec, ParsedScannerOutput } from './types.js';
 import type { Signal } from '@opensip-cli/core';
+
+const ARTIFACT_INVALID = externalToolErrorCatalog.require('EXTERNAL.SCANNER.ARTIFACT_INVALID');
 
 /** Trailing stderr bytes preserved on an artifact/exit fault (credential-redacted). */
 export const STDERR_TAIL = 2000;
@@ -23,7 +26,7 @@ export const STDERR_TAIL = 2000;
  *
  * For `output.kind === 'sarif'`, applies {@link acceptSarifDocument} **before**
  * tolerant {@link ingestSarif} (OBS-SARIF): structurally invalid SARIF faults with
- * `ADAPTER.ARTIFACT.INVALID` instead of a silent 0-signal clean pass under exit 0.
+ * `EXTERNAL.SCANNER.ARTIFACT_INVALID` instead of a silent 0-signal clean pass under exit 0.
  */
 export function parseSignals(
   command: ExternalCommandSpec,
@@ -45,7 +48,7 @@ export function parseSignals(
 
 /**
  * Accept + ingest SARIF for the run-loop boundary. Throws
- * `ADAPTER.ARTIFACT.INVALID` when JSON is invalid or the document fails
+ * `EXTERNAL.SCANNER.ARTIFACT_INVALID` when JSON is invalid or the document fails
  * structural acceptance.
  */
 export function parseSarifSignals(raw: string, tool: string): readonly Signal[] {
@@ -53,14 +56,14 @@ export function parseSarifSignals(raw: string, tool: string): readonly Signal[] 
   if (!parsed.ok) {
     throw new ToolError(
       `${tool} produced no usable sarif report (report unparseable).`,
-      'ADAPTER.ARTIFACT.INVALID',
+      ARTIFACT_INVALID.code,
     );
   }
   const accepted = acceptSarifDocument(parsed.value);
   if (!accepted.ok) {
     throw new ToolError(
       `${tool} produced no usable sarif report (report structure: ${accepted.reason}).`,
-      'ADAPTER.ARTIFACT.INVALID',
+      ARTIFACT_INVALID.code,
     );
   }
   return ingestSarif(accepted.log, { source: tool });
@@ -108,7 +111,7 @@ export function readReportArtifact(path: string, io: ArtifactIo): ReportRead {
 }
 
 /**
- * A11: build the typed `ADAPTER.ARTIFACT.INVALID` fault for an unusable file-backed
+ * A11: build the typed `EXTERNAL.SCANNER.ARTIFACT_INVALID` fault for an unusable file-backed
  * report, distinguishing the oversize-cap case from missing/empty/unparseable. An
  * error FACTORY (not a thrower) — the caller `throw`s it, which keeps the failure
  * unmistakable at the call site.
@@ -127,7 +130,7 @@ export function invalidArtifactFault(
       : `report ${read.invalidReason ?? 'invalid'}`;
   return new ToolError(
     `${tool} produced no usable ${command.output.kind} report (${detail}).`,
-    'ADAPTER.ARTIFACT.INVALID',
+    ARTIFACT_INVALID.code,
     { stderrTail: redactCredentials(stderr.slice(-STDERR_TAIL)) },
   );
 }

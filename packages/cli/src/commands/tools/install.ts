@@ -107,6 +107,9 @@ export function resolvePackedTarballPath(stagedPkgDir: string, packStdout: strin
 /** Pack the staged package dir into a tarball beside it; returns the tarball path. */
 function packStagedDir(stagedPkgDir: string): string {
   const out = execFileSync('npm', ['pack', '--pack-destination', stagedPkgDir, '.'], {
+    // Bounded (Plan 01): tool installation against a possibly-wedged registry.
+    timeout: 5 * 60_000,
+    maxBuffer: 32 * 1024 * 1024,
     cwd: stagedPkgDir,
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', process.stderr],

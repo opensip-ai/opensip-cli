@@ -19,6 +19,8 @@ import {
   type ProjectContext,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import { BootstrapError } from './bootstrap-error.js';
 import { loadCliDefaults, mergeConfigDefaults } from './cli-defaults.js';
 import { synthesizeNoInitConfigDocument } from './no-init-config.js';
@@ -33,6 +35,10 @@ import {
 import type { CliDefaults } from './cli-defaults.js';
 import type { CommandScopeIndex } from '../commands/command-scope-index.js';
 import type { HostCommandRuntimePolicy } from '../commands/host-runtime-access.js';
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export type BootstrapPlanningMode = 'tentative' | 'authoritative';
 
@@ -100,7 +106,11 @@ export function planPreActionBootstrap(input: PlanPreActionBootstrapInput): PreA
   if (commandEntry === undefined) {
     throw new ConfigurationError(
       `No declared runtime scope exists for mounted command '${commandPath}'.`,
-      { code: 'CONFIGURATION.COMMAND_SCOPE_UNDECLARED' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'scope-undeclared' },
+      },
     );
   }
   const runtimePolicy = commandEntry.runtimePolicy;

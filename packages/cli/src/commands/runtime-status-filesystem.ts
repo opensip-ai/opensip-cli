@@ -89,11 +89,13 @@ function scanDirectory(
       addRuntimeEntry(join(directory, entry.name), limits, state, pending);
     }
   } catch {
+    // @swallow-ok the flag IS the surfaced degradation — `sizeTruncated` is reported in the status output, so the coverage loss is visible to the caller
     state.sizeTruncated = true;
   } finally {
     try {
       handle?.closeSync();
     } catch {
+      // @swallow-ok same surfaced degradation on the descriptor-close path; a close failure cannot invalidate sizes already collected
       state.sizeTruncated = true;
     }
   }

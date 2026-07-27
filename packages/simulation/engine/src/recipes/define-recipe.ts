@@ -19,6 +19,17 @@
 
 import { ValidationError } from '@opensip-cli/core';
 
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
+
+/**
+ * One clustered definition for every recipe-authoring rejection (ruling D9).
+ *
+ * These were eight distinct `VALIDATION.SIMULATION.*` string literals with no catalog entry,
+ * alive only through `legacyFamilyCode`'s head-guessing. A recipe author fixes all of them the
+ * same way in the same file, so the code is one and the offending field travels in metadata.
+ */
+const RECIPE_INVALID = simulationErrorCatalog.require('SIMULATION.RECIPE.INVALID');
+
 import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
 
 /**
@@ -32,24 +43,36 @@ import type { SimulationRecipe, SimulationRecipeConfig } from './types.js';
 export function defineSimulationRecipe(config: SimulationRecipeConfig): SimulationRecipe {
   if (!config.id || typeof config.id !== 'string') {
     throw new ValidationError('SimulationRecipe missing required `id`', {
-      code: 'VALIDATION.SIMULATION.RECIPE_ID_MISSING',
+      code: RECIPE_INVALID.code,
+      definition: RECIPE_INVALID,
+      metadata: { field: 'id', condition: 'missing' },
     });
   }
   if (!config.name || typeof config.name !== 'string') {
     throw new ValidationError(`SimulationRecipe '${config.id}' missing required \`name\``, {
-      code: 'VALIDATION.SIMULATION.RECIPE_NAME_MISSING',
+      code: RECIPE_INVALID.code,
+      definition: RECIPE_INVALID,
+      metadata: { field: 'name', condition: 'missing' },
     });
   }
   if (!config.scenarios || typeof config.scenarios !== 'object') {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' missing required \`scenarios\` selector`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_SELECTOR_MISSING' },
+      {
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'scenarios', condition: 'missing' },
+      },
     );
   }
   if (!config.execution || typeof config.execution !== 'object') {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' missing required \`execution\` block`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_MISSING' },
+      {
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'execution', condition: 'missing' },
+      },
     );
   }
 
@@ -67,7 +90,11 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
   if (exec.mode !== 'parallel' && exec.mode !== 'sequential') {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.mode must be 'parallel' or 'sequential'`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MODE' },
+      {
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'execution.mode', condition: 'invalid' },
+      },
     );
   }
 
@@ -81,7 +108,11 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
     // documented way to request no timeout (see NO_TIMEOUT_MS in service.ts).
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.timeout must be a positive finite number (or omitted for no timeout)`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_TIMEOUT' },
+      {
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'execution.timeout', condition: 'invalid' },
+      },
     );
   }
 
@@ -91,7 +122,11 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
   ) {
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.maxParallel must be a positive finite integer (or omitted)`,
-      { code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_MAX_PARALLEL' },
+      {
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'execution.maxParallel', condition: 'invalid' },
+      },
     );
   }
 
@@ -99,7 +134,9 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
     throw new ValidationError(
       `SimulationRecipe '${config.name}' execution.stopOnFirstFailure must be a boolean (or omitted)`,
       {
-        code: 'VALIDATION.SIMULATION.RECIPE_EXECUTION_INVALID_STOP_ON_FIRST_FAILURE',
+        code: RECIPE_INVALID.code,
+        definition: RECIPE_INVALID,
+        metadata: { field: 'execution.stopOnFirstFailure', condition: 'invalid' },
       },
     );
   }

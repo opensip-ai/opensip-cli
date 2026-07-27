@@ -174,7 +174,7 @@ describe('listParentRuns', () => {
 
   it('rejects unsafe new Run IDs at write time', () => {
     for (const id of ['', 'unsafe/id', 'unsafe id', 'é', 'x'.repeat(129)]) {
-      expectValidationCode(() => runsRepo.saveRun(makeRun(id)), 'VALIDATION.RUN.INVALID_ID');
+      expectValidationCode(() => runsRepo.saveRun(makeRun(id)), 'SESSION.WRITE.RECORD_INVALID');
     }
   });
 
@@ -186,7 +186,7 @@ describe('listParentRuns', () => {
     expect(() => listParentRuns(datastore, { limit: 1 })).toThrow(
       expect.objectContaining({
         name: 'SystemError',
-        code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID',
+        code: 'SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE',
       }),
     );
   });
@@ -227,7 +227,7 @@ describe('listParentRuns', () => {
       truncated: false,
     });
     expect(() => listParentRuns(datastore, { limit: 1 })).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID' }),
+      expect.objectContaining({ code: 'SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE' }),
     );
   });
 
@@ -241,7 +241,7 @@ describe('listParentRuns', () => {
     insertLegacyRunRow(datastore, 'unsafe/local', '2026-01-01T00:00:00.000Z', '/local/nested');
 
     expect(() => listParentRuns(datastore, { limit: 1, cwdWithin: '/local' })).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_ID' }),
+      expect.objectContaining({ code: 'SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE' }),
     );
   });
 
@@ -249,7 +249,7 @@ describe('listParentRuns', () => {
     runsRepo.saveRun(makeRun('run-escape', { cwd: '/local/../foreign' }));
 
     expect(() => listParentRuns(datastore, { cwdWithin: '/local' })).toThrow(
-      expect.objectContaining({ code: 'SYSTEM.RUN_READ.UNSAFE_LEGACY_CWD' }),
+      expect.objectContaining({ code: 'SESSION.EVIDENCE.UNSAFE_LEGACY_VALUE' }),
     );
   });
 
@@ -381,12 +381,12 @@ describe('resolveParentRun', () => {
     for (const runId of ['', 'slash/not-safe', 'x'.repeat(129)]) {
       expectValidationCode(
         () => resolveParentRun(datastore, { runId }),
-        'VALIDATION.RUN_READ.RUN_ID_INVALID',
+        'SESSION.WRITE.RECORD_INVALID',
       );
     }
     expectValidationCode(
       () => resolveParentRun(datastore, { runId: 'run-valid', offset: -1 }),
-      'VALIDATION.RUN_READ.OFFSET_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
     expectValidationCode(
       () =>
@@ -394,7 +394,7 @@ describe('resolveParentRun', () => {
           runId: 'run-valid',
           offset: Number.MAX_SAFE_INTEGER,
         }),
-      'VALIDATION.RUN_READ.OFFSET_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
     expect(
       resolveParentRun(datastore, {
@@ -715,7 +715,7 @@ describe('resolveParentRunEvidence', () => {
     expect(() => resolveParentRunEvidence(datastore, { runId: run.id })).toThrow(
       expect.objectContaining({
         name: 'SystemError',
-        code: 'SYSTEM.RUN_READ.SESSION_PAYLOAD_INVALID',
+        code: 'SESSION.EVIDENCE.UNREADABLE',
       }),
     );
   });
@@ -748,7 +748,7 @@ describe('resolveParentRunEvidence', () => {
     });
     expectValidationCode(
       () => resolveParentRunEvidence(datastore, { runId: 'not/safe' }),
-      'VALIDATION.RUN_READ.RUN_ID_INVALID',
+      'SESSION.WRITE.RECORD_INVALID',
     );
     expectValidationCode(
       () =>
@@ -792,7 +792,7 @@ describe('resolveParentRunEvidence', () => {
     expect(() => resolveParentRunEvidence(datastore, { runId: run.id })).toThrow(
       expect.objectContaining({
         name: 'SystemError',
-        code: 'SYSTEM.RUN_READ.LINKED_SESSION_MISSING',
+        code: 'SESSION.EVIDENCE.UNREADABLE',
       }),
     );
   });

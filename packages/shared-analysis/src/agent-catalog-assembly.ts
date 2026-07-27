@@ -16,12 +16,15 @@
  */
 
 import { compareCodePoint } from '@opensip-cli/contracts';
-import { ValidationError } from '@opensip-cli/core';
+import { ValidationError, coreErrorCatalog } from '@opensip-cli/core';
 
 import { buildAgentCatalog } from './agent-catalog.js';
 
 import type { AgentCatalog, AgentCatalogBuildInput } from '@opensip-cli/contracts';
 import type { RuntimeCommandInventory } from '@opensip-cli/core';
+
+/** Registered replacement for the un-catalogued `AGENT_CATALOG.*` literals. */
+const AGENT_CATALOG_UNPUBLISHABLE = coreErrorCatalog.require('CORE.AGENT_CATALOG.UNPUBLISHABLE');
 
 /**
  * Input for the shared, pure {@link assembleAgentCatalog} both transports call
@@ -113,7 +116,11 @@ export function projectAgentCatalogRuntimeFacts(
       'agent-catalog: cannot project reserved root commands from an incomplete runtime command ' +
         'inventory (complete !== true); the discovery read fails closed rather than advertise a ' +
         'partial reservation set.',
-      { code: 'AGENT_CATALOG.INCOMPLETE_INVENTORY' },
+      {
+        code: AGENT_CATALOG_UNPUBLISHABLE.code,
+        definition: AGENT_CATALOG_UNPUBLISHABLE,
+        metadata: { condition: 'incomplete-inventory' },
+      },
     );
   }
   const roots = new Set<string>();

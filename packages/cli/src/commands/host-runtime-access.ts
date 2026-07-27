@@ -13,6 +13,7 @@ import {
   acquireRuntimeAccessLease,
   acquireRuntimeReadLease,
   acquireUserStateReadLease,
+  coreErrorCatalog,
   SystemError,
   type CommandScopeRequirement,
   type FileLockEvent,
@@ -20,8 +21,17 @@ import {
   type RuntimeLeaseEvent,
 } from '@opensip-cli/core';
 
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
 import type { HostCommandRuntimePolicy } from './host-runtime-policy.js';
 import type { DatastoreCloseResult } from '@opensip-cli/datastore';
+
+/** Core owns the SYSTEM.RUNTIME_LEASE.* namespace, so this definition comes from core. */
+const LEASE_RELEASE_FAILED = coreErrorCatalog.require('CORE.RUNTIME_LEASE.RELEASE_FAILED');
+
+// Plan 01 clean break: registered host definitions replace bare code literals that only
+// resolved through legacyFamilyCode's head-guessing.
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 export {
   DEFAULT_HOST_RUNTIME_POLICY,
@@ -214,7 +224,8 @@ export function createRuntimeLeaseLifecycle(
     if (firstError instanceof Error) throw firstError;
     if (firstError !== undefined) {
       throw new SystemError('Runtime lease release failed with an unknown error.', {
-        code: 'SYSTEM.RUNTIME_LEASE.RELEASE_FAILED',
+        code: LEASE_RELEASE_FAILED.code,
+        definition: LEASE_RELEASE_FAILED,
         cause: firstError,
       });
     }
@@ -293,7 +304,11 @@ export function assertEnteredUserStateOwner(operation: string): void {
   if (enteredHostOwnership?.userState !== true) {
     throw new SystemError(
       `Host user-state mutation '${operation}' requires an entered user-state runtime lease.`,
-      { code: 'SYSTEM.HOST_RUNTIME.USER_STATE_OWNER_REQUIRED' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'user-state-owner' },
+      },
     );
   }
 }
@@ -303,7 +318,11 @@ export function assertEnteredProjectOwner(operation: string): void {
   if (enteredHostOwnership?.project !== true) {
     throw new SystemError(
       `Host project mutation '${operation}' requires an entered project runtime lease.`,
-      { code: 'SYSTEM.HOST_RUNTIME.PROJECT_OWNER_REQUIRED' },
+      {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'project-owner' },
+      },
     );
   }
 }

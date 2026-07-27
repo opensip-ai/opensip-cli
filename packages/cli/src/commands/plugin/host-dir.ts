@@ -117,6 +117,9 @@ export function installMissingPeers(
         'npm',
         ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--no-save', `${name}@${range}`],
         {
+          // Bounded (Plan 01): package management against a possibly-wedged registry.
+          timeout: 5 * 60_000,
+          maxBuffer: 32 * 1024 * 1024,
           cwd: dir,
           stdio: ['ignore', process.stderr, process.stderr],
         },

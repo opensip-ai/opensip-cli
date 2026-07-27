@@ -39,6 +39,9 @@ import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './sou
 import type { GraphReadError } from './types.js';
 import type { Catalog, Indexes } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 /** Fallback page size when a caller-supplied `limit` is absent/non-finite —
  * matches the documented identity-search default (20 nodes). */
 const DEFAULT_SEARCH_LIMIT = 20;
@@ -71,7 +74,7 @@ export interface SymbolSearchView {
 }
 
 function searchError(message: string): GraphReadError {
-  return { code: 'GRAPH.READ.SYMBOL_SEARCH', operation: 'analysis', message };
+  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 /**
@@ -200,7 +203,7 @@ export function searchSymbolOccurrences(
     const afterStableKey = resolveAfterStableKey(indexes, query, matcher);
     if (afterStableKey === null) {
       return err({
-        code: 'GRAPH.READ.CURSOR_INVALID',
+        code: 'cursor-invalid',
         operation: 'analysis',
         message: 'Cursor continuation anchor is not present in this catalog view',
       });

@@ -23,7 +23,6 @@ export const MAX_MANIFEST_WALK_FRONTIER = 65_536;
 export const MANIFEST_DIRECTORY_READ_BUFFER_SIZE = 32;
 
 const CHECKPOINT_INTERVAL = 128;
-const DIRECTORY_OPEN_FAILED = Symbol('directory-open-failed');
 const PLATFORM_NOCASE = process.platform === 'darwin' || process.platform === 'win32';
 const COMMON_IGNORED_DIRECTORIES = new Set([
   '.git',
@@ -51,6 +50,8 @@ export interface ManifestWalkResult {
   readonly capped: boolean;
   readonly readFailed: boolean;
   readonly stoppedByVisitor: boolean;
+  /** A visitor invocation threw. The walk stops and the caller qualifies its evidence. */
+  readonly visitorFailed: boolean;
   readonly metrics: ManifestWalkMetrics;
 }
 
@@ -59,6 +60,7 @@ interface MutableWalkState {
   capped: boolean;
   readFailed: boolean;
   stoppedByVisitor: boolean;
+  visitorFailed: boolean;
   visitedDirectories: number;
   visitedEntries: number;
   peakDirectoryBatchEntries: number;
@@ -138,6 +140,7 @@ async function classifyUnknownEntry(
       return { kind: 'manifest', name: entry.name };
     }
   } catch {
+    // @swallow-ok the flags ARE the surfaced degradation — `readFailed` and `capped` become inventory coverage reason codes, so the caller sees the walk was incomplete
     context.state.readFailed = true;
     context.state.capped = true;
   }
@@ -209,10 +212,18 @@ async function readDirectoryBatch(
   return undefined;
 }
 
+/**
+ * Open one directory, or record why it could not be opened and yield nothing.
+ *
+ * There is no separate open-failed sentinel: the two "no directory" outcomes are already
+ * discriminated by the state flags the caller reads (`capped` alone for the directory cap,
+ * `capped` + `readFailed` for an open failure). A sentinel that every caller collapsed
+ * back into `undefined` distinguished nothing and could only rot.
+ */
 async function openDirectory(
   directoryPath: string,
   context: WalkContext,
-): Promise<Dir | typeof DIRECTORY_OPEN_FAILED | undefined> {
+): Promise<Dir | undefined> {
   if (context.state.visitedDirectories >= MAX_MANIFEST_WALK_DIRECTORIES) {
     context.state.capped = true;
     return undefined;
@@ -221,9 +232,11 @@ async function openDirectory(
   try {
     return await opendir(directoryPath, { bufferSize: MANIFEST_DIRECTORY_READ_BUFFER_SIZE });
   } catch {
+    // @swallow-ok: an unopenable directory qualifies the walk (readFailed + capped) rather
+    // than rejecting it; the reason travels to coverage evidence.
     context.state.readFailed = true;
     context.state.capped = true;
-    return DIRECTORY_OPEN_FAILED;
+    return undefined;
   }
 }
 
@@ -293,7 +306,7 @@ async function processDirectory(
     return;
   }
   const directory = await openDirectory(directoryPath, context);
-  if (directory === undefined || directory === DIRECTORY_OPEN_FAILED) return;
+  if (directory === undefined) return;
   try {
     const entries = await readDirectoryBatch(directory, directoryPath, context);
     if (entries !== undefined) pushDirectoryBatch(stack, work, entries, context);
@@ -309,12 +322,33 @@ async function processDirectory(
   }
 }
 
+/**
+ * Invoke the caller-supplied visitor under a guard.
+ *
+ * This is the walk's only foreign-code await. Every other await in this module is already
+ * guarded, so an unguarded one here would let a visitor bug reject a walk that had already
+ * observed most of the project — and reject it as a raw throw with no coded evidence,
+ * where every neighbouring failure degrades. A throw is recorded and stops the walk; the
+ * caller maps `visitorFailed` to a reason code.
+ */
+async function invokeVisitor(work: ManifestWork, context: WalkContext): Promise<void> {
+  try {
+    if ((await context.visitor(work)) === false) context.state.stoppedByVisitor = true;
+  } catch {
+    // @swallow-ok: the failure is surfaced through `visitorFailed`; the walk stops rather
+    // than continuing to feed a visitor that has already failed once.
+    context.state.visitorFailed = true;
+    context.state.stoppedByVisitor = true;
+  }
+}
+
 function frozenResult(state: MutableWalkState): ManifestWalkResult {
   return Object.freeze({
     cancelled: state.cancelled,
     capped: state.capped,
     readFailed: state.readFailed,
     stoppedByVisitor: state.stoppedByVisitor,
+    visitorFailed: state.visitorFailed,
     metrics: Object.freeze({
       visitedDirectories: state.visitedDirectories,
       visitedEntries: state.visitedEntries,
@@ -341,6 +375,7 @@ export async function walkManifestFilesystem(
     capped: false,
     readFailed: false,
     stoppedByVisitor: false,
+    visitorFailed: false,
     visitedDirectories: 0,
     visitedEntries: 0,
     peakDirectoryBatchEntries: 0,
@@ -361,8 +396,8 @@ export async function walkManifestFilesystem(
     if (work === undefined) break;
     if (work.type === 'directory') {
       await processDirectory(work, stack, context);
-    } else if ((await visitor(work)) === false) {
-      state.stoppedByVisitor = true;
+    } else {
+      await invokeVisitor(work, context);
     }
     if (observeManifestWalkCancellation(context)) break;
   }

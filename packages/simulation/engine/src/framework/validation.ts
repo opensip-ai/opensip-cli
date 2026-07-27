@@ -6,13 +6,18 @@
  * three blocks: identifier-shape checks, registry-uniqueness checks, and
  * the `errors -> ValidationError` collector. Centralising them here gives
  * uniform semantics (every kind enforces id/name shape the same way and
- * stamps the same `code: 'VALIDATION.SCENARIO.INVALID_CONFIG'`).
+ * stamps the same `code: 'SIMULATION.SCENARIO.INVALID'`).
  *
  * Kind-specific checks (e.g. chaos's recovery window) stay inline in
  * each define.ts.
  */
 
 import { ValidationError as CoreValidationError } from '@opensip-cli/core';
+
+import { simulationErrorCatalog } from '../errors/simulation-error-catalog.js';
+
+/** Registered replacement for the un-catalogued `SIMULATION.SCENARIO.INVALID` literal. */
+const SCENARIO_INVALID = simulationErrorCatalog.require('SIMULATION.SCENARIO.INVALID');
 
 import type { ScenarioKind } from '../types/kind-types.js';
 import type { Target } from './execution/target.js';
@@ -151,7 +156,7 @@ export function validateTargetAndWorkload(
 
 /**
  * Format a `ScenarioValidationError[]` and throw a `CoreValidationError`
- * with the canonical `'VALIDATION.SCENARIO.INVALID_CONFIG'` code if any
+ * with the canonical `'SIMULATION.SCENARIO.INVALID'` code if any
  * errors were collected. No-op when the list is empty.
  *
  * @throws {CoreValidationError} When `errors` is non-empty.
@@ -163,7 +168,8 @@ export function throwValidationErrors(
   if (errors.length === 0) return;
   const messages = errors.map((e) => `  - ${e.field}: ${e.message}`).join('\n');
   throw new CoreValidationError(`Invalid ${kind} scenario configuration:\n${messages}`, {
-    code: 'VALIDATION.SCENARIO.INVALID_CONFIG',
+    code: SCENARIO_INVALID.code,
+    definition: SCENARIO_INVALID,
     metadata: { errors: [...errors], kind },
   });
 }

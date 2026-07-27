@@ -649,7 +649,7 @@ describe('ContextSnapshotRepo', () => {
       .run();
     expect(readContextSnapshot(datastore, 'malformed')).toMatchObject({
       ok: false,
-      error: { code: 'GRAPH.READ.CONTEXT_SNAPSHOT' },
+      error: { code: 'context-snapshot' },
     });
   });
 
@@ -671,7 +671,7 @@ describe('ContextSnapshotRepo', () => {
       .run();
     expect(readContextSnapshot(datastore, 'row-a')).toMatchObject({
       ok: false,
-      error: { code: 'GRAPH.READ.CONTEXT_SNAPSHOT' },
+      error: { code: 'context-snapshot' },
     });
   });
 
@@ -707,7 +707,7 @@ describe('ContextSnapshotRepo', () => {
         .run();
       expect(readContextSnapshot(datastore, row.payload.snapshotId)).toMatchObject({
         ok: false,
-        error: { code: 'GRAPH.READ.CONTEXT_SNAPSHOT' },
+        error: { code: 'context-snapshot' },
       });
     }
   });

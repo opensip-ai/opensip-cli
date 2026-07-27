@@ -115,7 +115,7 @@ async function importEntryWithRetry(entryHref: string): Promise<Record<string, u
  * Missing package metadata, a missing/wrong-shape export, or an import that
  * throws all skip the package with a diagnostic — except for packs admitted
  * with `required: true` (host components), whose load failure throws
- * `SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED` so the run fails loudly instead
+ * `CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED` so the run fails loudly instead
  * of silently shrinking the check surface.
  */
 async function loadPackageContributions(
@@ -150,7 +150,7 @@ async function loadViaHostImport(
     if (admission.required === true) {
       throw new SystemError(
         `required capability pack ${pkg.name} has no readable package entry (${pkg.packageDir})`,
-        { code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED' },
+        { code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED' },
       );
     }
     onDiagnostic?.({
@@ -216,7 +216,7 @@ async function loadViaHostImport(
     });
     if (admission.required === true) {
       throw new SystemError(`required capability pack ${pkg.name} failed to load: ${msg}`, {
-        code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+        code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
         cause: error,
       });
     }
@@ -259,7 +259,7 @@ async function tryContributionLoader(
     if (admission.required === true) {
       const msg = error instanceof Error ? error.message : String(error);
       throw new SystemError(`required capability pack ${pkg.name} failed to load: ${msg}`, {
-        code: 'SYSTEM.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
+        code: 'CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED',
         cause: error,
       });
     }

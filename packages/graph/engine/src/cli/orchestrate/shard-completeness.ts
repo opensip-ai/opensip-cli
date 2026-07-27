@@ -1,6 +1,12 @@
 import { SystemError } from '@opensip-cli/core';
 
+import { graphErrorCatalog } from '../../errors/graph-error-catalog.js';
+
 import type { ShardFailureEvidence } from './shard-model.js';
+
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+const BUILD_INCOMPLETE = graphErrorCatalog.require('GRAPH.BUILD.INCOMPLETE');
 
 const DISPLAYED_SHARD_FAILURE_LIMIT = 10;
 
@@ -46,7 +52,9 @@ export function assertShardedBuildComplete(result: ShardCompletionEvidence): voi
       `catalog and derived artifacts are incomplete. Failed shard ids: ` +
       `${displayed.join(', ')}${omittedSuffix}.${primaryDetail}`,
     {
-      code: 'GRAPH.SHARD.FAILURES',
+      code: BUILD_INCOMPLETE.code,
+      definition: BUILD_INCOMPLETE,
+      metadata: { view: 'shard-failures' },
       ...(primary?.failureClass === undefined ? {} : { failureClass: primary.failureClass }),
       ...(stderrTail === undefined ? {} : { stderrTail }),
     },

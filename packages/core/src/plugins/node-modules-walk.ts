@@ -53,14 +53,14 @@ function isAbsenceErrno(code: string): boolean {
 function probeFailure(path: string, error: unknown): SystemError {
   return new SystemError(
     `Filesystem probe failed for ${path} (${errnoOf(error)}); refusing to treat an environment failure as "package not installed"`,
-    { code: 'SYSTEM.PLUGINS.FS_PROBE_FAILED', cause: error },
+    { code: 'CORE.PLUGINS.FS_PROBE_FAILED', cause: error },
   );
 }
 
 /**
  * True when `path` exists; absence/unreadable errnos → false.
  *
- * @throws {SystemError} `SYSTEM.PLUGINS.FS_PROBE_FAILED` on any non-absence
+ * @throws {SystemError} `CORE.PLUGINS.FS_PROBE_FAILED` on any non-absence
  *   errno (EMFILE/EIO/…) — resource exhaustion must never read as "not there".
  */
 function probePathPresent(path: string): boolean {
@@ -148,7 +148,7 @@ export function resolvePackageDir(projectDir: string, name: string): string | un
 /**
  * True when `packageDir` exists and contains a `package.json`. Absence and
  * permission denial read as `false`; any other probe failure (EMFILE, EIO, …)
- * throws `SYSTEM.PLUGINS.FS_PROBE_FAILED` — resource exhaustion must never
+ * throws `CORE.PLUGINS.FS_PROBE_FAILED` — resource exhaustion must never
  * masquerade as "not installed".
  */
 export function hasPackageJson(packageDir: string): boolean {
@@ -160,7 +160,7 @@ export function hasPackageJson(packageDir: string): boolean {
  * `[]` — indistinguishable from a genuinely empty directory, which is the
  * intended ancestor-walk semantics.
  *
- * @throws {SystemError} `SYSTEM.PLUGINS.FS_PROBE_FAILED` on any non-absence
+ * @throws {SystemError} `CORE.PLUGINS.FS_PROBE_FAILED` on any non-absence
  *   errno (EMFILE, EIO, …) — a resource failure must fail loud, not silently
  *   shrink discovery.
  */

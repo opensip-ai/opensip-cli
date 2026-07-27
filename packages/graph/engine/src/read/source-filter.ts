@@ -13,6 +13,9 @@ import type { AuditSourceRolePolicy, GraphSourceFilter } from './query-contracts
 import type { GraphReadError } from './types.js';
 import type { FunctionOccurrence } from '../types.js';
 
+// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
+// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
+
 /**
  * Max unique normalized project-relative catalog file paths classified against
  * the audit source-role globs for one `g1:` generation (P2 Phase 1.4). Beyond
@@ -74,7 +77,7 @@ export function compileSourceRoleMatcher(
     matchers = policy.testGlobs.map((glob) => new Minimatch(glob, MINIMATCH_OPTIONS));
   } catch {
     return err({
-      code: 'GRAPH.READ.SOURCE_ROLE_CONFIG',
+      code: 'query-invalid',
       operation: 'analysis',
       message: 'Failed to compile an audit source-role glob.',
     });
@@ -86,7 +89,7 @@ export function compileSourceRoleMatcher(
     considered.add(filePath);
     if (considered.size > limits.maxFiles) {
       return err({
-        code: 'GRAPH.READ.SOURCE_ROLE_LIMIT',
+        code: 'query-invalid',
         operation: 'analysis',
         message: 'Audit source-role classification exceeded the file limit.',
       });

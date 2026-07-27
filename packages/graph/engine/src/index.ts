@@ -265,3 +265,4 @@ export {
   currentGraphRecipes,
 } from './recipes/registry.js';
 export { resolveRecipeToRules } from './recipes/resolve.js';
+export { graphErrorCatalog } from './errors/graph-error-catalog.js';

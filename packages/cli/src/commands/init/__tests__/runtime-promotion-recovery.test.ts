@@ -390,14 +390,14 @@ const RECOVERY_ENTRY_CASES = [
   {
     name: 'exclusive-lease timeout',
     header: { status: 'valid', operationId: OPERATION_ID, state: 'open' },
-    leaseErrorCode: 'TIMEOUT.RUNTIME_EXCLUSIVE',
+    leaseErrorCode: 'CORE.RUNTIME_LEASE.EXCLUSIVE',
     expectedStatus: 'busy',
     expectedReasonCode: 'lease-busy',
   },
   {
     name: 'coordination busy',
     header: { status: 'valid', operationId: OPERATION_ID, state: 'open' },
-    leaseErrorCode: 'SYSTEM.RUNTIME_COORDINATION.BUSY',
+    leaseErrorCode: 'CORE.RUNTIME_COORDINATION.BUSY',
     expectedStatus: 'busy',
     expectedReasonCode: 'lease-busy',
   },

@@ -11,6 +11,12 @@ import { spawn, type ChildProcess } from 'node:child_process';
 
 import { SystemError } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
+
+// Plan 01 clean break: registered definitions replace bare code literals that only
+// resolved through the family fallback.
+const EXEC_FAILED = fitnessErrorCatalog.require('FIT.FITNESS.EXEC_FAILED');
+
 /**
  * Options for abortable command execution
  */
@@ -25,11 +31,28 @@ export interface AbortableExecOptions {
 /**
  * Result of command execution
  */
+/**
+ * Why a bounded exec stopped early.
+ *
+ * A closed union rather than a second boolean: the two arms exit differently (`cancelled` vs
+ * `runtime`) and advise differently, and ADR-0183 requires them to stay distinguishable.
+ */
+export type ExecAbortReason = 'cancelled' | 'deadline-exceeded';
+
+/** Outcome of one bounded external command: its capture, its exit, and why it stopped. */
 export interface ExecResult {
   stdout: string;
   stderr: string;
   exitCode: number | null;
   aborted: boolean;
+  /**
+   * Set whenever `aborted` is true.
+   *
+   * `aborted` alone could not distinguish a user's Ctrl-C from a timeout — the abort listener
+   * and the timeout callback set the same flag — so a check that timed out reported itself as
+   * cancelled and exited 130.
+   */
+  abortReason?: ExecAbortReason;
 }
 
 /**
@@ -43,7 +66,7 @@ class ExecError extends SystemError {
     public readonly exitCode: number | null,
     public readonly aborted: boolean,
   ) {
-    super(message, { code: 'SYSTEM.FITNESS.EXEC_FAILED' });
+    super(message, { code: EXEC_FAILED.code, definition: EXEC_FAILED });
     this.name = 'ExecError';
   }
 }
@@ -93,7 +116,9 @@ export function execAbortable(
       if (command.length === 0) {
         reject(
           new SystemError('Command array must not be empty', {
-            code: 'SYSTEM.FITNESS.EXEC_EMPTY_COMMAND',
+            code: EXEC_FAILED.code,
+            definition: EXEC_FAILED,
+            metadata: { condition: 'empty-command' },
           }),
         );
         return;
@@ -110,6 +135,7 @@ export function execAbortable(
     let stdout = '';
     let stderr = '';
     let aborted = false;
+    let abortReason: ExecAbortReason | undefined;
     let timeoutId: NodeJS.Timeout | undefined;
 
     // setEncoding routes chunks through a StringDecoder that buffers
@@ -144,6 +170,7 @@ export function execAbortable(
     const abortHandler = (): void => {
       if (!aborted) {
         aborted = true;
+        abortReason = 'cancelled';
         killProcess(child);
       }
     };
@@ -154,6 +181,7 @@ export function execAbortable(
       timeoutId = setTimeout(() => {
         if (!aborted) {
           aborted = true;
+          abortReason = 'deadline-exceeded';
           killProcess(child);
         }
       }, timeout);
@@ -172,7 +200,13 @@ export function execAbortable(
         });
         return;
       }
-      resolve({ stdout, stderr, exitCode: code, aborted });
+      resolve({
+        stdout,
+        stderr,
+        exitCode: code,
+        aborted,
+        ...(abortReason === undefined ? {} : { abortReason }),
+      });
     });
 
     child.on('error', (err: Error) => {

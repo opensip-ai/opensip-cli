@@ -51,7 +51,7 @@ export function createBoundedUtf8Capture(maxChars: number): BoundedUtf8Capture {
 }
 
 /** Slice `text` to at most `maxChars` code units without splitting a surrogate pair. */
-function sliceAvoidingSurrogateSplit(text: string, maxChars: number): string {
+export function sliceAvoidingSurrogateSplit(text: string, maxChars: number): string {
   if (maxChars <= 0) return '';
   if (text.length <= maxChars) return text;
   let end = maxChars;
