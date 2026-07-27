@@ -9,6 +9,7 @@ import { evaluateAssertions } from '../scorer/assertions.js';
 import { computeArmMetrics, computeRecoveryMetrics } from '../scorer/metrics.js';
 
 import { applyEditScript } from './edit-applier.js';
+import { safeErrorDetail } from './error-detail.js';
 import { executeArm } from './execute-arm.js';
 import { listGitVisibleFixtureFiles } from './fixture-inventory.js';
 import { REUSE_EXISTING_MODE, resolveFixtureReference } from './fixture-resolution.js';
@@ -36,6 +37,39 @@ export { DOGFOOD_FIXTURE_REFERENCE, resolveFixtureReference } from './fixture-re
 export type { FixtureResolution, FixtureResolutionOptions } from './fixture-resolution.js';
 
 type TaskMcpSession = Pick<McpArmSession, 'close' | 'invoker' | 'provenance'>;
+
+type CapturedOperation<T> =
+  | { readonly error: unknown; readonly success: false }
+  | { readonly success: true; readonly value: T };
+
+async function captureOperation<T>(operation: () => Promise<T>): Promise<CapturedOperation<T>> {
+  try {
+    return { success: true, value: await operation() };
+  } catch (error) {
+    return { error, success: false };
+  }
+}
+
+class OpenSipArmLifecycleError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'OpenSipArmLifecycleError';
+  }
+}
+
+function preserveExecutionAndCloseFailures(
+  executionError: unknown,
+  closeError: unknown,
+  workspaceRoot: string,
+): Error {
+  const sensitivePaths = [workspaceRoot];
+  const executionDetail = safeErrorDetail(executionError, sensitivePaths) || 'unknown failure';
+  const closeDetail = safeErrorDetail(closeError, sensitivePaths) || 'unknown failure';
+  const message = `${executionDetail} Related MCP session-close failure: ${closeDetail}`;
+  return executionError instanceof HarnessPrerequisiteError
+    ? new HarnessPrerequisiteError(message)
+    : new OpenSipArmLifecycleError(message);
+}
 
 /** Injectable effect seams used while executing one task or arm. */
 export interface RunTaskDependencies {
@@ -284,18 +318,28 @@ async function runOpenSipWithSession(
     target,
     opensipToolCallBudget(task),
   );
-  let legs: Awaited<ReturnType<typeof executeTaskLegs>>;
-  let catalogProbe: CatalogProbeRecord;
-  try {
+  const execution = await captureOperation(async () => {
     const invoker = session.invoker();
     // @fitness-ignore-next-line async-waterfall-detection -- Task reads must start only after the required fresh catalog probe has passed.
-    catalogProbe = await requireGraphCatalog(task, invoker, setup.mode);
-    legs = await executeTaskLegs(task, 'opensip', invoker, workspaceRoot, dependencies);
-  } finally {
-    await session.close();
+    const catalogProbe = await requireGraphCatalog(task, invoker, setup.mode);
+    const legs = await executeTaskLegs(task, 'opensip', invoker, workspaceRoot, dependencies);
+    return { catalogProbe, legs };
+  });
+  const closing = await captureOperation(() => session.close());
+  if (!execution.success) {
+    if (!closing.success) {
+      throw preserveExecutionAndCloseFailures(execution.error, closing.error, workspaceRoot);
+    }
+    throw execution.error;
   }
+  if (!closing.success) throw closing.error;
   const mcp: McpSetupProvenance = session.provenance();
-  return evaluateArm(task, 'opensip', { ...setup, catalogProbe, mcp }, legs);
+  return evaluateArm(
+    task,
+    'opensip',
+    { ...setup, catalogProbe: execution.value.catalogProbe, mcp },
+    execution.value.legs,
+  );
 }
 
 async function runFixtureArm(

@@ -14,7 +14,7 @@ import {
   runTaskArm,
   type RunTaskDependencies,
 } from './run-task.js';
-import { buildCliTarget, cleanupCliTarget } from './spawn.js';
+import { HarnessPrerequisiteError, buildCliTarget, cleanupCliTarget } from './spawn.js';
 
 import type { FixtureCopySource } from './fixture-workspace.js';
 import type { McpSetupProvenance, SetupRecord, StepRecord, ToolInvoker } from '../model/record.js';
@@ -134,6 +134,7 @@ function provenance(): McpSetupProvenance {
 interface FakeSessionOptions {
   readonly catalogAvailable?: boolean;
   readonly catalogFreshness?: StepRecord['freshness'];
+  readonly closeError?: Error;
   readonly facts?: Readonly<Record<string, readonly AnswerFact[]>>;
   readonly throwOnStep?: string;
 }
@@ -165,7 +166,9 @@ function fakeSession(root: string, events: string[], options: FakeSessionOptions
     close: () => {
       events.push('mcp:close');
       closed = true;
-      return Promise.resolve();
+      return options.closeError === undefined
+        ? Promise.resolve()
+        : Promise.reject(options.closeError);
     },
     invoker: () => invoker,
     provenance: () => {
@@ -458,6 +461,61 @@ describe('ordinary task orchestration', () => {
     expect(events).not.toContain('mcp:provenance');
     expect(events.at(-1)).toBe(`copy:cleanup:${roots[1]}`);
     expect(events.filter((event) => event.startsWith('copy:cleanup:'))).toHaveLength(2);
+  });
+
+  it('preserves execution failure when MCP session close also fails', async () => {
+    const events: string[] = [];
+    const root = temporaryDirectory('execution-close-failure-');
+
+    await expect(
+      runTaskArm(ordinaryTask(), 'opensip', {
+        dependencies: {
+          connectMcp: (workspaceRoot) =>
+            Promise.resolve(
+              fakeSession(workspaceRoot, events, {
+                closeError: new Error('stdio containment failed'),
+                throwOnStep: 'opensip-main',
+              }),
+            ),
+          setupFixture: (workspaceRoot) => Promise.resolve(setupRecord(workspaceRoot)),
+          withFixture: fakeFixtureCopies(events, [root]),
+        },
+      }),
+    ).rejects.toThrow(
+      /tool transport failed.*Related MCP session-close failure: stdio containment failed/u,
+    );
+
+    expect(events).toContain('mcp:close');
+    expect(events).not.toContain('mcp:provenance');
+  });
+
+  it('keeps prerequisite classification when catalog failure and close failure coincide', async () => {
+    const events: string[] = [];
+    const root = temporaryDirectory('catalog-close-failure-');
+    let observed: unknown;
+
+    try {
+      await runTaskArm(ordinaryTask(), 'opensip', {
+        dependencies: {
+          connectMcp: (workspaceRoot) =>
+            Promise.resolve(
+              fakeSession(workspaceRoot, events, {
+                catalogAvailable: false,
+                closeError: new Error('stdio containment failed'),
+              }),
+            ),
+          setupFixture: (workspaceRoot) => Promise.resolve(setupRecord(workspaceRoot)),
+          withFixture: fakeFixtureCopies(events, [root]),
+        },
+      });
+    } catch (error) {
+      observed = error;
+    }
+
+    expect(observed).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((observed as Error).message).toMatch(
+      /did not produce a queryable graph catalog.*session-close failure: stdio containment failed/u,
+    );
   });
 
   it('rejects a stale fixture catalog before measured task steps begin', async () => {
