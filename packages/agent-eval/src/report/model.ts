@@ -1,3 +1,4 @@
+import { isStepFailureCode } from '../model/record.js';
 import { isUnknownRecord as isRecord } from '../model/value-helpers.js';
 
 import type { ArmRunRecord } from '../model/record.js';
@@ -107,6 +108,20 @@ function isValidCliTarget(value: unknown): boolean {
   );
 }
 
+function hasValidStepFailure(value: unknown): boolean {
+  if (value === undefined) return true;
+  return (
+    isRecord(value) &&
+    isStepFailureCode(value.code) &&
+    (value.kind === 'binding' ||
+      value.kind === 'infrastructure' ||
+      value.kind === 'protocol' ||
+      value.kind === 'tool') &&
+    isPopulatedString(value.message) &&
+    (value.retryable === undefined || typeof value.retryable === 'boolean')
+  );
+}
+
 function hasRequiredStepRecord(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -117,6 +132,7 @@ function hasRequiredStepRecord(value: unknown): boolean {
     typeof value.wallMs === 'number' &&
     Number.isFinite(value.wallMs) &&
     Array.isArray(value.facts) &&
+    hasValidStepFailure(value.failure) &&
     (value.proofRelevance === undefined ||
       value.proofRelevance === 'irrelevant' ||
       value.proofRelevance === 'projection') &&

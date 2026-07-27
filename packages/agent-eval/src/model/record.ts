@@ -38,9 +38,41 @@ export interface StepFreshness {
   readonly verification: 'complete' | 'missing' | 'partial';
 }
 
+/** Closed durable vocabulary for failures normalized at a step boundary. */
+export const STEP_FAILURE_CODES = [
+  'ambiguous-binding',
+  'binding-limit',
+  'invalid-codebase-envelope',
+  'invalid-field',
+  'invalid-graph-envelope',
+  'invalid-mcp-json',
+  'invalid-runtime-envelope',
+  'malformed-mcp-result',
+  'mcp-extractor-failure',
+  'mcp-request-timeout',
+  'mcp-response-limit',
+  'mcp-tool-error',
+  'mcp-transport-unavailable',
+  'missing-binding',
+  'missing-mcp-content',
+  'native-tool-failure',
+  'non-text-mcp-content',
+  'observation-limit',
+  'tool-invocation-failure',
+] as const;
+
+export type StepFailureCode = (typeof STEP_FAILURE_CODES)[number];
+
+const STEP_FAILURE_CODE_SET: ReadonlySet<string> = new Set(STEP_FAILURE_CODES);
+
+/** Narrow untrusted report data to the closed step-failure vocabulary. */
+export function isStepFailureCode(value: unknown): value is StepFailureCode {
+  return typeof value === 'string' && STEP_FAILURE_CODE_SET.has(value);
+}
+
 /** A normalized, non-throwing failure captured at a step boundary. */
 export interface StepFailure {
-  readonly code: string;
+  readonly code: StepFailureCode;
   readonly kind: 'binding' | 'infrastructure' | 'protocol' | 'tool';
   readonly message: string;
   readonly retryable?: boolean;

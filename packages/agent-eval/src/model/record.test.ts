@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeStepRecord } from './record.js';
+import { isStepFailureCode, makeStepRecord, STEP_FAILURE_CODES } from './record.js';
 
 import type { StepFreshness } from './record.js';
 import type { ResolvedStrategyStep } from './task.js';
@@ -26,6 +26,12 @@ function emptyWithFreshness(freshness: StepFreshness) {
 }
 
 describe('makeStepRecord', () => {
+  it('recognizes only the closed durable failure vocabulary', () => {
+    expect(STEP_FAILURE_CODES.every(isStepFailureCode)).toBe(true);
+    expect(isStepFailureCode('future-failure')).toBe(false);
+    expect(isStepFailureCode(undefined)).toBe(false);
+  });
+
   it.each([
     { fresh: false, reasonCode: 'source-changed', verification: 'complete' },
     { fresh: false, verification: 'partial' },
@@ -47,7 +53,7 @@ describe('makeStepRecord', () => {
   it('discards contradictory facts from failed invocations at the durable boundary', () => {
     const record = makeStepRecord({
       facts: [{ kind: 'file', path: 'must-not-survive.ts' }],
-      failure: { code: 'failed', kind: 'tool', message: 'failed' },
+      failure: { code: 'native-tool-failure', kind: 'tool', message: 'failed' },
       leg: 'main',
       renderedResponse: 'bad',
       step: STEP,

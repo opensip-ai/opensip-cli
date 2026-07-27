@@ -5,6 +5,7 @@ import { makeStepRecord } from '../model/record.js';
 import { EVAL_REPORT_SCHEMA_VERSION, validateEvalReport } from './model.js';
 
 import type { EvalReport } from './model.js';
+import type { StepRecord } from '../model/record.js';
 import type { ResolvedStrategyStep } from '../model/task.js';
 
 function report(): EvalReport {
@@ -68,6 +69,41 @@ function report(): EvalReport {
 
 type ReportMutation = (value: EvalReport) => unknown;
 
+function withFirstStepFields(
+  value: EvalReport,
+  fields: Readonly<Record<string, unknown>>,
+): unknown {
+  const task = value.tasks[0];
+  const arm = task?.arms.opensip;
+  const leg = arm?.record.legs[0];
+  const step: StepRecord | undefined = leg?.steps[0];
+  if (task === undefined || arm === undefined || leg === undefined || step === undefined) {
+    throw new TypeError('EvalReport test fixture requires one OpenSIP step.');
+  }
+  return {
+    ...value,
+    tasks: [
+      {
+        ...task,
+        arms: {
+          ...task.arms,
+          opensip: {
+            ...arm,
+            record: {
+              ...arm.record,
+              legs: [
+                { ...leg, steps: [{ ...step, ...fields }, ...leg.steps.slice(1)] },
+                ...arm.record.legs.slice(1),
+              ],
+            },
+          },
+        },
+      },
+      ...value.tasks.slice(1),
+    ],
+  };
+}
+
 const INVALID_REPORT_CASES: readonly (readonly [string, ReportMutation])[] = [
   [
     'missing schema',
@@ -121,35 +157,39 @@ const INVALID_REPORT_CASES: readonly (readonly [string, ReportMutation])[] = [
   ],
   ['missing task arm', (value) => ({ ...value, tasks: [{ ...value.tasks[0], arms: {} }] })],
   [
-    'raw response leak',
-    (value) => {
-      const task = value.tasks[0];
-      const opensip = task?.arms.opensip;
-      const step = opensip?.record.legs[0]?.steps[0];
-      return {
-        ...value,
-        tasks: [
-          {
-            ...task,
-            arms: {
-              opensip: {
-                ...opensip,
-                record: {
-                  ...opensip?.record,
-                  legs: [
-                    {
-                      leg: 'main',
-                      steps: [{ ...step, renderedResponse: 'forbidden' }],
-                    },
-                  ],
-                },
-              },
-            },
-          },
-        ],
-      };
-    },
+    'unknown step failure code',
+    (value) =>
+      withFirstStepFields(value, {
+        failure: { code: 'future-failure', kind: 'protocol', message: 'invalid response' },
+      }),
   ],
+  [
+    'unknown step failure kind',
+    (value) =>
+      withFirstStepFields(value, {
+        failure: { code: 'invalid-mcp-json', kind: 'unknown', message: 'invalid response' },
+      }),
+  ],
+  [
+    'empty step failure message',
+    (value) =>
+      withFirstStepFields(value, {
+        failure: { code: 'invalid-mcp-json', kind: 'protocol', message: '' },
+      }),
+  ],
+  [
+    'invalid step retryability',
+    (value) =>
+      withFirstStepFields(value, {
+        failure: {
+          code: 'mcp-request-timeout',
+          kind: 'infrastructure',
+          message: 'timed out',
+          retryable: 'yes',
+        },
+      }),
+  ],
+  ['raw response leak', (value) => withFirstStepFields(value, { renderedResponse: 'forbidden' })],
 ];
 
 describe('EvalReport model', () => {

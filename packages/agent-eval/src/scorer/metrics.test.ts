@@ -244,7 +244,7 @@ describe('arm metrics', () => {
             truncated: true,
           }),
           step('failed-none', 'main', '', 1, [], {
-            failure: { code: 'failure', kind: 'tool', message: 'failed' },
+            failure: { code: 'native-tool-failure', kind: 'tool', message: 'failed' },
             step: resolvedStep('failed-none', true),
           }),
         ],
@@ -271,7 +271,7 @@ describe('arm metrics', () => {
         steps: [
           step('failed', 'main', 'bad', 4, [{ kind: 'package', name: 'core' }], {
             failure: {
-              code: 'protocol',
+              code: 'invalid-mcp-json',
               kind: 'protocol',
               message: 'invalid response',
             },

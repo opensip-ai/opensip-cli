@@ -285,7 +285,7 @@ describe('assertion evaluation', () => {
         'opensip',
         step('main', [{ kind: 'package', name: 'core' }], {
           failure: {
-            code: 'protocol',
+            code: 'invalid-mcp-json',
             kind: 'protocol',
             message: 'invalid response',
           },
@@ -307,7 +307,7 @@ describe('assertion evaluation', () => {
       truncated: true,
     });
     const failed = step('main', [], {
-      failure: { code: 'timeout', kind: 'tool', message: 'timeout' },
+      failure: { code: 'mcp-request-timeout', kind: 'infrastructure', message: 'timeout' },
       step: resolvedStep('failed', true),
     });
     const result = evaluateAssertions(oneLeg('control', completeNone, incompleteNone, failed), {});
@@ -341,7 +341,7 @@ describe('assertion evaluation', () => {
         truncated: true,
       }),
       step('main', [], {
-        failure: { code: 'timeout', kind: 'tool', message: 'timeout' },
+        failure: { code: 'mcp-request-timeout', kind: 'infrastructure', message: 'timeout' },
         step: resolvedStep('failed-only', true),
       }),
     ]) {
@@ -472,7 +472,7 @@ describe('staleness evaluation', () => {
           steps: [
             step('recovery', [], {
               failure: {
-                code: 'refresh-failed',
+                code: 'mcp-tool-error',
                 kind: 'tool',
                 message: 'refresh failed',
               },
@@ -594,7 +594,7 @@ describe('staleness evaluation', () => {
           steps: [
             step('post-edit', [], {
               failure: {
-                code: 'io',
+                code: 'native-tool-failure',
                 kind: 'infrastructure',
                 message: 'read failed',
               },

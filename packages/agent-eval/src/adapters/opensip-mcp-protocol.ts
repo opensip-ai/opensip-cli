@@ -12,7 +12,7 @@ import {
   extractCodebaseFreshness,
 } from './opensip-mcp-codebase-envelope.js';
 
-import type { StepCoverage, StepFreshness } from '../model/record.js';
+import type { StepCoverage, StepFailureCode, StepFreshness } from '../model/record.js';
 
 const GRAPH_READ_TOOLS = new Set([
   'blast_radius',
@@ -38,7 +38,7 @@ const CODEBASE_READ_TOOLS = new Set(['get_file_context']);
 export interface DecodedResult {
   readonly payload?: Readonly<Record<string, unknown>>;
   readonly failure?: {
-    readonly code: string;
+    readonly code: StepFailureCode;
     readonly kind: 'protocol' | 'tool';
     readonly message: string;
   };

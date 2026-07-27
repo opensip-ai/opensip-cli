@@ -102,7 +102,7 @@ describe('answer state', () => {
       createAnswerState('main'),
       step('main', [{ kind: 'symbol-handle', symbolId: 'symbol:run' }], {
         failure: {
-          code: 'protocol',
+          code: 'invalid-mcp-json',
           kind: 'protocol',
           message: 'invalid response',
         },
