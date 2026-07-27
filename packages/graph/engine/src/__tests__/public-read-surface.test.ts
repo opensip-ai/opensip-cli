@@ -393,17 +393,14 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     }
   });
 
-  it('maps persistence failures without returning an unpersisted generation', async () => {
+  it('preserves the rebuilt generation when persistence fails afterward', async () => {
     const store = DataStoreFactory.open({ backend: 'memory' });
     store.close();
-    runGraphMock.mockResolvedValue({ catalog: makeCatalog() });
+    const catalog = makeCatalog();
+    runGraphMock.mockResolvedValue({ catalog });
     await expect(read.rebuildCatalog({ cwd: '/project', datastore: store })).resolves.toEqual({
-      ok: false,
-      error: {
-        code: 'rebuild-failed',
-        operation: 'rebuild',
-        message: 'Graph rebuild failed due to infrastructure error',
-      },
+      ok: true,
+      value: catalog,
     });
   });
 

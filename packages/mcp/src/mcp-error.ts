@@ -156,6 +156,7 @@ export type McpReadReason =
   | 'missing-suite-evidence'
   | 'not-found'
   | 'rebuild-empty'
+  | 'rebuild-configuration'
   | 'rebuild-failed'
   | 'repair-entrypoint-unavailable'
   | 'repair-output-invalid'
@@ -211,6 +212,12 @@ export function fromGraphReadError(error: GraphReadError): McpReadError {
     }
     case 'rebuild-empty': {
       return readError('rebuild-empty', 'Graph rebuild produced an empty catalog');
+    }
+    case 'rebuild-cancelled': {
+      return readError('cancelled', 'Graph rebuild was cancelled');
+    }
+    case 'rebuild-configuration': {
+      return readError('rebuild-configuration', 'Graph rebuild configuration is invalid');
     }
     case 'rebuild-failed': {
       return readError('rebuild-failed', 'Graph rebuild failed due to an infrastructure error');

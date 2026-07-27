@@ -10,17 +10,39 @@ import type { GraphReadReason, GraphReadError } from '@opensip-cli/graph/read';
 
 describe('fromGraphReadError', () => {
   it.each([
-    ['catalog-identity', 'catalog-identity', 'Failed to read graph catalog identity'],
-    ['catalog-generation', 'catalog-generation', 'Failed to load graph catalog generation'],
-    ['rebuild-empty', 'rebuild', 'Graph rebuild produced an empty catalog'],
-    ['rebuild-failed', 'rebuild', 'Graph rebuild failed due to an infrastructure error'],
-  ] as const)('maps %s to its fixed MCP DTO', (code, operation, message) => {
+    [
+      'catalog-identity',
+      'catalog-identity',
+      'catalog-identity',
+      'Failed to read graph catalog identity',
+    ],
+    [
+      'catalog-generation',
+      'catalog-generation',
+      'catalog-generation',
+      'Failed to load graph catalog generation',
+    ],
+    ['rebuild-empty', 'rebuild', 'rebuild-empty', 'Graph rebuild produced an empty catalog'],
+    ['rebuild-cancelled', 'rebuild', 'cancelled', 'Graph rebuild was cancelled'],
+    [
+      'rebuild-configuration',
+      'rebuild',
+      'rebuild-configuration',
+      'Graph rebuild configuration is invalid',
+    ],
+    [
+      'rebuild-failed',
+      'rebuild',
+      'rebuild-failed',
+      'Graph rebuild failed due to an infrastructure error',
+    ],
+  ] as const)('maps %s to its fixed MCP DTO', (code, operation, mappedCode, message) => {
     const source: GraphReadError = {
       code,
       operation,
       message: 'secret token at /private/project/datastore.sqlite',
     };
-    expect(fromGraphReadError(source)).toEqual({ code, message });
+    expect(fromGraphReadError(source)).toEqual({ code: mappedCode, message });
   });
 
   it('bounds an unknown graph error code instead of trusting its message', () => {

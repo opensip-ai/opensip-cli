@@ -2,7 +2,7 @@
  * Public rebuild facade over runGraph.
  */
 
-import { currentScope, err, ok, type Result } from '@opensip-cli/core';
+import { currentScope, err, normalizeFailure, ok, type Result } from '@opensip-cli/core';
 
 import { realpathOrSelf } from '../cli/graph-sharded-engine.js';
 import { resolveDefaultEngineShards } from '../cli/orchestrate/engine-shard-policy.js';
@@ -11,6 +11,8 @@ import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
 import { CatalogRepo } from '../persistence/catalog-repo.js';
 import { currentRules } from '../rules/registry.js';
+
+import { failGraphRead, reportGraphReadFailure } from './read-boundary-failure.js';
 
 import type { Catalog, GraphReadError, RebuildCatalogInput, GraphReadReason } from './types.js';
 
@@ -29,25 +31,58 @@ export async function rebuildCatalog(
 ): Promise<Result<Catalog, GraphReadError>> {
   try {
     const result = await runCanonicalRebuild(input);
-    if (result.failedShardIds !== undefined && result.failedShardIds.length > 0) {
-      return err(
-        rebuildError('rebuild-failed', 'Graph rebuild did not complete every configured shard'),
-      );
-    }
     const catalog = result.catalog;
     if (catalog === null || catalog === undefined) {
       return err(rebuildError('rebuild-empty', 'Graph rebuild produced an empty catalog'));
     }
-    if (input.datastore !== undefined) new CatalogRepo(input.datastore).replaceAll(catalog);
+    if (input.datastore !== undefined) {
+      try {
+        new CatalogRepo(input.datastore).replaceAll(catalog);
+      } catch (error) {
+        // D7: the expensive rebuild succeeded. Preserve that usable evidence and record the
+        // persistence degradation instead of destroying the catalog with a failed Result.
+        reportGraphReadFailure(error, {
+          boundary: 'infrastructure',
+          condition: 'catalog-persistence',
+          module: 'graph:read:rebuild',
+          reason: 'rebuild-failed',
+          operation: 'rebuild',
+          message: 'Graph rebuild completed but its catalog could not be persisted',
+        });
+      }
+    }
     return ok(catalog);
-  } catch {
-    return err(rebuildError('rebuild-failed', 'Graph rebuild failed due to infrastructure error'));
+  } catch (error) {
+    const failure = normalizeFailure(error);
+    if (failure.definition.kind === 'cancelled') {
+      return err(rebuildError('rebuild-cancelled', 'Graph rebuild was cancelled'));
+    }
+    if (
+      failure.definition.exitClass === 'configuration' ||
+      failure.definition.exitClass === 'plugin-incompatible'
+    ) {
+      return failGraphRead(error, {
+        boundary: 'infrastructure',
+        condition: 'catalog-rebuild',
+        module: 'graph:read:rebuild',
+        reason: 'rebuild-configuration',
+        operation: 'rebuild',
+        message: 'Graph rebuild configuration is invalid',
+      });
+    }
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'catalog-rebuild',
+      module: 'graph:read:rebuild',
+      reason: 'rebuild-failed',
+      operation: 'rebuild',
+      message: 'Graph rebuild failed due to infrastructure error',
+    });
   }
 }
 
 interface CanonicalRebuildResult {
   readonly catalog: Catalog | null;
-  readonly failedShardIds?: readonly string[];
 }
 
 async function runCanonicalRebuild(input: RebuildCatalogInput): Promise<CanonicalRebuildResult> {

@@ -23,6 +23,8 @@ export type GraphReadFailureCondition =
   | 'architecture-projection'
   | 'catalog-generation'
   | 'catalog-identity'
+  | 'catalog-persistence'
+  | 'catalog-rebuild'
   | 'catalog-verification'
   | 'context-snapshot'
   | 'declaration-references'
@@ -56,10 +58,10 @@ function definitionFor(boundary: GraphReadBoundaryFailureInput['boundary']): Err
  * Preserve operator evidence while returning the deliberately cause-free ADR-0147 DTO.
  * Definition-backed causes remain primary; only unknown values receive the enclosing boundary.
  */
-export function failGraphRead(
+export function reportGraphReadFailure(
   error: unknown,
   input: GraphReadBoundaryFailureInput,
-): Result<never, GraphReadError> {
+): GraphReadError {
   const definition = definitionFor(input.boundary);
   const original = normalizeFailure(error);
   const boundaryError = createToolError(definition, input.message, {
@@ -80,5 +82,13 @@ export function failGraphRead(
   });
 
   const message = input.message.length > 160 ? `${input.message.slice(0, 157)}...` : input.message;
-  return err({ code: input.reason, operation: input.operation, message });
+  return { code: input.reason, operation: input.operation, message };
+}
+
+/** Return the operator-reported failure on the plain-data Result channel. */
+export function failGraphRead(
+  error: unknown,
+  input: GraphReadBoundaryFailureInput,
+): Result<never, GraphReadError> {
+  return err(reportGraphReadFailure(error, input));
 }
