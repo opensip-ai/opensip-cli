@@ -1,5 +1,4 @@
 /// <reference lib="dom" />
-/// <reference path="../client/globals.ts" />
 /**
  * @vitest-environment jsdom
  *
@@ -13,21 +12,27 @@
  * a fake `CyCore` (only `.layout().run()` is used on this path) sidesteps that
  * environment limitation and exercises the real success/failure branches.
  *
- * The triple-slash reference above (not a runtime import) brings the
- * `declare global { const cytoscape/cytoscapeDagre }` ambient augmentation
- * into this test-typecheck program — `view-graph-layout.ts` reads those as
- * bare identifiers, and without it they're only ambient under the separate
- * `src/client/tsconfig.json` compile unit, not here. A real `import` would
- * read as a genuine production dependency on a test-only module (globals.ts
- * has no runtime exports and no other importer), tripping the dogfood
- * `test-only-frontend-modules` check; a type-only reference does not.
+ * `view-graph-layout.ts` reads `cytoscape`/`cytoscapeDagre` as the ambient
+ * globals declared by `../client/globals.ts` (`declare global`, under the
+ * separate `src/client/tsconfig.json` compile unit). This file's own
+ * `declare global` block below re-declares just those two names locally for
+ * THIS test-typecheck program, instead of importing/referencing globals.ts:
+ * an `import` (even `import type`) would register as this check-only file's
+ * sole non-test importer and trip the dogfood `test-only-frontend-modules`
+ * check, and a triple-slash reference is banned by
+ * `@typescript-eslint/triple-slash-reference`.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { gvRunLayout } from '../client/view-graph-layout.js';
 import { gvState } from '../client/view-graph-state.js';
 
-import type { CyCore, CyLayout } from '../client/cytoscape-types.js';
+import type { CyCore, CyLayout, CytoscapeFactory } from '../client/cytoscape-types.js';
+
+declare global {
+  const cytoscape: CytoscapeFactory;
+  const cytoscapeDagre: unknown;
+}
 
 function fakeCy(shouldThrow: (layoutId: string) => boolean): CyCore {
   return {
