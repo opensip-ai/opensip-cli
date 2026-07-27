@@ -4,7 +4,7 @@ import { join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { resolveInsideRoot } from './workspace-paths.js';
+import { WorkspacePathError, resolveInsideRoot } from './workspace-paths.js';
 
 const roots: string[] = [];
 
@@ -24,9 +24,20 @@ describe('resolveInsideRoot', () => {
     expect(resolveInsideRoot(root, 'src/index.ts')).toBe(join(root, 'src/index.ts'));
   });
 
-  it.each(['../escape', '/absolute/path', ''])('rejects unsafe path %j', (path) => {
+  it.each([
+    ['../escape', 'path-escape'],
+    ['/absolute/path', 'invalid-task-path'],
+    ['', 'invalid-task-path'],
+  ] as const)('rejects unsafe path %j with %s', (path, code) => {
     const root = temporaryRoot();
-    expect(() => resolveInsideRoot(root, path)).toThrow(/relative path|escapes/u);
+    let observed: unknown;
+    try {
+      resolveInsideRoot(root, path);
+    } catch (error) {
+      observed = error;
+    }
+    expect(observed).toBeInstanceOf(WorkspacePathError);
+    expect(observed).toMatchObject({ code });
   });
 
   it('rejects an in-root symlink whose target escapes the workspace', () => {
@@ -34,6 +45,13 @@ describe('resolveInsideRoot', () => {
     const outside = temporaryRoot();
     mkdirSync(join(outside, 'target'));
     symlinkSync(join(outside, 'target'), join(root, 'linked'));
-    expect(() => resolveInsideRoot(root, 'linked/file.ts')).toThrow(/symlink/u);
+    let observed: unknown;
+    try {
+      resolveInsideRoot(root, 'linked/file.ts');
+    } catch (error) {
+      observed = error;
+    }
+    expect(observed).toBeInstanceOf(WorkspacePathError);
+    expect(observed).toMatchObject({ code: 'symlink-escape' });
   });
 });
