@@ -20,6 +20,7 @@ export function gvRegisterGraphLayouts(): boolean {
     gvState.dagreRegistered = true;
     return true;
   } catch {
+    // @swallow-ok callers convert false into a visible layout-degradation notice.
     gvState.dagreRegistered = false;
     return false;
   }
@@ -54,6 +55,7 @@ function gvTryRunLayout(cy: CyCore, layoutId: string): boolean {
     cy.layout(gvLayoutOptions(layoutId)).run();
     return true;
   } catch {
+    // @swallow-ok gvRunLayout owns the visible fallback/terminal notice.
     return false;
   }
 }

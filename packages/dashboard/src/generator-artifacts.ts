@@ -69,11 +69,16 @@ export function projectBrowserSessions(
   });
 }
 
+/** Fixed, non-sensitive recovery evidence embedded for the graph visualization. */
 export interface GraphVisualizationDegradation {
   readonly condition: 'catalog-projection-failed' | 'renderer-asset-unavailable';
   readonly message: string;
 }
 
+/**
+ * Bound and project a stored graph catalog, degrading malformed input to an
+ * explicit browser-visible recovery record.
+ */
 export function graphArtifacts(
   graphCatalog: GraphCatalog | null,
   maxGraphCatalogBytes: number | undefined,
@@ -114,6 +119,7 @@ export function graphArtifacts(
   }
 }
 
+/** Load the self-contained graph renderer or return fixed visible degradation evidence. */
 export function codePathsVendor(): {
   readonly javascript: string;
   readonly degradation?: GraphVisualizationDegradation;
