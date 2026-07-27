@@ -1,5 +1,7 @@
 import { join } from 'node:path';
 
+import { ToolError } from '@opensip-cli/core';
+
 import { hasErrorCode } from './error-code.js';
 import { RuntimeManifestError, runtimeManifestIdentityEqual } from './runtime-manifest.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
@@ -50,6 +52,13 @@ export function recoveryInputsCompatible(
   );
 }
 
+/** Read the raiser's declared `metadata.condition`, if it carried one. */
+function journalFailureCondition(error: unknown): string | undefined {
+  if (!(error instanceof ToolError)) return undefined;
+  const condition = error.metadata?.condition;
+  return typeof condition === 'string' ? condition : undefined;
+}
+
 export function recoveryFailureReason(
   error: unknown,
   journal: RuntimePromotionJournal | undefined,
@@ -62,14 +71,15 @@ export function recoveryFailureReason(
   | 'artifact-mismatch'
   | 'state-ambiguous' {
   if (journal === undefined) {
-    const message = error instanceof Error ? error.message : '';
-    if (message.includes('exceeds its bounded size')) return 'journal-oversize';
-    if (message.includes('another project key')) return 'journal-key-mismatch';
-    if (
-      message.includes('malformed') ||
-      message.includes('canonically encoded') ||
-      hasErrorCode(error, JOURNAL_ERROR_CODE)
-    ) {
+    // Reads the raiser's declared condition, NOT its prose. This used to be
+    // `message.includes('exceeds its bounded size')` — which made every one of those
+    // user-facing sentences load-bearing: rewording one silently reclassified the failure into
+    // `state-ambiguous`, the most conservative and least actionable arm, with nothing to catch
+    // it. The condition now travels in allowlisted metadata (D9).
+    const condition = journalFailureCondition(error);
+    if (condition === 'journal-oversize') return 'journal-oversize';
+    if (condition === 'journal-key-mismatch') return 'journal-key-mismatch';
+    if (condition === 'journal-malformed' || hasErrorCode(error, JOURNAL_ERROR_CODE)) {
       return 'journal-malformed';
     }
     return 'state-ambiguous';
