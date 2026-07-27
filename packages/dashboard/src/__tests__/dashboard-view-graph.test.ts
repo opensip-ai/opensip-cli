@@ -168,6 +168,10 @@ describe('View 8 — Visualization', () => {
     expect(c.textContent).toContain(
       'The layered layout is unavailable. The graph is using the built-in Cose layout.',
     );
+    expect(
+      c.querySelector<HTMLElement>('[data-graph-layout-degradation]')?.dataset
+        .graphLayoutDegradation,
+    ).toBe('dagre-registration-unavailable');
     expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 

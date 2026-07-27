@@ -5,24 +5,61 @@ import { gvState } from './view-graph-state.js';
 
 import type { CyCore } from './cytoscape-types.js';
 
+type GraphLayoutFailureStage = 'dagre-registration' | 'layout-run';
+type GraphLayoutFailureKind = 'type-error' | 'error' | 'non-error';
+
+const GRAPH_LAYOUT_FAILURE_CONDITIONS = {
+  'dagre-registration': {
+    'type-error': 'dagre-registration-type-error',
+    error: 'dagre-registration-error',
+    'non-error': 'dagre-registration-non-error',
+  },
+  'layout-run': {
+    'type-error': 'layout-run-type-error',
+    error: 'layout-run-error',
+    'non-error': 'layout-run-non-error',
+  },
+} as const;
+
+/** Closed, non-sensitive reason vocabulary for a failed graph-layout attempt. */
+export type GraphLayoutFailureCondition =
+  | (typeof GRAPH_LAYOUT_FAILURE_CONDITIONS)['dagre-registration'][GraphLayoutFailureKind]
+  | (typeof GRAPH_LAYOUT_FAILURE_CONDITIONS)['layout-run'][GraphLayoutFailureKind]
+  | 'dagre-registration-unavailable';
+
+/** Result of one renderer-layout operation without leaking a caught browser value. */
+export type GraphLayoutAttempt =
+  { readonly ok: true } | { readonly ok: false; readonly condition: GraphLayoutFailureCondition };
+
+type GraphLayoutDegradationCondition =
+  GraphLayoutFailureCondition | 'layout-initialization-fallback';
+
+function failedLayoutAttempt(error: unknown, stage: GraphLayoutFailureStage): GraphLayoutAttempt {
+  let kind: GraphLayoutFailureKind = 'non-error';
+  if (error instanceof TypeError) kind = 'type-error';
+  else if (error instanceof Error) kind = 'error';
+  return { ok: false, condition: GRAPH_LAYOUT_FAILURE_CONDITIONS[stage][kind] };
+}
+
 // Register the dagre layout extension once. Called lazily at first render so
 // vendored globals do not need to exist when the client bundle initializes.
-export function gvRegisterGraphLayouts(): boolean {
+export function gvRegisterGraphLayouts(): GraphLayoutAttempt {
   if (typeof cytoscape !== 'function' || typeof cytoscapeDagre === 'undefined') {
     gvState.dagreRegistered = false;
-    return false;
+    return { ok: false, condition: 'dagre-registration-unavailable' };
   }
-  let registered = true;
+  let result: GraphLayoutAttempt;
   try {
     if (!cytoscape.__gvDagreRegistered) {
       cytoscape.use(cytoscapeDagre);
       cytoscape.__gvDagreRegistered = true;
     }
-  } catch {
-    registered = false;
+    result = { ok: true };
+  } catch (error) {
+    result = failedLayoutAttempt(error, 'dagre-registration');
   }
-  gvState.dagreRegistered = registered;
-  return registered;
+  gvState.dagreRegistered = result.ok;
+  return result;
 }
 
 export function gvLayoutOptions(layoutId: string): Record<string, unknown> {
@@ -35,10 +72,14 @@ export function gvLayoutOptions(layoutId: string): Record<string, unknown> {
   return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 6000 };
 }
 
-function gvShowLayoutDegradation(container: HTMLElement, message: string): void {
+function gvShowLayoutDegradation(
+  container: HTMLElement,
+  message: string,
+  condition: GraphLayoutDegradationCondition,
+): void {
   const existing = container.querySelector<HTMLElement>('[data-graph-layout-degradation]');
   const notice = existing ?? el('div', { class: 'empty' });
-  notice.dataset.graphLayoutDegradation = 'true';
+  notice.dataset.graphLayoutDegradation = condition;
   notice.setAttribute('role', 'status');
   notice.textContent = message;
   if (!existing) container.prepend(notice);
@@ -49,48 +90,68 @@ function gvSetLayoutSelection(container: HTMLElement, layoutId: string): void {
   if (select) select.value = layoutId;
 }
 
-function gvTryRunLayout(cy: CyCore, layoutId: string): boolean {
-  let completed = true;
+function gvTryRunLayout(cy: CyCore, layoutId: string): GraphLayoutAttempt {
   try {
     cy.layout(gvLayoutOptions(layoutId)).run();
-  } catch {
-    completed = false;
+    return { ok: true };
+  } catch (error) {
+    return failedLayoutAttempt(error, 'layout-run');
   }
-  return completed;
 }
 
 export function gvRunLayout(container: HTMLElement, layoutId: string): void {
   const cy = gvState.cy;
   if (!cy) return;
-  const dagreUnavailable = layoutId === 'dagre' && !gvRegisterGraphLayouts();
+  const registration = layoutId === 'dagre' ? gvRegisterGraphLayouts() : { ok: true as const };
+  const dagreUnavailable = !registration.ok;
   const selectedLayout = dagreUnavailable ? 'cose' : layoutId;
-  if (gvTryRunLayout(cy, selectedLayout)) {
+  const selectedAttempt = gvTryRunLayout(cy, selectedLayout);
+  if (selectedAttempt.ok) {
     gvState.currentLayout = selectedLayout;
     gvSetLayoutSelection(container, selectedLayout);
     if (dagreUnavailable) {
       gvShowLayoutDegradation(
         container,
         'The layered layout is unavailable. The graph is using the built-in Cose layout.',
+        registration.condition,
       );
     }
     return;
   }
-  if (selectedLayout !== 'cose' && gvTryRunLayout(cy, 'cose')) {
+  if (selectedLayout !== 'cose') {
+    const fallbackAttempt = gvTryRunLayout(cy, 'cose');
+    if (!fallbackAttempt.ok) {
+      gvShowLayoutDegradation(
+        container,
+        'The graph layout could not be updated.',
+        fallbackAttempt.condition,
+      );
+      return;
+    }
     gvState.currentLayout = 'cose';
     gvSetLayoutSelection(container, 'cose');
     gvShowLayoutDegradation(
       container,
       'The selected layout could not run. The graph is using the built-in Cose layout.',
+      selectedAttempt.condition,
     );
     return;
   }
-  gvShowLayoutDegradation(container, 'The graph layout could not be updated.');
+  gvShowLayoutDegradation(
+    container,
+    'The graph layout could not be updated.',
+    selectedAttempt.condition,
+  );
 }
 
-export function gvReportDagreUnavailable(container: HTMLElement): void {
+export function gvReportDagreUnavailable(
+  container: HTMLElement,
+  condition: GraphLayoutFailureCondition,
+): void {
   gvShowLayoutDegradation(
     container,
     'The layered layout is unavailable. The graph is using the built-in Cose layout.',
+    condition,
   );
 }
 
@@ -99,5 +160,6 @@ export function gvReportLayoutInitializationFallback(container: HTMLElement): vo
   gvShowLayoutDegradation(
     container,
     'The selected layout could not initialize. The graph is using the built-in Cose layout.',
+    'layout-initialization-fallback',
   );
 }

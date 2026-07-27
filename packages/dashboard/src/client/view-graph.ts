@@ -317,7 +317,9 @@ function gvRenderGraph(
 
   // Register the dagre layout on first render (the vendored cytoscape global is
   // present by render time even if it was inlined after this bundle).
-  const dagreUnavailable = gvState.currentLayout === 'dagre' && !gvRegisterGraphLayouts();
+  const registration =
+    gvState.currentLayout === 'dagre' ? gvRegisterGraphLayouts() : { ok: true as const };
+  const dagreUnavailable = !registration.ok;
   if (dagreUnavailable) gvState.currentLayout = 'cose';
 
   // Section heading + ⓘ help button, consistent with the Coupling and Functions
@@ -337,7 +339,7 @@ function gvRenderGraph(
   const elements = gvResolveElements(container, indexes);
   if (!elements) return;
   if (dagreUnavailable) {
-    gvReportDagreUnavailable(container);
+    gvReportDagreUnavailable(container, registration.condition);
   }
   if (!gvMountCanvas(container, elements)) return;
   gvWireInteractions();
