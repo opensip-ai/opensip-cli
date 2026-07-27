@@ -1,14 +1,12 @@
 import { emitAgentFilteredJsonOutput, EXIT_CODES } from '@opensip-cli/contracts';
 import { createToolLogger, currentScope } from '@opensip-cli/core';
 
+import { catalogGraphDegradations, graphDegradationMessage } from '../degradation.js';
+
 import { finalizeGraphSignals, type FinalizedSignals } from './apply-suppressions.js';
 import { buildGraphEnvelope } from './build-envelope.js';
 import { runCatalogJsonMode, runGateMode } from './graph-modes.js';
-import {
-  buildUnifiedReportLines,
-  parseFailureBannerText,
-  resolutionBannerText,
-} from './graph-report.js';
+import { buildUnifiedReportLines, resolutionBannerText } from './graph-report.js';
 import { graphCompletionLogFields } from './graph-run-outcome.js';
 import { buildGraphSessionContribution } from './graph-session-contribution.js';
 import { readGraphEnv } from './pressure-monitor.js';
@@ -87,6 +85,8 @@ function envelopeFor(
     createdAt: new Date().toISOString(),
     durationMs,
     resolutionMode: result.catalog?.resolutionMode,
+    degradations: result.degradations ?? catalogGraphDegradations(result.catalog),
+    runFaulted: result.runFaulted,
   });
 }
 
@@ -245,7 +245,8 @@ async function renderGraphResult(
   // Fail-loud partial-coverage notice: a catalog missing unparseable files is
   // surfaced on every run-output surface (banner in human mode, outcome
   // warning in --json); the run log names each dropped file.
-  const parseFailureNotice = parseFailureBannerText(result.catalog?.buildCoverage?.parseErrorFiles);
+  const degradations = result.degradations ?? catalogGraphDegradations(result.catalog);
+  const degradationNotices = degradations.map(graphDegradationMessage);
   if (opts.json === true) {
     log.info({
       evt: 'graph.render.json.start',
@@ -268,14 +269,12 @@ async function renderGraphResult(
       cli,
       envelope,
       opts,
-      parseFailureNotice === undefined
+      degradationNotices.length === 0
         ? undefined
-        : [
-            {
-              message: parseFailureNotice,
-              code: 'graph.catalog.parse.partial',
-            },
-          ],
+        : degradationNotices.map((message) => ({
+            message,
+            code: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+          })),
     );
     log.info({
       evt: 'graph.render.json.complete',
@@ -312,9 +311,10 @@ async function renderGraphResult(
   // optional verbose/detail table); `durationMs` is threaded so the host-owned
   // wall-clock wins over the unit-sum (graph units carry durationMs:0); the
   // resolution caveat and the parse-failure coverage notice move to `banners`.
-  const banners = [resolutionBannerText(result.catalog?.resolutionMode), parseFailureNotice].filter(
-    (line): line is string => line !== undefined,
-  );
+  const banners = [
+    resolutionBannerText(result.catalog?.resolutionMode),
+    ...degradationNotices,
+  ].filter((line): line is string => line !== undefined);
   const presentation: RunPresentation = {
     type: 'run-presentation',
     tool: 'graph',

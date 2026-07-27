@@ -5,6 +5,8 @@ import {
   type ToolCliContext,
 } from '@opensip-cli/core';
 
+import { catalogGraphDegradations, mergeGraphDegradations } from '../degradation.js';
+
 import {
   type FinalizedSignals,
   assertFinalizedAcrossBoundary,
@@ -18,6 +20,7 @@ import { type GraphProfileBuilder, type GraphProfileRunRecorder } from './profil
 
 import type { GraphCommandOptions } from './graph-options.js';
 import type { GraphRunOutcome } from './graph-run-outcome.js';
+import type { GraphRunDegradation } from '../degradation.js';
 import type { Rule } from '../types.js';
 import type { DataStore } from '@opensip-cli/datastore';
 
@@ -61,6 +64,8 @@ export async function executeMultiPathGraph(
   let combinedFiles = 0;
   let totalSuppressed = 0;
   let lastResult: RunGraphResult | null = null;
+  const degradationGroups: (readonly GraphRunDegradation[])[] = [];
+  let runFaulted = false;
   const config = loadGraphConfig(opts.cwd);
   // @sequential-ok — each path is a full graph build; running them serially is
   // exactly the memory bound (parallel full builds would exhaust memory — the
@@ -87,6 +92,8 @@ export async function executeMultiPathGraph(
     });
     setProfileRunFinished(profileRun, r);
     lastResult = r;
+    degradationGroups.push(r.degradations ?? catalogGraphDegradations(r.catalog));
+    runFaulted ||= r.runFaulted === true;
     // Each path's signals are relative to that path's root, so waive them
     // against the same root before aggregating. The aggregate is re-branded
     // below; it is not suppressed a second time under an ambiguous root.
@@ -110,6 +117,8 @@ export async function executeMultiPathGraph(
     resolutionStats: lastResult.resolutionStats,
     cacheHit: lastResult.cacheHit,
     features: lastResult.features,
+    degradations: mergeGraphDegradations(degradationGroups),
+    runFaulted,
   };
   const finalizedAggregate = assertFinalizedAcrossBoundary(allSignals, totalSuppressed);
   return await deliverGraphResult(opts, combined, cli, startedAt, finalizedAggregate);

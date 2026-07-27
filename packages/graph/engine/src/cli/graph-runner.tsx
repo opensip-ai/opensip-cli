@@ -22,6 +22,7 @@ import {
   type ToolSessionContribution,
 } from '@opensip-cli/core';
 
+import { graphDegradationMessage } from '../degradation.js';
 import { buildGraphSessionPayload } from '../persistence/session-payload.js';
 
 import { assertFinalizedAcrossBoundary } from './apply-suppressions.js';
@@ -186,6 +187,8 @@ export async function renderGraphLive(
             recipe: args.recipe,
             runId: currentScope()?.runId ?? '',
             createdAt: new Date().toISOString(),
+            degradations: result.degradations,
+            runFaulted: result.runFaulted,
           });
           const session: ToolSessionContribution = contributionFromGraphPayload(
             { cwd: args.cwd, recipe: args.recipe },
@@ -195,9 +198,15 @@ export async function renderGraphLive(
           const { verdict } = envelope;
           // Parity with the static path's `RunPresentation.banners`: the live
           // done frame carries one banner slot, so stack the caveats as lines.
+          const coverageBannerLines =
+            result.degradations === undefined
+              ? [parseFailureBannerText(result.parseErrorFiles)].filter(
+                  (line): line is string => line !== undefined,
+                )
+              : result.degradations.map(graphDegradationMessage);
           const bannerLines = [
             resolutionBannerText(result.resolutionMode),
-            parseFailureBannerText(result.parseErrorFiles),
+            ...coverageBannerLines,
           ].filter((line): line is string => line !== undefined);
           const banner = bannerLines.length === 0 ? undefined : bannerLines.join('\n');
           const table = shouldRenderRunUnitTable({

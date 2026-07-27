@@ -29,13 +29,19 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { isErrorSignal, resolveVerdictPolicy } from '@opensip-cli/core';
+import { isErrorSignal, resolveFailOnDegraded, resolveVerdictPolicy } from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
+import {
+  GRAPH_PARTIAL_COVERAGE,
+  GRAPH_PARTIAL_COVERAGE_SLUG,
+  graphDegradationMessage,
+} from '../degradation.js';
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
+import type { GraphRunDegradation } from '../degradation.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, VerdictPolicy } from '@opensip-cli/core';
 
 /** Inputs to {@link buildGraphEnvelope}. */
 export interface BuildGraphEnvelopeInput {
@@ -46,6 +52,48 @@ export interface BuildGraphEnvelopeInput {
   /** Whole-run wall-clock; attributed to each unit row when known (else 0). */
   readonly durationMs?: number;
   readonly resolutionMode?: 'exact' | 'fast';
+  /** Structured, non-fault coverage loss governed by `failOnDegraded`. */
+  readonly degradations?: readonly GraphRunDegradation[];
+  /** A genuine pre-unit runtime fault; independent of coverage degradation. */
+  readonly runFaulted?: boolean;
+}
+
+function degradationSignal(
+  value: GraphRunDegradation,
+  input: Pick<BuildGraphEnvelopeInput, 'createdAt' | 'runId'>,
+): Signal {
+  return {
+    id: `${input.runId || 'graph'}:${GRAPH_PARTIAL_COVERAGE_SLUG}:${value.condition}`,
+    source: GRAPH_PARTIAL_COVERAGE_SLUG,
+    provider: 'opensip-cli',
+    severity: 'medium',
+    category: 'resilience',
+    ruleId: GRAPH_PARTIAL_COVERAGE_SLUG,
+    message: graphDegradationMessage(value),
+    filePath: '.',
+    metadata: {
+      degradation: true,
+      errorCode: GRAPH_PARTIAL_COVERAGE.code,
+      condition: value.condition,
+      count: value.count,
+    },
+    createdAt: input.createdAt,
+  };
+}
+
+/**
+ * Keep the warning rung and the independent degradation switch orthogonal.
+ * The marker itself must not consume a configured warning allowance when
+ * `failOnDegraded:false`; real warning findings retain their original threshold.
+ */
+function policyForDegradations(policy: VerdictPolicy, degradationCount: number): VerdictPolicy {
+  if (degradationCount === 0) return policy;
+  if (resolveFailOnDegraded('graph')) return { ...policy, failOnWarnings: 1 };
+  if (policy.failOnWarnings === 0) return policy;
+  return {
+    ...policy,
+    failOnWarnings: policy.failOnWarnings + degradationCount,
+  };
 }
 
 /**
@@ -59,7 +107,10 @@ export interface BuildGraphEnvelopeInput {
  * `buildCliOutput` behaviour (one `CheckOutput` per rule that fired).
  */
 export function buildGraphEnvelope(input: BuildGraphEnvelopeInput): SignalEnvelope {
-  const mapped: Signal[] = input.signals.map((signal) => {
+  const degradationSignals = (input.degradations ?? []).map((value) =>
+    degradationSignal(value, input),
+  );
+  const mapped: Signal[] = [...input.signals, ...degradationSignals].map((signal) => {
     const ruleId = mapEngineSlugToOpenSipRuleId(signal.ruleId);
     return { ...signal, ruleId, source: ruleId };
   });
@@ -78,7 +129,7 @@ export function buildGraphEnvelope(input: BuildGraphEnvelopeInput): SignalEnvelo
       slug,
       passed: !hasError,
       violationCount: group.length,
-      durationMs: 0,
+      durationMs: input.durationMs ?? 0,
     });
   }
 
@@ -89,11 +140,10 @@ export function buildGraphEnvelope(input: BuildGraphEnvelopeInput): SignalEnvelo
     createdAt: input.createdAt,
     units,
     signals: mapped,
-    // ADR-0035: graph declares no failOn* keys, so it inherits the host fallback
-    // {1,0} — reproducing gate-save's "any error-level finding fails" exactly.
-    // Graph has no pre-unit fault concept, so runFaulted stays false.
-    policy: resolveVerdictPolicy('graph'),
-    runFaulted: false,
+    // D7: partial coverage is a warning-class marker governed independently by
+    // failOnDegraded. It never sets the runtime-fault bit.
+    policy: policyForDegradations(resolveVerdictPolicy('graph'), degradationSignals.length),
+    runFaulted: input.runFaulted ?? false,
     // ADR-0036: graph's byte-preserved identity, stamped at construction (over
     // the remapped canonical ruleIds — see the header note).
     fingerprintStrategy: graphFingerprintStrategy,

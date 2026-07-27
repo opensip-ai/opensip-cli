@@ -49,6 +49,7 @@ import { obtainCatalog } from './orchestrate/cache-orchestrator.js';
 import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import { createPressureMonitor } from './pressure-monitor.js';
 
+import type { GraphRunDegradation } from '../degradation.js';
 import type {
   AdapterSelectionEvidence,
   Catalog,
@@ -150,6 +151,10 @@ export interface RunGraphResult {
    * (`runGraph`) single-program path leaves it undefined.
    */
   readonly shardStats?: ShardRunStats;
+  /** Explicit aggregate coverage evidence; authoritative when present. */
+  readonly degradations?: readonly GraphRunDegradation[];
+  /** Genuine pre-unit runtime fault, distinct from partial coverage. */
+  readonly runFaulted?: boolean;
 }
 
 /**

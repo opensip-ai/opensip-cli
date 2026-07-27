@@ -19,11 +19,13 @@ import {
   createToolLogger,
   ConfigurationError,
   isErrorSignal,
+  resolveFailOnDegraded,
   readPackageVersion,
   ToolError,
 } from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
+import { isGraphDegradationSignal } from '../degradation.js';
 import { renderCatalogJson } from '../render/catalog-json.js';
 
 import type { GraphCommandOptions } from './graph-options.js';
@@ -63,15 +65,34 @@ export async function runGateMode(
     reportTo: opts.reportTo,
     apiKey: opts.apiKey,
   };
+  const hasCoverageDegradation = envelope.signals.some(isGraphDegradationSignal);
+  const coverageFails = hasCoverageDegradation && resolveFailOnDegraded('graph');
   await runHostGateDispatch({
     cli,
     tool: 'graph',
     envelope,
     mode: opts.gateSave === true ? 'save' : 'compare',
     deliver: deliverOpts,
-    saveRunFailed: ({ envelope }) => envelope.signals.some(isErrorSignal),
+    saveRunFailed: ({ envelope }) =>
+      envelope.verdict.faulted === true || envelope.signals.some(isErrorSignal) || coverageFails,
+    compareRunFailed: ({ envelope, result }) =>
+      envelope.verdict.faulted === true ||
+      coverageFails ||
+      (result.degraded && resolveFailOnDegraded('graph')),
     renderSaveLines: ({ envelope, runFailed }) => {
       const errorCount = envelope.signals.filter(isErrorSignal).length;
+      if (runFailed && envelope.verdict.faulted === true) {
+        return [
+          `Graph baseline saved (${String(envelope.signals.length)} signals)`,
+          'Graph gate FAILED: the analysis faulted before it could produce trustworthy evidence.',
+        ];
+      }
+      if (runFailed && coverageFails && errorCount === 0) {
+        return [
+          `Graph baseline saved (${String(envelope.signals.length)} signals)`,
+          'Graph gate FAILED: catalog coverage is degraded.',
+        ];
+      }
       return runFailed
         ? [
             `Graph baseline saved (${String(envelope.signals.length)} signals)`,
@@ -79,19 +100,34 @@ export async function runGateMode(
           ]
         : [`Graph baseline saved (${String(envelope.signals.length)} signals)`];
     },
-    renderCompareLines: ({ result }) =>
-      result.degraded
-        ? [
-            `Graph gate FAILED: ${String(result.added.length)} new finding(s) since baseline.`,
-            // A7: print stamped fingerprint (includes #n collision ordinals);
-            // never re-hash via strategy at display time.
-            ...result.added.map(
-              (s) => `  + ${s.fingerprint ?? graphFingerprintStrategy.fingerprint(s)}`,
-            ),
-          ]
-        : [
-            `Graph gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,
-          ],
+    renderCompareLines: ({ result, runFailed }) => {
+      if (runFailed && envelope.verdict.faulted === true) {
+        return [
+          'Graph gate FAILED: the analysis faulted before it could produce trustworthy evidence.',
+        ];
+      }
+      if (result.degraded) {
+        if (!runFailed) {
+          return [
+            `Graph gate PASS (report-only): ${String(result.added.length)} new finding(s) since baseline.`,
+          ];
+        }
+        return [
+          `Graph gate FAILED: ${String(result.added.length)} new finding(s) since baseline.`,
+          // A7: print stamped fingerprint (includes #n collision ordinals);
+          // never re-hash via strategy at display time.
+          ...result.added.map(
+            (s) => `  + ${s.fingerprint ?? graphFingerprintStrategy.fingerprint(s)}`,
+          ),
+        ];
+      }
+      if (runFailed && coverageFails) {
+        return ['Graph gate FAILED: catalog coverage is degraded.'];
+      }
+      return [
+        `Graph gate PASS: no regressions (${String(result.resolved.length)} resolved since baseline).`,
+      ];
+    },
   });
 }
 

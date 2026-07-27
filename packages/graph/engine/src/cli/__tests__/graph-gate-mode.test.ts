@@ -12,7 +12,13 @@
  * signal here is by definition UNSUPPRESSED — exactly what should trip the gate.
  */
 
-import { createSignal, type Signal, type ToolCliContext } from '@opensip-cli/core';
+import {
+  createSignal,
+  RunScope,
+  runWithScope,
+  type Signal,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { makeReportFailureMock } from '../../__tests__/report-failure-mock.js';
@@ -137,6 +143,62 @@ describe('runGateMode --gate-save (ADR-0020 graph hard-fail, ADR-0036 host-owned
       expect.objectContaining({
         type: 'gate-done',
         lines: expect.arrayContaining([expect.stringContaining('Graph gate FAILED')]),
+      }),
+    );
+  });
+
+  it('fails a degraded baseline save without misreporting it as an error finding', async () => {
+    const { cli, deliverSignals, render } = mockCli();
+    await runGateMode(
+      gateSaveOpts(),
+      envelopeOf([signal({ ruleId: 'graph:catalog-partial-coverage' })]),
+      cli,
+      'exact',
+    );
+    expect(deliveredRunFailed(deliverSignals)).toBe(true);
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: expect.arrayContaining([expect.stringContaining('catalog coverage is degraded')]),
+      }),
+    );
+  });
+
+  it('fails gate compare while current coverage is degraded even when the marker is unchanged', async () => {
+    const { cli, deliverSignals, render } = mockCli();
+    await runGateMode(
+      { cwd: '/x', gateCompare: true },
+      envelopeOf([signal({ ruleId: 'graph.resilience.catalog-partial-coverage' })]),
+      cli,
+      'exact',
+    );
+    expect(deliveredRunFailed(deliverSignals)).toBe(true);
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: ['Graph gate FAILED: catalog coverage is degraded.'],
+      }),
+    );
+  });
+
+  it('keeps degraded gate compare report-only when failOnDegraded is disabled', async () => {
+    const { cli, deliverSignals, render } = mockCli();
+    const scope = new RunScope();
+    Object.assign(scope, { toolConfig: { graph: { failOnDegraded: false } } });
+    const marker = signal({ ruleId: 'graph.resilience.catalog-partial-coverage' });
+    (cli.compareBaseline as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      added: [marker],
+      resolved: [],
+      unchanged: [],
+      degraded: true,
+    });
+
+    await runWithScope(scope, () =>
+      runGateMode({ cwd: '/x', gateCompare: true }, envelopeOf([marker]), cli, 'exact'),
+    );
+
+    expect(deliveredRunFailed(deliverSignals)).toBe(false);
+    expect(render).toHaveBeenCalledWith(
+      expect.objectContaining({
+        lines: [expect.stringContaining('PASS (report-only)')],
       }),
     );
   });

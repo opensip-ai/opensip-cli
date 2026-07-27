@@ -192,8 +192,21 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
       warnings: [
         {
           message: expect.stringContaining('2 file(s) failed to parse') as string,
-          code: 'graph.catalog.parse.partial',
+          code: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
         },
+      ],
+    });
+    const emittedEnvelope = (jsonCli.emitEnvelope as ReturnType<typeof vi.fn>).mock.calls[0]?.[0];
+    expect(emittedEnvelope).toMatchObject({
+      verdict: { passed: false, faulted: false },
+      signals: [
+        expect.objectContaining({
+          ruleId: 'graph.resilience.catalog-partial-coverage',
+          metadata: expect.objectContaining({
+            errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+            count: 2,
+          }),
+        }),
       ],
     });
   });
@@ -209,6 +222,36 @@ describe('dispatchGraphResult — outcome return contract (ADR-0011)', () => {
     const jsonCli = mockCli();
     await dispatchGraphResult({ json: true, cwd: '/x' }, result, jsonCli, STARTED, '/x');
     expect(jsonCli.emitEnvelope).toHaveBeenCalledWith(expect.anything());
+  });
+
+  it('surfaces non-parse partial coverage instead of silently treating it as complete', async () => {
+    const partialResult = {
+      signals: [],
+      catalog: {
+        functions: {},
+        buildCoverage: {
+          status: 'partial',
+          discoveredFiles: 0,
+          parseErrorFiles: 0,
+          filesIdentity: 'sha256:0',
+        },
+      },
+    } as unknown as Parameters<typeof dispatchGraphResult>[1];
+    const cli = mockCli();
+
+    await dispatchGraphResult({ cwd: '/x' }, partialResult, cli, STARTED, '/x');
+
+    const presentation = (cli.render as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as {
+      banners?: readonly string[];
+      envelope?: { readonly signals: readonly { readonly metadata: Record<string, unknown> }[] };
+    };
+    expect(presentation.banners).toEqual([
+      'Graph catalog coverage is partial; one or more discovered inputs are absent.',
+    ]);
+    expect(presentation.envelope?.signals[0]?.metadata).toMatchObject({
+      errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+      condition: 'catalog-coverage-partial',
+    });
   });
 
   it('returns envelope + session for --report-to without delivering inside dispatch', async () => {

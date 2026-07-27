@@ -134,6 +134,31 @@ export const graphErrorCatalog = defineErrorCatalog(
     },
 
     /**
+     * A usable catalog was produced, but one or more known inputs are absent.
+     *
+     * This is ruling D7's degradation case, not a runtime fault: the structured
+     * marker remains in the SignalEnvelope on every output surface, and the
+     * existing `failOnDegraded` policy decides whether it fails the run. One
+     * definition covers each coverage source (D9); `metadata.condition` names
+     * the source and `metadata.count` quantifies it.
+     */
+    'GRAPH.CATALOG.PARTIAL_COVERAGE': {
+      code: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+      source: 'application',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: 'caller-policy',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Inspect the coverage condition, fix or exclude the omitted inputs, then rebuild the graph.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'count'],
+    },
+
+    /**
      * A workspace child process could not be created.
      *
      * Kept separate from timeout even though both fail one workspace unit: a spawn failure is
