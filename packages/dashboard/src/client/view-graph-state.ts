@@ -42,6 +42,7 @@ export const GV_LAYOUTS: readonly { id: string; label: string }[] = [
  *   currentLayout  the active Cytoscape layout id.
  *   cy             the live Cytoscape core instance (null until mounted).
  *   sccHighlight   "Highlight cycles" toggle (package-level SCC emphasis).
+ *   dagreRegistered whether the optional dagre extension registered successfully.
  *   escHandler     the active Escape keydown handler, tracked so each re-render
  *                  replaces (not stacks) its document-level listener.
  */
@@ -54,6 +55,7 @@ export const gvState: {
   currentLayout: string;
   cy: CyCore | null;
   sccHighlight: boolean;
+  dagreRegistered: boolean;
   escHandler: ((e: KeyboardEvent) => void) | null;
 } = {
   level: 'package',
@@ -64,5 +66,6 @@ export const gvState: {
   currentLayout: 'dagre',
   cy: null,
   sccHighlight: false,
+  dagreRegistered: false,
   escHandler: null,
 };

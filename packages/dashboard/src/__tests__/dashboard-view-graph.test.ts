@@ -28,7 +28,7 @@ interface Env {
   views: GraphView[];
 }
 
-function loadEnv(withVendor: boolean): Env {
+function loadEnv(withVendor: boolean, disableDagre = false): Env {
   // The Visualization view (and the whole Code Paths panel + prelude) now lives
   // in the typed client bundle (L4): loading the bundle registers the view into
   // the bundle's `views` global at IIFE eval. The cytoscape vendor blob is NOT
@@ -45,7 +45,10 @@ var graphIndexes = { byBodyHash: new Map(), bySimpleName: new Map(), callees: ne
   const parts: string[] = [head];
   // Vendor blob FIRST so the cytoscape global is defined before the bundle's
   // lazy dagre registration runs at render time.
-  if (withVendor) parts.push(dashboardCytoscapeVendorJs());
+  if (withVendor) {
+    parts.push(dashboardCytoscapeVendorJs());
+    if (disableDagre) parts.push('cytoscapeDagre = undefined;');
+  }
   parts.push(DASHBOARD_CLIENT_BUNDLE, 'return { views };');
   // eslint-disable-next-line @typescript-eslint/no-implied-eval, sonarjs/code-eval -- Trusted source: our own bundled dashboard JS.
   const factory = new Function(parts.join('\n'));
@@ -103,6 +106,17 @@ describe('View 8 — Visualization', () => {
     expect(c.querySelector('.empty')!.textContent).toContain('No graph to display');
   });
 
+  it('distinguishes malformed graph data from an absent graph', () => {
+    embedViewModel({ nodes: { unexpected: 'object' }, edges: [] });
+    const env = loadEnv(false);
+    const c = document.createElement('div');
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
+
+    expect(c.querySelector('.empty')?.textContent).toBe(
+      'Graph data in this report could not be read.',
+    );
+  });
+
   it('renders the catalog remediation recorded by the generator', () => {
     embedDegradation('catalog-projection-failed', 'Re-run opensip graph.');
     const env = loadEnv(false);
@@ -141,6 +155,20 @@ describe('View 8 — Visualization', () => {
     expect(layout).not.toBeNull();
     expect([...layout!.options].map((o) => o.value)).toEqual(['dagre', 'cose', 'breadthfirst']);
     expect(layout!.value).toBe('dagre'); // default
+  });
+
+  it('falls back visibly to Cose when the optional dagre extension is unavailable', () => {
+    const env = loadEnv(true, true);
+    embedViewModel(SAMPLE_VM);
+    const c = document.createElement('div');
+    document.body.append(c);
+    env.views.find((v) => v.id === 'graph')!.render(c, null, null, null);
+
+    expect(c.querySelector<HTMLSelectElement>('select[data-control="layout"]')?.value).toBe('cose');
+    expect(c.textContent).toContain(
+      'The layered layout is unavailable. The graph is using the built-in Cose layout.',
+    );
+    expect(c.querySelector('#code-paths-graph-canvas')).not.toBeNull();
   });
 
   it('renders a section heading with an ⓘ help button (consistent with Coupling/Functions)', () => {
