@@ -93,4 +93,31 @@ export const initAndPolicyDefinitions = {
       'Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it.',
     publicMetadataKeys: ['condition'],
   },
+  /**
+   * The init authored-state transaction refused to proceed.
+   *
+   * One code across ~199 refusals in the authored-state plane, because the operator's action
+   * genuinely is the same for all of them: init will not modify the authored state further, and
+   * the named path needs inspection or a fresh `init`. What differs between them is WHICH
+   * invariant broke, and each call site already says so precisely — "a foreign replay
+   * publication temporary is present", "the replay manifest bytes disagree with the durable
+   * journal", "authored preparation can no longer be aborted safely".
+   *
+   * Every one of those sentences was being replaced by "The operation failed." The code was
+   * `SYSTEM.INIT.AUTHORED_TRANSACTION`, a head no catalog declared, so it resolved to
+   * `SYSTEM_ERROR` — `exposure: 'redacted'` — and the projection discarded the message. This is
+   * the single largest instance of that loss in the codebase.
+   *
+   * `integrity` and `configuration`: these are fail-closed refusals over on-disk state, not
+   * malfunctions, and the operator resolves them by fixing or clearing that state.
+   */
+  'CLI.INIT.AUTHORED_TRANSACTION_UNSAFE': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.AUTHORED_TRANSACTION_UNSAFE',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'Init refused to modify the authored project state; nothing further was written. The message names the invariant that failed — inspect that path, or re-run `opensip init` to start a fresh attempt.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const;

@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **23**
-- Definitions: **223**
+- Definitions: **224**
 
 ## Catalogs
 
@@ -28,7 +28,7 @@ generated: true
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 5 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 6 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
 | `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
@@ -58,6 +58,7 @@ generated: true
 | `CLI.HOST.PROJECT_REQUIRED` | `opensip-cli` |  |  | not-found |  |  |  |  | Run from within an initialized project directory, or pass --cwd pointing at one. `opensip init` creates one. |
 | `CLI.HOST.STARTUP_LEASE` | `opensip-cli` |  |  | conflict | transient |  |  |  | The startup runtime lease was unavailable. Wait for other opensip runs to finish and re-run. |
 | `CLI.HOST.WIRING_INVALID` | `opensip-cli` |  |  |  |  |  |  |  | Capture the run id and report a bug; the CLI host was misdriven. |
+| `CLI.INIT.AUTHORED_TRANSACTION_UNSAFE` | `opensip-cli` |  | environment | integrity |  |  |  |  | Init refused to modify the authored project state; nothing further was written. The message names the invariant that failed — inspect that path, or re-run `opensip init` to start a fresh attempt. |
 | `CLI.INIT.PROMOTION_JOURNAL_INVALID` | `opensip-cli` |  |  | integrity |  |  |  |  | The promotion journal is not readable. Re-run `opensip init`; if it repeats, remove the runtime directory and initialize again. |
 | `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` | `opensip-cli` |  |  | conflict |  |  |  |  | Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it. |
 | `CLI.POLICY.DENIED` | `opensip-cli` |  | operator | permission |  |  |  |  | Policy denied this operation. Change the policy deliberately, or run an operation the policy allows. |

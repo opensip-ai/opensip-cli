@@ -2,6 +2,7 @@ import { join } from 'node:path';
 
 import { ToolError } from '@opensip-cli/core';
 
+import { AUTHORED_TRANSACTION_CODE } from './authored-state-transaction-fs.js';
 import { hasErrorCode } from './error-code.js';
 import { RuntimeManifestError, runtimeManifestIdentityEqual } from './runtime-manifest.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
@@ -91,7 +92,7 @@ export function recoveryFailureReason(
     error instanceof RuntimeManifestError ||
     error instanceof RuntimePromotionDatastoreError ||
     error instanceof RuntimePromotionPreflightError ||
-    hasErrorCode(error, 'SYSTEM.INIT.AUTHORED_TRANSACTION') ||
+    hasErrorCode(error, AUTHORED_TRANSACTION_CODE) ||
     hasErrorCode(error, 'SYSTEM.INIT.RUNTIME_PROMOTION_FILESYSTEM')
   ) {
     return 'artifact-mismatch';

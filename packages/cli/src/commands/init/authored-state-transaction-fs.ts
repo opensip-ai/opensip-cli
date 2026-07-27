@@ -12,9 +12,10 @@ import {
 } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { projectCoordinationKey, SystemError } from '@opensip-cli/core';
+import { projectCoordinationKey } from '@opensip-cli/core';
 
 import { normalizeAuthoredPathMode } from './authored-path-mode.js';
+import { authoredTransactionFailure } from './authored-state-transaction-failure.js';
 import { hasErrorCode } from './error-code.js';
 import {
   INIT_AUTHORED_PLAN_CAPS,
@@ -26,8 +27,13 @@ import { isWindowsDirectoryHandleFallback } from './runtime-directory-handle-fal
 import type { RuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
 import type { BigIntStats } from 'node:fs';
 
+// Re-exported so the ~199 existing importers of this module are untouched by the split.
+export {
+  authoredTransactionFailure,
+  AUTHORED_TRANSACTION_CODE,
+} from './authored-state-transaction-failure.js';
+
 const READ_CHUNK_BYTES = 64 * 1024;
-const ERROR_CODE = 'SYSTEM.INIT.AUTHORED_TRANSACTION';
 
 export interface AuthoredEntryIdentity {
   readonly dev: bigint;
@@ -83,13 +89,6 @@ export function readBoundedAuthoredDirectory(
   } finally {
     directory.closeSync();
   }
-}
-
-export function authoredTransactionFailure(message: string, cause?: unknown): never {
-  throw new SystemError(`Init authored transaction failed: ${message}`, {
-    code: ERROR_CODE,
-    ...(cause === undefined ? {} : { cause }),
-  });
 }
 
 export function authoredEntryIdentity(stat: BigIntStats): AuthoredEntryIdentity {
