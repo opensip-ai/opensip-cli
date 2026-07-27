@@ -44,6 +44,8 @@ export interface RepairApplyVerifyInput {
   readonly signal: string;
   readonly action: string;
   readonly force?: boolean;
+  /** Cancellation for this MCP request; distinct from the selected signal id above. */
+  readonly abortSignal?: AbortSignal;
 }
 
 export interface RepairWritePort {
@@ -58,6 +60,8 @@ export interface CliRepairWritePortOptions {
   readonly configPath?: string;
   readonly cliEntrypoint?: string;
   readonly timeoutMs?: number;
+  /** Server-lifetime cancellation captured from the entered RunScope. */
+  readonly abortSignal?: AbortSignal;
 }
 
 function cliEntrypoint(): string | undefined {
@@ -100,12 +104,14 @@ export class CliRepairWritePort implements RepairWritePort {
   private readonly configPath: string | undefined;
   private readonly entrypoint: string | undefined;
   private readonly timeoutMs: number;
+  private readonly abortSignal: AbortSignal | undefined;
 
   constructor(options: CliRepairWritePortOptions) {
     this.projectRoot = options.projectRoot;
     this.configPath = options.configPath;
     this.entrypoint = options.cliEntrypoint ?? cliEntrypoint();
     this.timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+    this.abortSignal = options.abortSignal;
   }
 
   applyVerify(
@@ -139,10 +145,19 @@ export class CliRepairWritePort implements RepairWritePort {
       '--json',
       ...(input.force === true ? ['--force'] : []),
     ];
-    return this.run(args);
+    const abortSignals = [this.abortSignal, input.abortSignal].filter(
+      (signal): signal is AbortSignal => signal !== undefined,
+    );
+    if (abortSignals.some((signal) => signal.aborted)) {
+      return Promise.resolve(err(readError('cancelled', 'repair apply verify was cancelled')));
+    }
+    return this.run(args, abortSignals);
   }
 
-  private run(args: readonly string[]): Promise<Result<RepairApplyVerifyResult, McpReadError>> {
+  private run(
+    args: readonly string[],
+    abortSignals: readonly AbortSignal[],
+  ): Promise<Result<RepairApplyVerifyResult, McpReadError>> {
     return new Promise((resolve) => {
       const child = spawn(process.execPath, [...args], {
         cwd: this.projectRoot,
@@ -152,20 +167,24 @@ export class CliRepairWritePort implements RepairWritePort {
       });
       const stdout = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
       const stderr = createBoundedUtf8Capture(MAX_CAPTURE_BYTES);
-      let timedOut = false;
       let settled = false;
+      let stopReason: 'cancelled' | 'output-too-large' | 'timeout' | undefined;
       let killEscalationTimer: ReturnType<typeof setTimeout> | undefined;
+
+      const onAbort = (): void => requestStop('cancelled');
 
       const settle = (result: Result<RepairApplyVerifyResult, McpReadError>): void => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
         if (killEscalationTimer !== undefined) clearTimeout(killEscalationTimer);
+        for (const signal of abortSignals) signal.removeEventListener('abort', onAbort);
         resolve(result);
       };
 
       /** M14: SIGTERM first, then SIGKILL if the child ignores cooperative stop. */
-      const requestStop = (): void => {
+      function requestStop(reason: NonNullable<typeof stopReason>): void {
+        stopReason ??= reason;
         try {
           child.kill('SIGTERM');
         } catch {
@@ -179,20 +198,25 @@ export class CliRepairWritePort implements RepairWritePort {
             // @swallow-ok child already exited between TERM and KILL
           }
         }, KILL_GRACE_MS);
-      };
+      }
 
       const timer = setTimeout(() => {
-        timedOut = true;
-        requestStop();
+        requestStop('timeout');
       }, this.timeoutMs);
+
+      for (const signal of abortSignals) {
+        signal.addEventListener('abort', onAbort, { once: true });
+        // Close the check→listener race without spawning another mutation after cancellation.
+        if (signal.aborted) onAbort();
+      }
 
       child.stdout.on('data', (chunk: Buffer) => {
         stdout.append(chunk);
-        if (stdout.truncated) requestStop();
+        if (stdout.truncated) requestStop('output-too-large');
       });
       child.stderr.on('data', (chunk: Buffer) => {
         stderr.append(chunk);
-        if (stderr.truncated) requestStop();
+        if (stderr.truncated) requestStop('output-too-large');
       });
       child.on('error', (error) => {
         settle(
@@ -205,13 +229,35 @@ export class CliRepairWritePort implements RepairWritePort {
         );
       });
       // M14: always settle — close is the terminal event even after SIGKILL.
-      child.on('close', () => {
-        if (timedOut) {
+      child.on('close', (code, signal) => {
+        if (stopReason === 'cancelled') {
+          settle(err(readError('cancelled', 'repair apply verify was cancelled')));
+          return;
+        }
+        if (stopReason === 'timeout') {
           settle(err(readError('repair-timeout', 'repair apply verify timed out')));
           return;
         }
-        if (stdout.truncated || stderr.truncated) {
+        if (stopReason === 'output-too-large' || stdout.truncated || stderr.truncated) {
           settle(err(readError('repair-output-too-large', 'repair output exceeded capture limit')));
+          return;
+        }
+        if (code !== 0 || signal !== null) {
+          const detail = stderr.value.trim();
+          const message =
+            detail === ''
+              ? 'repair apply verify child failed'
+              : sanitizeMcpErrorMessage(`repair apply verify child failed; stderr: ${detail}`, {
+                  projectRoot: this.projectRoot,
+                });
+          settle(
+            err(
+              readError('repair-child-failed', message, {
+                exitCode: code ?? -1,
+                ...(signal === null ? {} : { signal }),
+              }),
+            ),
+          );
           return;
         }
         const parsed = parseApplyVerifyResult(stdout.value);

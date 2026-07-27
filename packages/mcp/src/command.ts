@@ -251,6 +251,7 @@ async function serveMcpStdio(rawOpts: unknown, cli: ToolCliContext): Promise<voi
   const repairWrite = mutationEnabled
     ? new CliRepairWritePort({
         projectRoot: canonicalProjectRoot,
+        abortSignal: scope.abortSignal,
         ...(scope.projectContext?.configPath === undefined
           ? {}
           : { configPath: canonicalConfigPath }),

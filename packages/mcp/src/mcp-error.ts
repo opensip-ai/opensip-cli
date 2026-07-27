@@ -158,6 +158,7 @@ export type McpReadReason =
   | 'rebuild-empty'
   | 'rebuild-configuration'
   | 'rebuild-failed'
+  | 'repair-child-failed'
   | 'repair-entrypoint-unavailable'
   | 'repair-output-invalid'
   | 'repair-output-too-large'

@@ -31,7 +31,7 @@ export function registerRepairApplyVerify(server: McpStdioServer, deps: McpToolD
         force: z.boolean().optional(),
       }),
     },
-    async ({ ref, tool, signal, action, force }) => {
+    async ({ ref, tool, signal, action, force }, request) => {
       if (!deps.validToolIds.has(tool)) return unknownToolError(tool, deps.validToolIds);
       if (deps.repairWrite === undefined) {
         return errorResult({
@@ -45,6 +45,7 @@ export function registerRepairApplyVerify(server: McpStdioServer, deps: McpToolD
         signal,
         action,
         ...(force === undefined ? {} : { force }),
+        ...(request?.signal === undefined ? {} : { abortSignal: request.signal }),
       });
       if (!outcome.ok) return errorResult(outcome.error);
       return jsonResult(outcome.value);

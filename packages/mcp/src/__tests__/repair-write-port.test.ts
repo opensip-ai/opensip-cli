@@ -23,12 +23,17 @@ function writeChild(source: string): string {
   return file;
 }
 
-function port(entrypoint: string | undefined, timeoutMs = 5000): CliRepairWritePort {
+function port(
+  entrypoint: string | undefined,
+  timeoutMs = 5000,
+  abortSignal?: AbortSignal,
+): CliRepairWritePort {
   return new CliRepairWritePort({
     projectRoot: root,
     configPath: join(root, 'custom opensip.yml'),
     cliEntrypoint: entrypoint,
     timeoutMs,
+    ...(abortSignal === undefined ? {} : { abortSignal }),
   });
 }
 
@@ -175,6 +180,73 @@ describe('CliRepairWritePort', () => {
       error: {
         code: 'repair-timeout',
         message: 'repair apply verify timed out',
+      },
+    });
+  });
+
+  it('does not spawn a mutation after server cancellation', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    const result = await port('/does/not/exist.cjs', 5000, controller.signal).applyVerify({
+      ref: 'session:0',
+      tool: 'fit',
+      signal: '1',
+      action: 'fix-test',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'cancelled',
+        message: 'repair apply verify was cancelled',
+      },
+    });
+  });
+
+  it('terminates an in-flight mutation when its MCP request is cancelled', async () => {
+    const entrypoint = writeChild(`setInterval(() => {}, 10_000);`);
+    const controller = new AbortController();
+    const outcome = port(entrypoint).applyVerify({
+      ref: 'session:0',
+      tool: 'fit',
+      signal: '1',
+      action: 'fix-test',
+      abortSignal: controller.signal,
+    });
+    controller.abort();
+
+    await expect(outcome).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'cancelled',
+        message: 'repair apply verify was cancelled',
+      },
+    });
+  });
+
+  it('does not parse a successful payload from a failed child exit', async () => {
+    const entrypoint = writeChild(`
+      process.stdout.write(JSON.stringify({
+        data: { type: 'repair-apply-verify', status: 'applied' }
+      }));
+      process.stderr.write('verification failed');
+      process.exitCode = 7;
+    `);
+
+    const result = await port(entrypoint).applyVerify({
+      ref: 'session:0',
+      tool: 'fit',
+      signal: '1',
+      action: 'fix-test',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'repair-child-failed',
+        message: 'repair apply verify child failed; stderr: verification failed',
+        details: { exitCode: 7 },
       },
     });
   });
