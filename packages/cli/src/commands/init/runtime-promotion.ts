@@ -1,6 +1,11 @@
 import { basename } from 'node:path';
 
-import { acquireRuntimeExclusiveLease } from '@opensip-cli/core';
+import {
+  acquireRuntimeExclusiveLease,
+  currentLogger,
+  normalizeFailure,
+  toOperatorFailureProjection,
+} from '@opensip-cli/core';
 
 import {
   bindAuthoredStateReceipt,
@@ -286,6 +291,11 @@ async function runWithLease(
     if (isRuntimeManifestReleaseUnsafe(error)) {
       operation.leaseDisposition.releaseSafe = false;
     }
+    // Report before rolling back. This arm read ONE flag off the error and then dropped it:
+    // never logged, never attached to the result. So a fresh promotion that failed rolled back
+    // silently and the operator saw a recovery outcome with no cause — the failure that
+    // triggered it was unrecoverable from outside the process.
+    reportPromotionFailure('fresh-promotion-failed', error);
     const rollback = await rollbackFreshRuntimePromotion(operation);
     return rollback.result;
   }
@@ -296,6 +306,25 @@ async function runWithLease(
  * exclusive lease. Customer output stays bounded and path-free; durable detail
  * remains in the journal until identity-bound cleanup succeeds.
  */
+/**
+ * Surface a promotion failure before the recovery path converts it into an outcome.
+ *
+ * Diagnostic only — it must never replace the failure it is describing, and the recovery
+ * decision above is unchanged. `condition` names which boundary reported it.
+ */
+function reportPromotionFailure(condition: string, error: unknown): void {
+  try {
+    currentLogger().error({
+      evt: 'init.runtime_promotion.failed',
+      module: 'cli:runtime-promotion',
+      condition,
+      err: toOperatorFailureProjection(normalizeFailure(error)),
+    });
+  } catch {
+    // @swallow-ok a diagnostic must not fail the recovery path it exists to explain.
+  }
+}
+
 export async function runFreshRuntimePromotion(
   input: FreshRuntimePromotionInput,
   dependencyOverrides: Partial<RuntimePromotionDependencies> = {},
