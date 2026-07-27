@@ -24,6 +24,7 @@ import {
   createToolLogger,
   currentScope,
   resolveVerdictPolicy,
+  toPublicFailureProjection,
   type Signal,
   type VerdictPolicy,
 } from '@opensip-cli/core';
@@ -86,6 +87,10 @@ function normalizeFitnessSignalIdentity(signal: Signal, checkSlug: string): Sign
 
 /** Per-check error string for the unit sidecar: the check's own error, or a timeout marker. */
 function unitError(cr: RecipeCheckResult): string | undefined {
+  if (cr.failure !== undefined) {
+    const message = toPublicFailureProjection(cr.failure).message;
+    return typeof message === 'string' ? message : 'The check failed.';
+  }
   if (cr.error !== undefined) return cr.error;
   if (cr.timedOut === true) return 'timed out';
   return undefined;

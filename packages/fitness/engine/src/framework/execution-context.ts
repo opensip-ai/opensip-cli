@@ -8,7 +8,13 @@
 
 import * as fs from 'node:fs/promises';
 
-import { SystemError, currentLogger, currentScope } from '@opensip-cli/core';
+import {
+  SystemError,
+  coreSystemErrorCatalog,
+  currentLogger,
+  currentScope,
+  normalizeFailure,
+} from '@opensip-cli/core';
 
 import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { applyGlobalExcludes } from '../targets/index.js';
@@ -22,8 +28,8 @@ import type { FileCache } from './file-cache.js';
 
 // Plan 01 clean break: registered definitions replace bare code literals that only
 // resolved through the family fallback.
-const CHECK_ABORTED = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_ABORTED');
-const CHECK_DEADLINE_EXCEEDED = fitnessErrorCatalog.require('FIT.FITNESS.CHECK_DEADLINE_EXCEEDED');
+const CHECK_ABORTED = coreSystemErrorCatalog.require('CORE.SYSTEM.CANCELLED');
+const CHECK_DEADLINE_EXCEEDED = coreSystemErrorCatalog.require('CORE.SYSTEM.DEADLINE_EXCEEDED');
 const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVALID');
 const FILE_TOO_LARGE = fitnessErrorCatalog.require('FIT.FITNESS.FILE_TOO_LARGE');
 
@@ -48,6 +54,12 @@ export class CheckAbortedError extends SystemError {
     this.checkId = checkId;
     Object.setPrototypeOf(this, CheckAbortedError.prototype);
   }
+}
+
+/** Recognize cancellation across realms and native AbortError values. */
+export function isCheckCancellation(error: unknown): boolean {
+  if (error instanceof CheckAbortedError) return true;
+  return normalizeFailure(error).definition.kind === 'cancelled';
 }
 
 /**

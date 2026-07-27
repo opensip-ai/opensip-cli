@@ -10,7 +10,7 @@
 
 import { runWithRetry } from '@opensip-cli/core';
 
-import { CheckAbortedError } from '../framework/execution-context.js';
+import { isCheckCancellation } from '../framework/execution-context.js';
 
 /** Configuration for retry behavior */
 export interface RetryOptions {
@@ -39,6 +39,6 @@ export async function executeWithRetry<T>(
   return runWithRetry(fn, {
     enabled: options.enabled,
     maxRetries: options.maxRetries,
-    shouldNotRetry: (error) => error instanceof CheckAbortedError,
+    shouldNotRetry: isCheckCancellation,
   });
 }

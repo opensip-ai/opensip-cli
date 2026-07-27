@@ -25,6 +25,7 @@ import {
   currentFitnessLoadState,
 } from '../../framework/scope-registry.js';
 import { fitnessTool } from '../../tool.js';
+import { normalizeCheckPackLoadFailure, normalizePluginLoadFailure } from '../fit/check-loader.js';
 import { finalizeFitLoadOutcome } from '../fit/load-outcome.js';
 import { executeFit } from '../fit.js';
 
@@ -188,7 +189,9 @@ describe('executeFit fail-closed (ADR-0060)', () => {
         const load = currentFitnessLoadState();
         Object.assign(load, createFitnessLoadState());
         load.loadedFor = projectDir;
-        load.checkPackErrors = ['@acme/required-pack → fit-pack: ERR_MODULE_NOT_FOUND'];
+        load.checkPackErrors = [
+          normalizeCheckPackLoadFailure('@acme/required-pack → fit-pack: ERR_MODULE_NOT_FOUND'),
+        ];
         currentCheckRegistry().register(
           {
             config: {
@@ -231,7 +234,7 @@ describe('executeFit fail-closed (ADR-0060)', () => {
         load.checkPackErrors = [
           'package @opensip/fit resolves a different @opensip-cli/core (0.1.14) than this runtime (0.1.15) — skipping to avoid a split run scope',
           'configured package "@acme/missing" is not installed in node_modules — skipping',
-        ];
+        ].map(normalizeCheckPackLoadFailure);
         currentCheckRegistry().register(
           {
             config: {
@@ -274,7 +277,9 @@ describe('executeFit fail-closed (ADR-0060)', () => {
         Object.assign(load, createFitnessLoadState());
         load.loadedFor = projectDir;
         // The flattened error string classifies the pack as required (generic path)...
-        load.checkPackErrors = ['@opensip/fit → fit-pack: skipping — scope ABI mismatch'];
+        load.checkPackErrors = [
+          normalizeCheckPackLoadFailure('@opensip/fit → fit-pack: skipping — scope ABI mismatch'),
+        ];
         // ...while the STRUCTURED discovery diagnostic (recorded on the scope during
         // load) carries the real cause + code, which the outcome must prefer.
         currentScope()?.bootstrapDiagnostics.record({
@@ -332,7 +337,11 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       Object.assign(load, createFitnessLoadState());
       load.loadedFor = projectDir;
       load.pluginLoadErrors = [];
-      load.checkPackErrors = ['package @opensip/fit denied by capability-pack trust policy'];
+      load.checkPackErrors = [
+        normalizeCheckPackLoadFailure(
+          'package @opensip/fit denied by capability-pack trust policy',
+        ),
+      ];
       currentCheckRegistry().register(
         {
           config: {
@@ -351,9 +360,8 @@ describe('executeFit fail-closed (ADR-0060)', () => {
 
       expect(load.commandError).toBeUndefined();
       expect(load.loadDegraded).toBe(true);
-      expect(load.loadWarnings).toContain(
-        'Optional check pack failed to load: package @opensip/fit denied by capability-pack trust policy',
-      );
+      expect(load.loadWarnings).toContain('Optional check pack "@opensip/fit" failed to load.');
+      expect(load.degradedDiagnostics[0]?.detail).toContain('capability-pack trust policy');
       return Promise.resolve();
     });
   });
@@ -365,7 +373,9 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       load.loadedFor = projectDir;
       load.pluginLoadErrors = [];
       load.checkPackErrors = [
-        '@opensip/fit → fit-pack: package @opensip/fit denied by capability-pack trust policy',
+        normalizeCheckPackLoadFailure(
+          '@opensip/fit → fit-pack: package @opensip/fit denied by capability-pack trust policy',
+        ),
       ];
       currentCheckRegistry().register(
         {
@@ -383,10 +393,8 @@ describe('executeFit fail-closed (ADR-0060)', () => {
 
       finalizeFitLoadOutcome(projectDir);
 
-      expect(load.loadWarnings).toContain(
-        'Optional check pack failed to load: package @opensip/fit denied by capability-pack trust policy',
-      );
-      expect(load.loadWarnings.join('\n')).not.toContain('@opensip/fit → fit-pack');
+      expect(load.loadWarnings).toContain('Optional check pack "@opensip/fit" failed to load.');
+      expect(load.degradedDiagnostics[0]?.detail).not.toContain('@opensip/fit → fit-pack');
       return Promise.resolve();
     });
   });
@@ -396,7 +404,7 @@ describe('executeFit fail-closed (ADR-0060)', () => {
       const load = currentFitnessLoadState();
       Object.assign(load, createFitnessLoadState());
       load.loadedFor = projectDir;
-      load.pluginLoadErrors = ['optional-third-party: import failed'];
+      load.pluginLoadErrors = [normalizePluginLoadFailure('optional-third-party: import failed')];
       load.checkPackErrors = [];
       currentCheckRegistry().register(
         {

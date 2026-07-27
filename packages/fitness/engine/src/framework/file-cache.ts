@@ -83,7 +83,6 @@ export class FileCache {
   private readonly cache = new Map<string, string>();
   private _prewarmed = false;
   private _cleared = false;
-  private _autoClearTimer: ReturnType<typeof setTimeout> | null = null;
   private _prewarmSnapshot: readonly string[] | undefined;
 
   /**
@@ -151,9 +150,11 @@ export class FileCache {
     // THIS snapshot, never the live cache — on-demand reads by concurrently
     // running scoped checks would otherwise widen their file set
     // scheduling-dependently (nondeterministic findings run-to-run).
-    this._prewarmSnapshot = Object.freeze([...this.cache.keys()].sort());
+    // The execution universe is every discovered path, not only successful
+    // cache reads. A rejected prewarm must fall through to the check's ordinary
+    // read boundary, where it becomes visible degradation instead of vanishing.
+    this._prewarmSnapshot = Object.freeze([...allFiles].sort());
     this._cleared = false;
-    this.scheduleAutoClear();
     const durationMs = Date.now() - start;
     reportPrewarmGaps(prewarmRejected, this.cache.size);
 
@@ -234,10 +235,6 @@ export class FileCache {
     this._prewarmed = false;
     this._prewarmSnapshot = undefined;
     this._cleared = true;
-    if (this._autoClearTimer) {
-      clearTimeout(this._autoClearTimer);
-      this._autoClearTimer = null;
-    }
   }
 
   /**
@@ -260,25 +257,6 @@ export class FileCache {
   /**
    * Get cache statistics.
    */
-  /** Auto-clear after timeout to prevent memory leaks from missed lifecycle cleanup */
-  private scheduleAutoClear(): void {
-    if (this._autoClearTimer) {
-      clearTimeout(this._autoClearTimer);
-    }
-    this._autoClearTimer = setTimeout(
-      () => {
-        /* v8 ignore start -- 10-minute auto-clear timer; not exercised in unit tests */
-        if (this.cache.size > 0) {
-          this.clear();
-        }
-        /* v8 ignore stop */
-      },
-      10 * 60 * 1000,
-    ); // 10 minutes
-    // Unref so the timer doesn't keep the process alive
-    this._autoClearTimer.unref();
-  }
-
   get stats(): {
     size: number;
     prewarmed: boolean;

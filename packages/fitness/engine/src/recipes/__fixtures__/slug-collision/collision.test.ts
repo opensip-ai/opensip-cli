@@ -37,10 +37,10 @@ function createCollisionRegistry(): CheckRegistry {
 }
 
 describe('slug-collision fixture', () => {
-  it('skips ambiguous bare-slug recipe references (fail-closed)', () => {
+  it('rejects ambiguous bare-slug recipe references (fail-closed)', () => {
     const registry = createCollisionRegistry();
     const selector: CheckSelector = { type: 'explicit', checkIds: [SLUG_A] };
-    expect(resolveChecks(selector, registry)).toEqual([]);
+    expect(() => resolveChecks(selector, registry)).toThrow(/ambiguous/);
   });
 
   it('resolves namespaced selectors deterministically', () => {

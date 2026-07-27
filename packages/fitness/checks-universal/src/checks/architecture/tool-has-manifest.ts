@@ -147,8 +147,9 @@ export async function analyzeAllToolManifests(files: FileAccessor): Promise<Chec
   for (const filePath of files.paths) {
     if (path.basename(filePath) !== 'package.json') continue;
     let pkg: PackageJson;
+    const content = await files.read(filePath);
     try {
-      pkg = JSON.parse(await files.read(filePath)) as PackageJson;
+      pkg = JSON.parse(content) as PackageJson;
     } catch {
       // @swallow-ok a malformed package.json is another check’s subject, and a tool manifest cannot be read from it either way
       // A malformed package.json is some other check's concern; a tool

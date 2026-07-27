@@ -38,11 +38,11 @@ describe('CheckRegistry.resolveBareSlug', () => {
     expect(registry.resolveBareSlug('no-eval')).toBe('pack-a:no-eval');
   });
 
-  it('returns undefined for an ambiguous bare slug (fail-closed)', () => {
+  it('throws for an ambiguous bare slug (fail-closed)', () => {
     const registry = new CheckRegistry();
     registry.register(makeCheck({ slug: 'no-eval', id: 'first' }), 'pack-a');
     registry.register(makeCheck({ slug: 'no-eval', id: 'second' }), 'pack-b');
-    expect(registry.resolveBareSlug('no-eval')).toBeUndefined();
+    expect(() => registry.resolveBareSlug('no-eval')).toThrow(/ambiguous/);
   });
 
   it('returns undefined for unknown slugs', () => {

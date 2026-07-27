@@ -15,6 +15,7 @@ import {
   logger,
   SystemError,
   createSignal,
+  scrubText,
   applyContentFilter,
   currentScope,
 } from '@opensip-cli/core';
@@ -32,6 +33,7 @@ import { executeCommand } from './command-executor.js';
 import {
   CheckAbortedError,
   CheckDeadlineExceededError,
+  isCheckCancellation,
   createExecutionContext,
 } from './execution-context.js';
 import { createFileAccessor } from './file-accessor.js';
@@ -61,6 +63,11 @@ const ENGINE_STATE = fitnessErrorCatalog.require('FIT.FITNESS.ENGINE_STATE_INVAL
 // VIOLATION → SIGNAL CONVERSION
 // =============================================================================
 
+function publicMatch(checkSlug: string, match: string | undefined): string | undefined {
+  if (match === undefined) return undefined;
+  return checkSlug === 'no-hardcoded-secrets' ? '[redacted]' : scrubText(match);
+}
+
 function toSignal(
   violation: CheckViolation,
   checkSlug: string,
@@ -85,7 +92,9 @@ function toSignal(
     repair: repairFromViolation(violation, filePath),
     metadata: Object.fromEntries(
       Object.entries({
-        match: violation.match,
+        // Secret-finding evidence proves a match occurred; the literal secret is
+        // never valid public metadata. Other checks retain a scrubbed match.
+        match: publicMatch(checkSlug, violation.match),
         type: violation.type,
         checkSlug,
         checkTags: checkTags.length > 0 ? checkTags.join(',') : undefined,
@@ -132,7 +141,7 @@ function repairFromViolation(
  * @throws {Error} Always rethrows `error` (wrapped via `wrap` when not already an Error).
  */
 function rethrowUnlessAbort(error: unknown, wrap: (message: string) => Error): never {
-  if (error instanceof CheckAbortedError) throw error;
+  if (isCheckCancellation(error)) throw error;
   throw error instanceof Error ? error : wrap(String(error));
 }
 
@@ -145,7 +154,7 @@ async function analyzeSingleFile(
   try {
     rawContent = await ctx.readFile(filePath);
   } catch (error) {
-    if (error instanceof CheckAbortedError) throw error;
+    if (isCheckCancellation(error)) throw error;
 
     // FILE_TOO_LARGE is a deliberate, structural skip (files over the 10MB
     // read bound), not a transient fs race — burying it at debug contradicts
@@ -170,14 +179,25 @@ async function analyzeSingleFile(
       return 'skip';
     }
 
-    // Genuine filesystem races (ENOENT, permission errors, etc.) stay
-    // skippable at debug. Analyze bugs must not silently green-pass the
-    // rest of the run.
-    logger.debug('Skipping unreadable file', {
+    // A transient filesystem race may remain skippable, but it is degraded
+    // coverage and therefore must be visible to the run boundary (D7).
+    logger.warn('Skipping unreadable file', {
       evt: 'fitness.check.file.skip',
       module: 'fitness:framework',
       filePath,
       checkSlug: config.slug,
+      err: error instanceof Error ? error : undefined,
+    });
+    const warning = `Check '${config.slug}' skipped a file it could not read; coverage is degraded.`;
+    const load = currentScope()?.fitness?.load;
+    if (load !== undefined) {
+      load.loadDegraded = true;
+      if (!load.loadWarnings.includes(warning)) load.loadWarnings.push(warning);
+    }
+    currentScope()?.diagnostics.event('execute', 'warn', warning, {
+      checkSlug: config.slug,
+      filePath,
+      reason: 'read-failed',
     });
     return 'skip';
   }
@@ -215,9 +235,9 @@ async function executeAnalyzeMode(
   const builder = ResultBuilder.create({
     checkId: config.id,
     itemType: config.itemType ?? 'files',
-  })
-    .totalItems(files.length)
-    .filesScanned(files.length);
+  }).totalItems(files.length);
+
+  let filesScanned = 0;
 
   // @sequential-ok — checks analyze one file at a time by design: concurrency-1
   // keeps memory bounded (one file's content resident), preserves deterministic
@@ -229,6 +249,7 @@ async function executeAnalyzeMode(
 
     const violations = await analyzeSingleFile(config, filePath, ctx);
     if (violations === 'skip') continue;
+    filesScanned += 1;
 
     for (const violation of violations) {
       void builder.addSignal(
@@ -237,7 +258,7 @@ async function executeAnalyzeMode(
     }
   }
 
-  return builder.build();
+  return builder.filesScanned(filesScanned).build();
 }
 
 /** @throws {CheckAbortedError} When the check is aborted via AbortSignal */
@@ -508,7 +529,7 @@ export function defineCheck(config: UnifiedCheckConfig): Check {
         const filtered = buildFilteredResult(result, filteredSignals, ignoredCount, start);
         return appliedDirectives.length > 0 ? { ...filtered, appliedDirectives } : filtered;
       } catch (error) {
-        if (error instanceof CheckAbortedError) throw error;
+        if (isCheckCancellation(error)) throw error;
 
         const builder = ResultBuilder.create({
           checkId: config.id,

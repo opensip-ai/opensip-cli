@@ -17,18 +17,28 @@ import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
  * Shell program run from the project root (the command's cwd). For each
  * `apps/<name>/` containing a `tsconfig.json` it emits an `::app::` marker, runs
  * `tsc --noEmit` in that directory (merging stderr), then an `::exit::` marker
- * carrying the per-app exit code. We always `exit 0` so the framework treats the
- * run as successful and defers entirely to `parseOutput` (mirrors
- * `dependency-vulnerability-audit`).
+ * carrying the per-app exit code. The program returns 1 when any app failed so
+ * the real aggregate status survives; 0 and 1 are both parseable scanner exits.
+ * Exit 125 is reserved for a missing nested toolchain and becomes a framework
+ * fault instead of a fabricated TypeScript diagnostic.
  */
 const TSC_PER_APP_PROGRAM = `
+command -v npx >/dev/null 2>&1 || exit 125
+npx --no-install tsc --version >/dev/null 2>&1 || exit 125
+status=0
 for d in apps/*/; do
   [ -f "\${d}tsconfig.json" ] || continue
   echo "::app::\${d}"
   (cd "$d" && npx tsc --noEmit 2>&1)
-  echo "::exit::$?"
+  app_status=$?
+  echo "::exit::$app_status"
+  if [ "$app_status" -eq 127 ]; then
+    status=125
+  elif [ "$app_status" -ne 0 ] && [ "$status" -eq 0 ]; then
+    status=1
+  fi
 done
-exit 0
+exit "$status"
 `;
 
 // Markers emitted by the shell program.
@@ -171,8 +181,8 @@ export const typescriptFrontend = defineCheck({
   command: {
     bin: 'sh',
     args: ['-c', TSC_PER_APP_PROGRAM],
-    // The shell program always exits 0; per-app status is carried inline.
-    expectedExitCodes: [0],
+    // 0 = all apps compile (or none apply); 1 = parsed app failures.
+    expectedExitCodes: [0, 1],
     parseOutput(stdout, _stderr, _exitCode, _files, cwd): CheckViolation[] {
       return parseTscOutput(stdout, cwd);
     },

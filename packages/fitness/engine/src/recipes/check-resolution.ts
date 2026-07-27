@@ -88,7 +88,8 @@ export function validateCheckReferences(
   const missing: string[] = [];
 
   for (const id of checkIds) {
-    if (existingSet.has(id)) {
+    const namespacedMatches = allCheckIds.filter((known) => known.endsWith(`:${id}`));
+    if (existingSet.has(id) || namespacedMatches.length === 1) {
       valid.push(id);
     } else {
       missing.push(id);

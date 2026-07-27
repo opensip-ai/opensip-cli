@@ -7,8 +7,13 @@
  * shape via `FitnessRecipeService`.
  */
 
-import { BUILTIN_DEFAULT_RECIPE, EXIT_CODES, resolveToolRecipeName } from '@opensip-cli/contracts';
-import { createToolLogger, ConfigurationError } from '@opensip-cli/core';
+import {
+  BUILTIN_DEFAULT_RECIPE,
+  EXIT_CODES,
+  mapFailureToExitCode,
+  resolveToolRecipeName,
+} from '@opensip-cli/contracts';
+import { createToolLogger, normalizeFailure, toPublicFailureProjection } from '@opensip-cli/core';
 
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
@@ -119,13 +124,15 @@ export async function runRecipeOrAdHoc(
     }
     return await service.start(recipeName);
   } catch (error) {
-    const msg = error instanceof Error ? error.message : String(error);
-    const isConfigurationError = error instanceof ConfigurationError;
+    const projectedMessage = toPublicFailureProjection(normalizeFailure(error)).message;
+    const message =
+      typeof projectedMessage === 'string' ? projectedMessage : 'The fitness run failed.';
+    const exitCode = mapFailureToExitCode(error);
     return {
       error: {
         type: 'error',
-        message: isConfigurationError ? msg : `Fitness run failed: ${msg}`,
-        exitCode: isConfigurationError ? EXIT_CODES.CONFIGURATION_ERROR : EXIT_CODES.RUNTIME_ERROR,
+        message: exitCode === EXIT_CODES.RUNTIME_ERROR ? `Fitness run failed: ${message}` : message,
+        exitCode,
       },
     };
   }

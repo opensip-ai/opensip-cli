@@ -102,21 +102,17 @@ async function analyzeAllFiles(files: FileAccessor): Promise<CheckViolation[]> {
       continue;
     }
 
-    try {
-      const content = await files.read(filePath);
-      const file = getFileName(filePath);
+    const content = await files.read(filePath);
+    const file = getFileName(filePath);
 
-      if (!hasDirectiveMarkers(content)) {
-        continue;
-      }
+    if (!hasDirectiveMarkers(content)) {
+      continue;
+    }
 
-      const directives = collectFileDirectives(content, filePath, file);
+    const directives = collectFileDirectives(content, filePath, file);
 
-      for (const directive of directives) {
-        violations.push(directiveToViolation(directive));
-      }
-    } catch {
-      // @swallow-ok Skip unreadable files
+    for (const directive of directives) {
+      violations.push(directiveToViolation(directive));
     }
   }
 
