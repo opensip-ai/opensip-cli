@@ -41,8 +41,8 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-import { readPackageVersion } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { logger, normalizeFailure, readPackageVersion } from '@opensip-cli/core';
+import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
@@ -52,6 +52,12 @@ import type { CacheKeyInput } from '@opensip-cli/graph';
  * once from the nearest package.json, memoized in core's `readPackageVersion`.
  */
 const ADAPTER_VERSION = readPackageVersion(import.meta.url);
+const TSCONFIG_NOT_FOUND = graphErrorCatalog.require('GRAPH.TSCONFIG.NOT_FOUND');
+const TSCONFIG_INVALID = graphErrorCatalog.require('GRAPH.TSCONFIG.INVALID');
+const TSCONFIG_LOAD_FAILED = graphErrorCatalog.require('GRAPH.TSCONFIG.LOAD_FAILED');
+
+type ConfigHashFailureCondition =
+  'config-missing' | 'config-read-failed' | 'config-invalid' | 'resolved-config-failed';
 
 export function cacheKey(input: CacheKeyInput): string {
   throwIfGraphAdapterAborted(input.signal, 'TypeScript cache-key computation');
@@ -71,26 +77,62 @@ function hashResolvedTsconfig(configPathAbs: string | undefined, signal?: AbortS
     return 'no-tsconfig';
   }
   if (!existsSync(configPathAbs)) {
-    return `missing:${configPathAbs}`;
+    return configHashFallback('config-missing');
   }
-  const read = ts.readConfigFile(configPathAbs, (path) => ts.sys.readFile(path));
+  let read: ReturnType<typeof ts.readConfigFile>;
+  try {
+    read = ts.readConfigFile(configPathAbs, (path) => ts.sys.readFile(path));
+  } catch (error) {
+    return configHashFallback('config-read-failed', error);
+  }
   if (read.error !== undefined || read.config === undefined) {
-    /* v8 ignore next */
-    return `unreadable:${configPathAbs}`;
+    const diagnosticCode = read.error?.code;
+    return configHashFallback(
+      diagnosticCode === 5083 ? 'config-read-failed' : 'config-invalid',
+      undefined,
+      diagnosticCode,
+    );
   }
   // parseJsonConfigFileContent follows `extends` and merges the effective
   // compilerOptions. We hash ONLY the resolved compilerOptions (the
   // resolution-affecting surface) — not the full parsed file list, which is a
   // function of on-disk globs the per-file fingerprint already covers.
-  const parsed = ts.parseJsonConfigFileContent(
-    read.config,
-    ts.sys,
-    dirname(configPathAbs),
-    undefined,
-    configPathAbs,
-  );
+  let parsed: ts.ParsedCommandLine;
+  try {
+    parsed = ts.parseJsonConfigFileContent(
+      read.config,
+      ts.sys,
+      dirname(configPathAbs),
+      undefined,
+      configPathAbs,
+    );
+  } catch (error) {
+    return configHashFallback('resolved-config-failed', error);
+  }
   throwIfGraphAdapterAborted(signal, 'TypeScript config hashing');
   return createHash('sha256').update(stableStringify(parsed.options)).digest('hex').slice(0, 16);
+}
+
+function configHashFallback(
+  condition: ConfigHashFailureCondition,
+  error?: unknown,
+  diagnosticCode?: number,
+): string {
+  let boundary = TSCONFIG_LOAD_FAILED;
+  if (condition === 'config-missing') boundary = TSCONFIG_NOT_FOUND;
+  else if (condition === 'config-invalid') boundary = TSCONFIG_INVALID;
+  const failure = error === undefined ? undefined : normalizeFailure(error);
+  logger.warn({
+    evt: 'graph.adapter.tsconfig_hash_degraded',
+    module: 'graph:adapter-typescript',
+    code: failure?.known === 'known' ? failure.code : boundary.code,
+    boundaryCode: boundary.code,
+    condition,
+    diagnosticCode,
+    errno: failure?.metadata.errno,
+    msg: 'TypeScript configuration could not be fingerprinted; a location-independent cache marker is used',
+  });
+  return condition === 'config-missing' ? 'missing-tsconfig' : 'unreadable-tsconfig';
 }
 
 /**

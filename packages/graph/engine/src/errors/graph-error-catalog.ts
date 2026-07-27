@@ -287,6 +287,57 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'errno', 'language'],
     },
 
+    /** A requested TypeScript configuration anchor does not exist. */
+    'GRAPH.TSCONFIG.NOT_FOUND': {
+      code: 'GRAPH.TSCONFIG.NOT_FOUND',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction:
+        'Create the requested tsconfig.json or correct the configured TypeScript project path.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /** A TypeScript configuration was readable but structurally invalid. */
+    'GRAPH.TSCONFIG.INVALID': {
+      code: 'GRAPH.TSCONFIG.INVALID',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction:
+        'Correct the reported TypeScript configuration diagnostic, then retry the graph build.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'diagnosticCode'],
+    },
+
+    /** TypeScript configuration loading failed for an environmental I/O reason. */
+    'GRAPH.TSCONFIG.LOAD_FAILED': {
+      code: 'GRAPH.TSCONFIG.LOAD_FAILED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the configuration-load condition and OS errno, restore file access, then retry the graph build.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'diagnosticCode', 'errno'],
+    },
+
     /**
      * A shard-dependent operation has no trustworthy complete result.
      *
