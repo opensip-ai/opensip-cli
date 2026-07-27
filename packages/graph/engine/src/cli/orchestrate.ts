@@ -23,7 +23,13 @@
  * public type surface.
  */
 
-import { logger, withSpanAsync, type Signal } from '@opensip-cli/core';
+import {
+  createCancelledError,
+  currentScope,
+  logger,
+  withSpanAsync,
+  type Signal,
+} from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -160,6 +166,7 @@ function yieldToEventLoop(): Promise<void> {
 
 async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   const { stage, onProgress, monitor, fn, detailFn, attrsFn } = args;
+  throwIfGraphCancelled(stage);
   monitor?.setStage(stage);
   // Sample BEFORE the stage starts. The previous stage may have left
   // the heap near the threshold; bail out before doing more work that
@@ -170,6 +177,7 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   // row) before a synchronous stage blocks the loop. The cooperative resolve
   // stage yields again internally, so its spinner keeps ticking throughout.
   await yieldToEventLoop();
+  throwIfGraphCancelled(stage);
   const startedAt = Date.now();
   // Emit one span per stage. withSpanAsync keeps the span open across the
   // (possibly async) stage work and is a no-op when no SDK is registered.
@@ -178,6 +186,7 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
     `opensip_cli.graph.${stage}`,
     async (span) => {
       const out = await fn();
+      throwIfGraphCancelled(stage);
       if (attrsFn) span.setAttributes(attrsFn(out));
       return out;
     },
@@ -191,6 +200,13 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
     detail: detailFn?.(result),
   });
   return result;
+}
+
+/** Stage-boundary cancellation checkpoint using the one core cancellation definition (D5). */
+function throwIfGraphCancelled(stage: string): void {
+  if (currentScope()?.abortSignal?.aborted === true) {
+    throw createCancelledError(`Graph pipeline cancelled at the ${stage} stage.`);
+  }
 }
 
 /**

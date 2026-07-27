@@ -1,4 +1,9 @@
-import { ConfigurationError, type Signal, type ToolCliContext } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  createCancelledError,
+  type Signal,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 
 import {
   type FinalizedSignals,
@@ -61,6 +66,9 @@ export async function executeMultiPathGraph(
   // exactly the memory bound (parallel full builds would exhaust memory — the
   // very resource exhaustion this heuristic warns about).
   for (const p of paths) {
+    if (cli.scope.abortSignal?.aborted === true) {
+      throw createCancelledError('Graph multi-path run cancelled before the next path.');
+    }
     const profileRun = profile?.startRun({
       label: positionalPathLabel(p, opts.cwd),
       cwd: p,

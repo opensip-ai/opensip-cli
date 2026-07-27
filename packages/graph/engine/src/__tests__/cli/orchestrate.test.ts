@@ -186,6 +186,22 @@ describe('runGraph orchestrator', () => {
     });
   });
 
+  it('stops before launching a stage when the host scope is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const cancelledScope = makeGraphTestScope({ abortSignal: controller.signal });
+    try {
+      await runWithScope(cancelledScope, async () => {
+        currentAdapterRegistry().register(fakeAdapter({ projectDir }));
+        await expect(runGraph({ cwd: projectDir, noCache: true, rules: [] })).rejects.toMatchObject(
+          { code: 'CORE.SYSTEM.CANCELLED' },
+        );
+      });
+    } finally {
+      cancelledScope.dispose();
+    }
+  });
+
   it('writes the catalog to the datastore when one is provided and cache is enabled', async () => {
     await inGraphScope(async () => {
       currentAdapterRegistry().register(
