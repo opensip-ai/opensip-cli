@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { createSignal } from '@opensip-cli/core';
+import { RunScope, createSignal, runWithScope } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { executeYagni } from '../execute-yagni.js';
@@ -90,7 +90,54 @@ describe('executeYagni', () => {
         },
         [cleanDetector()],
       ),
-    ).rejects.toThrow("Unknown YAGNI detector 'ghost-detector'");
+    ).rejects.toMatchObject({
+      code: 'YAGNI.DETECTOR.NOT_FOUND',
+      message: "Unknown YAGNI detector 'ghost-detector'.",
+    });
+  });
+
+  it('contains a detector crash as a redacted fault and continues', async () => {
+    const result = await executeYagni({ cwd: fixtureDir() }, [
+      {
+        id: 'broken-detector',
+        slug: 'yagni:broken-detector',
+        description: 'fixture broken detector',
+        run: () => Promise.reject(new Error('/private/repo: detector exploded')),
+      },
+      cleanDetector(),
+    ]);
+
+    expect(result.envelope.verdict.faulted).toBe(true);
+    expect(result.envelope.units).toHaveLength(2);
+    expect(result.envelope.units[0]).toMatchObject({
+      slug: 'yagni:broken-detector',
+      passed: false,
+      error: 'The operation failed.',
+    });
+    expect(result.envelope.units[0]?.error).not.toContain('/private/repo');
+    expect(result.envelope.units[1]?.slug).toBe('yagni:clean-detector');
+  });
+
+  it('propagates host cancellation instead of recording a detector fault', async () => {
+    const controller = new AbortController();
+    const scope = new RunScope({ abortSignal: controller.signal });
+    const detector: YagniDetector = {
+      id: 'cancelled-detector',
+      slug: 'yagni:cancelled-detector',
+      description: 'fixture cancelled detector',
+      run: () => {
+        controller.abort();
+        return new Promise(() => undefined);
+      },
+    };
+
+    try {
+      await expect(
+        runWithScope(scope, () => executeYagni({ cwd: fixtureDir() }, [detector])),
+      ).rejects.toMatchObject({ name: 'AbortError' });
+    } finally {
+      scope.dispose();
+    }
   });
 
   it('settles live rows for detectors excluded by an explicit filter', async () => {

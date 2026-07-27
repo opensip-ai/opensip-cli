@@ -1,5 +1,3 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,16 +15,15 @@ const loadYagniConfigMock = vi.hoisted(() =>
     disabledDetectors: [],
   })),
 );
-const sendWorkerIpcMessageMock = vi.hoisted(() => vi.fn());
-const stopHeartbeatMock = vi.hoisted(() => vi.fn());
-const startWorkerHeartbeatMock = vi.hoisted(() => vi.fn(() => stopHeartbeatMock));
+const runJsonSpecWorkerMock = vi.hoisted(() => vi.fn());
+const SPEC_PATH = join(process.cwd(), '.runtime', 'yagni-spec.test.json');
+const COMMAND_SPEC_PATH = join(process.cwd(), '.runtime', 'yagni-command-spec.test.json');
 
 vi.mock('@opensip-cli/core', async (importOriginal) => {
   const actual = await importOriginal<typeof CoreModule>();
   return {
     ...actual,
-    sendWorkerIpcMessage: sendWorkerIpcMessageMock,
-    startWorkerHeartbeat: startWorkerHeartbeatMock,
+    runJsonSpecWorker: runJsonSpecWorkerMock,
   };
 });
 
@@ -45,28 +42,23 @@ function stubCli(): ToolCliContext {
   } as unknown as ToolCliContext;
 }
 
-function writeSpec(value: unknown): { dir: string; path: string } {
-  const dir = mkdtempSync(join(tmpdir(), 'yagni-worker-test-'));
-  const path = join(dir, 'spec.json');
-  writeFileSync(path, JSON.stringify(value), 'utf8');
-  return { dir, path };
-}
-
 beforeEach(() => {
   vi.clearAllMocks();
+  runJsonSpecWorkerMock.mockResolvedValue(undefined);
 });
 
 describe('yagni worker command', () => {
-  it('streams detector progress and the final result from a JSON spec', async () => {
-    const { dir, path } = writeSpec({
-      cwd: '/repo',
-      minConfidence: 'high',
-      detectors: ['yagni:unused-config-surface'],
-      categories: ['configuration'],
-      includeTests: true,
-      pathRoots: ['src'],
+  it('delegates terminal IPC, failure projection, heartbeat, and cancellation to the JSON worker', async () => {
+    await executeYagniWorker(SPEC_PATH, stubCli());
+
+    expect(runJsonSpecWorkerMock).toHaveBeenCalledTimes(1);
+    expect(runJsonSpecWorkerMock).toHaveBeenCalledWith({
+      specPath: SPEC_PATH,
+      run: expect.any(Function),
     });
-    const cli = stubCli();
+  });
+
+  it('maps a parsed worker spec and detector lifecycle events into the executor', async () => {
     const result = {
       envelope: { tool: 'yagni', runId: 'run-1' },
       session: { tool: 'yagni', cwd: '/repo' },
@@ -75,17 +67,28 @@ describe('yagni worker command', () => {
       options.onDetectorStart?.('yagni:unused-config-surface');
       options.onDetectorDone?.('yagni:unused-config-surface', 42);
       options.onDetectorsSkipped?.(['yagni:disabled-stub']);
-      return result;
+      return Promise.resolve(result);
     });
+    await executeYagniWorker(SPEC_PATH, stubCli());
+    const worker = runJsonSpecWorkerMock.mock.calls[0]?.[0] as {
+      run: (args: Record<string, unknown>, emit: (event: unknown) => void) => Promise<unknown>;
+    };
+    const emit = vi.fn();
 
-    try {
-      await yagniRunWorkerCommandSpec.handler?.({ _args: [path] }, cli);
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
+    await expect(
+      worker.run(
+        {
+          cwd: '/repo',
+          minConfidence: 'high',
+          detectors: ['yagni:unused-config-surface'],
+          categories: ['configuration'],
+          includeTests: true,
+          pathRoots: ['src'],
+        },
+        emit,
+      ),
+    ).resolves.toBe(result);
 
-    expect(startWorkerHeartbeatMock).toHaveBeenCalledTimes(1);
-    expect(stopHeartbeatMock).toHaveBeenCalledTimes(1);
     expect(loadYagniConfigMock).toHaveBeenCalledWith('/repo');
     expect(executeYagniMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -98,79 +101,29 @@ describe('yagni worker command', () => {
         pathRoots: ['src'],
       }),
     );
-    expect(sendWorkerIpcMessageMock).toHaveBeenNthCalledWith(1, {
-      kind: 'progress',
-      event: {
-        type: 'stage-start',
-        stage: 'yagni:unused-config-surface',
-        label: 'Unused Config Surface',
-      },
+    expect(emit).toHaveBeenNthCalledWith(1, {
+      type: 'stage-start',
+      stage: 'yagni:unused-config-surface',
+      label: 'Unused Config Surface',
     });
-    expect(sendWorkerIpcMessageMock).toHaveBeenNthCalledWith(2, {
-      kind: 'progress',
-      event: { type: 'stage-done', stage: 'yagni:unused-config-surface', durationMs: 42 },
+    expect(emit).toHaveBeenNthCalledWith(2, {
+      type: 'stage-done',
+      stage: 'yagni:unused-config-surface',
+      durationMs: 42,
     });
-    expect(sendWorkerIpcMessageMock).toHaveBeenNthCalledWith(3, {
-      kind: 'progress',
-      event: {
-        type: 'stage-done',
-        stage: 'yagni:disabled-stub',
-        durationMs: 0,
-        detail: 'skipped',
-      },
-    });
-    expect(sendWorkerIpcMessageMock).toHaveBeenNthCalledWith(4, {
-      kind: 'result',
-      value: result,
+    expect(emit).toHaveBeenNthCalledWith(3, {
+      type: 'stage-done',
+      stage: 'yagni:disabled-stub',
+      durationMs: 0,
+      detail: 'skipped',
     });
   });
 
-  it('sends structured worker errors and stops the heartbeat when execution fails', async () => {
-    const { dir, path } = writeSpec({ cwd: '/repo' });
-    const error = Object.assign(new Error('detector failed'), {
-      failureClass: 'configuration',
-    });
-    executeYagniMock.mockRejectedValue(error);
+  it('forwards the command spec path to the sanctioned JSON worker', async () => {
+    await yagniRunWorkerCommandSpec.handler?.({ _args: [COMMAND_SPEC_PATH] }, stubCli());
 
-    try {
-      await executeYagniWorker(path, stubCli());
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-
-    expect(sendWorkerIpcMessageMock).toHaveBeenCalledWith({
-      kind: 'error',
-      message: 'detector failed',
-      stack: expect.stringContaining('detector failed'),
-      failureClass: 'configuration',
-    });
-    expect(stopHeartbeatMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('normalizes non-Error worker failures', async () => {
-    const { dir, path } = writeSpec({ cwd: '/repo' });
-    executeYagniMock.mockRejectedValue('plain failure');
-
-    try {
-      await executeYagniWorker(path, stubCli());
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-
-    expect(sendWorkerIpcMessageMock).toHaveBeenCalledWith({
-      kind: 'error',
-      message: 'plain failure',
-    });
-    expect(stopHeartbeatMock).toHaveBeenCalledTimes(1);
-  });
-
-  it('surfaces a worker error when the internal handler has no spec path', async () => {
-    await yagniRunWorkerCommandSpec.handler?.({}, stubCli());
-
-    expect(sendWorkerIpcMessageMock).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'error' }),
+    expect(runJsonSpecWorkerMock).toHaveBeenCalledWith(
+      expect.objectContaining({ specPath: COMMAND_SPEC_PATH }),
     );
-    expect(executeYagniMock).not.toHaveBeenCalled();
-    expect(stopHeartbeatMock).toHaveBeenCalledTimes(1);
   });
 });
