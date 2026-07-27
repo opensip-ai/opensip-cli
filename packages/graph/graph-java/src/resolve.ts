@@ -33,10 +33,13 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
-  throwIfGraphAdapterAborted,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { isReturnValueDiscarded, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  isReturnValueDiscarded,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 

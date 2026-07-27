@@ -41,10 +41,13 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
-  throwIfGraphAdapterAborted,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  buildNameIndex,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {

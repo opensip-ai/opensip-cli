@@ -20,8 +20,10 @@ import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
 import { createToolError, isToolErrorLike, logger, normalizeFailure } from '@opensip-cli/core';
-import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { graphErrorCatalog } from '@opensip-cli/graph';
 import { glob, Ignore, type IgnoreLike } from 'glob';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
 

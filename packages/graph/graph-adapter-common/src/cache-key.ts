@@ -19,7 +19,8 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
 import { logger, normalizeFailure } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
 

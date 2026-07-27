@@ -25,6 +25,8 @@ export { createParseProjectFromAdapter } from './parse-from-adapter.js';
 
 export { hashConfig, makeConfigCacheKey } from './cache-key.js';
 
+export { throwIfGraphAdapterAborted } from './cancellation.js';
+
 export { skipToEndOfLine, skipBlockComment } from './body-digest.js';
 
 export { isReturnValueDiscarded } from './return-discarded.js';

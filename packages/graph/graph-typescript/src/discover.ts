@@ -18,9 +18,10 @@ import {
   normalizeFailure,
   scrubText,
 } from '@opensip-cli/core';
-import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { graphErrorCatalog } from '@opensip-cli/graph';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { normalizeProjectDir } from './normalize-project-dir.js';
 
 const MAX_TSCONFIG_BYTES = 1_000_000;

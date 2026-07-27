@@ -25,9 +25,9 @@
 import { relative, sep } from 'node:path';
 
 import { isToolErrorLike, projectRelativePath } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
 import { visitClassStaticBlock } from './inventory-visitors/class-static-init.js';
 import { visitConstructorDeclaration } from './inventory-visitors/constructor-declaration.js';

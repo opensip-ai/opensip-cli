@@ -17,9 +17,9 @@
 
 import { relative } from 'node:path';
 
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { parseProjectFast, type TypescriptFastParsedProject } from './parse-fast.js';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';

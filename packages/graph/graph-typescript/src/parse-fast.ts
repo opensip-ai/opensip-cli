@@ -29,8 +29,10 @@ import {
   projectRelativePath,
   scrubText,
 } from '@opensip-cli/core';
-import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { readSourceFileGuarded } from '@opensip-cli/graph';
 import ts from 'typescript';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { ParseInput, ParseOutput, ParseError } from '@opensip-cli/graph';
 

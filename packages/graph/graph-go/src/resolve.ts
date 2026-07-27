@@ -35,10 +35,13 @@ import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
-  throwIfGraphAdapterAborted,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  buildNameIndex,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
@@ -47,12 +50,13 @@ import type {
   DependencyEdge,
   DependencySiteRecord,
   EdgeSink,
-  GraphRunDegradation,
   ResolutionStats,
   ResolveInput,
   ResolveOutput,
 } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- language adapters keep position helpers local because each reads parser-specific node locations.
 function goPosition(

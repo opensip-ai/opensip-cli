@@ -42,8 +42,10 @@ import { existsSync } from 'node:fs';
 import { dirname } from 'node:path';
 
 import { logger, normalizeFailure, readPackageVersion } from '@opensip-cli/core';
-import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { graphErrorCatalog } from '@opensip-cli/graph';
 import ts from 'typescript';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
 

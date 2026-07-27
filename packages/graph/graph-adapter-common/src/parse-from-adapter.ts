@@ -15,7 +15,9 @@
 import { sep } from 'node:path';
 
 import { isToolErrorLike, logger, projectRelativePath, scrubText } from '@opensip-cli/core';
-import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { readSourceFileGuarded } from '@opensip-cli/graph';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type { LanguageAdapter } from '@opensip-cli/core';

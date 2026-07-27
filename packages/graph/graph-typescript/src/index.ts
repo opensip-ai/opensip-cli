@@ -28,15 +28,11 @@
 import { relative, resolve, sep } from 'node:path';
 
 import { createToolError, isToolErrorLike } from '@opensip-cli/core';
-import {
-  graphErrorCatalog,
-  ownerEdgeKey,
-  resolveSpecifierToPackage,
-  throwIfGraphAdapterAborted,
-} from '@opensip-cli/graph';
+import { graphErrorCatalog, ownerEdgeKey, resolveSpecifierToPackage } from '@opensip-cli/graph';
 import ts from 'typescript';
 
 import { cacheKey as typescriptCacheKey } from './cache-key.js';
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { discoverFiles as discoverTypescriptFiles } from './discover.js';
 import {
   buildCrossPackageContext,
@@ -66,7 +62,6 @@ import type {
   DiscoverInput,
   DiscoverOutput,
   GraphLanguageAdapter,
-  GraphRunDegradation,
   PackageManifestIndex,
   ParseInput,
   ParseOutput,
@@ -77,6 +72,8 @@ import type {
   Catalog,
   CallEdge,
 } from '@opensip-cli/graph';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
 
 /**
  * Starter list of well-known side-effect primitives for the

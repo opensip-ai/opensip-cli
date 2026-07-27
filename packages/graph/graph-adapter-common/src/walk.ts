@@ -22,8 +22,9 @@
 import { sep } from 'node:path';
 
 import { isToolErrorLike, projectRelativePath, scrubText, withSpan } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type {

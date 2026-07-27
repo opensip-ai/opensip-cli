@@ -19,9 +19,9 @@ import {
   createMutableStats,
   ownerEdgeKey,
   pushCreationEdge as pushSharedCreationEdge,
-  throwIfGraphAdapterAborted,
 } from '@opensip-cli/graph';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { createResolutionTrace } from './edge-helpers/resolution-trace.js';
 import {
   buildImportBindingSourceIndex,
@@ -41,11 +41,13 @@ import type {
   CallEdge,
   Catalog,
   EdgeSink,
-  GraphDegradationCondition,
-  GraphRunDegradation,
   ResolutionStats,
+  ResolveOutput,
 } from '@opensip-cli/graph';
 import type ts from 'typescript';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
+type GraphDegradationCondition = GraphRunDegradation['condition'];
 
 export { isReturnValueDiscarded } from './edges-dispatch.js';
 

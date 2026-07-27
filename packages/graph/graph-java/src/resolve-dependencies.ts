@@ -9,7 +9,7 @@
  * Phase 4 of opensip's substrate consolidation (DEC-498).
  */
 
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph-adapter-common';
 
 import type {
   Catalog,

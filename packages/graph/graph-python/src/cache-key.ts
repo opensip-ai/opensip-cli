@@ -21,8 +21,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 
 import { logger, normalizeFailure } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
-import { hashConfig } from '@opensip-cli/graph-adapter-common';
+import { hashConfig, throwIfGraphAdapterAborted } from '@opensip-cli/graph-adapter-common';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
 

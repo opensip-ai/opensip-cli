@@ -26,7 +26,6 @@ import {
   packageGroupOf,
   resolveSpecifierToPackage,
   sortReasonCodes,
-  throwIfGraphAdapterAborted,
   type CrossFileReferenceFact,
   type DeclarationFact,
   type DeclarationKind,
@@ -39,6 +38,7 @@ import {
 } from '@opensip-cli/graph';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { unaliasSymbol } from './edge-helpers/unalias-symbol.js';
 
 import type { CrossPackageContext } from './edge-helpers/cross-package-context.js';

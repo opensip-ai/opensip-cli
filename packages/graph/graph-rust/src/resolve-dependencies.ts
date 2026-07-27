@@ -13,14 +13,16 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { logger, normalizeFailure } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph-adapter-common';
 
 import type {
   Catalog,
   DependencyEdge,
   DependencySiteRecord,
-  GraphRunDegradation,
+  ResolveOutput,
 } from '@opensip-cli/graph';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
 
 export interface RustDependencyResolution {
   readonly edgesByOwner: ReadonlyMap<string, readonly DependencyEdge[]>;
