@@ -19,11 +19,13 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
-import { throwIfGraphAdapterAborted } from '@opensip-cli/graph';
+import { createToolError, isToolErrorLike, logger, normalizeFailure } from '@opensip-cli/core';
+import { graphErrorCatalog, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import { glob, Ignore, type IgnoreLike } from 'glob';
 
 import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
+
+const ADAPTER_DISCOVERY_FAILED = graphErrorCatalog.require('GRAPH.ADAPTER.DISCOVERY_FAILED');
 
 /** Per-language inputs to the shared discover template. */
 export interface TreeSitterDiscoverConfig {
@@ -61,7 +63,7 @@ export function createDiscover(
     void logger;
     throwIfGraphAdapterAborted(input.signal, `${languageId} discovery`);
 
-    const projectDirAbs = normalizeProjectDir(input.cwd);
+    const projectDirAbs = normalizeProjectDir(input.cwd, languageId);
     const configPathAbs = resolveConfigPath(
       projectDirAbs,
       input.configPathOverride,
@@ -85,16 +87,14 @@ export function createDiscover(
   };
 }
 
-/* v8 ignore start */
-function normalizeProjectDir(projectDir: string): string {
+function normalizeProjectDir(projectDir: string, languageId: string): string {
   const abs = resolve(projectDir);
   try {
     return realpathSync(abs);
-  } catch {
-    return abs;
+  } catch (error) {
+    throw discoveryError(error, 'project-root-realpath', languageId);
   }
 }
-/* v8 ignore stop */
 
 function resolveConfigPath(
   projectDirAbs: string,
@@ -131,14 +131,19 @@ function collectFiles(
   languageId: string,
 ): readonly string[] {
   const ignore = buildIgnore(excludedDirGlobs, preserveExcludedPath);
-  const matches: string[] = glob.sync(pattern, {
-    cwd: projectDirAbs,
-    absolute: true,
-    ignore,
-    nodir: true,
-    follow: false,
-    dot: false,
-  });
+  let matches: string[];
+  try {
+    matches = glob.sync(pattern, {
+      cwd: projectDirAbs,
+      absolute: true,
+      ignore,
+      nodir: true,
+      follow: false,
+      dot: false,
+    });
+  } catch (error) {
+    throw discoveryError(error, 'source-walk', languageId);
+  }
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of matches) {
@@ -158,6 +163,21 @@ function collectFiles(
   }
   out.sort();
   return out;
+}
+
+/** Preserve registered native classifications; classify only unknown discovery I/O here. */
+function discoveryError(error: unknown, condition: string, languageId: string): Error {
+  if (isToolErrorLike(error)) return error;
+  const failure = normalizeFailure(error);
+  const definition = failure.known === 'known' ? failure.definition : ADAPTER_DISCOVERY_FAILED;
+  return createToolError(definition, 'Graph source discovery failed.', {
+    cause: error,
+    metadata: {
+      condition,
+      language: languageId,
+      ...(typeof failure.metadata.errno === 'string' ? { errno: failure.metadata.errno } : {}),
+    },
+  });
 }
 
 function buildIgnore(

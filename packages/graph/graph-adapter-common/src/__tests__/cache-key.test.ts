@@ -2,13 +2,14 @@
  * Focused tests for graph-adapter-common/cache-key.ts.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { logger } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeConfigCacheKey } from '../cache-key.js';
+import { hashConfig, makeConfigCacheKey } from '../cache-key.js';
 
 describe('makeConfigCacheKey — resolutionMode', () => {
   let dir: string;
@@ -44,5 +45,20 @@ describe('makeConfigCacheKey — resolutionMode', () => {
     expect(exact).not.toBe(fast);
     expect(exact.endsWith('-exact')).toBe(true);
     expect(fast.endsWith('-fast')).toBe(true);
+  });
+
+  it('keeps the unreadable sentinel while reporting its classified failure', () => {
+    const configDirectory = join(dir, 'not-a-file');
+    mkdirSync(configDirectory);
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    expect(hashConfig(configDirectory)).toBe(`unreadable:${configDirectory}`);
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.adapter.config_hash_degraded',
+        code: 'SYSTEM_ERROR',
+        condition: 'config-unreadable',
+      }),
+    );
   });
 });

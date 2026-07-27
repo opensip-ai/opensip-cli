@@ -263,6 +263,31 @@ export const graphErrorCatalog = defineErrorCatalog(
     },
 
     /**
+     * A language adapter could not enumerate the source tree for reasons that do not already
+     * have a Core native-error classification.
+     *
+     * Permission and resource exhaustion retain their existing Core definitions (D6). This
+     * definition is the adapter boundary for remaining filesystem failures such as a malformed
+     * link traversal. One code covers every graph language (D9); metadata identifies the
+     * language and discovery step without exposing the affected absolute path.
+     */
+    'GRAPH.ADAPTER.DISCOVERY_FAILED': {
+      code: 'GRAPH.ADAPTER.DISCOVERY_FAILED',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Inspect the discovery condition and OS errno, repair the source-tree filesystem problem, then retry the graph build.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'errno', 'language'],
+    },
+
+    /**
      * A shard-dependent operation has no trustworthy complete result.
      *
      * Ordinary graph runs do not throw this merely because one shard failed:
