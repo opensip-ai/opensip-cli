@@ -72,7 +72,7 @@ export function gvLayoutOptions(layoutId: string): Record<string, unknown> {
   return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 6000 };
 }
 
-function gvShowLayoutDegradation(
+function reportFailure(
   container: HTMLElement,
   message: string,
   condition: GraphLayoutDegradationCondition,
@@ -110,7 +110,7 @@ export function gvRunLayout(container: HTMLElement, layoutId: string): void {
     gvState.currentLayout = selectedLayout;
     gvSetLayoutSelection(container, selectedLayout);
     if (dagreUnavailable) {
-      gvShowLayoutDegradation(
+      reportFailure(
         container,
         'The layered layout is unavailable. The graph is using the built-in Cose layout.',
         registration.condition,
@@ -121,34 +121,26 @@ export function gvRunLayout(container: HTMLElement, layoutId: string): void {
   if (selectedLayout !== 'cose') {
     const fallbackAttempt = gvTryRunLayout(cy, 'cose');
     if (!fallbackAttempt.ok) {
-      gvShowLayoutDegradation(
-        container,
-        'The graph layout could not be updated.',
-        fallbackAttempt.condition,
-      );
+      reportFailure(container, 'The graph layout could not be updated.', fallbackAttempt.condition);
       return;
     }
     gvState.currentLayout = 'cose';
     gvSetLayoutSelection(container, 'cose');
-    gvShowLayoutDegradation(
+    reportFailure(
       container,
       'The selected layout could not run. The graph is using the built-in Cose layout.',
       selectedAttempt.condition,
     );
     return;
   }
-  gvShowLayoutDegradation(
-    container,
-    'The graph layout could not be updated.',
-    selectedAttempt.condition,
-  );
+  reportFailure(container, 'The graph layout could not be updated.', selectedAttempt.condition);
 }
 
 export function gvReportDagreUnavailable(
   container: HTMLElement,
   condition: GraphLayoutFailureCondition,
 ): void {
-  gvShowLayoutDegradation(
+  reportFailure(
     container,
     'The layered layout is unavailable. The graph is using the built-in Cose layout.',
     condition,
@@ -157,7 +149,7 @@ export function gvReportDagreUnavailable(
 
 export function gvReportLayoutInitializationFallback(container: HTMLElement): void {
   gvSetLayoutSelection(container, 'cose');
-  gvShowLayoutDegradation(
+  reportFailure(
     container,
     'The selected layout could not initialize. The graph is using the built-in Cose layout.',
     'layout-initialization-fallback',
