@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { makeStepRecord } from '../model/record.js';
 
-import { EVAL_REPORT_SCHEMA_VERSION, validateEvalReport } from './model.js';
+import { EVAL_REPORT_SCHEMA_VERSION, inspectEvalReport, validateEvalReport } from './model.js';
 
 import type { EvalReport } from './model.js';
 import type { StepRecord } from '../model/record.js';
@@ -238,5 +238,19 @@ describe('EvalReport model', () => {
 
   it.each(INVALID_REPORT_CASES)('rejects %s', (_label, mutate) => {
     expect(validateEvalReport(mutate(report()))).toBe(false);
+  });
+
+  it('identifies the invalid root or task field without retaining report values', () => {
+    expect(inspectEvalReport({ ...report(), contractFingerprint: 'sha256:nope' })).toEqual({
+      field: 'contractFingerprint',
+      ok: false,
+    });
+    expect(
+      inspectEvalReport(
+        withFirstStepFields(report(), {
+          failure: { code: 'future-failure', kind: 'protocol', message: 'secret detail' },
+        }),
+      ),
+    ).toEqual({ field: 'tasks[0].arms.opensip.record.legs[0].steps[0].failure', ok: false });
   });
 });

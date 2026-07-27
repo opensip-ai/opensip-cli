@@ -1,7 +1,7 @@
 import { lstat, mkdir, unlink, writeFile } from 'node:fs/promises';
 import { dirname, extname, join, parse } from 'node:path';
 
-import { validateEvalReport } from './report/model.js';
+import { inspectEvalReport } from './report/model.js';
 import { renderMarkdown } from './report/render-markdown.js';
 import { HarnessPrerequisiteError } from './runner/spawn.js';
 
@@ -268,8 +268,11 @@ export async function persistReport(
   defaultPath: string,
   fileSystem: ArtifactFileSystem,
 ): Promise<ArtifactPaths> {
-  if (!validateEvalReport(report)) {
-    throw new CliHarnessError('The harness produced an invalid report; no artifacts were written.');
+  const validation = inspectEvalReport(report);
+  if (!validation.ok) {
+    throw new CliHarnessError(
+      `The harness produced an invalid report at ${validation.field}; no artifacts were written.`,
+    );
   }
   const json = `${JSON.stringify(report, undefined, 2)}\n`;
   const markdown = renderMarkdown(report);

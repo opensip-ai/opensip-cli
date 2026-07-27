@@ -907,6 +907,7 @@ describe('main', () => {
     expect(existsSync(jsonPath)).toBe(false);
     expect(existsSync(markdownPathFor(jsonPath))).toBe(false);
     expect(harness.stderr()).toContain('invalid report');
+    expect(harness.stderr()).toContain('tasks[0].arms.control.record.taskId');
   });
 
   it('creates a missing requested directory before writing the complete pair', async () => {
