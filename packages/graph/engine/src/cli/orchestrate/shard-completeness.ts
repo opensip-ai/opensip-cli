@@ -26,6 +26,7 @@ function primaryFailureDetail(primary: ShardFailureEvidence | undefined): string
   const failureClass = primary.failureClass ?? 'unknown';
   let processResult = `exit ${String(primary.exitCode)}`;
   if (primary.signal !== undefined) processResult += `, signal ${primary.signal}`;
+  if (primary.errorCode !== undefined) processResult += `, code ${primary.errorCode}`;
   let detail = ` First failure: ${primary.shardId} (${failureClass}, ${processResult})`;
   if (primary.stderrTail === undefined || primary.stderrTail.length === 0) return `${detail}.`;
   detail += `: ${primary.stderrTail}`;
@@ -54,7 +55,11 @@ export function assertShardedBuildComplete(result: ShardCompletionEvidence): voi
     {
       code: BUILD_INCOMPLETE.code,
       definition: BUILD_INCOMPLETE,
-      metadata: { view: 'shard-failures' },
+      metadata: {
+        condition: 'shard-failures',
+        ...(primary?.errorCode === undefined ? {} : { errorCode: primary.errorCode }),
+        ...(primary === undefined ? {} : { shard: primary.shardId }),
+      },
       ...(primary?.failureClass === undefined ? {} : { failureClass: primary.failureClass }),
       ...(stderrTail === undefined ? {} : { stderrTail }),
     },

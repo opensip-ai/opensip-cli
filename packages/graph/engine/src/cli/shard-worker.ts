@@ -18,14 +18,17 @@
 
 import { readFileSync } from 'node:fs';
 
-import { EXIT_CODES } from '@opensip-cli/contracts';
+import { EXIT_CODES, mapFailureToExitCode } from '@opensip-cli/contracts';
 import {
   correlationFromEnv,
   currentLogger,
   currentScope,
   currentTraceparent,
+  normalizeFailure,
   REPO_OTEL_ATTR,
   TENANT_OTEL_ATTR,
+  toOperatorFailureProjection,
+  toWorkerFailureWire,
 } from '@opensip-cli/core';
 
 import { buildAgainstStableFiles } from '../cache/stable-files-build.js';
@@ -34,7 +37,11 @@ import { pickAdapter } from '../lang-adapter/registry.js';
 import { spanRunStage } from './graph-tracer.js';
 import { buildAndResolveCatalog } from './orchestrate/catalog-builder.js';
 
-import type { ShardBuildResult, ShardWorkerSpec } from './orchestrate/shard-model.js';
+import type {
+  ShardBuildResult,
+  ShardWorkerOutput,
+  ShardWorkerSpec,
+} from './orchestrate/shard-model.js';
 import type { DiscoverOutput } from '../lang-adapter/types.js';
 import type { Attributes, RunCorrelation, ToolCliContext } from '@opensip-cli/core';
 
@@ -148,8 +155,9 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
       ...workerLogFields(correlation),
     });
     const result = await buildShard(spec, correlation);
-    // Single write of the whole JSON document — the parent reads stdout to EOF.
-    process.stdout.write(JSON.stringify(result));
+    const output: ShardWorkerOutput = { kind: 'result', result };
+    // Raw-stream is the sanctioned bare-JSON worker seam; the parent reads it to EOF.
+    cli.emitRaw(output);
     workerLogger.info({
       evt: 'graph.shard.worker.complete',
       module: 'graph:shard-worker',
@@ -158,22 +166,20 @@ export async function executeShardWorker(specPath: string, cli: ToolCliContext):
     });
     cli.setExitCode(EXIT_CODES.SUCCESS);
   } catch (error) {
+    const failure = normalizeFailure(error);
     workerLogger.error({
       evt: 'graph.shard.worker.error',
       module: 'graph:shard-worker',
       ...workerLogFields(correlation),
       shardId,
-      err: error instanceof Error ? error.message : String(error),
-      // The child's own view of the failure class. The parent re-derives this
-      // from the exit/parse channel for the runner event; this is the worker's
-      // local attribution — a build throw is a non-zero exit from the parent's
-      // perspective.
-      failureClass: 'exit_nonzero',
+      failure: toOperatorFailureProjection(failure),
     });
-    process.stderr.write(
-      `graph-shard-worker [${shardId}]: ${error instanceof Error ? error.message : String(error)}\n`,
-    );
-    cli.setExitCode(EXIT_CODES.RUNTIME_ERROR);
+    const output: ShardWorkerOutput = {
+      kind: 'failure',
+      failure: toWorkerFailureWire(error),
+    };
+    cli.emitRaw(output);
+    cli.setExitCode(mapFailureToExitCode(error));
   }
 }
 

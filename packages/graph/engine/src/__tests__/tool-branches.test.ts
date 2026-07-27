@@ -35,7 +35,7 @@ import { graphTool } from '../tool.js';
 import { makeReportFailureMock } from './report-failure-mock.js';
 import { makeGraphTestScope } from './test-utils/with-graph-scope.js';
 
-import type { ShardBuildResult, ShardWorkerSpec } from '../cli/orchestrate/shard-model.js';
+import type { ShardWorkerOutput, ShardWorkerSpec } from '../cli/orchestrate/shard-model.js';
 import type {
   DiscoverOutput,
   GraphLanguageAdapter,
@@ -93,19 +93,21 @@ interface MockCliBag {
   readonly setExitCode: MockInstance;
   readonly renderLive: MockInstance;
   readonly render: MockInstance;
+  readonly emitRaw: MockInstance;
 }
 
 function makeMockCli(datastore?: DataStore): MockCliBag {
   const setExitCode = vi.fn();
   const renderLive = vi.fn().mockResolvedValue(undefined);
   const render = vi.fn().mockResolvedValue(undefined);
+  const emitRaw = vi.fn();
   const cli = {
     registerLiveView: vi.fn(),
     renderLive,
     render,
     setExitCode,
     emitJson: vi.fn(),
-    emitRaw: vi.fn(),
+    emitRaw,
     emitEnvelope: vi.fn(),
     emitError: vi.fn(),
     deliverSignals: vi.fn(() => Promise.resolve()),
@@ -120,7 +122,7 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
     scope: { datastore: () => datastore, languages: new LanguageRegistry() },
     reportFailure: makeReportFailureMock(setExitCode, render),
   } as unknown as ToolCliContext;
-  return { cli, setExitCode, renderLive, render };
+  return { cli, setExitCode, renderLive, render, emitRaw };
 }
 
 /** Force `process.stdout.isTTY` for one test, restoring the prior value after. */
@@ -315,12 +317,13 @@ describe('graph-shard-worker handler', () => {
       resolutionMode: 'exact',
     };
     writeFileSync(specPath, JSON.stringify(spec), 'utf8');
-    const { cli, setExitCode } = makeMockCli();
+    const { cli, setExitCode, emitRaw } = makeMockCli();
     await handlerFor('graph-shard-worker')({ _args: [specPath] }, cli);
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-    const result = JSON.parse(out) as ShardBuildResult;
-    expect(result.shardId).toBe('pkg:a');
+    expect(emitRaw).toHaveBeenCalledTimes(1);
+    const output = emitRaw.mock.calls[0]?.[0] as ShardWorkerOutput;
+    expect(output.kind).toBe('result');
+    expect(output.kind === 'result' ? output.result.shardId : undefined).toBe('pkg:a');
   });
 });
 

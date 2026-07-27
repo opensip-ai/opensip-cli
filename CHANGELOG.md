@@ -57,6 +57,8 @@ exit code are deliberately absent.
 | Graph command is cancelled outside the live worker                    |      1 |   130 | The static and auxiliary graph error boundary now maps the cancelled exit class canonically instead of flattening it to runtime exit 1.                                                  |
 | Graph workspace child returns malformed or absent JSON                |      0 |     1 | A child that exits successfully without a valid `SignalEnvelope` now faults the aggregate run instead of contributing an empty signal list and making that workspace unit false-green.   |
 | Graph workspace fan-out is cooperatively cancelled                    |      1 |   130 | The parent now stops scheduling units, terminates active children, and preserves the host-owned `CORE.SYSTEM.CANCELLED` definition.                                                      |
+| Graph shard worker cannot read its build specification                |      1 |     3 | The shard worker now preserves the structured not-found definition across its stdout wire and derives the child exit instead of hardcoding runtime exit 1.                               |
+| Graph shard worker is cooperatively cancelled                         |      1 |   130 | Shard-worker failures now use the canonical mapper, so `CORE.SYSTEM.CANCELLED` survives the subprocess boundary.                                                                         |
 
 #### Behaviour changes: MCP error codes are uniform (Plan 01)
 

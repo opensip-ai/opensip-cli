@@ -51,10 +51,13 @@ describe('assertShardedBuildComplete', () => {
       exitCode: 1,
       failureClass: 'exit_nonzero',
       signal: 'SIGKILL',
-      stderr: `${'x'.repeat(1200)}worker root cause`,
+      errorCode: 'GRAPH.CATALOG.UNREADABLE',
+      stderr: `${'x'.repeat(1200)}worker root cause api_key=supersecretvalue`,
     });
 
     expect(failure.stderrTail).toHaveLength(1000);
+    expect(failure.stderrTail).toContain('[redacted]');
+    expect(failure.stderrTail).not.toContain('supersecretvalue');
     expect(() =>
       assertShardedBuildComplete({
         failedShardIds: [failure.shardId],
@@ -65,7 +68,9 @@ describe('assertShardedBuildComplete', () => {
         code: 'GRAPH.BUILD.INCOMPLETE',
         failureClass: 'exit_nonzero',
         stderrTail: expect.stringContaining('worker root cause'),
-        message: expect.stringContaining('graph/graph-java (exit_nonzero, exit 1, signal SIGKILL)'),
+        message: expect.stringContaining(
+          'graph/graph-java (exit_nonzero, exit 1, signal SIGKILL, code GRAPH.CATALOG.UNREADABLE)',
+        ),
       }),
     );
   });

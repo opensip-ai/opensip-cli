@@ -130,7 +130,7 @@ export const graphErrorCatalog = defineErrorCatalog(
         'The graph build did not cover every source. Re-run `opensip graph` when the working tree is settled; the coverage fields report what was missed.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['condition'],
+      publicMetadataKeys: ['condition', 'errorCode', 'shard'],
     },
 
     /**
