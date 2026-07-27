@@ -7,20 +7,29 @@
  * within the Phase 0 budget so a careless version bump fails CI.
  */
 
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { dashboardCytoscapeVendorJs } from '../code-paths/cytoscape-vendor.js';
 
 /** Phase 0 raw-byte budget (matches scripts/vendor-cytoscape.mjs). */
 const BUDGET_KB = 600;
+const manifest = JSON.parse(
+  readFileSync(new URL('../../package.json', import.meta.url), 'utf8'),
+) as {
+  devDependencies: Readonly<Record<string, string>>;
+};
 
 describe('dashboardCytoscapeVendorJs', () => {
   it('starts with the vendor version-stamp banner', () => {
     const js = dashboardCytoscapeVendorJs();
     expect(js.startsWith('/*')).toBe(true);
     expect(js).toContain('VENDORED — DO NOT EDIT BY HAND.');
-    expect(js).toContain('cytoscape@');
-    expect(js).toContain('cytoscape-dagre@');
+    for (const name of ['cytoscape', 'cytoscape-dagre']) {
+      expect(js).toContain(`${name}@${manifest.devDependencies[name]}`);
+    }
+    expect(js).not.toContain('@unknown');
   });
 
   it('declares the cytoscape + cytoscapeDagre UMD globals', () => {
