@@ -177,8 +177,8 @@ export interface SpawnResult {
 
 /** Signals a missing local prerequisite that the operator can remedy. */
 export class HarnessPrerequisiteError extends Error {
-  public constructor(message: string) {
-    super(message);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'HarnessPrerequisiteError';
   }
 }
