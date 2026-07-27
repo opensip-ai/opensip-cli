@@ -49,7 +49,7 @@ export const resolvePropertyAccessCall: EdgeResolver<ts.CallExpression> = (node,
   const receiver = node.expression.expression;
   const bindingNames = ts.isIdentifier(receiver) ? [receiver.text] : [];
 
-  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const real = unaliasSymbol(symbol, ctx.typeChecker, ctx.recordResolutionDegradation);
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
     const sf = d.getSourceFile();

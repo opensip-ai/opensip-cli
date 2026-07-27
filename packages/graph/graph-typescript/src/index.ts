@@ -27,7 +27,7 @@
 
 import { relative, resolve, sep } from 'node:path';
 
-import { createToolError } from '@opensip-cli/core';
+import { createToolError, isToolErrorLike } from '@opensip-cli/core';
 import {
   graphErrorCatalog,
   ownerEdgeKey,
@@ -66,6 +66,7 @@ import type {
   DiscoverInput,
   DiscoverOutput,
   GraphLanguageAdapter,
+  GraphRunDegradation,
   PackageManifestIndex,
   ParseInput,
   ParseOutput,
@@ -237,10 +238,23 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
   // so method boundary calls are exact-tier only (the equivalence gate runs in
   // exact mode); imported-function boundary calls stay tier-independent.
   let resolveMethodTarget: MethodTargetResolver | undefined;
+  let degradedBoundarySites = 0;
   if (input.project.kind !== 'fast') {
     const checker = input.project.program.getTypeChecker();
-    resolveMethodTarget = (node): string | null =>
-      methodTargetFile(node, checker, input.projectDirAbs);
+    resolveMethodTarget = (node): string | null => {
+      let degraded = false;
+      try {
+        return methodTargetFile(node, checker, input.projectDirAbs, () => {
+          degraded = true;
+        });
+      } catch (error) {
+        if (isToolErrorLike(error)) throw error;
+        degraded = true;
+        return null;
+      } finally {
+        if (degraded) degradedBoundarySites += 1;
+      }
+    };
   }
   const boundaryCalls = extractBoundaryCalls(
     toTsCallSites(input.callSites),
@@ -249,7 +263,11 @@ async function resolveCallSitesAdapter(input: ResolveInput<TsParsed>): Promise<R
     resolveMethodTarget,
   );
   throwIfGraphAdapterAborted(input.signal, 'TypeScript boundary resolution');
-  return { ...base, boundaryCalls };
+  return {
+    ...base,
+    boundaryCalls,
+    degradations: addExactResolutionDegradation(base.degradations, degradedBoundarySites),
+  };
 }
 
 async function resolveCallSitesExact(
@@ -317,6 +335,7 @@ async function resolveCallSitesExact(
     edgesByOwner: collectByOwner(result.catalog),
     dependenciesByOwner,
     semanticFacts,
+    degradations: result.degradations,
     stats: result.resolutionStats,
   };
 }
@@ -359,8 +378,33 @@ async function resolveCallSitesFast(
   });
   return {
     edgesByOwner: collectByOwner(result.catalog),
+    degradations: result.degradations,
     stats: result.resolutionStats,
   };
+}
+
+function addExactResolutionDegradation(
+  values: readonly GraphRunDegradation[] | undefined,
+  count: number,
+): readonly GraphRunDegradation[] {
+  if (count === 0) return values ?? [];
+  const output = [...(values ?? [])];
+  const index = output.findIndex(
+    (value) =>
+      value.errorCode === 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED' &&
+      value.condition === 'typescript-exact-resolution',
+  );
+  if (index === -1) {
+    output.push({
+      errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+      condition: 'typescript-exact-resolution',
+      count,
+    });
+  } else {
+    const current = output[index];
+    if (current !== undefined) output[index] = { ...current, count: current.count + count };
+  }
+  return output;
 }
 
 /**

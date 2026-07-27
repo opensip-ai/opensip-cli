@@ -98,7 +98,13 @@ describe('buildGraphEnvelope', () => {
     const env = buildGraphEnvelope({
       ...BASE,
       signals: [],
-      degradations: [{ condition: 'parse-errors', count: 2 }],
+      degradations: [
+        {
+          errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+          condition: 'parse-errors',
+          count: 2,
+        },
+      ],
     });
 
     expect(env.verdict).toMatchObject({ passed: false, faulted: false });
@@ -117,7 +123,13 @@ describe('buildGraphEnvelope', () => {
   });
 
   it('honours failOnDegraded independently of the warning threshold', () => {
-    const degradation = [{ condition: 'parse-errors' as const, count: 1 }];
+    const degradation = [
+      {
+        errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE' as const,
+        condition: 'parse-errors' as const,
+        count: 1,
+      },
+    ];
     const markerOnly = withGraphConfig({ failOnDegraded: false, failOnWarnings: 1 }, () =>
       buildGraphEnvelope({ ...BASE, signals: [], degradations: degradation }),
     );
@@ -131,6 +143,27 @@ describe('buildGraphEnvelope', () => {
       }),
     );
     expect(realWarning.verdict.passed).toBe(false);
+  });
+
+  it('retains a condition-specific registered degradation code', () => {
+    const env = buildGraphEnvelope({
+      ...BASE,
+      signals: [],
+      degradations: [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition: 'typescript-exact-resolution',
+          count: 4,
+        },
+      ],
+    });
+
+    expect(env.signals[0]?.metadata).toMatchObject({
+      degradation: true,
+      errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+      condition: 'typescript-exact-resolution',
+      count: 4,
+    });
   });
 
   it('threads genuine pre-unit faults separately from degradation', () => {

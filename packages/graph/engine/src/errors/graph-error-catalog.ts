@@ -262,6 +262,40 @@ export const graphErrorCatalog = defineErrorCatalog(
       publicMetadataKeys: ['condition', 'count'],
     },
 
+    /** One or more TypeScript call sites were omitted after a contained resolver fault. */
+    'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED': {
+      code: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Inspect the resolution condition and report a reproducible graph adapter fault.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'count'],
+    },
+
+    /** A language manifest could not be read while deriving dependency edges. */
+    'GRAPH.ADAPTER.MANIFEST_UNREADABLE': {
+      code: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'I/O',
+      retry: CALLER_POLICY_RETRY,
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Restore access to the language manifest or exclude the affected package, then rebuild the graph.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'count'],
+    },
+
     /**
      * A language adapter could not enumerate the source tree for reasons that do not already
      * have a Core native-error classification.

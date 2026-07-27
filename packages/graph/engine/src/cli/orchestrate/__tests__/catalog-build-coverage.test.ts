@@ -141,6 +141,35 @@ describe('catalogBuildCoverage', () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it('persists registered post-parse degradation and marks coverage partial', () => {
+    const root = mkdtempSync(join(tmpdir(), 'graph-build-coverage-degraded-'));
+    roots.push(root);
+
+    expect(
+      catalogBuildCoverage({
+        projectRoot: root,
+        files: [],
+        parseErrors: [],
+        degradations: [
+          {
+            errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+            condition: 'typescript-exact-resolution',
+            count: 3,
+          },
+        ],
+      }),
+    ).toMatchObject({
+      status: 'partial',
+      degradations: [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition: 'typescript-exact-resolution',
+          count: 3,
+        },
+      ],
+    });
+  });
+
   it('degrades a missing project root without masking the graph result', () => {
     const missingRoot = join(tmpdir(), `graph-build-coverage-missing-${String(Date.now())}`);
 

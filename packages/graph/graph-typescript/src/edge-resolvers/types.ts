@@ -41,6 +41,8 @@ export interface ResolverContext {
   readonly importSpecifiers: ReadonlyMap<string, string>;
   /** Optional bounded trace sink created once by the enclosing resolution pass. */
   readonly resolutionTrace?: ResolutionTraceSink;
+  /** Marks the current call site degraded after a contained checker fallback. */
+  readonly recordResolutionDegradation?: () => void;
 }
 
 export type EdgeResolver<N extends ts.Node = ts.Node> = (

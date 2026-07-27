@@ -147,6 +147,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
         projectRoot: input.projectRoot,
         files: input.discovery.files,
         parseErrors: built.parseErrors,
+        degradations: built.degradations,
         // Wave 4 incremental rebuild is byte-identical to a `--no-cache` full
         // rebuild (see `buildAndResolveCatalogIncremental`'s correctness note
         // and docs/public/40-graph/01-stages-and-catalog.md#incremental-rebuild):

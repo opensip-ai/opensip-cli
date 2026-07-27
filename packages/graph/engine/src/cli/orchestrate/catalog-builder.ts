@@ -29,6 +29,7 @@ import type {
   CrossBoundaryCall,
   DependencyEdge,
   FunctionOccurrence,
+  GraphRunDegradation,
   ParseError,
   ReExportRecord,
   ResolutionMode,
@@ -105,6 +106,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  readonly degradations: readonly GraphRunDegradation[];
 }> {
   const {
     runStage,
@@ -193,6 +195,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
+    degradations: resolved.degradations ?? [],
   };
 }
 
@@ -241,6 +244,7 @@ export async function buildAndResolveCatalogIncremental(
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  readonly degradations: readonly GraphRunDegradation[];
 }> {
   const {
     runStage,
@@ -364,6 +368,7 @@ export async function buildAndResolveCatalogIncremental(
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
+    degradations: resolved.degradations ?? [],
   };
 }
 

@@ -73,6 +73,29 @@ export type ResolutionMode = 'exact' | 'fast';
  */
 export type CatalogEngineMode = 'exact' | 'sharded';
 
+/** Closed D9 condition vocabulary for graph coverage degradation. */
+export type GraphDegradationCondition =
+  | 'catalog-coverage-partial'
+  | 'go-module-manifest'
+  | 'parse-errors'
+  | 'rust-cargo-manifest'
+  | 'shard-failures'
+  | 'typescript-exact-resolution'
+  | 'typescript-syntactic-resolution';
+
+/** Registered definition codes that can present graph degradation evidence. */
+export type GraphDegradationErrorCode =
+  | 'GRAPH.ADAPTER.MANIFEST_UNREADABLE'
+  | 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED'
+  | 'GRAPH.CATALOG.PARTIAL_COVERAGE';
+
+/** Plain-data coverage evidence that survives graph worker and cache boundaries. */
+export interface GraphRunDegradation {
+  readonly errorCode: GraphDegradationErrorCode;
+  readonly condition: GraphDegradationCondition;
+  readonly count: number;
+}
+
 /** Bounded producer coverage retained so warm context reads stay honest. */
 export interface CatalogBuildCoverage {
   /** Complete only when every canonical input went through a fully evidenced build. */
@@ -83,6 +106,8 @@ export interface CatalogBuildCoverage {
   readonly parseErrorFiles: number;
   /** SHA-256 identity of the exact normalized project-relative input set. */
   readonly filesIdentity: string;
+  /** Bounded registered degradation evidence produced after parse/walk. */
+  readonly degradations?: readonly GraphRunDegradation[];
 }
 
 /**

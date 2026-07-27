@@ -245,5 +245,6 @@ async function buildShard(
     fingerprint: stableBuild.filesFingerprint,
     boundaryCalls: built.boundaryCalls ?? [],
     parseErrors: built.parseErrors,
+    ...(built.degradations.length === 0 ? {} : { degradations: built.degradations }),
   };
 }

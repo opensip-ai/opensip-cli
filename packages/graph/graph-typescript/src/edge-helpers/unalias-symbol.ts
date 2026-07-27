@@ -8,7 +8,11 @@
 
 import ts from 'typescript';
 
-export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Symbol {
+export function unaliasSymbol(
+  symbol: ts.Symbol,
+  checker: ts.TypeChecker,
+  onFailure?: () => void,
+): ts.Symbol {
   let current = symbol;
   // Cap iterations defensively; realistic chains are 1–2 hops.
   /* v8 ignore start */
@@ -19,6 +23,8 @@ export function unaliasSymbol(symbol: ts.Symbol, checker: ts.TypeChecker): ts.Sy
       if (next === current) return current;
       current = next;
     } catch {
+      // @swallow-ok decline-beats-guess fallback; the enclosing producer records degradation
+      onFailure?.();
       return current;
     }
   }

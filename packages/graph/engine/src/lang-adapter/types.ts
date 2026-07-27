@@ -23,6 +23,7 @@ import type {
   DependencyForm,
   DependencyRole,
   FunctionOccurrence,
+  GraphRunDegradation,
   ParseError,
   ReExportRecord,
   ResolutionMode,
@@ -272,6 +273,8 @@ export interface ResolveOutput {
    * (possibly empty); fast mode and non-emitting adapters omit the field.
    */
   readonly semanticFacts?: SemanticFactBundle;
+  /** Registered, non-fatal analysis omissions governed by `failOnDegraded`. */
+  readonly degradations?: readonly GraphRunDegradation[];
   readonly stats: ResolutionStats;
 }
 

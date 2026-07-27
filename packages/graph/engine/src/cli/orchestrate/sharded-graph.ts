@@ -264,6 +264,7 @@ async function buildShardedGraph(
       projectRoot,
       files: allFiles,
       parseErrors: fragments.flatMap((fragment) => fragment.parseErrors),
+      degradations: fragments.flatMap((fragment) => fragment.degradations ?? []),
       status: built.failures.length === 0 ? 'complete' : 'partial',
     }),
   };

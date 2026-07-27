@@ -28,11 +28,12 @@ export function methodTargetFile(
   node: ts.Node,
   checker: ts.TypeChecker,
   projectDirAbs: string,
+  onDegraded?: () => void,
 ): string | null {
   if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return null;
   const symbol = checker.getSymbolAtLocation(node.expression);
   if (!symbol) return null;
-  const real = unaliasSymbol(symbol, checker);
+  const real = unaliasSymbol(symbol, checker, onDegraded);
   for (const d of real.getDeclarations() ?? []) {
     const sf = d.getSourceFile();
     // A SOURCE decl means the method lives in a file the in-shard/inline pass can

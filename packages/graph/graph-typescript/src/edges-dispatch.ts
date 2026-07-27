@@ -168,7 +168,7 @@ const CALLABLE_DECL =
 function symbolHasInProjectSourceDecl(calleeExpr: ts.Expression, ctx: ResolverContext): boolean {
   const symbol = ctx.typeChecker.getSymbolAtLocation(calleeExpr);
   if (!symbol) return false;
-  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const real = unaliasSymbol(symbol, ctx.typeChecker, ctx.recordResolutionDegradation);
   for (const d of real.getDeclarations() ?? []) {
     if (
       !d.getSourceFile().isDeclarationFile &&

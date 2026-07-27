@@ -34,7 +34,7 @@ export const resolveDirectCall: EdgeResolver<ts.CallExpression> = (node, ctx) =>
   const symbol = ctx.typeChecker.getSymbolAtLocation(node.expression);
   if (!symbol) return UNRESOLVED;
 
-  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const real = unaliasSymbol(symbol, ctx.typeChecker, ctx.recordResolutionDegradation);
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
     const sf = d.getSourceFile();

@@ -277,7 +277,9 @@ function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx, depth = 0): v
       ctx.coverage.emittedDeclarations++;
       const sym = symbolOfDeclaration(node, ctx.checker, ctx.coverage);
       if (sym !== undefined) {
-        const real = unaliasSymbol(sym, ctx.checker);
+        const real = unaliasSymbol(sym, ctx.checker, () => {
+          ctx.coverage.reasons.push('semantic-checker-fault');
+        });
         if (!ctx.declBySymbol.has(real)) ctx.declBySymbol.set(real, { fact, symbol: real });
       }
     }
@@ -406,7 +408,9 @@ function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
     return;
   }
 
-  const real = unaliasSymbol(symbol, file.checker);
+  const real = unaliasSymbol(symbol, file.checker, () => {
+    file.coverage.reasons.push('semantic-checker-fault');
+  });
   const span = nodeSpan(id, file.sourceFile, file.limits, file.coverage);
   if (span === undefined) {
     file.coverage.omittedReferences++;

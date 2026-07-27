@@ -5,7 +5,9 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { compareCodePoint } from '@opensip-cli/contracts';
 import { currentLogger, tryCatch } from '@opensip-cli/core';
 
-import type { CatalogBuildCoverage, ParseError } from '../../types.js';
+import { mergeGraphDegradations } from '../../degradation.js';
+
+import type { CatalogBuildCoverage, GraphRunDegradation, ParseError } from '../../types.js';
 
 const MODULE_NAME = 'graph:catalog-build-coverage';
 
@@ -74,6 +76,7 @@ export function catalogBuildCoverage(input: {
   readonly files: readonly string[];
   readonly parseErrors: readonly ParseError[];
   readonly status?: CatalogBuildCoverage['status'];
+  readonly degradations?: readonly GraphRunDegradation[];
 }): CatalogBuildCoverage {
   let status = input.status ?? 'complete';
   let canonicalRoot = resolve(input.projectRoot);
@@ -110,10 +113,13 @@ export function catalogBuildCoverage(input: {
       .filter((file): file is string => file !== undefined)
       .filter((file) => fileSet.has(file)),
   );
+  const degradations = mergeGraphDegradations([input.degradations ?? []]);
+  if (degradations.length > 0) status = 'partial';
   return {
     status,
     discoveredFiles: fileSet.size,
     parseErrorFiles: parseErrorFiles.size,
     filesIdentity: graphInputFilesIdentity(relativeFiles),
+    ...(degradations.length === 0 ? {} : { degradations }),
   };
 }

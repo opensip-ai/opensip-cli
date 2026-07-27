@@ -24,7 +24,13 @@
 // because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
 // emits it — only the adapter can extract a callee name syntactically.
 // Consumers import it from `../../types.js` (or the package barrel) directly.
-import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
+import type {
+  Catalog,
+  CrossBoundaryCall,
+  GraphRunDegradation,
+  ParseError,
+  ResolutionMode,
+} from '../../types.js';
 import type { RunCorrelation, WorkerFailureWire } from '@opensip-cli/core';
 
 /** Bounded, serializable evidence retained when a shard worker fails. */
@@ -122,6 +128,8 @@ export interface ShardBuildResult {
    */
   readonly boundaryCalls: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  /** Optional for parent/worker compatibility with pre-migration fragments. */
+  readonly degradations?: readonly GraphRunDegradation[];
 }
 
 /** Versioned shard-worker stdout carrier; the parent also reads legacy bare results. */

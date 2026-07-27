@@ -195,7 +195,8 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
           key !== 'status' &&
           key !== 'discoveredFiles' &&
           key !== 'parseErrorFiles' &&
-          key !== 'filesIdentity',
+          key !== 'filesIdentity' &&
+          key !== 'degradations',
       ) ||
       (payload.buildCoverage.status !== 'complete' && payload.buildCoverage.status !== 'partial') ||
       !Number.isSafeInteger(payload.buildCoverage.discoveredFiles) ||
@@ -205,7 +206,11 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
       (payload.buildCoverage.parseErrorFiles as number) >
         (payload.buildCoverage.discoveredFiles as number) ||
       typeof payload.buildCoverage.filesIdentity !== 'string' ||
-      !/^sha256:[a-f0-9]{64}$/u.test(payload.buildCoverage.filesIdentity))
+      !/^sha256:[a-f0-9]{64}$/u.test(payload.buildCoverage.filesIdentity) ||
+      !isSafeGraphDegradations(payload.buildCoverage.degradations) ||
+      (Array.isArray(payload.buildCoverage.degradations) &&
+        payload.buildCoverage.degradations.length > 0 &&
+        payload.buildCoverage.status !== 'partial'))
   ) {
     throw new Error('Malformed catalog build coverage');
   }
@@ -390,7 +395,8 @@ function validateShardBuildResult(
     value.fragment.language !== row.language ||
     value.fragment.cacheKey !== row.cacheKey ||
     !isSafeBoundaryCalls(value.boundaryCalls) ||
-    !isSafeParseErrors(value.parseErrors)
+    !isSafeParseErrors(value.parseErrors) ||
+    !isSafeGraphDegradations(value.degradations)
   ) {
     throw new Error('Malformed shard fragment payload');
   }
@@ -445,6 +451,45 @@ function isSafeParseErrorCode(value: unknown): boolean {
     value === 'GRAPH.TS.WALK_FAULT'
   );
 }
+
+function isSafeGraphDegradations(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.length <= 20 &&
+      value.every((entry) => isSafeGraphDegradation(entry)))
+  );
+}
+
+function isSafeGraphDegradation(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).some((key) => !DEGRADATION_KEYS.has(key))) {
+    return false;
+  }
+  if (!Number.isSafeInteger(value.count) || (value.count as number) <= 0) return false;
+  switch (value.errorCode) {
+    case 'GRAPH.CATALOG.PARTIAL_COVERAGE': {
+      return (
+        value.condition === 'catalog-coverage-partial' ||
+        value.condition === 'parse-errors' ||
+        value.condition === 'shard-failures'
+      );
+    }
+    case 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED': {
+      return (
+        value.condition === 'typescript-exact-resolution' ||
+        value.condition === 'typescript-syntactic-resolution'
+      );
+    }
+    case 'GRAPH.ADAPTER.MANIFEST_UNREADABLE': {
+      return value.condition === 'go-module-manifest' || value.condition === 'rust-cargo-manifest';
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+const DEGRADATION_KEYS = new Set(['condition', 'count', 'errorCode']);
 
 function isOptionalCatalogText(value: unknown): boolean {
   return value === undefined || isSafeCatalogText(value);

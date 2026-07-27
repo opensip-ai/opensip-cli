@@ -215,6 +215,12 @@ describe('buildLiveGraphOutput', () => {
         tmpdir(),
       ),
     );
-    expect(out.degradations).toEqual([{ condition: 'parse-errors', count: 2 }]);
+    expect(out.degradations).toEqual([
+      {
+        errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+        condition: 'parse-errors',
+        count: 2,
+      },
+    ]);
   });
 });

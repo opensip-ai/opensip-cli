@@ -14,7 +14,7 @@
 
 import { relative, sep } from 'node:path';
 
-import { logger, yieldToEventLoop } from '@opensip-cli/core';
+import { isToolErrorLike, logger, yieldToEventLoop } from '@opensip-cli/core';
 import {
   createMutableStats,
   ownerEdgeKey,
@@ -35,9 +35,16 @@ import {
 import { computeVerdict, pushCallEdge, rebuildCatalog, tsPosition } from './edges-dispatch.js';
 
 import type { CrossPackageContext } from './edge-helpers/cross-package-context.js';
-import type { ResolverContext } from './edge-resolvers/types.js';
+import type { ResolutionTraceSink, ResolverContext } from './edge-resolvers/types.js';
 import type { CallSiteRecord } from './walk.js';
-import type { CallEdge, Catalog, ResolutionStats } from '@opensip-cli/graph';
+import type {
+  CallEdge,
+  Catalog,
+  EdgeSink,
+  GraphDegradationCondition,
+  GraphRunDegradation,
+  ResolutionStats,
+} from '@opensip-cli/graph';
 import type ts from 'typescript';
 
 export { isReturnValueDiscarded } from './edges-dispatch.js';
@@ -47,6 +54,7 @@ const YIELD_EVERY_CALL_SITES = 250;
 export interface EdgeResolutionOutput {
   readonly catalog: Catalog;
   readonly resolutionStats: ResolutionStats;
+  readonly degradations: readonly GraphRunDegradation[];
 }
 
 export interface EdgeResolutionFromRecordsInput {
@@ -74,9 +82,16 @@ export async function resolveEdgesFromRecords(
   const stats = createMutableStats();
   const sink = { edgesByOwner: callsByHash, stats };
 
-  const crossPackage = input.crossPackage;
   const resolutionTrace = createResolutionTrace();
   const importSpecifiersByFile = new Map<ts.SourceFile, ReadonlyMap<string, string>>();
+  const state: ExactResolutionState = {
+    input,
+    checker,
+    sink,
+    importSpecifiersByFile,
+    resolutionTrace,
+  };
+  let degradedCallSites = 0;
 
   let processed = 0;
   for (const r of input.callSites) {
@@ -85,35 +100,7 @@ export async function resolveEdgesFromRecords(
       throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
     }
     processed += 1;
-    const ownerKey = ownerEdgeKey(
-      r.ownerHash,
-      relative(input.projectDirAbs, r.sourceFile.fileName).split(sep).join('/'),
-      r.ownerLine,
-      r.ownerColumn,
-    );
-    if (r.kind === 'creation') {
-      if (r.childHash === undefined) continue;
-      pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
-      continue;
-    }
-    let importSpecifiers = importSpecifiersByFile.get(r.sourceFile);
-    if (importSpecifiers === undefined) {
-      importSpecifiers = buildImportSpecifierIndex(r.sourceFile);
-      importSpecifiersByFile.set(r.sourceFile, importSpecifiers);
-    }
-    const ctx: ResolverContext = {
-      catalog: input.catalog,
-      program: input.program,
-      typeChecker: checker,
-      sourceFile: r.sourceFile,
-      projectDirAbs: input.projectDirAbs,
-      crossPackage,
-      importSpecifiers,
-      resolutionTrace,
-    };
-    const verdict = computeVerdict(r.node, ctx);
-    if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
+    if (resolveExactRecord(r, state)) degradedCallSites += 1;
   }
 
   throwIfGraphAdapterAborted(input.signal, 'TypeScript exact call resolution');
@@ -128,9 +115,14 @@ export async function resolveEdgesFromRecords(
     resolvedMedium: stats.resolvedMedium,
     resolvedLow: stats.resolvedLow,
     unresolved: stats.unresolved,
+    degradedCallSites,
   });
 
-  return { catalog: newCatalog, resolutionStats: stats };
+  return {
+    catalog: newCatalog,
+    resolutionStats: stats,
+    degradations: resolutionDegradations('typescript-exact-resolution', degradedCallSites),
+  };
 }
 
 export interface EdgeResolutionSyntacticInput {
@@ -151,6 +143,14 @@ export async function resolveEdgesSyntactic(
   const knownFiles = collectKnownFiles(input.catalog);
   const importIndexByFile = new Map<ts.SourceFile, ImportIndex>();
   const importBindingsByFile = new Map<ts.SourceFile, ReadonlyMap<string, ImportBindingSource>>();
+  const state: SyntacticResolutionState = {
+    input,
+    sink,
+    knownFiles,
+    importIndexByFile,
+    importBindingsByFile,
+  };
+  let degradedCallSites = 0;
 
   let processed = 0;
   for (const r of input.callSites) {
@@ -159,38 +159,7 @@ export async function resolveEdgesSyntactic(
       throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
     }
     processed += 1;
-    const ownerKey = ownerEdgeKey(
-      r.ownerHash,
-      relative(input.projectDirAbs, r.sourceFile.fileName).split(sep).join('/'),
-      r.ownerLine,
-      r.ownerColumn,
-    );
-    if (r.kind === 'creation') {
-      if (r.childHash === undefined) continue;
-      pushSharedCreationEdge(tsPosition(r.node, r.sourceFile), ownerKey, r.childHash, sink);
-      continue;
-    }
-    let importIndex = importIndexByFile.get(r.sourceFile);
-    if (importIndex === undefined) {
-      importIndex = buildImportIndex(r.sourceFile, input.projectDirAbs, knownFiles);
-      importIndexByFile.set(r.sourceFile, importIndex);
-    }
-    let importBindings = importBindingsByFile.get(r.sourceFile);
-    if (importBindings === undefined) {
-      importBindings = buildImportBindingSourceIndex(r.sourceFile);
-      importBindingsByFile.set(r.sourceFile, importBindings);
-    }
-    const currentFileRel = relative(input.projectDirAbs, r.sourceFile.fileName)
-      .split(sep)
-      .join('/');
-    const verdict = resolveSyntactic(r.node, {
-      catalog: input.catalog,
-      currentFileRel,
-      importIndex,
-      importBindings,
-    });
-    if (verdict === null) continue;
-    pushCallEdge(r.node, r.sourceFile, verdict, ownerKey, sink);
+    if (resolveSyntacticRecord(r, state)) degradedCallSites += 1;
   }
 
   throwIfGraphAdapterAborted(input.signal, 'TypeScript syntactic call resolution');
@@ -204,7 +173,156 @@ export async function resolveEdgesSyntactic(
     resolvedMedium: stats.resolvedMedium,
     resolvedLow: stats.resolvedLow,
     unresolved: stats.unresolved,
+    degradedCallSites,
   });
 
-  return { catalog: newCatalog, resolutionStats: stats };
+  return {
+    catalog: newCatalog,
+    resolutionStats: stats,
+    degradations: resolutionDegradations('typescript-syntactic-resolution', degradedCallSites),
+  };
+}
+
+interface ExactResolutionState {
+  readonly input: EdgeResolutionFromRecordsInput;
+  readonly checker: ts.TypeChecker;
+  readonly sink: EdgeSink;
+  readonly importSpecifiersByFile: Map<ts.SourceFile, ReadonlyMap<string, string>>;
+  readonly resolutionTrace?: ResolutionTraceSink;
+}
+
+function resolveExactRecord(record: CallSiteRecord, state: ExactResolutionState): boolean {
+  const ownerKey = callSiteOwnerKey(record, state.input.projectDirAbs);
+  if (record.kind === 'creation') {
+    pushCreationRecord(record, ownerKey, state.sink);
+    return false;
+  }
+  let importSpecifiers = state.importSpecifiersByFile.get(record.sourceFile);
+  if (importSpecifiers === undefined) {
+    importSpecifiers = buildImportSpecifierIndex(record.sourceFile);
+    state.importSpecifiersByFile.set(record.sourceFile, importSpecifiers);
+  }
+  let degraded = false;
+  const ctx: ResolverContext = {
+    catalog: state.input.catalog,
+    program: state.input.program,
+    typeChecker: state.checker,
+    sourceFile: record.sourceFile,
+    projectDirAbs: state.input.projectDirAbs,
+    crossPackage: state.input.crossPackage,
+    importSpecifiers,
+    resolutionTrace: state.resolutionTrace,
+    recordResolutionDegradation: () => {
+      degraded = true;
+    },
+  };
+  try {
+    const verdict = computeVerdict(record.node, ctx);
+    if (verdict !== null)
+      pushCallEdge(record.node, record.sourceFile, verdict, ownerKey, state.sink);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    degraded = true;
+    state.sink.stats.totalCallSites += 1;
+    state.sink.stats.unresolved += 1;
+  }
+  return degraded;
+}
+
+interface SyntacticResolutionState {
+  readonly input: EdgeResolutionSyntacticInput;
+  readonly sink: EdgeSink;
+  readonly knownFiles: ReadonlySet<string>;
+  readonly importIndexByFile: Map<ts.SourceFile, ImportIndex>;
+  readonly importBindingsByFile: Map<ts.SourceFile, ReadonlyMap<string, ImportBindingSource>>;
+}
+
+function resolveSyntacticRecord(record: CallSiteRecord, state: SyntacticResolutionState): boolean {
+  const ownerKey = callSiteOwnerKey(record, state.input.projectDirAbs);
+  if (record.kind === 'creation') {
+    pushCreationRecord(record, ownerKey, state.sink);
+    return false;
+  }
+  const importIndex = cachedImportIndex(record.sourceFile, state);
+  const importBindings = cachedImportBindings(record.sourceFile, state);
+  const currentFileRel = relative(state.input.projectDirAbs, record.sourceFile.fileName)
+    .split(sep)
+    .join('/');
+  try {
+    const verdict = resolveSyntactic(record.node, {
+      catalog: state.input.catalog,
+      currentFileRel,
+      importIndex,
+      importBindings,
+    });
+    if (verdict !== null)
+      pushCallEdge(record.node, record.sourceFile, verdict, ownerKey, state.sink);
+    return false;
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    state.sink.stats.totalCallSites += 1;
+    state.sink.stats.unresolved += 1;
+    return true;
+  }
+}
+
+function cachedImportIndex(
+  sourceFile: ts.SourceFile,
+  state: SyntacticResolutionState,
+): ImportIndex {
+  let value = state.importIndexByFile.get(sourceFile);
+  if (value === undefined) {
+    value = buildImportIndex(sourceFile, state.input.projectDirAbs, state.knownFiles);
+    state.importIndexByFile.set(sourceFile, value);
+  }
+  return value;
+}
+
+function cachedImportBindings(
+  sourceFile: ts.SourceFile,
+  state: SyntacticResolutionState,
+): ReadonlyMap<string, ImportBindingSource> {
+  let value = state.importBindingsByFile.get(sourceFile);
+  if (value === undefined) {
+    value = buildImportBindingSourceIndex(sourceFile);
+    state.importBindingsByFile.set(sourceFile, value);
+  }
+  return value;
+}
+
+function callSiteOwnerKey(record: CallSiteRecord, projectDirAbs: string): string {
+  return ownerEdgeKey(
+    record.ownerHash,
+    relative(projectDirAbs, record.sourceFile.fileName).split(sep).join('/'),
+    record.ownerLine,
+    record.ownerColumn,
+  );
+}
+
+function pushCreationRecord(record: CallSiteRecord, ownerKey: string, sink: EdgeSink): void {
+  if (record.childHash === undefined) return;
+  pushSharedCreationEdge(
+    tsPosition(record.node, record.sourceFile),
+    ownerKey,
+    record.childHash,
+    sink,
+  );
+}
+
+function resolutionDegradations(
+  condition: Extract<
+    GraphDegradationCondition,
+    'typescript-exact-resolution' | 'typescript-syntactic-resolution'
+  >,
+  count: number,
+): readonly GraphRunDegradation[] {
+  return count === 0
+    ? []
+    : [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition,
+          count,
+        },
+      ];
 }

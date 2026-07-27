@@ -93,6 +93,13 @@ describe('CatalogRepo shard-fragment cache', () => {
           code: 'GRAPH.TS.SOURCE_UNREADABLE',
         },
       ],
+      degradations: [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition: 'typescript-exact-resolution',
+          count: 2,
+        },
+      ],
     };
     repo.upsertShardFragment(populated);
 
@@ -151,6 +158,19 @@ describe('CatalogRepo shard-fragment cache', () => {
     [
       'parse-error container',
       (valid: ShardBuildResult) => ({ ...valid, parseErrors: [{ filePath: 'a.ts' }] }),
+    ],
+    [
+      'degradation code-condition mismatch',
+      (valid: ShardBuildResult) => ({
+        ...valid,
+        degradations: [
+          {
+            errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+            condition: 'typescript-exact-resolution',
+            count: 1,
+          },
+        ],
+      }),
     ],
   ])('rejects a malformed %s', (_label, mutate) => {
     const valid = result('pkg:a', 'key-1', 'fp-1');

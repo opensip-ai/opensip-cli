@@ -32,11 +32,7 @@ import { buildSignalEnvelope } from '@opensip-cli/contracts';
 import { isErrorSignal, resolveFailOnDegraded, resolveVerdictPolicy } from '@opensip-cli/core';
 
 import { graphFingerprintStrategy } from '../baseline-strategy.js';
-import {
-  GRAPH_PARTIAL_COVERAGE,
-  GRAPH_PARTIAL_COVERAGE_SLUG,
-  graphDegradationMessage,
-} from '../degradation.js';
+import { GRAPH_PARTIAL_COVERAGE_SLUG, graphDegradationMessage } from '../degradation.js';
 import { mapEngineSlugToOpenSipRuleId } from '../render/rule-id-mapping.js';
 
 import type { GraphRunDegradation } from '../degradation.js';
@@ -73,7 +69,7 @@ function degradationSignal(
     filePath: '.',
     metadata: {
       degradation: true,
-      errorCode: GRAPH_PARTIAL_COVERAGE.code,
+      errorCode: value.errorCode,
       condition: value.condition,
       count: value.count,
     },
