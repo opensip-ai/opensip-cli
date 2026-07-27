@@ -210,6 +210,7 @@ function readProjectConfig(path: string): string | undefined {
     // to the default exclusion config (see addRuntimeExclusion) rather than
     // failing the scan — but the swallow must stay observable.
     warnConfigFallback(path, 'config-read-failed', { errorCode: errorCode(error) });
+    // @swallow-ok warnConfigFallback records the degraded ruleset before the sentinel returns.
     return undefined;
   }
 }
