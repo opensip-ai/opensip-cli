@@ -89,6 +89,7 @@ export function createDiscover(
   };
 }
 
+/** @throws {Error} When the project root cannot be canonicalized for discovery. */
 function normalizeProjectDir(projectDir: string, languageId: string): string {
   const abs = resolve(projectDir);
   try {
@@ -124,6 +125,7 @@ function realpathOrPath(p: string): string {
 }
 /* v8 ignore stop */
 
+/** @throws {Error} When source discovery fails or the host cancels the walk. */
 function collectFiles(
   projectDirAbs: string,
   pattern: string,

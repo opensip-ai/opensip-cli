@@ -124,7 +124,11 @@ export function evaluateRules(ruleSet: readonly Rule[], data: RuleEvaluationInpu
   return signals;
 }
 
-/** Cancellation is control flow, never a rule defect to isolate as a finding. */
+/**
+ * Cancellation is control flow, never a rule defect to isolate as a finding.
+ *
+ * @throws {ToolError} When the active graph invocation has been cancelled.
+ */
 function throwIfRuleEvaluationCancelled(): void {
   if (currentScope()?.abortSignal?.aborted === true) {
     throw createCancelledError('Graph rule evaluation cancelled by the host.');

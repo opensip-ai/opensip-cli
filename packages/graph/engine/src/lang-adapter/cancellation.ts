@@ -16,6 +16,8 @@ export function graphAdapterSignal(signal?: AbortSignal): AbortSignal | undefine
  * A typed host reason is already the most precise failure and must not be
  * downgraded. Native `AbortSignal.timeout()` reasons become the registered
  * deadline definition; every other abort uses the one core cancellation code.
+ *
+ * @throws {ToolError} When the effective signal is aborted.
  */
 export function throwIfGraphAdapterAborted(signal: AbortSignal | undefined, stage: string): void {
   const effectiveSignal = graphAdapterSignal(signal);

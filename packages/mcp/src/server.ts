@@ -273,6 +273,8 @@ export class McpStdioServer {
    * Serve until the stdio transport closes. Resolves on stdin EOF (or a
    * SIGINT-driven graceful close). Never calls `process.exit` — the host command
    * handler resolves cleanly and owns the final exit code (ADR-0084).
+   *
+   * @throws {ToolError} When the stdio transport cannot connect or start serving.
    */
   async serve(): Promise<void> {
     // Route the structured logger sink to stderr for the serve lifetime: stdout

@@ -253,6 +253,7 @@ function safeProjectRelativePath(projectDirAbs: string, fileName: string): strin
   return projectRelativePath(fileName.split(sep).join('/'), projectDirAbs.split(sep).join('/'));
 }
 
+/** @throws {WalkDepthExceededError | ToolError} When traversal is too deep or is cancelled. */
 function guardWalk(signal: AbortSignal | undefined, depth: number): void {
   throwIfGraphAdapterAborted(signal, 'TypeScript walk');
   if (depth > MAX_WALK_DEPTH) throw new WalkDepthExceededError();

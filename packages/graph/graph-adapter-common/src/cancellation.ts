@@ -5,7 +5,11 @@ import {
   isToolErrorLike,
 } from '@opensip-cli/core';
 
-/** Definition-preserving cooperative checkpoint for tree-sitter graph adapters. */
+/**
+ * Definition-preserving cooperative checkpoint for tree-sitter graph adapters.
+ *
+ * @throws {ToolError} When the effective adapter signal is aborted.
+ */
 export function throwIfGraphAdapterAborted(signal: AbortSignal | undefined, stage: string): void {
   const effectiveSignal = signal ?? currentScope()?.abortSignal;
   if (effectiveSignal?.aborted !== true) return;

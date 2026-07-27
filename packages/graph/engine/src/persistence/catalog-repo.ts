@@ -377,7 +377,11 @@ interface ShardFragmentRowIdentity {
   readonly shardFingerprint: string;
 }
 
-/** Fail-closed validator for one decoded shard-fragment cache payload. */
+/**
+ * Fail-closed validator for one decoded shard-fragment cache payload.
+ *
+ * @throws {Error} When identity, catalog shape, or fragment evidence is malformed.
+ */
 function validateShardBuildResult(
   value: unknown,
   row: ShardFragmentRowIdentity,
@@ -416,14 +420,14 @@ function isSafeBoundaryCall(value: unknown): boolean {
     isSafeCatalogText(value.ownerHash) &&
     isSafeCatalogText(value.ownerFile) &&
     isPositiveInteger(value.ownerLine) &&
-    isNonNegativeInteger(value.ownerColumn) &&
+    isSafeZeroBasedCoordinate(value.ownerColumn) &&
     isSafeCatalogText(value.calleeName) &&
     isOptionalCatalogText(value.importedName) &&
     isOptionalCatalogText(value.importSpecifier) &&
     isOptionalCatalogText(value.targetFile) &&
     (value.importSpecifier !== undefined || value.targetFile !== undefined) &&
     isPositiveInteger(value.line) &&
-    isNonNegativeInteger(value.column) &&
+    isSafeZeroBasedCoordinate(value.column) &&
     isBoundedMessage(value.text, CALL_EDGE_TEXT_MAX) &&
     (value.discarded === undefined || typeof value.discarded === 'boolean')
   );
@@ -502,7 +506,7 @@ function isPositiveInteger(value: unknown): boolean {
   return Number.isSafeInteger(value) && (value as number) > 0;
 }
 
-function isNonNegativeInteger(value: unknown): boolean {
+function isSafeZeroBasedCoordinate(value: unknown): boolean {
   return Number.isSafeInteger(value) && (value as number) >= 0;
 }
 

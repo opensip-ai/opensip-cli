@@ -174,6 +174,7 @@ function malformedPersistedPayload(condition: PersistedPayloadCondition, cause?:
   );
 }
 
+/** @throws {Error} When the stored inventory shape, row binding, or identity is invalid. */
 function validatedInventoryPayload(row: SnapshotRow): unknown {
   const parsed = projectInventorySnapshotSchema.safeParse(row.payload);
   if (!parsed.success) throw malformedPersistedPayload('inventory-schema-invalid');
@@ -186,6 +187,7 @@ function validatedInventoryPayload(row: SnapshotRow): unknown {
   return parsed.data;
 }
 
+/** @throws {Error} When the stored test-selection shape, row binding, or identity is invalid. */
 function validatedTestSelectionPayload(row: SnapshotRow): unknown {
   const parsed = testSelectionSnapshotSchema.safeParse(row.payload);
   if (!parsed.success) throw malformedPersistedPayload('test-selection-schema-invalid');
@@ -203,6 +205,9 @@ function validatedTestSelectionPayload(row: SnapshotRow): unknown {
  *
  * Future schema versions remain opaque so the public reader can report `unsupported-version`;
  * current schemas must prove shape, row binding, and their content-derived snapshot identity.
+ *
+ * @throws {Error} When a current-version payload fails encoding, byte-count, shape, or identity
+ *   validation.
  */
 function validatedPersistedPayload(row: SnapshotRow): unknown {
   let encoded: string;

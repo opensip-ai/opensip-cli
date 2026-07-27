@@ -184,6 +184,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
 
 function createTraversalGuard(signal: AbortSignal | undefined): WalkTraversalGuard {
   return {
+    /** @throws {RangeError | ToolError} When traversal exceeds its bound or is cancelled. */
     checkpoint(depth): void {
       throwIfGraphAdapterAborted(signal, 'tree-sitter walk');
       if (depth > MAX_WALK_DEPTH) {

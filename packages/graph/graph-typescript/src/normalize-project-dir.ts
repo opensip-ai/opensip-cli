@@ -22,6 +22,8 @@ const PROJECT_DIR_INSPECTION_FAILED = graphErrorCatalog.require(
  * Normalize a project directory: resolve to absolute, then realpath
  * (follows symlinks). Throws ConfigurationError if missing or not a
  * directory.
+ *
+ * @throws {ToolError} When the project root is missing, not a directory, or cannot be inspected.
  */
 export function normalizeProjectDir(input: string): string {
   const absolute = isAbsolute(input) ? input : resolve(input);

@@ -69,6 +69,7 @@ export function discoverFiles(
   };
 }
 
+/** @throws {ToolError} When the selected tsconfig is missing or cannot be inspected. */
 function resolveTsConfigPath(projectDirAbs: string, override?: string): string {
   let candidate: string;
   if (override === undefined) {
@@ -100,6 +101,7 @@ function resolveTsConfigPath(projectDirAbs: string, override?: string): string {
   }
 }
 
+/** @throws {ToolError} When the tsconfig or an extended config cannot be read or parsed. */
 function loadTsConfig(tsConfigPathAbs: string): {
   options: ts.CompilerOptions;
   fileNames: readonly string[];
@@ -176,6 +178,7 @@ function loadTsConfig(tsConfigPathAbs: string): {
   return { options: result.options, fileNames: result.fileNames };
 }
 
+/** @throws {ToolError} Always; preserves a registered cause or classifies the config failure. */
 function throwTsconfigLoadFailure(error: unknown, condition: string): never {
   if (isToolErrorLike(error)) throw error;
   const failure = normalizeFailure(error);

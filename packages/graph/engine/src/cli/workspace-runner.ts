@@ -159,8 +159,12 @@ export async function discoverPolyglotUnits(
 /**
  * Spawn one child process per WorkspaceUnit, run `graph <rootDir>
  * --json` in each, and aggregate the parsed findings. Concurrency is
- * capped (default `cpus()-1`). Always resolves; child failures are
- * surfaced via `anyChildFailed`.
+ * capped (default `cpus()-1`). Child-process failures are surfaced via
+ * `anyChildFailed`; invalid empty input and host cancellation reject before
+ * returning a partial aggregate.
+ *
+ * @throws {ConfigurationError} When no workspace units were supplied.
+ * @throws {ToolError} When the host cancels the workspace run.
  */
 export async function runWorkspaceUnitsInParallel(
   input: RunWorkspaceUnitsInput,

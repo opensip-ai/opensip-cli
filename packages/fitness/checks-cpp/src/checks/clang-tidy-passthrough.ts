@@ -67,6 +67,12 @@ function mergeClangTidyStreams(stdout: string, stderr: string): string {
   return `${stdout}\n${stderr}`;
 }
 
+/**
+ * Convert one parsed diagnostic into a fitness violation.
+ *
+ * @throws {ClangTidyEnvironmentError} When clang-tidy reports that the translation-unit
+ *   environment is incomplete, rather than reporting a source-code diagnostic.
+ */
 function violationFromClangTidyMatch(
   match: RegExpExecArray,
   cwd: string,

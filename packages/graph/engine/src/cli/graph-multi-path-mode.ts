@@ -55,6 +55,12 @@ function setProfileRunFinished(
   }
 }
 
+/**
+ * Execute and aggregate a graph run for each positional project path.
+ *
+ * @throws {ConfigurationError} When a path's graph configuration is invalid.
+ * @throws {ToolError} When the host cancels the multi-path run or an engine boundary fails.
+ */
 export async function executeMultiPathGraph(
   ctx: MultiPathContext,
   paths: readonly string[],

@@ -207,7 +207,11 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   return result;
 }
 
-/** Stage-boundary cancellation checkpoint using the one core cancellation definition (D5). */
+/**
+ * Stage-boundary cancellation checkpoint using the one core cancellation definition (D5).
+ *
+ * @throws {ToolError} When the active graph invocation has been cancelled.
+ */
 function throwIfGraphCancelled(stage: string): void {
   if (currentScope()?.abortSignal?.aborted === true) {
     throw createCancelledError(`Graph pipeline cancelled at the ${stage} stage.`);
