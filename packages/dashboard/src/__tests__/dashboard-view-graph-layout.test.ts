@@ -1,4 +1,5 @@
 /// <reference lib="dom" />
+/// <reference path="../client/globals.ts" />
 /**
  * @vitest-environment jsdom
  *
@@ -11,14 +12,18 @@
  * on its first guard before reaching any layout logic. Testing directly against
  * a fake `CyCore` (only `.layout().run()` is used on this path) sidesteps that
  * environment limitation and exercises the real success/failure branches.
+ *
+ * The triple-slash reference above (not a runtime import) brings the
+ * `declare global { const cytoscape/cytoscapeDagre }` ambient augmentation
+ * into this test-typecheck program — `view-graph-layout.ts` reads those as
+ * bare identifiers, and without it they're only ambient under the separate
+ * `src/client/tsconfig.json` compile unit, not here. A real `import` would
+ * read as a genuine production dependency on a test-only module (globals.ts
+ * has no runtime exports and no other importer), tripping the dogfood
+ * `test-only-frontend-modules` check; a type-only reference does not.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
-// Side-effect only: brings the `declare global { const cytoscape/cytoscapeDagre }`
-// ambient augmentation into this test-typecheck program — `view-graph-layout.ts`
-// reads those as bare identifiers, and without this import they're only ambient
-// under the separate `src/client/tsconfig.json` compile unit, not here.
-import '../client/globals.js';
 import { gvRunLayout } from '../client/view-graph-layout.js';
 import { gvState } from '../client/view-graph-state.js';
 
