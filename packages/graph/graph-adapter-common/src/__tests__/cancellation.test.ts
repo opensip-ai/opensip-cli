@@ -61,4 +61,25 @@ describe('tree-sitter adapter cancellation', () => {
     );
     expectCancelled(() => runWalk({ input: walkInput, walkFile: () => undefined }));
   });
+
+  it('checks cancellation inside a language visitor checkpoint', () => {
+    const controller = new AbortController();
+    const path = `${process.cwd()}/fixture.go`;
+    const input: WalkInput<TreeSitterParsedProject> = {
+      project: { files: new Map([[path, {} as never]]) },
+      projectDirAbs: process.cwd(),
+      files: [path],
+      signal: controller.signal,
+    };
+
+    expectCancelled(() =>
+      runWalk({
+        input,
+        walkFile: (_path, _file, _root, _sinks, traversal): void => {
+          controller.abort();
+          traversal.checkpoint(1);
+        },
+      }),
+    );
+  });
 });

@@ -51,6 +51,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
+  type WalkTraversalGuard,
 } from '@opensip-cli/graph-adapter-common';
 
 import { digestGoBody, digestSyntheticBody } from './body-digest.js';
@@ -92,6 +93,7 @@ function walkFile(
   file: GoParsedFile,
   projectDirAbs: string,
   sinks: WalkSinks,
+  traversal: WalkTraversalGuard,
 ): void {
   const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
@@ -122,10 +124,11 @@ function walkFile(
     definedInGenerated,
     out,
     callSites,
+    traversal,
   };
   const initialFrame: Frame = { ownerHash: moduleInit.bodyHash };
 
-  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx, 1);
 }
 
 /**
@@ -228,20 +231,22 @@ interface WalkCtx {
   readonly definedInGenerated: boolean;
   readonly out: Record<string, FunctionOccurrence[]>;
   readonly callSites: CallSiteRecord[];
+  readonly traversal: WalkTraversalGuard;
 }
 
 // @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor; the cycle is the traversal (visit re-enters via visitFunction/visitClosure)
-function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
+  ctx.traversal.checkpoint(depth);
   if (node.type === 'function_declaration') {
-    visitFunction(node, frame, ctx, null);
+    visitFunction(node, frame, ctx, depth, null);
     return;
   }
   if (node.type === 'method_declaration') {
     const receiverType = extractReceiverType(node);
-    visitFunction(node, frame, ctx, receiverType);
+    visitFunction(node, frame, ctx, depth, receiverType);
     return;
   }
-  if (node.type === 'func_literal' && visitClosure(node, frame, ctx)) {
+  if (node.type === 'func_literal' && visitClosure(node, frame, ctx, depth)) {
     return;
   }
   if (node.type === 'call_expression') {
@@ -252,22 +257,28 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of childrenOf(node)) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx, depth + 1);
 }
 
-function visitFunction(node: Node, frame: Frame, ctx: WalkCtx, receiverType: string | null): void {
+function visitFunction(
+  node: Node,
+  frame: Frame,
+  ctx: WalkCtx,
+  depth: number,
+  receiverType: string | null,
+): void {
   const occ = buildFunctionOccurrence(node, ctx, receiverType);
   if (!occ) return;
   record(ctx.out, occ);
   const childFrame: Frame = { ownerHash: occ.bodyHash };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx, depth + 1);
   }
 }
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- Go and Rust closure walkers intentionally stay parallel to match each tree-sitter grammar's callable shape.
-function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
+function visitClosure(node: Node, frame: Frame, ctx: WalkCtx, depth: number): boolean {
   const occ = buildClosureOccurrence(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -282,7 +293,7 @@ function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   }
   const body = node.childForFieldName('body');
   if (body) {
-    visit(body, { ownerHash: occ.bodyHash }, ctx);
+    visit(body, { ownerHash: occ.bodyHash }, ctx, depth + 1);
   }
   return true;
 }

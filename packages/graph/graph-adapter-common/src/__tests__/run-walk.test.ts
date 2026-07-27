@@ -214,6 +214,26 @@ describe('runWalk', () => {
     ]);
   });
 
+  it('bounds adapter recursion before the JavaScript stack is exhausted', () => {
+    const files = new Map<string, TreeSitterParsedFile>([['/proj/deep.go', mkFile('deep')]]);
+    const input: WalkInput<P> = {
+      project: { files },
+      projectDirAbs: '/proj',
+      files: ['/proj/deep.go'],
+    };
+
+    const out = runWalk<P>({
+      input,
+      walkFile: (_path, _file, _root, _sinks, traversal): void => {
+        traversal.checkpoint(Number.MAX_SAFE_INTEGER);
+      },
+    });
+
+    expect(out.parseErrors[0]?.message).toBe(
+      'walker recursion capacity exceeded; no evidence retained for this file',
+    );
+  });
+
   it('scrubs the project root from an ordinary walker failure', () => {
     const files = new Map<string, TreeSitterParsedFile>([['/proj/private.go', mkFile('private')]]);
     const input: WalkInput<P> = {

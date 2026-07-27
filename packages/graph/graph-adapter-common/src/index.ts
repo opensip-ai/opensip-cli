@@ -37,6 +37,7 @@ export {
   runWalk,
   type RunWalkParams,
   type WalkSinks,
+  type WalkTraversalGuard,
   synthesizeModuleInit,
   type SynthesizeModuleInitParams,
   buildNameIndex,

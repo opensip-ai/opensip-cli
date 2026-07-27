@@ -98,6 +98,15 @@ export interface WalkSinks {
   readonly dependencySites: DependencySiteRecord[];
 }
 
+/** Per-node cooperative cancellation and recursion-capacity guard for adapter visitors. */
+export interface WalkTraversalGuard {
+  /** Check host cancellation and reject a tree deeper than the synchronous visitor can handle. */
+  readonly checkpoint: (depth: number) => void;
+}
+
+// Leave ample room for real syntax while staying safely below ordinary JavaScript stack limits.
+const MAX_WALK_DEPTH = 512;
+
 /** Inputs to the shared `walkProject` driver. */
 export interface RunWalkParams<P extends TreeSitterParsedProject> {
   readonly input: WalkInput<P>;
@@ -110,6 +119,7 @@ export interface RunWalkParams<P extends TreeSitterParsedProject> {
     file: P['files'] extends ReadonlyMap<string, infer F> ? F : never,
     projectDirAbs: string,
     sinks: WalkSinks,
+    traversal: WalkTraversalGuard,
   ) => void;
 }
 
@@ -129,6 +139,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
   const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
   const sinks: WalkSinks = { occurrences, callSites, dependencySites };
+  const traversal = createTraversalGuard(input.signal);
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
 
@@ -147,6 +158,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
             file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
             input.projectDirAbs,
             fileSinks,
+            traversal,
           );
           throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
           commitWalkSinks(sinks, fileSinks);
@@ -167,6 +179,17 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
       'graph.walk.file_count': sortedPaths.length,
     },
   );
+}
+
+function createTraversalGuard(signal: AbortSignal | undefined): WalkTraversalGuard {
+  return {
+    checkpoint(depth): void {
+      throwIfGraphAdapterAborted(signal, 'tree-sitter walk');
+      if (depth > MAX_WALK_DEPTH) {
+        throw new RangeError(`tree-sitter walk exceeded depth ${String(MAX_WALK_DEPTH)}`);
+      }
+    },
+  };
 }
 
 function createWalkSinks(): WalkSinks {
