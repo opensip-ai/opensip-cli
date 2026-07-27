@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **21**
-- Definitions: **187**
+- Definitions: **213**
 
 ## Catalogs
 
@@ -23,7 +23,7 @@ generated: true
 | `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 11 |
 | `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 4 |
 | `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
-| `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 2 |
+| `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 3 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
@@ -32,7 +32,7 @@ generated: true
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 5 |
 | `@opensip-cli/session-store` | `@opensip-cli/session-store` | `packages/session-store/src/errors/session-store-error-catalog.ts` | 5 |
-| `@opensip-cli/graph` | `3873f1c2-02a9-4719-930a-bca74b62b706` | `packages/graph/engine/src/errors/graph-error-catalog.ts` | 4 |
+| `@opensip-cli/graph` | `3873f1c2-02a9-4719-930a-bca74b62b706` | `packages/graph/engine/src/errors/graph-error-catalog.ts` | 29 |
 | `@opensip-cli/tree-sitter` | `@opensip-cli/tree-sitter` | `packages/tree-sitter/src/errors/tree-sitter-error-catalog.ts` | 2 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-coordination.ts` | 10 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/runtime-lease.ts` | 21 |
@@ -206,12 +206,38 @@ generated: true
 | `FIT.FITNESS.PATH_REJECTED` | `@opensip-cli/fitness` | application | tool-author | security | never | error | runtime | active | Analyze only paths from the resolved target set; a path outside it, or a directory, is refused. |
 | `FIT.FITNESS.SESSION_IN_PROGRESS` | `@opensip-cli/fitness` | application | tool-author | conflict | never | error | runtime | active | Wait for the active fitness session to finish or abort it. |
 | `FIT.NOT_FOUND.RECIPE` | `@opensip-cli/fitness` | application | user | not-found | never | error | not-found | active | Run opensip fit recipes to list available recipes. |
+| `GRAPH.ADAPTER.DISCOVERY_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the discovery condition and OS errno, repair the source-tree filesystem problem, then retry the graph build. |
+| `GRAPH.ADAPTER.MANIFEST_INVALID` | `@opensip-cli/graph` | application | user | validation | never | warning | success | active | Correct the language manifest or exclude the affected package, then rebuild the graph. |
+| `GRAPH.ADAPTER.MANIFEST_UNREADABLE` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | warning | success | active | Restore access to the language manifest or exclude the affected package, then rebuild the graph. |
+| `GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED` | `@opensip-cli/graph` | application | tool-author | invariant | never | warning | success | active | Inspect the resolution condition and report a reproducible graph adapter fault. |
 | `GRAPH.BUILD.INCOMPLETE` | `@opensip-cli/graph` | application | environment | conflict | transient | warning | success | active | The graph build did not cover every source. Re-run `opensip graph` when the working tree is settled; the coverage fields report what was missed. |
-| `GRAPH.CATALOG.UNREADABLE` | `@opensip-cli/graph` | infrastructure | environment | integrity | caller-policy | error | runtime | active | Run `opensip graph` to rebuild the catalog, then retry the read. |
-| `GRAPH.READ.CURSOR_INVALID` | `@opensip-cli/graph` | application | tool-author | validation | never | error | runtime | active | Restart the page sequence without a cursor; cursors are only valid for the catalog generation that issued them. |
-| `GRAPH.READ.QUERY_INVALID` | `@opensip-cli/graph` | application | tool-author | validation | never | error | runtime | active | Correct the named query field; the message states the supported values or bound for it. |
-| `MCP.STDIO.PROTOCOL` | `@opensip-cli/mcp` | application | tool-author | compatibility | never | error | runtime | active | Fix the JSON-RPC request shape and reconnect the MCP client. |
+| `GRAPH.CATALOG.PARTIAL_COVERAGE` | `@opensip-cli/graph` | application | environment | integrity |  | warning | success | active | Inspect the coverage condition, fix or exclude the omitted inputs, then rebuild the graph. |
+| `GRAPH.CATALOG.UNREADABLE` | `@opensip-cli/graph` | infrastructure | environment | integrity |  | error | runtime | active | Run `opensip graph` to rebuild the catalog, then retry the read. |
+| `GRAPH.CONTEXT_CATALOG.DATASTORE_REQUIRED` | `@opensip-cli/graph` | application |  | invariant | never | error | runtime | active | Enter a project RunScope with its datastore before invoking graph context producers. |
+| `GRAPH.CONTEXT_CATALOG.OPERATION_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the operation condition and local datastore failure detail, restore storage availability, then retry. |
+| `GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED` | `@opensip-cli/graph` | infrastructure | environment | integrity |  | error | runtime | active | Discard the malformed context snapshot and re-run its producing graph context command. |
+| `GRAPH.PROJECT_DIR.INSPECTION_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the project-root condition and OS errno, restore filesystem access, then retry. |
+| `GRAPH.PROJECT_DIR.NOT_A_DIRECTORY` | `@opensip-cli/graph` | application | user | validation | never | error | configuration | active | Choose a directory as the graph project root, then retry. |
+| `GRAPH.PROJECT_DIR.NOT_FOUND` | `@opensip-cli/graph` | application | user | not-found | never | error | configuration | active | Correct the graph project root or create the requested directory. |
+| `GRAPH.READ.CURSOR_INVALID` | `@opensip-cli/graph` | application |  | validation | never | error | runtime | active | Restart the page sequence without a cursor; cursors are only valid for the catalog generation that issued them. |
+| `GRAPH.READ.INFRASTRUCTURE_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the read condition and local failure detail, restore the failing dependency, then retry. |
+| `GRAPH.READ.PROJECTION_FAILED` | `@opensip-cli/graph` | application |  | invariant | never | error | runtime | active | Capture the read condition and run id, then report the graph projection failure to the tool author. |
+| `GRAPH.READ.QUERY_INVALID` | `@opensip-cli/graph` | application |  | validation | never | error | runtime | active | Correct the named query field; the message states the supported values or bound for it. |
+| `GRAPH.RULE.EVALUATION_FAILED` | `@opensip-cli/graph` | application |  | invariant | never | error | runtime | active | Disable or fix the named graph rule, then re-run; other rules completed and their evidence was retained. |
+| `GRAPH.SHARD.FAILURES` | `@opensip-cli/graph` | infrastructure | environment | integrity |  | error | runtime | active | Inspect the named shard and its bounded stderr detail in the run log, then retry the graph build. |
+| `GRAPH.TS.OWNER_POSITION_MISSING` | `@opensip-cli/graph` | application | tool-author | invariant | never | error | runtime | active | Report the graph adapter invariant failure with the affected coordinate field. |
+| `GRAPH.TS.SOURCE_UNREADABLE` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | warning | success | active | Restore access to the omitted TypeScript source or exclude it, then rebuild the graph. |
+| `GRAPH.TS.WALK_DEPTH_EXCEEDED` | `@opensip-cli/graph` | application | user | resource | never | warning | success | active | Simplify or exclude the deeply nested TypeScript source, then rebuild the graph. |
+| `GRAPH.TS.WALK_FAULT` | `@opensip-cli/graph` | application | tool-author | invariant | never | warning | success | active | Report the TypeScript graph walk fault and omit the affected file. |
+| `GRAPH.TSCONFIG.INVALID` | `@opensip-cli/graph` | application | user | validation | never | error | configuration | active | Correct the reported TypeScript configuration diagnostic, then retry the graph build. |
+| `GRAPH.TSCONFIG.LOAD_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Inspect the configuration-load condition and OS errno, restore file access, then retry the graph build. |
+| `GRAPH.TSCONFIG.NOT_FOUND` | `@opensip-cli/graph` | application | user | not-found | never | error | configuration | active | Create the requested tsconfig.json or correct the configured TypeScript project path. |
+| `GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED` | `@opensip-cli/graph` | application |  | integrity | never | error | runtime | active | Ensure the parent and child use the same opensip-cli build, then report the malformed child envelope if it recurs. |
+| `GRAPH.WORKSPACE.CHILD_SPAWN_FAILED` | `@opensip-cli/graph` | infrastructure | environment | I/O |  | error | runtime | active | Check process limits, permissions, and the reported OS errno, then retry the workspace run. |
+| `GRAPH.WORKSPACE.CHILD_TIMEOUT` | `@opensip-cli/graph` | infrastructure | environment | timeout |  | error | runtime | active | Reduce the workspace unit workload or raise the child deadline, then retry the run. |
+| `MCP.STDIO.PROTOCOL` | `@opensip-cli/mcp` | application | tool-author | compatibility | never | error | runtime | active | Verify the JSON-RPC request against the advertised MCP tool schema; if it is valid, capture the run id and report the handler failure. |
 | `MCP.STDIO.SHUTDOWN` | `@opensip-cli/mcp` | application | user | cancelled | never | error | cancelled | active | MCP server shut down. Restart opensip mcp if more queries are needed. |
+| `MCP.STDIO.TRANSPORT_FAILED` | `@opensip-cli/mcp` | infrastructure | environment | I/O | caller-policy | error | runtime | active | Check the parent process stdio pipes and local process limits, then reconnect the MCP client. |
 | `NETWORK_ERROR` | `@opensip-cli/core` | external | environment | network | transient | error | report-failed | active | Check network connectivity and the remote endpoint. |
 | `NOT_FOUND` | `@opensip-cli/core` | application | user | not-found | never | error | not-found | active | Verify the resource name and list available options. |
 | `OUTPUT.EGRESS.REQUEST_INVALID` | `@opensip-cli/output` | application | tool-author | validation | never | error | runtime | active | Supply a non-empty idempotency key of at most 256 characters for each egress chunk. |
