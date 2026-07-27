@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { createNativeInvoker } from '../adapters/native-tools.js';
 
 import { withFixtureCopy } from './fixture-workspace.js';
+import { HarnessPrerequisiteError } from './spawn.js';
 
 import type { AnswerFact, ResolvedStrategyStep } from '../model/task.js';
 
@@ -74,6 +75,36 @@ describe('withFixtureCopy', () => {
       ),
     ).rejects.toThrow('boom');
     expect(existsSync(copiedRoot)).toBe(false);
+  });
+
+  it('preserves a primary failure when temporary cleanup also fails', async () => {
+    const fixture = fixtureRepository();
+    const primary = new HarnessPrerequisiteError('fixture execution failed');
+    let temporaryRoot = '';
+
+    const error = await withFixtureCopy(
+      { fixtureDirectory: fixture.source, repositoryRoot: fixture.root },
+      (root) => {
+        temporaryRoot = join(root, '..');
+        return Promise.reject(primary);
+      },
+      {
+        removeTemporaryRoot: (path) => {
+          rmSync(path, { force: true, recursive: true });
+          throw new Error(`cleanup refused ${path}`);
+        },
+      },
+    ).then(
+      () => undefined,
+      (error_: unknown) => error_,
+    );
+
+    expect(error).toBe(primary);
+    expect(primary.message).toContain('fixture execution failed');
+    expect(primary.message).toContain('Fixture cleanup also failed');
+    expect(primary.message).toContain('[redacted-path]');
+    expect(primary.message).not.toContain(temporaryRoot);
+    expect(existsSync(temporaryRoot)).toBe(false);
   });
 
   it('excludes ignored fixture bytes from the executable workspace and extracted facts', async () => {
