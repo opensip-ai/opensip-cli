@@ -200,6 +200,7 @@ async function executeTaskLegs(
         assertions: assertionsForLeg(task, 'main'),
         invoker,
         leg: 'main',
+        sensitivePaths: [workspaceRoot],
         steps: task.strategies[arm].steps,
       }),
     ];
@@ -209,6 +210,7 @@ async function executeTaskLegs(
     assertions: assertionsForLeg(task, 'pre-edit'),
     invoker,
     leg: 'pre-edit',
+    sensitivePaths: [workspaceRoot],
     steps: task.strategies[arm].steps,
   });
   const appliedEdits = dependencies.applyEdit(workspaceRoot, task.staleness.edit);
@@ -216,6 +218,7 @@ async function executeTaskLegs(
     assertions: assertionsForLeg(task, 'post-edit'),
     invoker,
     leg: 'post-edit',
+    sensitivePaths: [workspaceRoot],
     steps: task.staleness.postEditSteps[arm],
   });
   const postEdit = { ...postEditResult, appliedEdits };
@@ -225,6 +228,7 @@ async function executeTaskLegs(
     assertions: assertionsForLeg(task, 'recovery'),
     invoker,
     leg: 'recovery',
+    sensitivePaths: [workspaceRoot],
     steps: recoverySteps,
   });
   return [preEdit, postEdit, recovery];

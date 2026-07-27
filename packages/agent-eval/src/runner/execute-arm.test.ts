@@ -193,6 +193,35 @@ describe('executeArm', () => {
     expect(second.steps[0]?.failure?.code).toBe('missing-binding');
   });
 
+  it('normalizes a rejected invocation into bounded step failure data', async () => {
+    const workspaceRoot = '/private/agent-eval-fixture';
+    const invoker: ToolInvoker = () =>
+      Promise.reject(new Error(`transport unavailable for ${workspaceRoot}\nretry later`));
+
+    const result = await executeArm({
+      assertions: {
+        leg: 'main',
+        mustInclude: [{ kind: 'file', path: 'never.ts' }],
+      },
+      invoker,
+      sensitivePaths: [workspaceRoot],
+      steps: [strategyStep('transport-failure')],
+    });
+
+    expect(result.steps[0]).toMatchObject({
+      completeness: 'incomplete',
+      facts: [],
+      failure: {
+        code: 'tool-invocation-failure',
+        kind: 'infrastructure',
+        message: 'transport unavailable for [redacted-path] retry later',
+      },
+      noneOutcome: 'failed',
+      responseBytes: 0,
+      stepId: 'transport-failure',
+    });
+  });
+
   it('stamps the requested leg and rejects cross-leg execution', async () => {
     const invoker = factInvoker({
       verify: [{ kind: 'freshness', fresh: true }],

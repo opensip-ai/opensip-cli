@@ -438,29 +438,32 @@ describe('ordinary task orchestration', () => {
     expect(result.metrics.opensip.callCount).toBe(1);
   });
 
-  it('closes the MCP session and cleans both copies when OpenSIP execution fails', async () => {
+  it('records an MCP invocation rejection and still closes the session and fixture copies', async () => {
     const events: string[] = [];
     const roots = [
       temporaryDirectory('control-failure-test-'),
       temporaryDirectory('opensip-failure-test-'),
     ] as const;
 
-    await expect(
-      runTask(ordinaryTask(), {
-        dependencies: {
-          connectMcp: (root) =>
-            Promise.resolve(fakeSession(root, events, { throwOnStep: 'opensip-main' })),
-          createControlInvoker: () => invokerWithEvents('native', events),
-          setupFixture: (root) => Promise.resolve(setupRecord(root)),
-          withFixture: fakeFixtureCopies(events, roots),
-        },
-      }),
-    ).rejects.toThrow('tool transport failed');
+    const result = await runTask(ordinaryTask(), {
+      dependencies: {
+        connectMcp: (root) =>
+          Promise.resolve(fakeSession(root, events, { throwOnStep: 'opensip-main' })),
+        createControlInvoker: () => invokerWithEvents('native', events),
+        setupFixture: (root) => Promise.resolve(setupRecord(root)),
+        withFixture: fakeFixtureCopies(events, roots),
+      },
+    });
 
     expect(events).toContain('mcp:close');
-    expect(events).not.toContain('mcp:provenance');
+    expect(events).toContain('mcp:provenance');
     expect(events.at(-1)).toBe(`copy:cleanup:${roots[1]}`);
     expect(events.filter((event) => event.startsWith('copy:cleanup:'))).toHaveLength(2);
+    expect(result.record.arms.opensip.legs[0]?.steps[0]?.failure).toMatchObject({
+      code: 'tool-invocation-failure',
+      kind: 'infrastructure',
+      message: 'tool transport failed',
+    });
   });
 
   it('preserves execution failure when MCP session close also fails', async () => {
@@ -474,15 +477,15 @@ describe('ordinary task orchestration', () => {
             Promise.resolve(
               fakeSession(workspaceRoot, events, {
                 closeError: new Error('stdio containment failed'),
-                throwOnStep: 'opensip-main',
               }),
             ),
+          execute: () => Promise.reject(new Error('arm execution failed')),
           setupFixture: (workspaceRoot) => Promise.resolve(setupRecord(workspaceRoot)),
           withFixture: fakeFixtureCopies(events, [root]),
         },
       }),
     ).rejects.toThrow(
-      /tool transport failed.*Related MCP session-close failure: stdio containment failed/u,
+      /arm execution failed.*Related MCP session-close failure: stdio containment failed/u,
     );
 
     expect(events).toContain('mcp:close');
