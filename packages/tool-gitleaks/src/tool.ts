@@ -20,7 +20,7 @@
  */
 
 import { existsSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import { currentLogger, readPackageVersion } from '@opensip-cli/core';
 import { defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
@@ -169,23 +169,47 @@ function defaultExclusionConfig(): string {
   return [EXCLUSION_MARKER, '[extend]', 'useDefault = true', '', LEGACY_ALLOWLIST].join('\n');
 }
 
+function errorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return error instanceof Error ? error.name : 'unknown';
+}
+
+function warnConfigFallback(
+  path: string,
+  condition: 'config-read-failed' | 'config-too-large',
+  detail: Readonly<Record<string, unknown>>,
+): void {
+  currentLogger().warn({
+    evt: 'gitleaks.project_config.degraded',
+    module: 'tool-gitleaks',
+    condition,
+    config: basename(path),
+    ...detail,
+  });
+}
+
 function readProjectConfig(path: string): string | undefined {
   try {
     // Config files are small TOML; reject oversized inputs before reading.
     const MAX_GITLEAKS_CONFIG_BYTES = 1_048_576;
-    if (statSync(path).size > MAX_GITLEAKS_CONFIG_BYTES) return undefined;
+    const size = statSync(path).size;
+    if (size > MAX_GITLEAKS_CONFIG_BYTES) {
+      warnConfigFallback(path, 'config-too-large', { size, limit: MAX_GITLEAKS_CONFIG_BYTES });
+      return undefined;
+    }
     return readFileSync(path, 'utf8').trimEnd();
   } catch (error) {
     // Best-effort: an unreadable/oversized project gitleaks config falls back
     // to the default exclusion config (see addRuntimeExclusion) rather than
     // failing the scan — but the swallow must stay observable.
-    const logger = currentLogger();
-    logger.debug({
-      evt: 'gitleaks.project_config.read_failed',
-      module: 'tool-gitleaks',
-      path,
-      error: error instanceof Error ? error.message : String(error),
-    });
+    warnConfigFallback(path, 'config-read-failed', { errorCode: errorCode(error) });
     return undefined;
   }
 }
