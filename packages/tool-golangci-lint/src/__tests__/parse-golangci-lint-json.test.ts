@@ -106,6 +106,43 @@ describe('parseGolangciLintJson', () => {
     ).toEqual([]);
   });
 
+  it('surfaces report-level errors and warnings as quality signals', () => {
+    const raw = JSON.stringify({
+      Issues: [],
+      Report: {
+        Error: 'typechecking failed for one package',
+        Warnings: [{ Tag: 'linters_context', Text: 'one linter was disabled' }],
+      },
+    });
+
+    expect(parseGolangciLintJson(output(raw), CTX)).toEqual([
+      expect.objectContaining({
+        ruleId: 'golangci-lint-report-error',
+        severity: 'high',
+        message: 'typechecking failed for one package',
+      }),
+      expect.objectContaining({
+        ruleId: 'golangci-lint-report-warning',
+        severity: 'medium',
+        message: 'one linter was disabled',
+        metadata: expect.objectContaining({ reportTag: 'linters_context' }),
+      }),
+    ]);
+  });
+
+  it('faults on malformed report-level warning evidence', () => {
+    expect(() =>
+      parseGolangciLintJson(
+        output(JSON.stringify({ Issues: [], Report: { Warnings: [{}] } })),
+        CTX,
+      ),
+    ).toThrow(
+      expect.objectContaining({
+        metadata: { condition: 'invalid-report-warning', scanner: 'golangci-lint' },
+      }),
+    );
+  });
+
   it('faults when malformed output would otherwise read as a clean scan', () => {
     expect(() => parseGolangciLintJson(output('not json at all'), CTX)).toThrow(
       expect.objectContaining({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' }),
