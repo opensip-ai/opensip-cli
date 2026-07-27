@@ -21,9 +21,14 @@
  * `parseDiagnostics`, which we read per file.
  */
 
-import { extname, relative } from 'node:path';
+import { extname, sep } from 'node:path';
 
-import { isToolErrorLike } from '@opensip-cli/core';
+import {
+  isToolErrorLike,
+  normalizeFailure,
+  projectRelativePath,
+  scrubText,
+} from '@opensip-cli/core';
 import { readSourceFileGuarded, throwIfGraphAdapterAborted } from '@opensip-cli/graph';
 import ts from 'typescript';
 
@@ -46,6 +51,9 @@ interface SourceFileWithParseDiagnostics extends ts.SourceFile {
   readonly parseDiagnostics?: readonly ts.Diagnostic[];
 }
 
+const MAX_PARSE_DIAGNOSTICS_PER_FILE = 20;
+const MAX_PARSE_DIAGNOSTIC_LENGTH = 1000;
+
 /**
  * Parse each input file into a standalone `ts.SourceFile` with parent
  * pointers, building no Program and constructing no type checker.
@@ -64,10 +72,9 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
       text = readSourceFileGuarded(fileName);
     } catch (error) {
       if (isToolErrorLike(error)) throw error;
-      /* v8 ignore next */
       parseErrors.push({
-        filePath: relative(input.projectDirAbs, fileName),
-        message: error instanceof Error ? error.message : String(error),
+        filePath: safeProjectRelativePath(input, fileName),
+        message: sourceReadFailureMessage(error),
       });
       continue;
     }
@@ -86,11 +93,21 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
 
     const diagnostics = (sourceFile as SourceFileWithParseDiagnostics).parseDiagnostics;
     if (diagnostics && diagnostics.length > 0) {
-      const filePath = relative(input.projectDirAbs, fileName);
-      for (const diag of diagnostics) {
+      const filePath = safeProjectRelativePath(input, fileName);
+      for (const diag of diagnostics.slice(0, MAX_PARSE_DIAGNOSTICS_PER_FILE)) {
         parseErrors.push({
           filePath,
-          message: ts.flattenDiagnosticMessageText(diag.messageText, '\n'),
+          message: scrubText(
+            ts.flattenDiagnosticMessageText(diag.messageText, '\n'),
+            MAX_PARSE_DIAGNOSTIC_LENGTH,
+          ),
+        });
+      }
+      const overflow = diagnostics.length - MAX_PARSE_DIAGNOSTICS_PER_FILE;
+      if (overflow > 0) {
+        parseErrors.push({
+          filePath,
+          message: `${String(overflow)} additional TypeScript parse diagnostic(s) omitted`,
         });
       }
     }
@@ -99,6 +116,30 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
   throwIfGraphAdapterAborted(input.signal, 'TypeScript fast parse');
 
   return { project: { kind: 'fast', sourceFiles }, parseErrors };
+}
+
+function safeProjectRelativePath(input: ParseInput, fileName: string): string {
+  return projectRelativePath(
+    fileName.split(sep).join('/'),
+    input.projectDirAbs.split(sep).join('/'),
+  );
+}
+
+function sourceReadFailureMessage(error: unknown): string {
+  const failure = normalizeFailure(error);
+  if (failure.code === 'CORE.SYSTEM.PERMISSION') {
+    return 'Source file could not be read because filesystem permission was denied.';
+  }
+  if (failure.code === 'CORE.SYSTEM.RESOURCE') {
+    return 'Source file could not be read because a system resource limit was reached.';
+  }
+  if (failure.code === 'NOT_FOUND') {
+    return 'Source file was unavailable when graph parsing began.';
+  }
+  if (error instanceof Error && error.message.includes('source file exceeds')) {
+    return 'Source file exceeds the graph source-size limit.';
+  }
+  return 'Source file could not be read.';
 }
 
 /**
