@@ -32,6 +32,7 @@ import {
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
+  sampleProcessTreeIfDue,
   signalProcessTree,
   stopProcessTreeTracking,
 } from './process-tree.js';
@@ -407,11 +408,11 @@ export function spawnProcess(
     };
 
     child.stdout?.on('data', (chunk: Buffer) => {
-      if (processTree !== undefined) sampleProcessTree(processTree);
+      if (processTree !== undefined) sampleProcessTreeIfDue(processTree);
       stdoutBytes += capture(stdout, chunk);
     });
     child.stderr?.on('data', (chunk: Buffer) => {
-      if (processTree !== undefined) sampleProcessTree(processTree);
+      if (processTree !== undefined) sampleProcessTreeIfDue(processTree);
       stderrBytes += capture(stderr, chunk);
     });
     child.on('error', (spawnError) => {

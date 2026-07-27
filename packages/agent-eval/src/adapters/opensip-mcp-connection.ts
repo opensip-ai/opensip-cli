@@ -11,6 +11,7 @@ import {
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
+  sampleProcessTreeIfDue,
   signalProcessTree,
   stopProcessTreeTracking,
 } from '../runner/process-tree.js';
@@ -302,11 +303,11 @@ export class BoundedStdioClientTransport implements BoundedStdioTransport {
       });
     }
     child.stdout.on('data', (chunk: Buffer) => {
-      if (this.processTree !== undefined) sampleProcessTree(this.processTree);
+      if (this.processTree !== undefined) sampleProcessTreeIfDue(this.processTree);
       this.consumeStdout(chunk);
     });
     child.stderr.on('data', () => {
-      if (this.processTree !== undefined) sampleProcessTree(this.processTree);
+      if (this.processTree !== undefined) sampleProcessTreeIfDue(this.processTree);
     });
     child.stderr.pipe(this.stderrStream, { end: false });
     child.stdin.on('error', (error) => this.reportError(error));

@@ -30,6 +30,8 @@ export type ProcessSnapshot = () => readonly PosixProcessIdentity[];
 /** Injectable native effects for deterministic process-tree tests. */
 export interface ProcessTreeDependencies {
   readonly killProcess?: typeof process.kill;
+  /** Test-only monotonic clock seam. */
+  readonly monotonicNow?: () => number;
   readonly snapshotProcesses?: ProcessSnapshot;
 }
 
@@ -157,6 +159,7 @@ export interface ProcessTreeSummary {
 
 class DescendantTracker {
   private failed = false;
+  private lastSampleCompletedAt: number | undefined;
   private successfulSamples = 0;
   private everObservedRoot = false;
   private rootIdentityInitialized = false;
@@ -169,6 +172,7 @@ class DescendantTracker {
     private readonly rootPid: number,
     private readonly rootProcessGroupId: number,
     private readonly snapshotProcesses: ProcessSnapshot,
+    private readonly monotonicNow: () => number,
   ) {
     this.sample();
   }
@@ -209,7 +213,20 @@ class DescendantTracker {
     } catch {
       this.failed = true;
       this.rootObservedAlive = false;
+    } finally {
+      this.lastSampleCompletedAt = this.monotonicNow();
     }
+  }
+
+  /** Keep untrusted output volume from driving synchronous process-table scans. */
+  public sampleIfDue(): void {
+    if (
+      this.lastSampleCompletedAt !== undefined &&
+      this.monotonicNow() - this.lastSampleCompletedAt < TRACKING_INTERVAL_MS
+    ) {
+      return;
+    }
+    this.sample();
   }
 
   public alive(): readonly TrackedProcess[] {
@@ -430,6 +447,7 @@ export function retainPosixProcessTree(
     child.pid,
     child.pid,
     dependencies.snapshotProcesses ?? defaultProcessSnapshot,
+    dependencies.monotonicNow ?? performance.now.bind(performance),
   );
   tracker.start();
   return Object.freeze({ child, processGroupId: child.pid, tracker });
@@ -437,6 +455,11 @@ export function retainPosixProcessTree(
 
 export function sampleProcessTree(tree: PosixProcessTree): void {
   tree.tracker.sample();
+}
+
+/** Sample only when the observation interval has elapsed since the last completed scan. */
+export function sampleProcessTreeIfDue(tree: PosixProcessTree): void {
+  tree.tracker.sampleIfDue();
 }
 
 export function stopProcessTreeTracking(tree: PosixProcessTree): void {

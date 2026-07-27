@@ -5,6 +5,7 @@ import {
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
+  sampleProcessTreeIfDue,
   signalProcessTree,
   stopProcessTreeTracking,
   type KillableChild,
@@ -123,6 +124,37 @@ describe('retained POSIX process trees', () => {
     expect(processTreeTrackingReliable(tree)).toBe(false);
     signalProcessTree(tree, 'SIGTERM', { killProcess });
     expect(killProcess).toHaveBeenCalledWith(-4242, 'SIGTERM');
+  });
+
+  it('bounds output-driven sampling by the tracking interval', () => {
+    const retained = fakeChild();
+    let monotonicNow = 1000;
+    const snapshotProcesses = vi.fn(() => [
+      {
+        commandFingerprint: 'a'.repeat(64),
+        parentPid: 1,
+        pid: 4242,
+        processGroupId: 4242,
+        posixSession: 4242,
+        startedAt: 'test-root-start',
+      },
+    ]);
+    const tree = retainPosixProcessTree(retained.child, 'linux', {
+      monotonicNow: () => monotonicNow,
+      snapshotProcesses,
+    });
+    retainedTrees.push(tree);
+
+    for (let event = 0; event < 100; event += 1) sampleProcessTreeIfDue(tree);
+    expect(snapshotProcesses).toHaveBeenCalledTimes(1);
+
+    monotonicNow += 199;
+    sampleProcessTreeIfDue(tree);
+    expect(snapshotProcesses).toHaveBeenCalledTimes(1);
+
+    monotonicNow += 1;
+    sampleProcessTreeIfDue(tree);
+    expect(snapshotProcesses).toHaveBeenCalledTimes(2);
   });
 
   it('fails closed when a same-second retained PID has a different command fingerprint', () => {
