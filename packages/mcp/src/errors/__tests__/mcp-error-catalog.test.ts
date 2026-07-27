@@ -21,4 +21,13 @@ describe('mcpErrorCatalog (Plan 00 Phase 5.6)', () => {
     expect(def.kind).toBe('cancelled');
     expect(def.exitClass).toBe('cancelled');
   });
+
+  it('separates stdio transport failures from protocol compatibility', () => {
+    const def = mcpErrorCatalog.require('MCP.STDIO.TRANSPORT_FAILED');
+    expect(def).toMatchObject({
+      kind: 'I/O',
+      defaultResponsibility: 'environment',
+      exitClass: 'runtime',
+    });
+  });
 });

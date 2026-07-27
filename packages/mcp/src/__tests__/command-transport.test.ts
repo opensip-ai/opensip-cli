@@ -14,7 +14,13 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { currentScope, logger, RunScope } from '@opensip-cli/core';
+import {
+  createCancelledError,
+  currentScope,
+  logger,
+  normalizeFailure,
+  RunScope,
+} from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mcpCancelledExitCode, mcpCommandSpec } from '../command.js';
@@ -215,6 +221,37 @@ describe('MCP dispatch observability', () => {
     expect(Object.keys(event).sort()).toEqual(
       ['durationMs', 'evt', 'module', 'outcome', 'tool'].sort(),
     );
+  });
+
+  it('classifies sanitized dispatch throws on the registered protocol definition', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const caught = await dispatchOf(serverWithScope(new RunScope()))('who_calls', () => {
+      throw new Error('/private/project?token=secret-value');
+    }).catch((error: unknown) => error);
+
+    expect(normalizeFailure(caught)).toMatchObject({
+      known: 'known',
+      code: 'MCP.STDIO.PROTOCOL',
+      metadata: { reason: 'tool-dispatch' },
+    });
+    expect(caught).toBeInstanceOf(Error);
+    expect((caught as Error).message).toContain('<path>');
+    expect((caught as Error).message).not.toContain('/private/project');
+  });
+
+  it('does not downgrade a definition-backed dispatch failure', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => undefined);
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const caught = await dispatchOf(serverWithScope(new RunScope()))('who_calls', () => {
+      throw createCancelledError('client cancelled');
+    }).catch((error: unknown) => error);
+
+    expect(normalizeFailure(caught)).toMatchObject({
+      known: 'known',
+      code: 'CORE.SYSTEM.CANCELLED',
+      definition: { kind: 'cancelled' },
+    });
   });
 
   it('preserves a sanitized tool failure when the error logger also fails', async () => {
