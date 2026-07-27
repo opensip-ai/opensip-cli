@@ -2,6 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+// @fitness-ignore-next-line missing-type-exports -- MCP SDK publishes types.js through its declared "./*" export; the workspace-only check cannot discover external package manifests.
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+
 import { makeStepRecord } from '../model/record.js';
 import { buildDeterministicEnv } from '../runner/env.js';
 import { safeErrorDetail } from '../runner/error-detail.js';
@@ -31,6 +34,8 @@ import { decodeToolResult, inspectToolEnvelope } from './opensip-mcp-protocol.js
 
 import type { McpSetupProvenance, StepRecord, ToolInvoker } from '../model/record.js';
 import type { ProofClosureAssessment, ResolvedStrategyStep, RunLeg } from '../model/task.js';
+
+const MCP_REQUEST_TIMEOUT_CODE = Number(ErrorCode.RequestTimeout);
 
 export { EXPECTED_MCP_SURFACE_EPOCH, REQUIRED_MCP_TOOL_NAMES } from './opensip-mcp-handshake.js';
 export type {
@@ -332,9 +337,22 @@ export class McpArmSession {
         this.requestTimeoutMs,
       );
     } catch (error) {
-      throw new HarnessPrerequisiteError(
-        `OpenSIP MCP server became unavailable while calling ${step.tool}: ${safeErrorDetail(error, this.sensitivePaths)}`,
-      );
+      const timedOut = error instanceof McpError && error.code === MCP_REQUEST_TIMEOUT_CODE;
+      const detail = safeErrorDetail(error, this.sensitivePaths) || 'unknown failure';
+      return makeStepRecord({
+        failure: {
+          code: timedOut ? 'mcp-request-timeout' : 'mcp-transport-unavailable',
+          kind: 'infrastructure',
+          message: timedOut
+            ? `OpenSIP MCP request timed out while calling ${step.tool}: ${detail}`
+            : `OpenSIP MCP server became unavailable while calling ${step.tool}: ${detail}`,
+          retryable: true,
+        },
+        leg: stepLeg(step),
+        renderedResponse: '',
+        step,
+        wallMs: Math.max(0, performance.now() - startedAt),
+      });
     }
     const decoded = decodeToolResult(result, this.maxResponseBytes);
     if (decoded.failure !== undefined || decoded.payload === undefined) {

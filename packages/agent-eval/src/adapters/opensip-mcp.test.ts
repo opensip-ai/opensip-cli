@@ -3,6 +3,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PassThrough } from 'node:stream';
 
+// @fitness-ignore-next-line missing-type-exports -- MCP SDK publishes types.js through its declared "./*" export; the workspace-only check cannot discover external package manifests.
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { HarnessPrerequisiteError } from '../runner/spawn.js';
@@ -1159,23 +1161,44 @@ describe('McpArmSession tool record mapping', () => {
     await session.close();
   });
 
-  it('surfaces a dead server as a prerequisite error', async () => {
-    const root = temporaryRoot();
-    const harness = fakeConnection(root, {
-      toolResults: [],
-    });
-    const original = harness.connection.callTool.bind(harness.connection);
-    let calls = 0;
-    harness.connection.callTool = (input, timeoutMs) => {
-      calls += 1;
-      if (calls === 1) return original(input, timeoutMs);
-      return Promise.reject(new Error('transport closed'));
-    };
-    const { session } = await connectFake(root, harness);
+  it.each([
+    {
+      code: 'mcp-request-timeout',
+      error: new McpError(ErrorCode.RequestTimeout, 'Request timed out'),
+      message: /request timed out.*Request timed out/u,
+      title: 'request timeout',
+    },
+    {
+      code: 'mcp-transport-unavailable',
+      error: new Error('transport closed'),
+      message: /became unavailable.*transport closed/u,
+      title: 'dead transport',
+    },
+  ] as const)(
+    'records a $title as infrastructure failure data',
+    async ({ code, error, message }) => {
+      const root = temporaryRoot();
+      const harness = fakeConnection(root, {
+        toolResults: [],
+      });
+      const original = harness.connection.callTool.bind(harness.connection);
+      let calls = 0;
+      harness.connection.callTool = (input, timeoutMs) => {
+        calls += 1;
+        if (calls === 1) return original(input, timeoutMs);
+        return Promise.reject(error);
+      };
+      const { session } = await connectFake(root, harness);
 
-    await expect(session.invoker()(resolvedStep())).rejects.toThrow(
-      /became unavailable.*transport closed/u,
-    );
-    await session.close();
-  });
+      const record = await session.invoker()(resolvedStep());
+
+      expect(record).toMatchObject({
+        failure: { code, kind: 'infrastructure', retryable: true },
+        noneOutcome: 'failed',
+        responseBytes: 0,
+      });
+      expect(record.failure?.message).toMatch(message);
+      await session.close();
+    },
+  );
 });
