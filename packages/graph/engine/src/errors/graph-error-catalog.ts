@@ -420,6 +420,37 @@ export const graphErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
     },
 
+    /** TypeScript inventory omitted one file after an adapter invariant fault. */
+    'GRAPH.TS.WALK_FAULT': {
+      code: 'GRAPH.TS.WALK_FAULT',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'redacted',
+      exitClass: 'success',
+      operatorAction: 'Report the TypeScript graph walk fault and omit the affected file.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+
+    /** TypeScript inventory omitted one file whose AST exceeded the guarded walk depth. */
+    'GRAPH.TS.WALK_DEPTH_EXCEEDED': {
+      code: 'GRAPH.TS.WALK_DEPTH_EXCEEDED',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'resource',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Simplify or exclude the deeply nested TypeScript source, then rebuild the graph.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+
     /**
      * A shard-dependent operation has no trustworthy complete result.
      *
