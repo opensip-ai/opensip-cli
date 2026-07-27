@@ -3,17 +3,21 @@ import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
 import { DEFAULT_SEMANTIC_FACT_LIMITS, MAX_SEMANTIC_DECLARATIONS } from '@opensip-cli/graph';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { buildCrossPackageContext } from '../edge-helpers/cross-package-context.js';
 import { typescriptGraphAdapter } from '../index.js';
-import { collectSemanticReferenceFacts } from '../semantic-reference-facts.js';
+import {
+  collectSemanticReferenceFacts,
+  isExternalDeclarationFile,
+} from '../semantic-reference-facts.js';
 
 import type { Catalog } from '@opensip-cli/graph';
 
 let dir: string | undefined;
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (dir !== undefined) {
     rmSync(dir, { recursive: true, force: true });
     dir = undefined;
@@ -180,6 +184,37 @@ describe('collectSemanticReferenceFacts', () => {
     });
     expect(limited.declarations.length).toBeLessThanOrEqual(2);
     expect(limited.coverage.status === 'partial' || limited.declarations.length <= 2).toBe(true);
+  });
+
+  it('marks checker exceptions as partial semantic coverage', async () => {
+    const projectDir = writeProject({
+      'src/a.ts': `export interface A { value: string }\nexport const a: A = { value: 'x' };\n`,
+    });
+    const { program, discovery, catalog } = await exactSemanticFacts(projectDir);
+    const checker = program.getTypeChecker();
+    vi.spyOn(checker, 'getSymbolAtLocation').mockImplementation(() => {
+      throw new Error('synthetic checker fault');
+    });
+
+    const facts = collectSemanticReferenceFacts({
+      program,
+      discoveredFiles: discovery.files,
+      projectRootAbs: discovery.projectDirAbs,
+      crossPackage: buildCrossPackageContext(catalog, discovery.projectDirAbs),
+    });
+
+    expect(facts.coverage.status).toBe('partial');
+    expect(facts.coverage.reasons).toContain('semantic-checker-fault');
+  });
+
+  it('accounts for an unresolvable declaration path before classifying it as external', () => {
+    const projectDir = writeProject({ 'src/a.ts': 'export const a = 1;\n' });
+    const coverage = { reasons: [] as string[] };
+
+    expect(isExternalDeclarationFile(join(projectDir, 'missing.d.ts'), projectDir, coverage)).toBe(
+      true,
+    );
+    expect(coverage.reasons).toContain('declaration-realpath-unresolvable');
   });
 
   it('returns present-empty complete coverage when there are no project facts', async () => {

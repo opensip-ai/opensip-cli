@@ -264,7 +264,7 @@ function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
     } else {
       ctx.decls.push(fact);
       ctx.coverage.emittedDeclarations++;
-      const sym = symbolOfDeclaration(node, ctx.checker);
+      const sym = symbolOfDeclaration(node, ctx.checker, ctx.coverage);
       if (sym !== undefined) {
         const real = unaliasSymbol(sym, ctx.checker);
         if (!ctx.declBySymbol.has(real)) ctx.declBySymbol.set(real, { fact, symbol: real });
@@ -379,7 +379,8 @@ function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
   try {
     symbol = file.checker.getSymbolAtLocation(id);
   } catch {
-    // @swallow-ok the TypeScript checker throws on some synthetic nodes; no symbol means no semantic fact, and the occurrence is still recorded from syntax
+    // @swallow-ok a checker fault drops only this semantic fact; coverage records the degradation
+    file.coverage.reasons.push('semantic-checker-fault');
     symbol = undefined;
   }
   if (symbol === undefined) {
@@ -465,7 +466,7 @@ function emitNonLocalReference(
   }
 
   // External / lib .d.ts — label external, no target id.
-  if (isExternalDeclarationFile(declSf.fileName, ctx.projectRootReal)) {
+  if (isExternalDeclarationFile(declSf.fileName, ctx.projectRootReal, ctx.coverage)) {
     emitRefFact(ctx, {
       targetName: boundText(real.getName(), ctx.limits),
       basis: 'external',
@@ -787,12 +788,17 @@ function declarationNameNode(node: ts.Node): ts.Node | undefined {
   return undefined;
 }
 
-function symbolOfDeclaration(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
+function symbolOfDeclaration(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+  coverage: MutableCoverage,
+): ts.Symbol | undefined {
   let symbol: ts.Symbol | undefined;
   try {
     symbol = checker.getSymbolAtLocation(declarationNameNode(node) ?? node);
   } catch {
-    // @swallow-ok same checker hazard on the declaration path; absence of a symbol is a valid answer here, not a failure
+    // @swallow-ok same checker hazard on the declaration path; coverage records the degradation
+    coverage.reasons.push('semantic-checker-fault');
     symbol = undefined;
   }
   return symbol;
@@ -1075,9 +1081,16 @@ function isGeneratedFile(rel: string): boolean {
   return /\bdist\/|\bbuild\/|\.generated\./.test(rel);
 }
 
-function isExternalDeclarationFile(fileName: string, projectRootReal: string): boolean {
+export function isExternalDeclarationFile(
+  fileName: string,
+  projectRootReal: string,
+  coverage: Pick<MutableCoverage, 'reasons'>,
+): boolean {
   const real = safeRealpath(fileName);
-  if (real === undefined) return true;
+  if (real === undefined) {
+    coverage.reasons.push('declaration-realpath-unresolvable');
+    return true;
+  }
   if (!isPathInside(real, projectRootReal)) return true;
   const norm = real.split(sep).join('/');
   return (
