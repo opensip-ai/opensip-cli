@@ -73,12 +73,24 @@ export function buildCrossPackageContext(
 export function derivePackageRoots(catalog: Catalog, projectDirAbs: string): string[] {
   const rootDirs = new Set<string>();
   const projectRootAbs = normalizeDir(projectDirAbs);
+  // A resolve invocation may probe the same ancestors thousands of times, but
+  // MCP can rebuild repeatedly in one process. Cache only for this invocation
+  // so a newly added/removed package.json is observed on the next build.
+  const manifestDirs = new Set<string>();
+  const nonManifestDirs = new Set<string>();
+  const hasManifest = (dirAbs: string): boolean => {
+    if (manifestDirs.has(dirAbs)) return true;
+    if (nonManifestDirs.has(dirAbs)) return false;
+    const present = existsSync(join(dirAbs, 'package.json'));
+    (present ? manifestDirs : nonManifestDirs).add(dirAbs);
+    return present;
+  };
 
   for (const occs of Object.values(catalog.functions)) {
     if (!occs) continue;
     for (const occ of occs) {
       const fileDirAbs = dirname(join(projectDirAbs, occ.filePath));
-      const root = findPackageRoot(fileDirAbs, projectRootAbs);
+      const root = findPackageRoot(fileDirAbs, projectRootAbs, hasManifest);
       if (root !== undefined) rootDirs.add(root);
     }
   }
@@ -90,7 +102,11 @@ export function derivePackageRoots(catalog: Catalog, projectDirAbs: string): str
  * including `projectRootAbs`) that contains a `package.json`. Returns
  * `undefined` when no manifest is found up to the project root.
  */
-function findPackageRoot(startDirAbs: string, projectRootAbs: string): string | undefined {
+function findPackageRoot(
+  startDirAbs: string,
+  projectRootAbs: string,
+  hasManifest: (dirAbs: string) => boolean,
+): string | undefined {
   let dir = normalizeDir(startDirAbs);
   for (;;) {
     if (hasManifest(dir)) return dir;
@@ -99,19 +115,6 @@ function findPackageRoot(startDirAbs: string, projectRootAbs: string): string | 
     if (parent === dir) return undefined; // filesystem root — give up
     dir = parent;
   }
-}
-
-const MANIFEST_DIRS = new Set<string>();
-const NON_MANIFEST_DIRS = new Set<string>();
-
-/** Memoized `<dir>/package.json` existence probe (process-lifetime cache —
- *  package.json presence is stable within a run). */
-function hasManifest(dirAbs: string): boolean {
-  if (MANIFEST_DIRS.has(dirAbs)) return true;
-  if (NON_MANIFEST_DIRS.has(dirAbs)) return false;
-  const present = existsSync(join(dirAbs, 'package.json'));
-  (present ? MANIFEST_DIRS : NON_MANIFEST_DIRS).add(dirAbs);
-  return present;
 }
 
 /** Strip a trailing path separator so dir comparisons are stable. */
