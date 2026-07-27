@@ -32,6 +32,14 @@ describe('createPressureMonitor', () => {
       } catch (error) {
         expect(error).toBeInstanceOf(MemoryPressureError);
         expect((error as MemoryPressureError).stage).toBe('walk');
+        expect(error).toMatchObject({
+          code: 'CORE.SYSTEM.RESOURCE',
+          definition: {
+            kind: 'resource',
+            exitClass: 'runtime',
+            exposure: 'redacted',
+          },
+        });
       }
     } finally {
       monitor.dispose();

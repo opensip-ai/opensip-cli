@@ -388,6 +388,29 @@ describe('GraphLanguageAdapter contract — TypeScript', () => {
       }),
     ).resolves.toBeDefined();
   });
+
+  it('types a missing owner coordinate as an adapter invariant failure', async () => {
+    const { walk, catalog, project } = await buildPipeline(typescriptGraphAdapter, dir);
+    const first = walk.callSites[0];
+    expect(first).toBeDefined();
+    const records: CallSiteRecord[] = [
+      { ...first, ownerLine: undefined },
+      ...walk.callSites.slice(1),
+    ];
+
+    await expect(
+      typescriptGraphAdapter.resolveCallSites({
+        project,
+        catalog,
+        callSites: records,
+        projectDirAbs: dir,
+        resolutionMode: 'exact',
+      }),
+    ).rejects.toMatchObject({
+      code: 'GRAPH.TS.OWNER_POSITION_MISSING',
+      metadata: { field: 'ownerLine' },
+    });
+  });
 });
 
 // ── Python adapter ──────────────────────────────────────────────────

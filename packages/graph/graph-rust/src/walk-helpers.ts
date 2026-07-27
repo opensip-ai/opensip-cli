@@ -2,7 +2,12 @@
  * Shared occurrence-building helpers for the Rust AST walker.
  */
 
-import { childrenOf, nameOf, namedChildrenOf } from '@opensip-cli/graph-adapter-common';
+import {
+  childrenOf,
+  nameOf,
+  namedChildrenOf,
+  type WalkTraversalGuard,
+} from '@opensip-cli/graph-adapter-common';
 
 import { digestRustBody } from './body-digest.js';
 
@@ -23,6 +28,7 @@ export interface WalkCtx {
   readonly definedInGenerated: boolean;
   readonly out: Record<string, FunctionOccurrence[]>;
   readonly callSites: CallSiteRecord[];
+  readonly traversal: WalkTraversalGuard;
 }
 
 export function implTargetName(node: Node): string {

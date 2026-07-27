@@ -62,6 +62,46 @@ describe('generateDashboardHtml — graph catalog wiring', () => {
     expect(Object.keys(parsed.functions)).toContain('foo');
   });
 
+  it('keeps the report usable and records remediation for a malformed graph catalog', () => {
+    const html = generateDashboardHtml({
+      sessions: [],
+      graphCatalog: {} as unknown as GraphCatalog,
+    });
+
+    expect(html).not.toContain('id="graph-catalog"');
+    expect(html).toContain('id="graph-visualization-degradations"');
+    expect(html).toContain('catalog-projection-failed');
+    expect(html).toContain('Run `opensip graph`, then regenerate this report.');
+    expect(html).toContain("renderDashboardPanel('panel-overview'");
+  });
+
+  it('guards every client panel so one renderer cannot stop the remaining report', () => {
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+
+    expect(html).toContain('function renderDashboardPanel(panelId, label, render)');
+    expect(html).toContain("globalThis.addEventListener('error'");
+    expect(html).toContain("globalThis.addEventListener('unhandledrejection'");
+    expect(html).toContain('id="report-degradation-banner"');
+    expect(html).toContain('The rest of the report remains available.');
+    expect(html).toContain("renderDashboardPanel('panel-change-impact'");
+    expect(html).toContain('renderDashboardPanel("panel-code-paths", "Code Graph"');
+    expect(html.indexOf('function renderDashboardPanel')).toBeLessThan(
+      html.indexOf('// The vendored Cytoscape renderer'),
+    );
+  });
+
+  it('does not load fonts or other resources from external hosts', () => {
+    const html = generateDashboardHtml({ sessions: [], graphCatalog: minimalCatalog });
+    const remoteResourceTags =
+      html.match(
+        /<(?:audio|iframe|img|link|script|source|video)\b[^>]*(?:href|src)=["']https?:\/\//giu,
+      ) ?? [];
+
+    expect(remoteResourceTags).toEqual([]);
+    expect(html).not.toMatch(/url\(["']?https?:\/\//iu);
+    expect(html).not.toContain('fonts.googleapis.com');
+  });
+
   it('embeds EDITOR_PROTOCOL = null when no editorProtocol is supplied', () => {
     const html = generateDashboardHtml({ sessions: [], graphCatalog: null });
     expect(html).toContain('const EDITOR_PROTOCOL = null;');

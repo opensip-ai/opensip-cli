@@ -8,9 +8,17 @@ import {
   testSelectionSnapshotIdentityMatches,
   testSelectionSnapshotSchema,
 } from '@opensip-cli/contracts';
-import { currentLogger, currentScope, isRecord, ValidationError } from '@opensip-cli/core';
+import {
+  createToolError,
+  currentLogger,
+  currentScope,
+  isRecord,
+  ValidationError,
+} from '@opensip-cli/core';
 import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datastore/internal';
 import { desc, eq, inArray } from 'drizzle-orm';
+
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import { graphContextSnapshot } from './schema.js';
 
@@ -29,6 +37,19 @@ export const MAX_CONTEXT_SNAPSHOT_TOTAL_BYTES = 24 * 1024 * 1024;
 const SAFE_CODE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const INVALID_SNAPSHOT_CODE = 'GRAPH.CONTEXT_SNAPSHOT.INVALID';
 const MODULE_NAME = 'graph:context-snapshot-repo';
+const SNAPSHOT_PAYLOAD_MALFORMED = graphErrorCatalog.require(
+  'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED',
+);
+
+type PersistedPayloadCondition =
+  | 'payload-not-json'
+  | 'byte-count-mismatch'
+  | 'inventory-schema-invalid'
+  | 'inventory-row-id-mismatch'
+  | 'inventory-identity-mismatch'
+  | 'test-selection-schema-invalid'
+  | 'test-selection-row-id-mismatch'
+  | 'test-selection-identity-mismatch';
 
 interface PruneSummary {
   readonly kind: string;
@@ -142,6 +163,74 @@ function validateInput(input: ContextSnapshotSaveInput): {
 
 type SnapshotRow = typeof graphContextSnapshot.$inferSelect;
 
+function malformedPersistedPayload(condition: PersistedPayloadCondition, cause?: unknown): Error {
+  return createToolError(
+    SNAPSHOT_PAYLOAD_MALFORMED,
+    'Stored graph context snapshot payload is malformed.',
+    {
+      ...(cause === undefined ? {} : { cause }),
+      metadata: { condition },
+    },
+  );
+}
+
+/** @throws {Error} When the stored inventory shape, row binding, or identity is invalid. */
+function validatedInventoryPayload(row: SnapshotRow): unknown {
+  const parsed = projectInventorySnapshotSchema.safeParse(row.payload);
+  if (!parsed.success) throw malformedPersistedPayload('inventory-schema-invalid');
+  if (parsed.data.snapshotId !== row.id) {
+    throw malformedPersistedPayload('inventory-row-id-mismatch');
+  }
+  if (!projectInventorySnapshotIdentityMatches(parsed.data)) {
+    throw malformedPersistedPayload('inventory-identity-mismatch');
+  }
+  return parsed.data;
+}
+
+/** @throws {Error} When the stored test-selection shape, row binding, or identity is invalid. */
+function validatedTestSelectionPayload(row: SnapshotRow): unknown {
+  const parsed = testSelectionSnapshotSchema.safeParse(row.payload);
+  if (!parsed.success) throw malformedPersistedPayload('test-selection-schema-invalid');
+  if (parsed.data.snapshotId !== row.id) {
+    throw malformedPersistedPayload('test-selection-row-id-mismatch');
+  }
+  if (!testSelectionSnapshotIdentityMatches(parsed.data)) {
+    throw malformedPersistedPayload('test-selection-identity-mismatch');
+  }
+  return parsed.data;
+}
+
+/**
+ * Re-establish the immutable payload proof at the persistence boundary.
+ *
+ * Future schema versions remain opaque so the public reader can report `unsupported-version`;
+ * current schemas must prove shape, row binding, and their content-derived snapshot identity.
+ *
+ * @throws {Error} When a current-version payload fails encoding, byte-count, shape, or identity
+ *   validation.
+ */
+function validatedPersistedPayload(row: SnapshotRow): unknown {
+  let encoded: string;
+  try {
+    encoded = canonicalJson(row.payload);
+  } catch (error) {
+    throw malformedPersistedPayload('payload-not-json', error);
+  }
+  if (Buffer.byteLength(encoded, 'utf8') !== row.byteCount) {
+    throw malformedPersistedPayload('byte-count-mismatch');
+  }
+
+  if (row.kind === 'inventory' && row.schemaVersion === PROJECT_INVENTORY_SCHEMA_VERSION) {
+    return validatedInventoryPayload(row);
+  }
+
+  if (row.kind === 'test-selection' && row.schemaVersion === TEST_SELECTION_SCHEMA_VERSION) {
+    return validatedTestSelectionPayload(row);
+  }
+
+  return row.payload;
+}
+
 function fromRow(row: SnapshotRow): ContextSnapshotRecord {
   return {
     id: row.id,
@@ -152,7 +241,7 @@ function fromRow(row: SnapshotRow): ContextSnapshotRecord {
     sourceIdentity: row.sourceIdentity,
     configIdentity: row.configIdentity,
     byteCount: row.byteCount,
-    payload: row.payload,
+    payload: validatedPersistedPayload(row),
   };
 }
 

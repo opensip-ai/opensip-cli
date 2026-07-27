@@ -11,6 +11,7 @@ import {
   processTreeTrackingReliable,
   retainPosixProcessTree,
   sampleProcessTree,
+  sampleProcessTreeIfDue,
   signalProcessTree,
   stopProcessTreeTracking,
 } from '../runner/process-tree.js';
@@ -179,6 +180,18 @@ export interface BoundedStdioTerminalStatus {
   readonly signal: NodeJS.Signals | null;
 }
 
+/** Harness-local identity for an unsolicited MCP process termination. */
+export class UnexpectedMcpTerminalError extends Error {
+  public constructor(status: BoundedStdioTerminalStatus) {
+    const terminalDescription =
+      status.exitCode === null
+        ? `signal ${String(status.signal)}`
+        : `exit ${String(status.exitCode)}`;
+    super(`MCP server exited unexpectedly (${terminalDescription}).`);
+    this.name = 'UnexpectedMcpTerminalError';
+  }
+}
+
 type TransportMessage = Parameters<Transport['send']>[0];
 
 interface BoundedStdioTransport extends Transport {
@@ -302,11 +315,11 @@ export class BoundedStdioClientTransport implements BoundedStdioTransport {
       });
     }
     child.stdout.on('data', (chunk: Buffer) => {
-      if (this.processTree !== undefined) sampleProcessTree(this.processTree);
+      if (this.processTree !== undefined) sampleProcessTreeIfDue(this.processTree);
       this.consumeStdout(chunk);
     });
     child.stderr.on('data', () => {
-      if (this.processTree !== undefined) sampleProcessTree(this.processTree);
+      if (this.processTree !== undefined) sampleProcessTreeIfDue(this.processTree);
     });
     child.stderr.pipe(this.stderrStream, { end: false });
     child.stdin.on('error', (error) => this.reportError(error));
@@ -451,9 +464,7 @@ export class BoundedStdioClientTransport implements BoundedStdioTransport {
     }
     if (this.processTree !== undefined) sampleProcessTree(this.processTree);
     if (!this.clientCloseRequested && this.fatalError === undefined) {
-      const terminalDescription =
-        exitCode === null ? `signal ${String(signal)}` : `exit ${String(exitCode)}`;
-      this.fatalError = new Error(`MCP server exited unexpectedly (${terminalDescription}).`);
+      this.fatalError = new UnexpectedMcpTerminalError({ exitCode, signal });
     }
     if (this.treeIsAlive() || !this.trackingReliable()) this.signalProcessTree('SIGTERM');
     void this.beginInternalClose().catch((error: unknown) => {
@@ -508,7 +519,7 @@ export class BoundedStdioClientTransport implements BoundedStdioTransport {
   }
 
   private isUnexpectedTerminalError(): boolean {
-    return this.fatalError?.message.startsWith('MCP server exited unexpectedly') === true;
+    return this.fatalError instanceof UnexpectedMcpTerminalError;
   }
 
   private replaceGenericTerminalError(error: Error): void {

@@ -29,6 +29,7 @@ import type {
   CrossBoundaryCall,
   DependencyEdge,
   FunctionOccurrence,
+  GraphRunDegradation,
   ParseError,
   ReExportRecord,
   ResolutionMode,
@@ -89,6 +90,8 @@ export interface CatalogBuildOptions {
    * `'sharded'`.
    */
   readonly engineMode?: EngineMode;
+  /** Host cancellation/deadline signal threaded into adapter calls. */
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -103,9 +106,18 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  readonly degradations: readonly GraphRunDegradation[];
 }> {
-  const { runStage, adapter, discovery, resolutionMode, onProgress, monitor, emitBoundaryCalls } =
-    options;
+  const {
+    runStage,
+    adapter,
+    discovery,
+    resolutionMode,
+    onProgress,
+    monitor,
+    emitBoundaryCalls,
+    signal,
+  } = options;
   const engineMode: EngineMode = options.engineMode ?? 'exact';
   // Phase 4 unified walk: Stage 1's catalog construction and Stage 2's
   // call-site location share a single AST descent per file. The walk
@@ -121,6 +133,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
         files: discovery.files,
         compilerOptions: discovery.compilerOptions,
         resolutionMode,
+        signal,
       }),
     detailFn: () => adapter.displayName,
   });
@@ -133,6 +146,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
         project: parsed.project,
         files: discovery.files,
         projectDirAbs: discovery.projectDirAbs,
+        signal,
       }),
     detailFn: (w) => `${String(Object.keys(w.occurrences).length)} functions`,
   });
@@ -144,6 +158,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     resolutionMode,
     engineMode,
     reExports: walked.reExports ?? [],
+    signal,
   });
 
   // Stitch inside the resolve stage so the checklist detail counts the
@@ -164,6 +179,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
         projectDirAbs: discovery.projectDirAbs,
         resolutionMode,
         emitBoundaryCalls,
+        signal,
       });
       const catalog = attachSemanticFacts(
         stitchEdges(initialCatalog, result.edgesByOwner, result.dependenciesByOwner),
@@ -179,6 +195,7 @@ export async function buildAndResolveCatalog(options: CatalogBuildOptions): Prom
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
+    degradations: resolved.degradations ?? [],
   };
 }
 
@@ -216,6 +233,8 @@ export interface IncrementalCatalogBuildOptions {
   /** Emit cross-boundary descriptors for the re-walked closure (Phase 3
    *  convergence — the exact path recovers them so warm == cold). */
   readonly emitBoundaryCalls?: boolean;
+  /** Host cancellation/deadline signal threaded into adapter calls. */
+  readonly signal?: AbortSignal;
 }
 
 export async function buildAndResolveCatalogIncremental(
@@ -225,6 +244,7 @@ export async function buildAndResolveCatalogIncremental(
   readonly resolutionStats: ResolutionStats;
   readonly boundaryCalls?: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  readonly degradations: readonly GraphRunDegradation[];
 }> {
   const {
     runStage,
@@ -236,6 +256,7 @@ export async function buildAndResolveCatalogIncremental(
     onProgress,
     monitor,
     emitBoundaryCalls,
+    signal,
   } = options;
   const parsed = await runStage({
     stage: 'parse',
@@ -247,6 +268,7 @@ export async function buildAndResolveCatalogIncremental(
         files: discovery.files,
         compilerOptions: discovery.compilerOptions,
         resolutionMode,
+        signal,
       }),
     detailFn: () => `${adapter.displayName} (incremental)`,
   });
@@ -262,6 +284,7 @@ export async function buildAndResolveCatalogIncremental(
         cachedCatalog,
         parsedProject: parsed.project,
         changedFilesAbs,
+        signal,
       }),
     detailFn: (out) => `${String(out.closureRel.size)} closure file(s)`,
   });
@@ -276,6 +299,7 @@ export async function buildAndResolveCatalogIncremental(
       discovery,
       occurrences: mergedFunctions as Record<string, FunctionOccurrence[]>,
       resolutionMode,
+      signal,
     })),
     functions: mergedFunctions,
     ...(mergedReExports.length > 0 ? { reExports: mergedReExports } : {}),
@@ -307,6 +331,7 @@ export async function buildAndResolveCatalogIncremental(
         projectDirAbs: discovery.projectDirAbs,
         resolutionMode,
         emitBoundaryCalls,
+        signal,
       });
       const finalFunctions = mergeResolvedAndCachedEdges(
         initialCatalog,
@@ -343,6 +368,7 @@ export async function buildAndResolveCatalogIncremental(
     resolutionStats: resolved.stats,
     boundaryCalls: resolved.boundaryCalls,
     parseErrors: [...parsed.parseErrors, ...walked.parseErrors],
+    degradations: resolved.degradations ?? [],
   };
 }
 
@@ -390,6 +416,7 @@ interface AssembleCatalogInput {
   readonly resolutionMode: ResolutionMode;
   readonly engineMode?: EngineMode;
   readonly reExports?: readonly ReExportRecord[];
+  readonly signal?: AbortSignal;
 }
 
 /**
@@ -405,6 +432,7 @@ async function assembleCatalog(input: AssembleCatalogInput): Promise<Catalog> {
     resolutionMode,
     engineMode = 'exact',
     reExports = [],
+    signal,
   } = input;
   return {
     version: '3.0',
@@ -422,6 +450,7 @@ async function assembleCatalog(input: AssembleCatalogInput): Promise<Catalog> {
         configPathAbs: discovery.configPathAbs,
         compilerOptions: discovery.compilerOptions,
         resolutionMode,
+        signal,
       }),
       engineMode,
     ),

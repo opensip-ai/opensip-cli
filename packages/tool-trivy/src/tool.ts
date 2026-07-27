@@ -29,8 +29,12 @@
  * trivy id.
  */
 
-import { readPackageVersion } from '@opensip-cli/core';
-import { compareVersion, defineExternalToolAdapter } from '@opensip-cli/external-tool-adapter';
+import { readPackageVersion, ToolError } from '@opensip-cli/core';
+import {
+  compareVersion,
+  defineExternalToolAdapter,
+  externalToolErrorCatalog,
+} from '@opensip-cli/external-tool-adapter';
 
 import type { Tool, ToolIdentity } from '@opensip-cli/core';
 import type { AdapterRunContext } from '@opensip-cli/external-tool-adapter';
@@ -42,6 +46,22 @@ export const TRIVY_IDENTITY: ToolIdentity = {
 
 /** Stable UUID identity (ADR-0048); mirrors `opensipTools.stableId` in package.json. */
 export const TRIVY_STABLE_ID = 'a26ea0eb-ee3b-4e22-a3f3-7e1f93e16000';
+const SCAN_FAULT = externalToolErrorCatalog.require('EXTERNAL.SCANNER.FAULT');
+
+function requireComparableVersion(ctx: AdapterRunContext): string {
+  const version = ctx.binary.version;
+  if (version === undefined || compareVersion(version, '0.40.0') === 'unknown') {
+    throw new ToolError(
+      'Trivy version could not be determined; refusing to guess version-specific scan flags.',
+      SCAN_FAULT.code,
+      {
+        definition: SCAN_FAULT,
+        metadata: { condition: 'version-unknown', scanner: 'trivy' },
+      },
+    );
+  }
+  return version;
+}
 
 /**
  * Normalize the `trivy --version` stdout to a bare semver. Trivy prints a
@@ -82,14 +102,15 @@ export function parseTrivyVersion(stdout: string): string {
  * substrate derives findings from the parsed SARIF (any nonzero is a fault).
  */
 export function buildScanArgs(ctx: AdapterRunContext): readonly string[] {
+  const version = requireComparableVersion(ctx);
   // Trivy renamed the scanner value `config` → `misconfig` in 0.48 and the
   // check-update flag in 0.51. Keep the adapter's declared 0.40 floor usable.
   const scanners =
-    compareVersion(ctx.binary.version, '0.48.0') === 'too-old'
+    compareVersion(version, '0.48.0') === 'too-old'
       ? 'vuln,secret,config'
       : 'vuln,secret,misconfig';
   const skipCheckUpdate =
-    compareVersion(ctx.binary.version, '0.51.0') === 'too-old'
+    compareVersion(version, '0.51.0') === 'too-old'
       ? '--skip-policy-update'
       : '--skip-check-update';
 

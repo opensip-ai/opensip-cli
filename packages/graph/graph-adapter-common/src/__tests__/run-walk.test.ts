@@ -163,6 +163,97 @@ describe('runWalk', () => {
     expect(out.parseErrors[0]?.message).toBe('plain-string-failure');
   });
 
+  it('discards every staged record when a file walk fails partway through', () => {
+    const files = new Map<string, TreeSitterParsedFile>([['/proj/bad.go', mkFile('bad')]]);
+    const input: WalkInput<P> = {
+      project: { files },
+      projectDirAbs: '/proj',
+      files: ['/proj/bad.go'],
+    };
+
+    const out = runWalk<P>({
+      input,
+      walkFile: (_absPath, _file, _projectDirAbs, sinks): void => {
+        record(sinks.occurrences, occ('partial', 'partial-hash'));
+        sinks.callSites.push(callSite('partial-hash'));
+        sinks.dependencySites.push(depSite('./partial', 'partial-hash'));
+        throw new Error('walk failed after mutation');
+      },
+    });
+
+    expect(out.occurrences).toEqual({});
+    expect(out.callSites).toEqual([]);
+    expect(out.dependencySites).toEqual([]);
+    expect(out.parseErrors).toEqual([
+      { filePath: 'bad.go', message: 'walk failed after mutation' },
+    ]);
+  });
+
+  it('classifies recursion exhaustion without retaining raw stack text or staged evidence', () => {
+    const files = new Map<string, TreeSitterParsedFile>([['/proj/deep.go', mkFile('deep')]]);
+    const input: WalkInput<P> = {
+      project: { files },
+      projectDirAbs: '/proj',
+      files: ['/proj/deep.go'],
+    };
+
+    const out = runWalk<P>({
+      input,
+      walkFile: (_absPath, _file, _projectDirAbs, sinks): void => {
+        record(sinks.occurrences, occ('partial', 'partial-hash'));
+        throw new RangeError('Maximum call stack size exceeded at /proj/deep.go');
+      },
+    });
+
+    expect(out.occurrences).toEqual({});
+    expect(out.parseErrors).toEqual([
+      {
+        filePath: 'deep.go',
+        message: 'walker recursion capacity exceeded; no evidence retained for this file',
+      },
+    ]);
+  });
+
+  it('bounds adapter recursion before the JavaScript stack is exhausted', () => {
+    const files = new Map<string, TreeSitterParsedFile>([['/proj/deep.go', mkFile('deep')]]);
+    const input: WalkInput<P> = {
+      project: { files },
+      projectDirAbs: '/proj',
+      files: ['/proj/deep.go'],
+    };
+
+    const out = runWalk<P>({
+      input,
+      walkFile: (_path, _file, _root, _sinks, traversal): void => {
+        traversal.checkpoint(Number.MAX_SAFE_INTEGER);
+      },
+    });
+
+    expect(out.parseErrors[0]?.message).toBe(
+      'walker recursion capacity exceeded; no evidence retained for this file',
+    );
+  });
+
+  it('scrubs the project root from an ordinary walker failure', () => {
+    const files = new Map<string, TreeSitterParsedFile>([['/proj/private.go', mkFile('private')]]);
+    const input: WalkInput<P> = {
+      project: { files },
+      projectDirAbs: '/proj',
+      files: ['/proj/private.go'],
+    };
+
+    const out = runWalk<P>({
+      input,
+      walkFile: (): void => {
+        throw new Error('failed while walking /proj/private.go');
+      },
+    });
+
+    expect(out.parseErrors).toEqual([
+      { filePath: 'private.go', message: 'failed while walking private.go' },
+    ]);
+  });
+
   it('skips an entry whose project map claims `has` but returns no value from `get` (defensive guard)', () => {
     // A Map-like whose has/get disagree for one key — the exact inconsistency
     // the `if (!file) continue;` guard defends against (e.g. a concurrently

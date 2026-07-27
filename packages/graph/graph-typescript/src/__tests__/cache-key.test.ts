@@ -5,11 +5,12 @@
  * deterministic output for the same input.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { logger } from '@opensip-cli/core';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { cacheKey } from '../cache-key.js';
 
@@ -21,6 +22,7 @@ describe('lang-typescript cacheKey — branches', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -35,10 +37,55 @@ describe('lang-typescript cacheKey — branches', () => {
     expect(out).toContain('-no-tsconfig');
   });
 
-  it('returns ts-<version>-missing:<path> when the tsconfig does not exist', () => {
+  it('uses a location-independent marker when the tsconfig does not exist', () => {
     const fake = join(dir, 'tsconfig.json');
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
     const out = cacheKey({ projectDirAbs: dir, configPathAbs: fake, resolutionMode: 'exact' });
-    expect(out).toContain('missing:');
+    expect(out).toContain('missing-tsconfig');
+    expect(out).not.toContain(dir);
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'GRAPH.TSCONFIG.NOT_FOUND',
+        condition: 'config-missing',
+      }),
+    );
+  });
+
+  it('keeps an unreadable config from failing cache-key computation', () => {
+    const configDirectory = join(dir, 'tsconfig.json');
+    mkdirSync(configDirectory);
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const out = cacheKey({
+      projectDirAbs: dir,
+      configPathAbs: configDirectory,
+      resolutionMode: 'exact',
+    });
+
+    expect(out).toContain('unreadable-tsconfig');
+    expect(out).not.toContain(dir);
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boundaryCode: 'GRAPH.TSCONFIG.LOAD_FAILED',
+        condition: 'config-read-failed',
+      }),
+    );
+  });
+
+  it('bounds config reads before TypeScript resolves the config', () => {
+    const file = join(dir, 'tsconfig.json');
+    writeFileSync(file, `{"padding":"${'x'.repeat(1_000_000)}"}`, 'utf8');
+    const warning = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+
+    const out = cacheKey({ projectDirAbs: dir, configPathAbs: file, resolutionMode: 'exact' });
+
+    expect(out).toContain('unreadable-tsconfig');
+    expect(warning).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boundaryCode: 'GRAPH.TSCONFIG.LOAD_FAILED',
+        condition: 'config-read-failed',
+      }),
+    );
   });
 
   it('returns a stable ts-<version>-<hash> when the tsconfig is readable', () => {

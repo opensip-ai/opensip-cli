@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import {
   mapEngineSlugToOpenSipRuleId,
   mapOpenSipRuleIdToEngineSlug,
+  GRAPH_DIAGNOSTIC_SLUGS,
   OPENSIP_RULE_ID_REGEX,
   RULE_ID_MAPPING,
 } from '../../render/rule-id-mapping.js';
@@ -48,6 +49,9 @@ describe('mapEngineSlugToOpenSipRuleId', () => {
     expect(mapEngineSlugToOpenSipRuleId('graph:test-only-reachable')).toBe(
       'graph.dead-code.test-only-reachable',
     );
+    expect(mapEngineSlugToOpenSipRuleId('graph:catalog-partial-coverage')).toBe(
+      'graph.resilience.catalog-partial-coverage',
+    );
   });
 
   it('throws ValidationError for unknown slug', () => {
@@ -70,7 +74,7 @@ describe('mapEngineSlugToOpenSipRuleId', () => {
 
   it('mapping table has no extras beyond the registered rules', () => {
     const rules = withGraphScopeSync(() => currentRules());
-    const registeredSlugs = new Set(rules.map((r) => r.slug));
+    const registeredSlugs = new Set([...rules.map((r) => r.slug), ...GRAPH_DIAGNOSTIC_SLUGS]);
     for (const mappedSlug of Object.keys(RULE_ID_MAPPING)) {
       expect(
         registeredSlugs.has(mappedSlug),

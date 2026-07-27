@@ -109,4 +109,26 @@ describe('createParseProjectFromAdapter', () => {
     expect(out.project.files.size).toBe(0);
     expect(out.parseErrors).toEqual([]);
   });
+
+  it('projects adapter failures without retaining the absolute project path', () => {
+    const bad = join(dir, 'private.txt');
+    writeFileSync(bad, 'secret source', 'utf8');
+    const adapter = {
+      id: 'fake',
+      parse(): ParsedFile {
+        throw new Error(`parser rejected ${bad}`);
+      },
+    } as never as LanguageAdapter<ParsedFile>;
+
+    const out = createParseProjectFromAdapter(adapter)({
+      projectDirAbs: dir,
+      files: [bad],
+      resolutionMode: 'exact',
+    });
+
+    expect(out.parseErrors).toEqual([
+      { filePath: 'private.txt', message: 'parser rejected private.txt' },
+    ]);
+    expect(out.parseErrors[0]?.message).not.toContain(dir);
+  });
 });

@@ -20,12 +20,12 @@ export function dashboardCssTheme(): string {
   --warning: #d4a574; --warning-light: rgba(212,165,116,0.2);
   --error: #c75b4a; --error-light: rgba(199,91,74,0.2);
   --border: #1f1f1f; --border-light: #2a2a2a;
-  /* Type matched to opensip.ai: Geist sans everywhere, Geist Mono for code.
-     Like the site, display headings are the SAME family differentiated by
-     weight (not a separate serif) — see the bumped h1/h2 weights below. */
-  --font: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Keep the report self-contained by using platform fonts. Display headings
+     use the same family differentiated by weight; code uses the system mono
+     stack below. */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font);
-  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --radius: 8px; --radius-sm: 4px;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -37,6 +37,7 @@ h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text-mu
 .header-icon { color: var(--accent); display: flex; align-items: center; }
 .header-title { min-width: 0; }
 .header-brand { color: var(--accent); font-size: 13px; font-weight: 500; }
+.report-degradation-banner { margin: 0 0 20px; padding: 12px 14px; color: var(--warning); background: var(--warning-light); border: 1px solid var(--warning); border-radius: var(--radius); font-weight: 600; }
 .report-details { margin-left: auto; position: relative; font-size: 13px; }
 .report-details summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-weight: 600; padding: 4px 0; user-select: none; }
 .report-details summary::-webkit-details-marker { display: none; }

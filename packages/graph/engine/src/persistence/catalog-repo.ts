@@ -17,6 +17,7 @@ import { sql } from 'drizzle-orm';
 
 import { isSafeShardedCacheAnchor } from '../cache/sharded-cache-key.js';
 import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
+import { CALL_EDGE_TEXT_MAX } from '../lang-adapter/edge-helpers.js';
 import { isValidDependencyFormRole } from '../types.js';
 
 import { graphCatalog, graphShardFragment } from './schema.js';
@@ -67,6 +68,8 @@ const MAX_EDGES_PER_OCCURRENCE = 100_000;
 const MAX_NESTED_EDGES = 5_000_000;
 const MAX_TARGETS_PER_EDGE = 10_000;
 const MAX_NESTED_TARGETS = 10_000_000;
+const MAX_BOUNDARY_CALLS = 5_000_000;
+const MAX_PARSE_ERRORS = 1_000_000;
 const MAX_FINGERPRINT = 64 * 1024 * 1024;
 const ADAPTER_ID = /^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,63})$/;
 
@@ -192,7 +195,8 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
           key !== 'status' &&
           key !== 'discoveredFiles' &&
           key !== 'parseErrorFiles' &&
-          key !== 'filesIdentity',
+          key !== 'filesIdentity' &&
+          key !== 'degradations',
       ) ||
       (payload.buildCoverage.status !== 'complete' && payload.buildCoverage.status !== 'partial') ||
       !Number.isSafeInteger(payload.buildCoverage.discoveredFiles) ||
@@ -202,7 +206,11 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
       (payload.buildCoverage.parseErrorFiles as number) >
         (payload.buildCoverage.discoveredFiles as number) ||
       typeof payload.buildCoverage.filesIdentity !== 'string' ||
-      !/^sha256:[a-f0-9]{64}$/u.test(payload.buildCoverage.filesIdentity))
+      !/^sha256:[a-f0-9]{64}$/u.test(payload.buildCoverage.filesIdentity) ||
+      !isSafeGraphDegradations(payload.buildCoverage.degradations) ||
+      (Array.isArray(payload.buildCoverage.degradations) &&
+        payload.buildCoverage.degradations.length > 0 &&
+        payload.buildCoverage.status !== 'partial'))
   ) {
     throw new Error('Malformed catalog build coverage');
   }
@@ -360,6 +368,155 @@ function addBoundedEdges(
     if (counts.targets > MAX_NESTED_TARGETS) return false;
   }
   return true;
+}
+
+interface ShardFragmentRowIdentity {
+  readonly shardId: string;
+  readonly language: string;
+  readonly cacheKey: string;
+  readonly shardFingerprint: string;
+}
+
+/**
+ * Fail-closed validator for one decoded shard-fragment cache payload.
+ *
+ * @throws {Error} When identity, catalog shape, or fragment evidence is malformed.
+ */
+function validateShardBuildResult(
+  value: unknown,
+  row: ShardFragmentRowIdentity,
+): asserts value is ShardBuildResult {
+  if (
+    !isRecord(value) ||
+    value.shardId !== row.shardId ||
+    value.fingerprint !== row.shardFingerprint
+  ) {
+    throw new Error('Malformed shard fragment identity');
+  }
+  validateCatalogShape(value.fragment);
+  validateFunctionContainers(value.fragment);
+  if (
+    value.fragment.language !== row.language ||
+    value.fragment.cacheKey !== row.cacheKey ||
+    !isSafeBoundaryCalls(value.boundaryCalls) ||
+    !isSafeParseErrors(value.parseErrors) ||
+    !isSafeGraphDegradations(value.degradations)
+  ) {
+    throw new Error('Malformed shard fragment payload');
+  }
+}
+
+function isSafeBoundaryCalls(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_BOUNDARY_CALLS &&
+    value.every((entry) => isSafeBoundaryCall(entry))
+  );
+}
+
+function isSafeBoundaryCall(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  return (
+    isSafeCatalogText(value.ownerHash) &&
+    isSafeCatalogText(value.ownerFile) &&
+    isPositiveInteger(value.ownerLine) &&
+    isSafeZeroBasedCoordinate(value.ownerColumn) &&
+    isSafeCatalogText(value.calleeName) &&
+    isOptionalCatalogText(value.importedName) &&
+    isOptionalCatalogText(value.importSpecifier) &&
+    isOptionalCatalogText(value.targetFile) &&
+    (value.importSpecifier !== undefined || value.targetFile !== undefined) &&
+    isPositiveInteger(value.line) &&
+    isSafeZeroBasedCoordinate(value.column) &&
+    isBoundedMessage(value.text, CALL_EDGE_TEXT_MAX) &&
+    (value.discarded === undefined || typeof value.discarded === 'boolean')
+  );
+}
+
+function isSafeParseErrors(value: unknown): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length <= MAX_PARSE_ERRORS &&
+    value.every(
+      (entry) =>
+        isRecord(entry) &&
+        isSafeCatalogText(entry.filePath) &&
+        isBoundedMessage(entry.message, MAX_CATALOG_TEXT) &&
+        isSafeParseErrorCode(entry.code),
+    )
+  );
+}
+
+function isSafeParseErrorCode(value: unknown): boolean {
+  return (
+    value === undefined ||
+    value === 'GRAPH.TS.SOURCE_UNREADABLE' ||
+    value === 'GRAPH.TS.WALK_DEPTH_EXCEEDED' ||
+    value === 'GRAPH.TS.WALK_FAULT'
+  );
+}
+
+function isSafeGraphDegradations(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (Array.isArray(value) &&
+      value.length <= 20 &&
+      value.every((entry) => isSafeGraphDegradation(entry)))
+  );
+}
+
+function isSafeGraphDegradation(value: unknown): boolean {
+  if (!isRecord(value) || Object.keys(value).some((key) => !DEGRADATION_KEYS.has(key))) {
+    return false;
+  }
+  if (!Number.isSafeInteger(value.count) || (value.count as number) <= 0) return false;
+  switch (value.errorCode) {
+    case 'GRAPH.CATALOG.PARTIAL_COVERAGE': {
+      return (
+        value.condition === 'catalog-coverage-partial' ||
+        value.condition === 'parse-errors' ||
+        value.condition === 'shard-failures'
+      );
+    }
+    case 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED': {
+      return (
+        value.condition === 'typescript-exact-resolution' ||
+        value.condition === 'typescript-syntactic-resolution'
+      );
+    }
+    case 'GRAPH.ADAPTER.MANIFEST_UNREADABLE': {
+      return value.condition === 'go-module-manifest' || value.condition === 'rust-cargo-manifest';
+    }
+    case 'GRAPH.ADAPTER.MANIFEST_INVALID': {
+      return value.condition === 'go-module-manifest-invalid';
+    }
+    default: {
+      return false;
+    }
+  }
+}
+
+const DEGRADATION_KEYS = new Set(['condition', 'count', 'errorCode']);
+
+function isOptionalCatalogText(value: unknown): boolean {
+  return value === undefined || isSafeCatalogText(value);
+}
+
+function isPositiveInteger(value: unknown): boolean {
+  return Number.isSafeInteger(value) && (value as number) > 0;
+}
+
+function isSafeZeroBasedCoordinate(value: unknown): boolean {
+  return Number.isSafeInteger(value) && (value as number) >= 0;
+}
+
+function isBoundedMessage(value: unknown, maxLength: number): boolean {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= maxLength &&
+    !value.includes('\0')
+  );
 }
 
 /**
@@ -666,7 +823,23 @@ export class CatalogRepo {
     if (row.cacheKey !== expectedCacheKey || row.shardFingerprint !== expectedFingerprint) {
       return null;
     }
-    return row.payload as ShardBuildResult;
+    const payload: unknown = row.payload;
+    try {
+      validateShardBuildResult(payload, row);
+      return payload;
+    } catch (error) {
+      // @swallow-ok the shard cache is disposable: reject this row, report the
+      // registered integrity condition, and let the planner rebuild the shard.
+      logger.error({
+        evt: 'graph.shard_fragment.read.error',
+        module: MODULE_NAME,
+        code: CATALOG_UNREADABLE.code,
+        definition: CATALOG_UNREADABLE,
+        metadata: { condition: 'shard-fragment-malformed', shard: shardId },
+        err: boundedErrorCause(error),
+      });
+      return null;
+    }
   }
 
   /**

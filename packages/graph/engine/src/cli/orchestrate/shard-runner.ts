@@ -23,8 +23,12 @@ import {
   correlationToEnv,
   currentLogger,
   currentScope,
-  mapWithConcurrency,
   currentTraceparent,
+  mapWithConcurrency,
+  normalizeFailure,
+  scrubText,
+  toMachineFailureProjection,
+  toolErrorFromWorkerFailureWire,
 } from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
@@ -173,6 +177,10 @@ export interface ShardFailure {
   readonly failureClass?: FailureClass;
   /** Process signal reported by Node when the worker did not exit normally. */
   readonly signal?: string;
+  /** Definition-backed worker code reconstructed from the safe failure wire. */
+  readonly errorCode?: string;
+  /** Machine projection carried by the worker; contains no raw error, cause, or stack. */
+  readonly failure?: Readonly<Record<string, unknown>>;
 }
 
 /** Result of the sharded build: successful fragments plus any per-shard failures. */
@@ -199,17 +207,22 @@ function shardFailureFromOutcome(outcome: ShardOutcome): ShardFailure {
     exitCode: outcome.exitCode,
     stderr: outcome.stderr,
     ...failureClassificationFields(outcome),
+    ...(outcome.errorCode === undefined ? {} : { errorCode: outcome.errorCode }),
+    ...(outcome.failure === undefined ? {} : { failure: outcome.failure }),
   };
 }
 
 /** Retain only a bounded stderr tail when projecting an internal worker failure. */
 export function boundedShardFailureEvidence(failure: ShardFailure): ShardFailureEvidence {
-  const stderrTail = failure.stderr.trim().slice(-STDERR_TAIL_CHARACTER_LIMIT);
+  const scrubbedStderr = scrubText(failure.stderr, failure.stderr.length);
+  const stderrTail = scrubbedStderr.trim().slice(-STDERR_TAIL_CHARACTER_LIMIT);
   return {
     shardId: failure.shardId,
     exitCode: failure.exitCode,
     ...failureClassificationFields(failure),
     ...(stderrTail.length === 0 ? {} : { stderrTail }),
+    ...(failure.errorCode === undefined ? {} : { errorCode: failure.errorCode }),
+    ...(failure.failure === undefined ? {} : { failure: failure.failure }),
   };
 }
 
@@ -349,6 +362,7 @@ export async function planShardWork(
         projectDirAbs: shard.rootDir,
         configPathAbs: shard.configPathAbs,
         resolutionMode,
+        signal: currentScope()?.abortSignal,
       }),
       // Shard fragments only ever feed the sharded engine; stamp the mode so a
       // fragment row can never be confused with a single-program (exact) build.
@@ -381,6 +395,90 @@ interface ShardOutcome {
   readonly stderr: string;
   readonly failureClass?: FailureClass;
   readonly signal?: string;
+  readonly errorCode?: string;
+  readonly failure?: Readonly<Record<string, unknown>>;
+}
+
+interface DecodedShardWorkerFailure {
+  readonly failureClass?: FailureClass;
+  readonly errorCode: string;
+  readonly failure: Readonly<Record<string, unknown>>;
+}
+
+type DecodedShardWorkerOutput =
+  | { readonly kind: 'result'; readonly result: ShardBuildResult }
+  | { readonly kind: 'failure'; readonly failure: DecodedShardWorkerFailure };
+
+function isShardWorkerRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isShardBuildResult(value: unknown, expectedShardId: string): value is ShardBuildResult {
+  if (!isShardWorkerRecord(value)) return false;
+  return (
+    value.shardId === expectedShardId &&
+    isShardWorkerRecord(value.fragment) &&
+    typeof value.fingerprint === 'string' &&
+    Array.isArray(value.boundaryCalls) &&
+    Array.isArray(value.parseErrors)
+  );
+}
+
+function knownFailureClass(value: unknown): FailureClass | undefined {
+  switch (value) {
+    case 'spawn':
+    case 'exit_nonzero':
+    case 'stdout_parse':
+    case 'timeout':
+    case 'ipc_error': {
+      return value;
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
+function decodeShardWorkerFailure(value: unknown): DecodedShardWorkerFailure | undefined {
+  if (!isShardWorkerRecord(value)) return undefined;
+  const reconstructed = toolErrorFromWorkerFailureWire({
+    message: typeof value.message === 'string' ? value.message : 'Shard worker failed.',
+    ...(typeof value.code === 'string' ? { code: value.code } : {}),
+    ...(typeof value.detailCode === 'string' ? { detailCode: value.detailCode } : {}),
+    ...(typeof value.failureClass === 'string' ? { failureClass: value.failureClass } : {}),
+    ...(isShardWorkerRecord(value.failure) ? { failure: value.failure } : {}),
+    ...(typeof value.wireVersion === 'number' ? { failureWireVersion: value.wireVersion } : {}),
+  });
+  if (reconstructed === undefined) return undefined;
+  const envelope = normalizeFailure(reconstructed);
+  const failureClass = knownFailureClass(value.failureClass);
+  return {
+    ...(failureClass === undefined ? {} : { failureClass }),
+    errorCode: envelope.code,
+    failure: toMachineFailureProjection(envelope),
+  };
+}
+
+/** Decode the current carrier and the pre-carrier bare ShardBuildResult for rolling upgrades. */
+function decodeShardWorkerOutput(
+  stdout: string,
+  expectedShardId: string,
+): DecodedShardWorkerOutput | undefined {
+  let value: unknown;
+  try {
+    value = JSON.parse(stdout) as unknown;
+  } catch {
+    // @swallow-ok the enclosing spawn boundary classifies this as stdout_parse.
+    return undefined;
+  }
+  if (isShardBuildResult(value, expectedShardId)) return { kind: 'result', result: value };
+  if (!isShardWorkerRecord(value)) return undefined;
+  if (value.kind === 'result' && isShardBuildResult(value.result, expectedShardId)) {
+    return { kind: 'result', result: value.result };
+  }
+  if (value.kind !== 'failure') return undefined;
+  const failure = decodeShardWorkerFailure(value.failure);
+  return failure === undefined ? undefined : { kind: 'failure', failure };
 }
 
 /**
@@ -557,34 +655,40 @@ function spawnShardWorker(shard: Shard, ctx: ShardSpawnContext): Promise<ShardOu
         });
         return;
       }
+      const output = decodeShardWorkerOutput(stdout, shard.id);
       if (code !== EXIT_CODES.SUCCESS) {
+        const structured = output?.kind === 'failure' ? output.failure : undefined;
         resolvePromise({
           shardId: shard.id,
           exitCode: code ?? -1,
           stderr,
-          failureClass: 'exit_nonzero',
+          failureClass: structured?.failureClass ?? 'exit_nonzero',
+          ...(structured === undefined
+            ? {}
+            : { errorCode: structured.errorCode, failure: structured.failure }),
           ...(signal === null ? {} : { signal }),
         });
         return;
       }
-      try {
-        const result = JSON.parse(stdout) as ShardBuildResult;
+      if (output?.kind === 'result') {
         resolvePromise({
           shardId: shard.id,
-          result,
+          result: output.result,
           exitCode: EXIT_CODES.SUCCESS,
           stderr,
         });
-      } catch (error) {
-        /* v8 ignore start */
-        resolvePromise({
-          shardId: shard.id,
-          exitCode: EXIT_CODES.RUNTIME_ERROR,
-          stderr: `unparseable worker output: ${error instanceof Error ? error.message : String(error)}`,
-          failureClass: 'stdout_parse',
-        });
-        /* v8 ignore stop */
+        return;
       }
+      const structured = output?.kind === 'failure' ? output.failure : undefined;
+      resolvePromise({
+        shardId: shard.id,
+        exitCode: EXIT_CODES.RUNTIME_ERROR,
+        stderr: 'unparseable or invalid shard worker output',
+        failureClass: structured?.failureClass ?? 'stdout_parse',
+        ...(structured === undefined
+          ? {}
+          : { errorCode: structured.errorCode, failure: structured.failure }),
+      });
     });
   });
 }

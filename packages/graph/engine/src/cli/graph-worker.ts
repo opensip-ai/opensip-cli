@@ -19,16 +19,11 @@
  * only caller.
  */
 
-import { readFileSync } from 'node:fs';
-
 import {
   defineCommand,
-  getWorkerErrorFailureClass,
-  sendWorkerIpcMessage,
-  startWorkerHeartbeat,
+  runJsonSpecWorker,
   type CommandSpec,
   type ToolCliContext,
-  type WorkerMessage,
 } from '@opensip-cli/core';
 
 import { resolveRecipeToRules } from '../recipes/resolve.js';
@@ -50,31 +45,25 @@ interface GraphWorkerSpec {
   readonly shards?: readonly Shard[];
 }
 
-/** Post one IPC message to the parent (no-op when not forked). */
-function send(msg: WorkerMessage<ProgressEvent, LiveGraphOutput>): void {
-  sendWorkerIpcMessage(msg);
-}
-
 /**
  * Read the build spec, re-derive config + rules, run `runGraph` headless, and
  * stream stage progress + the final result over IPC. Never throws to the caller —
  * a failure is sent as a `{ kind: 'error' }` message so the parent rejects cleanly.
  */
 export async function executeGraphWorker(specPath: string, cli: ToolCliContext): Promise<void> {
-  const stopHeartbeat = startWorkerHeartbeat();
-  try {
-    const args = JSON.parse(readFileSync(specPath, 'utf8')) as GraphWorkerSpec;
-    const config = loadGraphConfig(args.cwd);
-    const recipeSelection = resolveGraphRecipeSelection(args.cwd, args.recipe);
-    const rules = resolveRecipeToRules(recipeSelection.name, {
-      tolerant: recipeSelection.tolerant,
-    });
-    const datastore = cli.scope.datastore() as DataStore | undefined;
-    const sharded = (args.shards?.length ?? 0) > 1;
-    if (sharded) {
-      send({
-        kind: 'result',
-        value: await runShardedLiveBuild(
+  await runJsonSpecWorker<GraphWorkerSpec, ProgressEvent, LiveGraphOutput>({
+    specPath,
+    run: async (args, emit) => {
+      const sendProgress = (event: ProgressEvent): void => emit(event);
+      const config = loadGraphConfig(args.cwd);
+      const recipeSelection = resolveGraphRecipeSelection(args.cwd, args.recipe);
+      const rules = resolveRecipeToRules(recipeSelection.name, {
+        tolerant: recipeSelection.tolerant,
+      });
+      const datastore = cli.scope.datastore() as DataStore | undefined;
+      const sharded = (args.shards?.length ?? 0) > 1;
+      if (sharded) {
+        return await runShardedLiveBuild(
           {
             cwd: args.cwd,
             noCache: args.noCache,
@@ -86,45 +75,30 @@ export async function executeGraphWorker(specPath: string, cli: ToolCliContext):
           },
           args.shards ?? [],
           datastore,
-          (event) => send({ kind: 'progress', event: toProgressEvent(event, true) }),
-        ),
+          (event) => sendProgress(toProgressEvent(event, true)),
+        );
+      }
+      const result = await runGraph({
+        cwd: args.cwd,
+        noCache: args.noCache,
+        resolution: args.resolution,
+        config,
+        rules,
+        datastore,
+        onProgress: (event) => sendProgress(toProgressEvent(event)),
       });
-      return;
-    }
-    const result = await runGraph({
-      cwd: args.cwd,
-      noCache: args.noCache,
-      resolution: args.resolution,
-      config,
-      rules,
-      datastore,
-      onProgress: (event) => send({ kind: 'progress', event: toProgressEvent(event) }),
-    });
-    // Send only the serializable slim payload — a RunGraphResult can't cross the
-    // fork boundary (class-method accumulators + Maps). The parent persists the
-    // signals + renders from reportLines (ADR-0028).
-    //
-    // Suppression runs HERE, inside the worker (ADR-0014): buildLiveGraphOutput
-    // is the single chokepoint, and the worker holds the build root (args.cwd)
-    // plus disk access to read the `@graph-ignore`-directive files. The parent
-    // receives an already-waived LiveGraphOutput — it re-stamps the FinalizedSignals
-    // brand the IPC structured-clone drops, but performs NO second suppression.
-    send({
-      kind: 'result',
-      value: await buildLiveGraphOutput(result, args.cwd),
-    });
-  } catch (error) {
-    send({
-      kind: 'error',
-      message: error instanceof Error ? error.message : String(error),
-      ...(error instanceof Error && error.stack !== undefined ? { stack: error.stack } : {}),
-      ...(getWorkerErrorFailureClass(error) === undefined
-        ? {}
-        : { failureClass: getWorkerErrorFailureClass(error) }),
-    });
-  } finally {
-    stopHeartbeat();
-  }
+      // Send only the serializable slim payload — a RunGraphResult can't cross the
+      // fork boundary (class-method accumulators + Maps). The parent persists the
+      // signals + renders from reportLines (ADR-0028).
+      //
+      // Suppression runs HERE, inside the worker (ADR-0014): buildLiveGraphOutput
+      // is the single chokepoint, and the worker holds the build root (args.cwd)
+      // plus disk access to read the `@graph-ignore`-directive files. The parent
+      // receives an already-waived LiveGraphOutput — it re-stamps the FinalizedSignals
+      // brand the IPC structured-clone drops, but performs NO second suppression.
+      return await buildLiveGraphOutput(result, args.cwd);
+    },
+  });
 }
 
 /** `graph-run-worker` — [internal] headless graph build, IPC progress/result. */

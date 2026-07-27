@@ -41,13 +41,17 @@ describe('normalizeProjectDir (DRY-4)', () => {
     }
   });
 
-  it('throws ConfigurationError on missing directory', () => {
-    expect(() => normalizeProjectDir(`${realDir}-missing`)).toThrow(/does not exist/);
+  it('uses the registered not-found definition for a missing directory', () => {
+    expect(() => normalizeProjectDir(`${realDir}-missing`)).toThrow(
+      expect.objectContaining({ code: 'GRAPH.PROJECT_DIR.NOT_FOUND' }),
+    );
   });
 
-  it('throws ConfigurationError when the path is a file, not a directory', () => {
+  it('uses the registered validation definition when the path is a file', () => {
     const filePath = join(realDir, 'a-file.txt');
     writeFileSync(filePath, 'not a dir', 'utf8');
-    expect(() => normalizeProjectDir(filePath)).toThrow(/not a directory/);
+    expect(() => normalizeProjectDir(filePath)).toThrow(
+      expect.objectContaining({ code: 'GRAPH.PROJECT_DIR.NOT_A_DIRECTORY' }),
+    );
   });
 });

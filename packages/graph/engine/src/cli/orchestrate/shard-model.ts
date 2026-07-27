@@ -24,8 +24,14 @@
 // because the adapter contract (`lang-adapter/types.ts` → `ResolveOutput`)
 // emits it — only the adapter can extract a callee name syntactically.
 // Consumers import it from `../../types.js` (or the package barrel) directly.
-import type { Catalog, CrossBoundaryCall, ParseError, ResolutionMode } from '../../types.js';
-import type { RunCorrelation } from '@opensip-cli/core';
+import type {
+  Catalog,
+  CrossBoundaryCall,
+  GraphRunDegradation,
+  ParseError,
+  ResolutionMode,
+} from '../../types.js';
+import type { RunCorrelation, WorkerFailureWire } from '@opensip-cli/core';
 
 /** Bounded, serializable evidence retained when a shard worker fails. */
 export interface ShardFailureEvidence {
@@ -34,6 +40,10 @@ export interface ShardFailureEvidence {
   readonly failureClass?: string;
   readonly signal?: string;
   readonly stderrTail?: string;
+  /** Definition-backed worker code reconstructed by the parent, when supplied. */
+  readonly errorCode?: string;
+  /** Machine-safe failure projection; never a raw Error, cause, or stack. */
+  readonly failure?: Readonly<Record<string, unknown>>;
 }
 
 /**
@@ -118,7 +128,14 @@ export interface ShardBuildResult {
    */
   readonly boundaryCalls: readonly CrossBoundaryCall[];
   readonly parseErrors: readonly ParseError[];
+  /** Optional for parent/worker compatibility with pre-migration fragments. */
+  readonly degradations?: readonly GraphRunDegradation[];
 }
+
+/** Versioned shard-worker stdout carrier; the parent also reads legacy bare results. */
+export type ShardWorkerOutput =
+  | { readonly kind: 'result'; readonly result: ShardBuildResult }
+  | { readonly kind: 'failure'; readonly failure: WorkerFailureWire };
 
 /** Per-run sharded-build statistics, mirrored into the --profile summary
  *  (ADR-0045 measurement plane). All counts are plain numbers. */

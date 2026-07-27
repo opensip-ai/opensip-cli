@@ -12,10 +12,12 @@
  * loads at module top level), so `parseProject` stays synchronous.
  */
 
-import { relative } from 'node:path';
+import { sep } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { isToolErrorLike, logger, projectRelativePath, scrubText } from '@opensip-cli/core';
 import { readSourceFileGuarded } from '@opensip-cli/graph';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type { LanguageAdapter } from '@opensip-cli/core';
@@ -37,47 +39,21 @@ export function createParseProjectFromAdapter(
     const parseErrors: ParseError[] = [];
 
     for (const path of input.files) {
-      let source: string;
-      /* v8 ignore start */
-      try {
-        source = readSourceFileGuarded(path);
-      } catch (error) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: `read failed: ${error instanceof Error ? error.message : String(error)}`,
-        });
+      const result = parseOneFile(adapter, input, path);
+      if (!result.ok) {
+        parseErrors.push(result.error);
         continue;
       }
-      /* v8 ignore stop */
-      let parsed: ParsedFile | null;
-      /* v8 ignore start */
-      try {
-        parsed = adapter.parse(source, path);
-      } catch (error) {
+      if (result.parsed.tree.rootNode.hasError) {
         parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: error instanceof Error ? error.message : String(error),
-        });
-        continue;
-      }
-      /* v8 ignore stop */
-      /* v8 ignore start */
-      if (parsed === null) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
-          message: 'tree-sitter returned no tree',
-        });
-        continue;
-      }
-      /* v8 ignore stop */
-      if (parsed.tree.rootNode.hasError) {
-        parseErrors.push({
-          filePath: relative(input.projectDirAbs, path),
+          filePath: safeProjectRelativePath(input, path),
           message: 'tree-sitter reported syntax errors; partial tree retained',
         });
       }
-      files.set(path, parsed);
+      files.set(path, result.parsed);
     }
+
+    throwIfGraphAdapterAborted(input.signal, `${adapter.id} parse`);
 
     logger.info({
       evt: 'graph.parse.complete',
@@ -88,4 +64,64 @@ export function createParseProjectFromAdapter(
 
     return { project: { files }, parseErrors };
   };
+}
+
+type FileParseResult =
+  | { readonly ok: true; readonly parsed: ParsedFile }
+  | { readonly ok: false; readonly error: ParseError };
+
+function parseOneFile(
+  adapter: LanguageAdapter<ParsedFile>,
+  input: ParseInput,
+  path: string,
+): FileParseResult {
+  const stage = `${adapter.id} parse`;
+  throwIfGraphAdapterAborted(input.signal, stage);
+  let source: string;
+  /* v8 ignore start */
+  try {
+    source = readSourceFileGuarded(path);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    return {
+      ok: false,
+      error: parseError(
+        input,
+        path,
+        `read failed: ${error instanceof Error ? error.message : String(error)}`,
+      ),
+    };
+  }
+  /* v8 ignore stop */
+  throwIfGraphAdapterAborted(input.signal, stage);
+  let parsed: ParsedFile | null;
+  /* v8 ignore start */
+  try {
+    parsed = adapter.parse(source, path);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    return {
+      ok: false,
+      error: parseError(input, path, error instanceof Error ? error.message : String(error)),
+    };
+  }
+  if (parsed === null) {
+    return { ok: false, error: parseError(input, path, 'tree-sitter returned no tree') };
+  }
+  /* v8 ignore stop */
+  throwIfGraphAdapterAborted(input.signal, stage);
+  return { ok: true, parsed };
+}
+
+function parseError(input: ParseInput, path: string, message: string): ParseError {
+  const filePath = safeProjectRelativePath(input, path);
+  const safeMessage = scrubText(
+    message.replaceAll(path, filePath).replaceAll(input.projectDirAbs, '[project]'),
+    1000,
+  );
+  return { filePath, message: safeMessage };
+}
+
+function safeProjectRelativePath(input: ParseInput, path: string): string {
+  return projectRelativePath(path.split(sep).join('/'), input.projectDirAbs.split(sep).join('/'));
 }

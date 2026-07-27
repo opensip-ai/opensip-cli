@@ -68,6 +68,12 @@ export interface GitProvenance {
   readonly worktreeDirty: boolean;
 }
 
+type GitProvenanceSpawn = typeof spawnProcess;
+
+export interface GitProvenanceOptions {
+  readonly spawn?: GitProvenanceSpawn;
+}
+
 /**
  * Parse bounded Git status and ignored-source inventories into provenance.
  *
@@ -93,16 +99,29 @@ export function parseGitProvenance(output: string, ignoredSourceOutput = ''): Gi
  *
  * @throws {HarnessPrerequisiteError} When Git fails, times out, or exceeds its output bound.
  */
-function requireGitProvenanceOutput(result: Awaited<ReturnType<typeof spawnProcess>>): string {
-  if (
-    result.error !== undefined ||
-    result.exitCode !== 0 ||
-    result.outputLimitExceeded ||
-    result.timedOut
-  ) {
-    throw new HarnessPrerequisiteError(
-      'Git revision is unavailable; run agent-eval from a built repository checkout.',
-    );
+function gitQueryFailure(result: Awaited<ReturnType<typeof spawnProcess>>): string | undefined {
+  if (result.timedOut) return 'timed out';
+  if (result.outputLimitExceeded) return 'exceeded its output bound';
+  if (result.error !== undefined) {
+    const code = result.errorCode === undefined ? '' : ` (${result.errorCode})`;
+    return `could not start${code}`;
+  }
+  if (result.exitCode === null) {
+    return result.signal === null
+      ? 'closed without an exit code'
+      : `was terminated by ${result.signal}`;
+  }
+  if (result.exitCode !== 0) return `exited with code ${String(result.exitCode)}`;
+  return undefined;
+}
+
+function requireGitProvenanceOutput(
+  result: Awaited<ReturnType<typeof spawnProcess>>,
+  query: 'ignored-source inventory' | 'status',
+): string {
+  const failure = gitQueryFailure(result);
+  if (failure !== undefined) {
+    throw new HarnessPrerequisiteError(`Git ${query} query ${failure}.`);
   }
   return result.stdout;
 }
@@ -110,20 +129,22 @@ function requireGitProvenanceOutput(result: Awaited<ReturnType<typeof spawnProce
 /** Resolve bounded Git revision/worktree and graph-relevant ignored-source snapshots. */
 export function resolveGitProvenance(
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
+  dependencies: GitProvenanceOptions = {},
 ): Promise<GitProvenance> {
-  const options = {
+  const spawnOptions = {
     cwd: repositoryRoot,
     env: buildDeterministicEnv(),
     maxOutputBytes: GIT_OUTPUT_BYTES,
     timeoutMs: GIT_TIMEOUT_MS,
   };
+  const execute = dependencies.spawn ?? spawnProcess;
   return Promise.all([
-    spawnProcess(
+    execute(
       'git',
       ['status', '--porcelain=v2', '--branch', '--untracked-files=normal'],
-      options,
+      spawnOptions,
     ),
-    spawnProcess(
+    execute(
       'git',
       [
         'ls-files',
@@ -134,18 +155,12 @@ export function resolveGitProvenance(
         '--',
         ...GRAPH_RELEVANT_IGNORED_PATHS,
       ],
-      options,
+      spawnOptions,
     ),
-  ]).then(([status, ignoredSources]) => {
-    try {
-      return parseGitProvenance(
-        requireGitProvenanceOutput(status),
-        requireGitProvenanceOutput(ignoredSources),
-      );
-    } catch {
-      throw new HarnessPrerequisiteError(
-        'Git revision is unavailable; run agent-eval from a built repository checkout.',
-      );
-    }
-  });
+  ]).then(([status, ignoredSources]) =>
+    parseGitProvenance(
+      requireGitProvenanceOutput(status, 'status'),
+      requireGitProvenanceOutput(ignoredSources, 'ignored-source inventory'),
+    ),
+  );
 }

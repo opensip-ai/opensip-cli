@@ -16,7 +16,11 @@
  */
 
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
+
+import { logger, normalizeFailure } from '@opensip-cli/core';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { CacheKeyInput } from '@opensip-cli/graph';
 
@@ -28,20 +32,32 @@ import type { CacheKeyInput } from '@opensip-cli/graph';
  *   - read fails               → `'unreadable:<path>'`
  *   - otherwise                → first 16 hex of sha256(content)
  */
-export function hashConfig(configPathAbs: string | undefined): string {
+export function hashConfig(configPathAbs: string | undefined, signal?: AbortSignal): string {
+  throwIfGraphAdapterAborted(signal, 'config hashing');
   if (configPathAbs === undefined || configPathAbs.length === 0) {
     return 'no-config';
   }
-  if (!existsSync(configPathAbs)) {
-    return `missing:${configPathAbs}`;
-  }
+  let hash: string;
   try {
     const content = readFileSync(configPathAbs, 'utf8');
-    return createHash('sha256').update(content).digest('hex').slice(0, 16);
-  } catch {
-    /* v8 ignore next */
-    return `unreadable:${configPathAbs}`;
+    hash = createHash('sha256').update(content).digest('hex').slice(0, 16);
+  } catch (error) {
+    const failure = normalizeFailure(error);
+    const missing = failure.code === 'NOT_FOUND';
+    if (!missing) {
+      logger.warn({
+        evt: 'graph.adapter.config_hash_degraded',
+        module: 'graph:adapter-common',
+        code: failure.code,
+        errno: failure.metadata.errno,
+        condition: 'config-unreadable',
+        msg: 'A language config could not be fingerprinted; cache reuse is disabled for its content',
+      });
+    }
+    return `${missing ? 'missing' : 'unreadable'}:${configPathAbs}`;
   }
+  throwIfGraphAdapterAborted(signal, 'config hashing');
+  return hash;
 }
 
 /**
@@ -54,6 +70,6 @@ export function makeConfigCacheKey(options: {
 }): (input: CacheKeyInput) => string {
   const { prefix } = options;
   return function cacheKey(input: CacheKeyInput): string {
-    return `${prefix}-${hashConfig(input.configPathAbs)}-${input.resolutionMode}`;
+    return `${prefix}-${hashConfig(input.configPathAbs, input.signal)}-${input.resolutionMode}`;
   };
 }

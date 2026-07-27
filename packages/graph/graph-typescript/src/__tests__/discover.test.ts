@@ -7,11 +7,10 @@
  * dedups, sorts).
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 
-import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { discoverFiles } from '../discover.js';
@@ -107,8 +106,44 @@ describe('discoverFiles', () => {
     expect(out.tsConfigPathAbs.endsWith('abs.tsconfig.json')).toBe(true);
   });
 
-  it('throws ConfigurationError when the tsconfig does not exist', () => {
+  it('uses the registered not-found definition without exposing the absolute path', () => {
     // No tsconfig.json written into `dir`.
-    expect(() => discoverFiles({ projectDir: dir })).toThrow(ConfigurationError);
+    expect(() => discoverFiles({ projectDir: dir })).toThrow(
+      expect.objectContaining({
+        code: 'GRAPH.TSCONFIG.NOT_FOUND',
+        message: 'TypeScript configuration was not found.',
+      }),
+    );
+  });
+
+  it('uses the registered validation definition for malformed JSON', () => {
+    writeFileSync(join(dir, 'tsconfig.json'), '{"compilerOptions": {', 'utf8');
+
+    expect(() => discoverFiles({ projectDir: dir })).toThrow(
+      expect.objectContaining({
+        code: 'GRAPH.TSCONFIG.INVALID',
+        message: 'TypeScript configuration is invalid.',
+      }),
+    );
+  });
+
+  it('classifies a non-file config anchor at the config-load boundary', () => {
+    mkdirSync(join(dir, 'tsconfig.json'));
+
+    expect(() => discoverFiles({ projectDir: dir })).toThrow(
+      expect.objectContaining({
+        code: 'GRAPH.TSCONFIG.LOAD_FAILED',
+        message: 'TypeScript configuration is not a regular file.',
+      }),
+    );
+  });
+
+  it('does not silently treat an unreadable extends target as absent', () => {
+    writeFileSync(join(dir, 'tsconfig.json'), '{"extends":"./base.json"}', 'utf8');
+    mkdirSync(join(dir, 'base.json'));
+
+    expect(() => discoverFiles({ projectDir: dir })).toThrow(
+      expect.objectContaining({ code: 'GRAPH.TSCONFIG.LOAD_FAILED' }),
+    );
   });
 });

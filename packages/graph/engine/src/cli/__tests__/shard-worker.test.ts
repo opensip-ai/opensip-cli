@@ -2,9 +2,9 @@
  * `graph-shard-worker` — the per-shard build subprocess entry
  * (`executeShardWorker`). It reads a `ShardWorkerSpec` JSON file, runs
  * the build over the shard's files via the scope's language adapter, and
- * writes a `ShardBuildResult` JSON to stdout, exiting 0. A bad spec path
- * (or any build error) is attributed to the shard: stderr names it and
- * the exit code is 1.
+ * writes a structured result carrier to stdout, exiting 0. A bad spec path
+ * (or any build error) emits a machine-safe worker failure carrier and uses
+ * the definition-derived exit code.
  */
 
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
@@ -27,7 +27,11 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../../lang-adapter/types.js';
-import type { ShardBuildResult, ShardWorkerSpec } from '../orchestrate/shard-model.js';
+import type {
+  ShardBuildResult,
+  ShardWorkerOutput,
+  ShardWorkerSpec,
+} from '../orchestrate/shard-model.js';
 import type { ToolCliContext } from '@opensip-cli/core';
 
 function fakeAdapter(id = 'typescript', fileExtension = '.ts'): GraphLanguageAdapter {
@@ -90,6 +94,9 @@ function mockCli(): { cli: ToolCliContext; setExitCode: MockInstance } {
   return {
     cli: {
       setExitCode,
+      emitRaw: (value: unknown) => {
+        stdout += JSON.stringify(value);
+      },
       scope: { languages: new LanguageRegistry() },
       reportFailure: makeReportFailureMock(setExitCode),
     } as unknown as ToolCliContext,
@@ -98,7 +105,6 @@ function mockCli(): { cli: ToolCliContext; setExitCode: MockInstance } {
 }
 
 let dir: string;
-let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let stdout = '';
 let stderr = '';
@@ -108,10 +114,6 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'shard-worker-'));
   stdout = '';
   stderr = '';
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((c: string | Uint8Array) => {
-    stdout += typeof c === 'string' ? c : c.toString();
-    return true;
-  });
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation((c: string | Uint8Array) => {
     stderr += typeof c === 'string' ? c : c.toString();
     return true;
@@ -120,7 +122,6 @@ beforeEach(() => {
 
 afterEach(() => {
   currentAdapterRegistry().clear();
-  stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(dir, { recursive: true, force: true });
 });
@@ -140,7 +141,9 @@ describe('executeShardWorker', () => {
     await executeShardWorker(specPath, cli);
 
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const result = JSON.parse(stdout) as ShardBuildResult;
+    const output = JSON.parse(stdout) as ShardWorkerOutput;
+    expect(output.kind).toBe('result');
+    const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
     expect(result.shardId).toBe('pkg:a');
     expect(result.fragment.language).toBe('typescript');
     expect(result.fragment.functions.fn).toHaveLength(1);
@@ -165,21 +168,31 @@ describe('executeShardWorker', () => {
     await executeShardWorker(specPath, cli);
 
     expect(setExitCode).toHaveBeenCalledWith(0);
-    const result = JSON.parse(stdout) as ShardBuildResult;
+    const output = JSON.parse(stdout) as ShardWorkerOutput;
+    const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
     expect(result.fragment.language).toBe('python');
     expect(result.fragment.cacheKey).toContain('python');
     expect(result.fingerprint).toContain('pkg/a.py');
   });
 
-  it('attributes a read/parse failure to the shard: stderr names it, exit 1', async () => {
+  it('emits a structured read failure without raw stderr and uses its mapped exit', async () => {
     currentAdapterRegistry().register(fakeAdapter());
     // Spec file does not exist → readFileSync throws inside the worker.
     const { cli, setExitCode } = mockCli();
     await executeShardWorker(join(dir, 'missing.json'), cli);
 
-    expect(setExitCode).toHaveBeenCalledWith(1);
-    expect(stderr).toContain('graph-shard-worker');
-    expect(stdout).toBe('');
+    expect(setExitCode).toHaveBeenCalledWith(3);
+    const output = JSON.parse(stdout) as ShardWorkerOutput;
+    expect(output).toMatchObject({
+      kind: 'failure',
+      failure: {
+        wireVersion: 1,
+        code: 'NOT_FOUND',
+      },
+    });
+    expect(output).not.toHaveProperty('failure.stack');
+    expect(output).not.toHaveProperty('failure.cause');
+    expect(stderr).not.toContain('graph-shard-worker');
   });
 
   // Q1 (host-owned-run-timing): a worker command returns NO ToolSessionContribution

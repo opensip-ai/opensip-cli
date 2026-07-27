@@ -95,6 +95,10 @@ globalThis.openFunctionCard = openFunctionCard;
 
 beforeEach(() => {
   document.body.innerHTML = '';
+  Object.defineProperty(navigator, 'clipboard', {
+    configurable: true,
+    value: undefined,
+  });
 });
 
 describe('editorLinkUrl (via the Function Card action row)', () => {
@@ -128,6 +132,41 @@ describe('editorLinkUrl (via the Function Card action row)', () => {
     expect(editorHref(null)).toBeNull();
     // The fallback is a Copy path button, not an anchor.
     expect(document.querySelector('.fc-actions button.fc-action')?.textContent).toBe('Copy path');
+  });
+
+  it('shows when the browser clipboard API is unavailable', () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: undefined,
+    });
+    expect(editorHref(null)).toBeNull();
+    const button = document.querySelector<HTMLButtonElement>('.fc-actions button.fc-action')!;
+
+    button.click();
+
+    expect(button.textContent).toBe('Copy unavailable — select path');
+  });
+
+  it('shows a rejected clipboard write instead of creating an unhandled rejection', async () => {
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('permission denied')) },
+    });
+    expect(editorHref(null)).toBeNull();
+    const button = document.querySelector<HTMLButtonElement>('.fc-actions button.fc-action')!;
+    const failureRendered = new Promise<void>((resolve) => {
+      const observer = new MutationObserver(() => {
+        if (button.textContent !== 'Copy failed — select path') return;
+        observer.disconnect();
+        resolve();
+      });
+      observer.observe(button, { childList: true });
+    });
+
+    button.click();
+    await failureRendered;
+
+    expect(button.textContent).toBe('Copy failed — select path');
   });
 
   it('renders no editor anchor for an unrecognized protocol', () => {

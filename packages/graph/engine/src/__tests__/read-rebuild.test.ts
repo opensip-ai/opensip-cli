@@ -1,3 +1,4 @@
+import { ConfigurationError, createCancelledError } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { rebuildCatalog } from '../read/rebuild.js';
@@ -60,13 +61,13 @@ describe('rebuildCatalog', () => {
     expect(replaceAll).toHaveBeenCalledWith(catalog);
   });
 
-  it('maps failed shards and infrastructure throws to rebuild failures', async () => {
-    runGraphMock.mockResolvedValueOnce({ catalog: { builtAt: 't' }, failedShardIds: ['1'] });
-    const failed = await rebuildCatalog({ cwd: '/proj' });
-    expect(failed.ok).toBe(false);
-    if (failed.ok) return;
-    expect(failed.error.code).toBe('rebuild-failed');
-    expect(failed.error.message).toContain('shard');
+  it('preserves a useful partial shard catalog and maps infrastructure throws', async () => {
+    const partialCatalog = { builtAt: 't', buildCoverage: { status: 'partial' } };
+    runGraphMock.mockResolvedValueOnce({ catalog: partialCatalog, failedShardIds: ['1'] });
+    await expect(rebuildCatalog({ cwd: '/proj' })).resolves.toEqual({
+      ok: true,
+      value: partialCatalog,
+    });
 
     runGraphMock.mockRejectedValueOnce(new Error('disk full'));
     const thrown = await rebuildCatalog({ cwd: '/proj' });
@@ -74,6 +75,40 @@ describe('rebuildCatalog', () => {
     if (thrown.ok) return;
     expect(thrown.error.code).toBe('rebuild-failed');
     expect(thrown.error.message).toContain('infrastructure');
+  });
+
+  it('keeps cancellation and configuration distinct on the Result boundary', async () => {
+    runGraphMock.mockRejectedValueOnce(createCancelledError('cancel private detail'));
+    await expect(rebuildCatalog({ cwd: '/proj' })).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'rebuild-cancelled',
+        operation: 'rebuild',
+        message: 'Graph rebuild was cancelled',
+      },
+    });
+
+    runGraphMock.mockRejectedValueOnce(new ConfigurationError('install private adapter path'));
+    await expect(rebuildCatalog({ cwd: '/proj' })).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'rebuild-configuration',
+        operation: 'rebuild',
+        message: 'Graph rebuild configuration is invalid',
+      },
+    });
+  });
+
+  it('returns the rebuilt catalog when post-build persistence fails', async () => {
+    const catalog = { builtAt: '2026-07-10T00:00:00.000Z' };
+    runGraphMock.mockResolvedValueOnce({ catalog });
+    replaceAll.mockImplementationOnce(() => {
+      throw new Error('disk full');
+    });
+
+    await expect(
+      rebuildCatalog({ cwd: '/proj', datastore: { kind: 'memory' } as never }),
+    ).resolves.toEqual({ ok: true, value: catalog });
   });
 
   it('truncates long rebuild error messages', async () => {

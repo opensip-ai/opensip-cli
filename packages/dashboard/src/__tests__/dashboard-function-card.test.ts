@@ -104,6 +104,22 @@ describe('Function Card overlay', () => {
     expect(overlay!.textContent).toContain('function-declaration');
   });
 
+  it('renders a visible card when a stale row references a missing function', () => {
+    bootDashboard({
+      version: '2.0',
+      tool: 'graph',
+      language: 'typescript',
+      builtAt: 'now',
+      functions: {},
+    });
+
+    w().openFunctionCard('missing-hash');
+
+    expect(document.querySelector('.function-card-overlay')?.textContent).toContain(
+      'This function is not present in the report’s embedded graph catalog.',
+    );
+  });
+
   it('renders a method shape (kind=method) correctly', () => {
     bootDashboard({
       version: '2.0',

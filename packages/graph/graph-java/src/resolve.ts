@@ -35,7 +35,11 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { isReturnValueDiscarded, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  isReturnValueDiscarded,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import { resolveDependencies } from './resolve-dependencies.js';
 
@@ -66,6 +70,7 @@ function javaPosition(
 }
 
 export function resolveCallSites(input: ResolveInput<JavaParsedProject>): ResolveOutput {
+  throwIfGraphAdapterAborted(input.signal, 'Java call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:java' });
   // Same-language only (see graph-go/resolve.ts): keep cross-language false
   // edges out of the merged exact catalog.
@@ -75,6 +80,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
   const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
+    throwIfGraphAdapterAborted(input.signal, 'Java call resolution');
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as JavaParsedFile;
     if (r.kind === 'creation') {
@@ -99,7 +105,7 @@ export function resolveCallSites(input: ResolveInput<JavaParsedProject>): Resolv
   // Java's package = directory-mirror convention.
   const dependenciesByOwner =
     input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(input.dependencySites, input.catalog)
+      ? resolveDependencies(input.dependencySites, input.catalog, input.signal)
       : undefined;
 
   return dependenciesByOwner === undefined

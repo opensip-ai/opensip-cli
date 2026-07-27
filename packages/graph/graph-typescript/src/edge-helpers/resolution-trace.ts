@@ -10,12 +10,60 @@
  * divergence investigation starts from measurement, not a rebuilt harness.
  */
 
-/* v8 ignore start -- debug-only; exercised manually via GRAPH_SITE_LOG, never in the test suite */
 import { appendFileSync } from 'node:fs';
 import { relative, sep } from 'node:path';
 
-import type { ResolverContext } from '../edge-resolvers/types.js';
+import { logger, normalizeFailure, scrubText } from '@opensip-cli/core';
+
+import type { ResolutionTraceSink, ResolverContext } from '../edge-resolvers/types.js';
 import type ts from 'typescript';
+
+const MAX_TRACE_ROWS = 10_000;
+const MAX_TRACE_BYTES = 2_000_000;
+const MAX_TRACE_FIELD_LENGTH = 300;
+
+/** Create one bounded, failure-latched trace sink for an enclosing resolution pass. */
+export function createResolutionTrace(): ResolutionTraceSink | undefined {
+  const logPath = process.env.GRAPH_SITE_LOG;
+  if (logPath === undefined) return;
+  let enabled = true;
+  let rows = 0;
+  let bytes = 0;
+  return {
+    append(fields): void {
+      if (!enabled || rows >= MAX_TRACE_ROWS) return;
+      const line = `${fields.map(safeTraceField).join('\t')}\n`;
+      const lineBytes = Buffer.byteLength(line, 'utf8');
+      if (bytes + lineBytes > MAX_TRACE_BYTES) {
+        enabled = false;
+        logger.warn({
+          evt: 'graph.resolution_trace.disabled',
+          module: 'graph:resolution-trace',
+          condition: 'size-cap',
+        });
+        return;
+      }
+      try {
+        appendFileSync(logPath, line);
+        rows += 1;
+        bytes += lineBytes;
+      } catch (error) {
+        enabled = false;
+        const failure = normalizeFailure(error);
+        logger.warn({
+          evt: 'graph.resolution_trace.disabled',
+          module: 'graph:resolution-trace',
+          condition: 'write-failed',
+          errorCode: failure.code,
+        });
+      }
+    },
+  };
+}
+
+function safeTraceField(value: string): string {
+  return scrubText(value.replaceAll(/[\t\r\n]/gu, ' '), MAX_TRACE_FIELD_LENGTH);
+}
 
 /** The inputs of one `resolveDeclToHash` decision, as traced by {@link traceResolveDecl}. */
 export interface ResolveDeclDecision {
@@ -29,24 +77,20 @@ export interface ResolveDeclDecision {
 
 /** Append one resolveDeclToHash decision row when GRAPH_SITE_LOG is set; else a no-op. */
 export function traceResolveDecl(decision: ResolveDeclDecision): void {
-  const logPath = process.env.GRAPH_SITE_LOG;
-  if (logPath === undefined) return;
   const { ctx, candidateNames, bindingNames, declSourceFile, dts, out } = decision;
+  if (ctx.resolutionTrace === undefined) return;
   const owner = relative(ctx.projectDirAbs, ctx.sourceFile.fileName).split(sep).join('/');
   const declRel = relative(ctx.projectDirAbs, declSourceFile.fileName).split(sep).join('/');
   const specifiers = bindingNames.map((b) => ctx.importSpecifiers.get(b) ?? '-').join(',');
   const declineStr = dts ? 'DECLINE-dts-hop' : 'DECLINE-source';
   const outStr = out === null ? declineStr : out.slice(0, 10);
-  const line =
-    [
-      process.env.GRAPH_ENGINE ?? '?',
-      owner,
-      candidateNames.join('|'),
-      `decl=${declRel}`,
-      `dts=${String(dts)}`,
-      `spec=${specifiers}`,
-      `out=${outStr}`,
-    ].join('\t') + '\n';
-  appendFileSync(logPath, line);
+  ctx.resolutionTrace.append([
+    process.env.GRAPH_ENGINE ?? '?',
+    owner,
+    candidateNames.join('|'),
+    `decl=${declRel}`,
+    `dts=${String(dts)}`,
+    `spec=${specifiers}`,
+    `out=${outStr}`,
+  ]);
 }
-/* v8 ignore stop */

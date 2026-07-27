@@ -174,6 +174,21 @@ describe('trivy tool — binary helpers', () => {
     );
   });
 
+  it.each([undefined, 'unknown'])('refuses to guess scan flags for version %s', (version) => {
+    const ctx = {
+      projectRoot: '/proj',
+      binary: { path: '/usr/local/bin/trivy', layer: 'path', version },
+      artifactPath: (name: string) => `/proj/.runtime/artifacts/trivy/run1/${name}`,
+    } as unknown as AdapterRunContext;
+
+    expect(() => buildScanArgs(ctx)).toThrow(
+      expect.objectContaining({
+        code: 'EXTERNAL.SCANNER.FAULT',
+        metadata: { condition: 'version-unknown', scanner: 'trivy' },
+      }),
+    );
+  });
+
   it('A8: requests the misconfig scanner (offline) so the advertised Dockerfile findings are actually produced', () => {
     // `trivy fs` defaults to `vuln,secret` only — without `--scanners …,misconfig`
     // a real run emits ZERO misconfig results while metadata/docs/the DS002 golden

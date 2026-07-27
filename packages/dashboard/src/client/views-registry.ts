@@ -20,7 +20,7 @@
 
 import { filterState } from './filters.js';
 
-import type { ViewLike } from './code-paths-types.js';
+import type { CatalogLike, IndexesLike, ViewLike } from './code-paths-types.js';
 
 export const views: ViewLike[] = [];
 let activeViewId: string | null = null;
@@ -34,13 +34,38 @@ export function getView(id: string): ViewLike | null {
   return null;
 }
 
-export function renderActiveView(): void {
-  if (!activeViewId) return;
+function showViewFailure(view: ViewLike, container: HTMLElement, action: string): void {
+  const notice = document.createElement('div');
+  notice.className = 'empty';
+  notice.setAttribute('role', 'status');
+  notice.textContent = view.label + ' could not be ' + action + '. Other views remain available.';
+  container.replaceChildren(notice);
+}
+
+/** Invoke a registered extension view without allowing it to unwind the report. */
+export function renderRegisteredView(
+  view: ViewLike,
+  container: HTMLElement,
+  catalog: CatalogLike | null,
+  indexes: IndexesLike,
+): boolean {
+  try {
+    view.render(container, catalog, indexes, filterState);
+    return true;
+  } catch {
+    showViewFailure(view, container, 'rendered');
+    // @swallow-ok the extension failure is replaced with a visible in-page notice.
+    return false;
+  }
+}
+
+export function renderActiveView(): boolean {
+  if (!activeViewId) return false;
   const view = getView(activeViewId);
-  if (!view) return;
+  if (!view) return false;
   const container = document.querySelector('#code-paths-view-' + view.id);
-  if (!(container instanceof HTMLElement)) return;
-  view.render(container, graphCatalog, graphIndexes, filterState);
+  if (!(container instanceof HTMLElement)) return false;
+  return renderRegisteredView(view, container, graphCatalog, graphIndexes);
 }
 
 export interface ActivateViewOptions {
@@ -70,13 +95,13 @@ export function activateView(id: string, options: ActivateViewOptions = {}): voi
       // activates, only the URL hash isn't updated.
     }
   }
-  renderActiveView();
+  if (!renderActiveView()) return;
   if (typeof view.onActivate === 'function') {
     try {
       view.onActivate();
     } catch {
-      // @swallow-ok onActivate is an optional, best-effort view hook (e.g. the
-      // graph view's Cytoscape mount); a failure must not break view switching.
+      const container = document.querySelector<HTMLElement>('#code-paths-view-' + view.id);
+      if (container) showViewFailure(view, container, 'activated');
     }
   }
 }

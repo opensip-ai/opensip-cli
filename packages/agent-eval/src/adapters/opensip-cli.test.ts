@@ -2,6 +2,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
+import { HarnessPrerequisiteError } from '../runner/spawn.js';
+
 import {
   DEFAULT_SETUP_FIXTURE_PROJECT_DEPENDENCIES,
   buildGraphArgv,
@@ -123,6 +125,30 @@ describe('setupFixtureProject', () => {
       /OpenSIP init setup exited with code 2.*Diagnostic tail.*invalid configuration/s,
     );
     expect(dependencies.spawnCli).toHaveBeenCalledTimes(1);
+  });
+
+  it('redacts paths and credentials from setup diagnostics', async () => {
+    const root = join(process.cwd(), 'sensitive customer project');
+    const secret = 'setup-secret-value';
+    const dependencies = dependenciesWith([
+      spawnResult({
+        error: `spawn failed at ${join(root, 'bin', 'opensip')} token=${secret}`,
+        exitCode: 2,
+        stderr: `invalid configuration at ${join(root, 'opensip-cli.config.yml')} token=${secret}`,
+      }),
+    ]);
+
+    const error = await setupFixtureProject(root, 'java', dependencies).then(
+      () => undefined,
+      (error_: unknown) => error_,
+    );
+
+    expect(error).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((error as Error).message).toContain('invalid configuration');
+    expect((error as Error).message).toContain('[redacted-path]');
+    expect((error as Error).message).toContain('[redacted-credential]');
+    expect((error as Error).message).not.toContain(root);
+    expect((error as Error).message).not.toContain(secret);
   });
 
   it('rejects graph exits outside the documented zero-or-one acceptance set', async () => {

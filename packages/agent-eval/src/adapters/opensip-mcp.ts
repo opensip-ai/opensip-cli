@@ -32,6 +32,8 @@ import { decodeToolResult, inspectToolEnvelope } from './opensip-mcp-protocol.js
 import type { McpSetupProvenance, StepRecord, ToolInvoker } from '../model/record.js';
 import type { ProofClosureAssessment, ResolvedStrategyStep, RunLeg } from '../model/task.js';
 
+const MCP_REQUEST_TIMEOUT_CODE = -32_001;
+
 export { EXPECTED_MCP_SURFACE_EPOCH, REQUIRED_MCP_TOOL_NAMES } from './opensip-mcp-handshake.js';
 export type {
   McpConnection,
@@ -54,6 +56,8 @@ export interface McpArmSessionOptions {
   /** Maximum post-handshake MCP tool calls in this session. */
   readonly maxToolCalls?: number;
   readonly requestTimeoutMs?: number;
+  /** Test-only owned-directory cleanup seam. */
+  readonly removeOwnedHome?: (path: string) => void;
   /** Verifies the selected installed target before launch and after process close. */
   readonly targetStabilityCheck?: () => void;
   readonly workspaceRoot: string;
@@ -63,6 +67,81 @@ function stepLeg(step: ResolvedStrategyStep): RunLeg {
   return step.leg ?? 'main';
 }
 
+/** Recognize the SDK timeout across duplicate physical SDK copies. */
+function isMcpRequestTimeoutError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    error.name === 'McpError' &&
+    'code' in error &&
+    error.code === MCP_REQUEST_TIMEOUT_CODE
+  );
+}
+
+type McpSessionFailureCondition =
+  'connect' | 'connection-close' | 'owned-home-remove' | 'target-stability';
+
+interface McpSessionFailure {
+  readonly condition: McpSessionFailureCondition;
+  readonly error: unknown;
+}
+
+function removeOwnedHomeDirectory(path: string): void {
+  rmSync(path, {
+    force: true,
+    maxRetries: 3,
+    recursive: true,
+    retryDelay: 50,
+  });
+}
+
+function captureLifecycleFailure(
+  condition: McpSessionFailureCondition,
+  operation: () => void,
+): McpSessionFailure | undefined {
+  try {
+    operation();
+    return undefined;
+  } catch (error) {
+    return { condition, error };
+  }
+}
+
+async function captureAsyncLifecycleFailure(
+  condition: McpSessionFailureCondition,
+  operation: () => Promise<void>,
+): Promise<McpSessionFailure | undefined> {
+  try {
+    await operation();
+    return undefined;
+  } catch (error) {
+    return { condition, error };
+  }
+}
+
+function lifecyclePrerequisiteError(
+  context: string,
+  primary: McpSessionFailure,
+  failures: readonly McpSessionFailure[],
+  sensitivePaths: readonly string[],
+): HarnessPrerequisiteError {
+  const related = failures.filter((failure) => failure !== primary);
+  if (primary.error instanceof HarnessPrerequisiteError && related.length === 0) {
+    return primary.error;
+  }
+  const primaryMessage =
+    primary.error instanceof HarnessPrerequisiteError
+      ? primary.error.message
+      : `${context}: ${safeErrorDetail(primary.error, sensitivePaths) || 'unknown failure'}`;
+  if (related.length === 0) return new HarnessPrerequisiteError(primaryMessage);
+  const relatedDetail = related
+    .map(
+      (failure) =>
+        `${failure.condition}: ${safeErrorDetail(failure.error, sensitivePaths) || 'unknown failure'}`,
+    )
+    .join('; ');
+  return new HarnessPrerequisiteError(`${primaryMessage} Related failures: ${relatedDetail}`);
+}
+
 interface McpArmSessionState {
   readonly connection: McpConnection;
   readonly handshakeDurationMs: number;
@@ -70,6 +149,7 @@ interface McpArmSessionState {
   readonly maxToolCalls: number;
   readonly ownedHome: string | undefined;
   readonly requestTimeoutMs: number;
+  readonly removeOwnedHome: (path: string) => void;
   readonly sensitivePaths: readonly string[];
   readonly stderr: BoundedByteRing;
   readonly surface: VerifiedSurface;
@@ -84,6 +164,7 @@ export class McpArmSession {
   private remainingToolCalls: number;
   private readonly ownedHome: string | undefined;
   private readonly requestTimeoutMs: number;
+  private readonly removeOwnedHome: (path: string) => void;
   private readonly sensitivePaths: readonly string[];
   private readonly stderr: BoundedByteRing;
   private readonly surface: VerifiedSurface;
@@ -96,6 +177,7 @@ export class McpArmSession {
     this.remainingToolCalls = state.maxToolCalls;
     this.ownedHome = state.ownedHome;
     this.requestTimeoutMs = state.requestTimeoutMs;
+    this.removeOwnedHome = state.removeOwnedHome;
     this.sensitivePaths = state.sensitivePaths;
     this.stderr = state.stderr;
     this.surface = state.surface;
@@ -138,6 +220,7 @@ export class McpArmSession {
     const connectionFactory = options.connectionFactory ?? defaultConnectionFactory;
     const cliCommand = options.cliCommand ?? process.execPath;
     const cliDistResolver = options.cliDistResolver ?? resolveCliDist;
+    const removeOwnedHome = options.removeOwnedHome ?? removeOwnedHomeDirectory;
     const ownedHome =
       options.env?.HOME === undefined
         ? mkdtempSync(join(tmpdir(), 'opensip-agent-eval-home-'))
@@ -186,32 +269,42 @@ export class McpArmSession {
         maxToolCalls,
         ownedHome,
         requestTimeoutMs,
+        removeOwnedHome,
         sensitivePaths,
         stderr,
         surface,
         targetStabilityCheck: options.targetStabilityCheck,
       });
     } catch (error) {
-      await connection?.close().catch((closeError: unknown) => {
-        void closeError;
-      });
-      if (ownedHome !== undefined) {
-        rmSync(ownedHome, {
-          force: true,
-          maxRetries: 3,
-          recursive: true,
-          retryDelay: 50,
-        });
-      }
-      let authoritativeError = error;
-      try {
-        options.targetStabilityCheck?.();
-      } catch (stabilityError) {
-        authoritativeError = stabilityError;
-      }
-      if (authoritativeError instanceof HarnessPrerequisiteError) throw authoritativeError;
-      throw new HarnessPrerequisiteError(
-        `Unable to connect to the OpenSIP MCP server: ${safeErrorDetail(authoritativeError, sensitivePaths)}`,
+      const connectFailure: McpSessionFailure = { condition: 'connect', error };
+      const retainedConnection = connection;
+      const closeFailure =
+        retainedConnection === undefined
+          ? undefined
+          : await captureAsyncLifecycleFailure('connection-close', () =>
+              retainedConnection.close(),
+            );
+      const homeFailure =
+        ownedHome === undefined
+          ? undefined
+          : captureLifecycleFailure('owned-home-remove', () => removeOwnedHome(ownedHome));
+      const stabilityFailure = captureLifecycleFailure('target-stability', () =>
+        options.targetStabilityCheck?.(),
+      );
+      const failures = [
+        connectFailure,
+        ...(closeFailure === undefined ? [] : [closeFailure]),
+        ...(homeFailure === undefined ? [] : [homeFailure]),
+        ...(stabilityFailure === undefined ? [] : [stabilityFailure]),
+      ];
+      // Installed-target mutation remains authoritative, but every preceding
+      // connect/rollback failure stays visible as bounded related evidence.
+      const primary = stabilityFailure ?? connectFailure;
+      throw lifecyclePrerequisiteError(
+        'Unable to connect to the OpenSIP MCP server',
+        primary,
+        failures,
+        sensitivePaths,
       );
     }
   }
@@ -251,9 +344,22 @@ export class McpArmSession {
         this.requestTimeoutMs,
       );
     } catch (error) {
-      throw new HarnessPrerequisiteError(
-        `OpenSIP MCP server became unavailable while calling ${step.tool}: ${safeErrorDetail(error, this.sensitivePaths)}`,
-      );
+      const timedOut = isMcpRequestTimeoutError(error);
+      const detail = safeErrorDetail(error, this.sensitivePaths) || 'unknown failure';
+      return makeStepRecord({
+        failure: {
+          code: timedOut ? 'mcp-request-timeout' : 'mcp-transport-unavailable',
+          kind: 'infrastructure',
+          message: timedOut
+            ? `OpenSIP MCP request timed out while calling ${step.tool}: ${detail}`
+            : `OpenSIP MCP server became unavailable while calling ${step.tool}: ${detail}`,
+          retryable: true,
+        },
+        leg: stepLeg(step),
+        renderedResponse: '',
+        step,
+        wallMs: Math.max(0, performance.now() - startedAt),
+      });
     }
     const decoded = decodeToolResult(result, this.maxResponseBytes);
     if (decoded.failure !== undefined || decoded.payload === undefined) {
@@ -321,21 +427,30 @@ export class McpArmSession {
   }
 
   public async close(): Promise<void> {
-    try {
-      await this.connection.close();
-    } finally {
-      try {
-        this.targetStabilityCheck?.();
-      } finally {
-        if (this.ownedHome !== undefined) {
-          rmSync(this.ownedHome, {
-            force: true,
-            maxRetries: 3,
-            recursive: true,
-            retryDelay: 50,
-          });
-        }
-      }
+    const connectionFailure = await captureAsyncLifecycleFailure('connection-close', () =>
+      this.connection.close(),
+    );
+    const stabilityFailure = captureLifecycleFailure('target-stability', () =>
+      this.targetStabilityCheck?.(),
+    );
+    const ownedHome = this.ownedHome;
+    const homeFailure =
+      ownedHome === undefined
+        ? undefined
+        : captureLifecycleFailure('owned-home-remove', () => this.removeOwnedHome(ownedHome));
+    const failures = [
+      ...(connectionFailure === undefined ? [] : [connectionFailure]),
+      ...(stabilityFailure === undefined ? [] : [stabilityFailure]),
+      ...(homeFailure === undefined ? [] : [homeFailure]),
+    ];
+    const primary = stabilityFailure ?? connectionFailure ?? homeFailure;
+    if (primary !== undefined) {
+      throw lifecyclePrerequisiteError(
+        'Unable to close the OpenSIP MCP session',
+        primary,
+        failures,
+        this.sensitivePaths,
+      );
     }
   }
 }

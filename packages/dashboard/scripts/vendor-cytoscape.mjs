@@ -8,7 +8,7 @@
  * treated as source for code-review purposes — the diff is auditable when
  * versions bump.
  *
- * Why these two and not three: `cytoscape-dagre@3` bundles its own dagre
+ * Why these two and not three: `cytoscape-dagre` bundles its own dagre
  * (`@dagrejs/dagre`) inside its UMD build, so the standalone `dagre`
  * package is dead weight (~280 KB) and is deliberately NOT vendored. See
  * Phase 0 of a local implementation plan
@@ -34,6 +34,7 @@ import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG_ROOT = join(HERE, '..');
+const dashboardManifest = JSON.parse(readFileSync(join(PKG_ROOT, 'package.json'), 'utf8'));
 
 /** Raw-byte budget. Phase 0 measured ~480 KB; 600 KB allows modest growth. */
 const BUDGET_KB = 600;
@@ -44,15 +45,20 @@ function pkgVersion(name) {
   // Walk up to the package.json next to the package's node_modules dir.
   let dir = dirname(entry);
   for (let i = 0; i < 8; i++) {
+    const manifestPath = join(dir, 'package.json');
+    let raw;
     try {
-      const pj = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-      if (pj.name === name) return pj.version;
-    } catch {
-      // keep walking
+      raw = readFileSync(manifestPath, 'utf8');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      dir = dirname(dir);
+      continue;
     }
+    const pj = JSON.parse(raw);
+    if (pj.name === name && typeof pj.version === 'string') return pj.version;
     dir = dirname(dir);
   }
-  return 'unknown';
+  throw new Error(`could not locate a version for ${name}`);
 }
 
 function resolveFromPackage(pkg, relPath) {
@@ -61,15 +67,30 @@ function resolveFromPackage(pkg, relPath) {
   const main = require.resolve(pkg);
   let dir = dirname(main);
   for (let i = 0; i < 8; i++) {
+    const manifestPath = join(dir, 'package.json');
+    let raw;
     try {
-      const pj = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8'));
-      if (pj.name === pkg) return join(dir, relPath);
-    } catch {
-      // keep walking
+      raw = readFileSync(manifestPath, 'utf8');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      dir = dirname(dir);
+      continue;
     }
+    const pj = JSON.parse(raw);
+    if (pj.name === pkg) return join(dir, relPath);
     dir = dirname(dir);
   }
   throw new Error(`could not locate ${pkg} package root`);
+}
+
+function assertDeclaredVersion(name, installedVersion) {
+  const declaredVersion = dashboardManifest.devDependencies?.[name];
+  if (declaredVersion !== installedVersion) {
+    throw new Error(
+      `${name} resolves to ${installedVersion}, but package.json declares ${String(declaredVersion)}. ` +
+        'Install the exact declared dependency before regenerating the vendor artifact.',
+    );
+  }
 }
 
 const sources = [
@@ -82,10 +103,11 @@ const sources = [
   {
     name: 'cytoscape-dagre',
     version: pkgVersion('cytoscape-dagre'),
-    file: resolveFromPackage('cytoscape-dagre', 'cytoscape-dagre.js'),
+    file: resolveFromPackage('cytoscape-dagre', 'dist/cytoscape-dagre.min.js'),
     global: 'cytoscapeDagre',
   },
 ];
+for (const source of sources) assertDeclaredVersion(source.name, source.version);
 
 const banner =
   '/*\n' +
@@ -96,7 +118,7 @@ const banner =
   ' * Bundled UMD globals (offline-capable, inlined into every report):\n' +
   sources.map((s) => ` *   - ${s.name}@${s.version}  → global "${s.global}"\n`).join('') +
   ' *\n' +
-  ' * cytoscape-dagre@3 self-bundles @dagrejs/dagre; no standalone dagre is\n' +
+  ' * cytoscape-dagre self-bundles @dagrejs/dagre; no standalone dagre is\n' +
   ' * vendored. Layout registration happens at view init via\n' +
   ' * `cytoscape.use(cytoscapeDagre)`.\n' +
   ' */\n';
@@ -104,7 +126,7 @@ const banner =
 const parts = [banner];
 for (const s of sources) {
   parts.push(`\n/* ===== ${s.name}@${s.version} ===== */\n`);
-  parts.push(readFileSync(s.file, 'utf8'));
+  parts.push(readFileSync(s.file, 'utf8').trimEnd());
   parts.push('\n');
 }
 const bundle = parts.join('');
@@ -113,6 +135,13 @@ const rawBytes = Buffer.byteLength(bundle, 'utf8');
 const gzBytes = gzipSync(bundle).length;
 const rawKb = Math.round(rawBytes / 1024);
 const gzKb = Math.round(gzBytes / 1024);
+
+if (rawBytes > BUDGET_KB * 1024) {
+  throw new Error(
+    `vendor bundle ${rawKb} KB exceeds the ${BUDGET_KB} KB budget. ` +
+      'Either shrink the renderer stack or raise BUDGET_KB with justification.',
+  );
+}
 
 const outDir = join(PKG_ROOT, 'src', 'vendor');
 mkdirSync(outDir, { recursive: true });
@@ -124,11 +153,3 @@ for (const s of sources) console.log(`  ${s.name}@${s.version}`);
 console.log(`  raw:  ${rawBytes} bytes (${rawKb} KB)`);
 console.log(`  gzip: ${gzBytes} bytes (${gzKb} KB)`);
 console.log(`  budget: ${BUDGET_KB} KB raw`);
-
-if (rawKb > BUDGET_KB) {
-  console.error(
-    `\nERROR: vendor bundle ${rawKb} KB exceeds the ${BUDGET_KB} KB budget. ` +
-      `Either shrink the renderer stack or raise BUDGET_KB with justification.`,
-  );
-  process.exit(1);
-}

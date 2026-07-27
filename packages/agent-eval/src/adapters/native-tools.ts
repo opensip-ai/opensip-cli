@@ -22,6 +22,7 @@ const DEFAULT_MAX_WALKED_FILES = 20_000;
 const DEFAULT_MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const DEFAULT_MAX_FILE_BYTES = 1024 * 1024;
 const DEFAULT_MAX_GLOB_RESULTS = 2000;
+const DEFAULT_MAX_STEP_WALL_MS = 120_000;
 
 const HARD_MAX_MATCHES = 2000;
 const HARD_MAX_READ_BYTES = 1024 * 1024;
@@ -30,6 +31,7 @@ const HARD_MAX_TOTAL_BYTES = 16 * 1024 * 1024;
 const HARD_MAX_FILE_BYTES = 2 * 1024 * 1024;
 const HARD_MAX_GLOB_RESULTS = 2000;
 const HARD_MAX_CONTEXT_LINES = 40;
+const HARD_MAX_STEP_WALL_MS = 10 * DEFAULT_MAX_STEP_WALL_MS;
 const MIN_RENDER_BUDGET_BYTES = Buffer.byteLength(TRUNCATION_MARKER, 'utf8');
 
 type NativeToolName = 'contentSearch' | 'globList' | 'readFile';
@@ -72,6 +74,19 @@ interface NativeInvocationResult {
 /** Optional prevalidated file view used by clean dogfood evaluation. */
 export interface NativeInvokerOptions {
   readonly allowedPaths?: readonly string[];
+  /** Testable monotonic clock used only for cooperative work-budget checks. */
+  readonly monotonicNow?: () => number;
+  /** Per-step cooperative wall budget; regex execution itself is not preemptible. */
+  readonly maxStepWallMs?: number;
+}
+
+interface NativeRuntimeBudget {
+  readonly deadline: number;
+  readonly now: () => number;
+}
+
+function deadlineExceeded(runtime: NativeRuntimeBudget): boolean {
+  return runtime.now() >= runtime.deadline;
 }
 
 function boundedInteger(value: unknown, defaultValue: number, hardMaximum: number): number {
@@ -123,6 +138,7 @@ interface ContentSearchOptions {
   readonly maxFileBytes: number;
   readonly maxMatches: number;
   readonly maxTotalBytes: number;
+  readonly runtime: NativeRuntimeBudget;
   readonly walked: WalkResult;
 }
 
@@ -179,6 +195,11 @@ function searchFileLines(
 ): void {
   const lines = content.toString('utf8').split(/\r?\n/u);
   for (const [index, lineText] of lines.entries()) {
+    if (deadlineExceeded(options.runtime)) {
+      state.truncated = true;
+      state.stopped = true;
+      return;
+    }
     options.matcher.lastIndex = 0;
     if (!options.matcher.test(lineText)) continue;
     const contextStart = Math.max(0, index - options.contextLines);
@@ -208,11 +229,23 @@ function searchFile(
   state: ContentSearchState,
 ): void {
   if (options.glob && !options.glob.test(path)) return;
-  const absolute = resolveInsideRoot(workspaceRoot, path);
-  if (!lstatSync(absolute).isFile()) return;
-  const content = readPrefix(absolute, options.maxFileBytes);
-  if (content.truncated) state.truncated = true;
-  searchFileLines(path, content.buffer, options, state);
+  try {
+    const absolute = resolveInsideRoot(workspaceRoot, path);
+    if (!lstatSync(absolute).isFile()) return;
+    const content = readPrefix(absolute, options.maxFileBytes);
+    if (content.truncated) state.truncated = true;
+    searchFileLines(path, content.buffer, options, state);
+  } catch (error) {
+    if (!isRecoverableSearchFileError(error)) throw error;
+    state.truncated = true;
+  }
+}
+
+function isRecoverableSearchFileError(error: unknown): boolean {
+  if (!(error instanceof Error) || !('code' in error) || typeof error.code !== 'string') {
+    return false;
+  }
+  return ['EACCES', 'ELOOP', 'ENOENT', 'ENOTDIR', 'EPERM'].includes(error.code);
 }
 
 function collectContentMatches(
@@ -226,6 +259,10 @@ function collectContentMatches(
     truncated: options.walked.truncated,
   };
   for (const path of options.walked.paths) {
+    if (deadlineExceeded(options.runtime)) {
+      state.truncated = true;
+      break;
+    }
     searchFile(workspaceRoot, path, options, state);
     if (state.stopped) break;
   }
@@ -236,8 +273,11 @@ function walkedFiles(
   workspaceRoot: string,
   maxFiles: number,
   allowedPaths: readonly string[] | undefined,
+  runtime: NativeRuntimeBudget,
 ): WalkResult {
-  if (allowedPaths === undefined) return walkFiles(workspaceRoot, maxFiles);
+  if (allowedPaths === undefined) {
+    return walkFiles(workspaceRoot, maxFiles, undefined, () => deadlineExceeded(runtime));
+  }
   return {
     paths: allowedPaths.slice(0, maxFiles),
     truncated: allowedPaths.length > maxFiles,
@@ -248,6 +288,7 @@ function contentSearch(
   workspaceRoot: string,
   args: JsonObject,
   allowedPaths: readonly string[] | undefined,
+  runtime: NativeRuntimeBudget,
 ): NativeInvocationResult {
   const maxTotalBytes = boundedRenderBudget(args.maxTotalBytes);
   const pattern = stringArgument(args, 'pattern');
@@ -258,10 +299,12 @@ function contentSearch(
     maxFileBytes: boundedInteger(args.maxFileBytes, DEFAULT_MAX_FILE_BYTES, HARD_MAX_FILE_BYTES),
     maxMatches: boundedInteger(args.maxMatches, DEFAULT_MAX_MATCHES, HARD_MAX_MATCHES),
     maxTotalBytes,
+    runtime,
     walked: walkedFiles(
       workspaceRoot,
       boundedInteger(args.maxWalkedFiles, DEFAULT_MAX_WALKED_FILES, HARD_MAX_WALKED_FILES),
       allowedPaths,
+      runtime,
     ),
   });
   const bounded = renderBounded(
@@ -312,6 +355,7 @@ function globList(
   workspaceRoot: string,
   args: JsonObject,
   allowedPaths: readonly string[] | undefined,
+  runtime: NativeRuntimeBudget,
 ): NativeInvocationResult {
   const pattern = globToRegex(stringArgument(args, 'pattern'));
   const maxWalkedFiles = boundedInteger(
@@ -324,10 +368,18 @@ function globList(
     DEFAULT_MAX_GLOB_RESULTS,
     HARD_MAX_GLOB_RESULTS,
   );
-  const walked = walkedFiles(workspaceRoot, maxWalkedFiles, allowedPaths);
-  const allMatches = walked.paths.filter((path) => pattern.test(path));
+  const walked = walkedFiles(workspaceRoot, maxWalkedFiles, allowedPaths, runtime);
+  const allMatches: string[] = [];
+  let deadlineTruncated = false;
+  for (const path of walked.paths) {
+    if (deadlineExceeded(runtime)) {
+      deadlineTruncated = true;
+      break;
+    }
+    if (pattern.test(path)) allMatches.push(path);
+  }
   const paths = allMatches.slice(0, maxResults);
-  const truncated = walked.truncated || allMatches.length > maxResults;
+  const truncated = walked.truncated || deadlineTruncated || allMatches.length > maxResults;
   const bounded = renderBounded(paths, DEFAULT_MAX_TOTAL_BYTES, truncated);
   return {
     payload: {
@@ -353,14 +405,15 @@ function runNativeTool(
   workspaceRoot: string,
   step: ResolvedStrategyStep,
   options: NativeInvokerOptions,
+  runtime: NativeRuntimeBudget,
 ): NativeInvocationResult {
   const tool = nativeToolName(step.tool);
   switch (tool) {
     case 'contentSearch': {
-      return contentSearch(workspaceRoot, step.arguments, options.allowedPaths);
+      return contentSearch(workspaceRoot, step.arguments, options.allowedPaths, runtime);
     }
     case 'globList': {
-      return globList(workspaceRoot, step.arguments, options.allowedPaths);
+      return globList(workspaceRoot, step.arguments, options.allowedPaths, runtime);
     }
     case 'readFile': {
       return readFileTool(workspaceRoot, step.arguments, options.allowedPaths);
@@ -382,8 +435,15 @@ function invokeNativeStep(
   options: NativeInvokerOptions,
 ) {
   const startedAt = performance.now();
+  const monotonicNow = options.monotonicNow ?? (() => performance.now());
+  const runtime = {
+    deadline:
+      monotonicNow() +
+      boundedInteger(options.maxStepWallMs, DEFAULT_MAX_STEP_WALL_MS, HARD_MAX_STEP_WALL_MS),
+    now: monotonicNow,
+  };
   try {
-    const result = runNativeTool(workspaceRoot, step, options);
+    const result = runNativeTool(workspaceRoot, step, options, runtime);
     const facts = step.extract(result.payload);
     const proofClosure = step.assessProofClosure?.(result.payload);
     return makeStepRecord({

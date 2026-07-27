@@ -43,7 +43,11 @@ import {
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  buildNameIndex,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import type { PythonParsedFile, PythonParsedProject } from './parse.js';
 import type {
@@ -74,6 +78,7 @@ function pythonPosition(
 }
 
 export function resolveCallSites(input: ResolveInput<PythonParsedProject>): ResolveOutput {
+  throwIfGraphAdapterAborted(input.signal, 'Python call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:python' });
   // Same-language only (see graph-go/resolve.ts): `.py`/`.pyi` only, never a
   // same-named occurrence from another language in the merged exact catalog.
@@ -87,6 +92,7 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
   const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
+    throwIfGraphAdapterAborted(input.signal, 'Python call resolution');
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as PythonParsedFile;
     if (r.kind === 'creation') {
@@ -116,7 +122,7 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
   // module discovery (no symbol table, no tsconfig resolution).
   const dependenciesByOwner =
     input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(input.dependencySites, input.catalog)
+      ? resolveDependencies(input.dependencySites, input.catalog, input.signal)
       : undefined;
 
   return dependenciesByOwner === undefined
@@ -146,11 +152,14 @@ export function resolveCallSites(input: ResolveInput<PythonParsedProject>): Reso
 function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
+  signal?: AbortSignal,
 ): ReadonlyMap<string, readonly DependencyEdge[]> {
+  throwIfGraphAdapterAborted(signal, 'Python dependency resolution');
   // Build filePath → module-init bodyHash map. Catalog occurrences carry
   // project-relative POSIX filePath; module-init kind is filtered.
   const moduleInitByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Python dependency resolution');
     if (!occs) continue;
     for (const o of occs) {
       if (o.kind === 'module-init') moduleInitByFilePath.set(o.filePath, o.bodyHash);
@@ -159,6 +168,7 @@ function resolveDependencies(
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'Python dependency resolution');
     const file = site.sourceFileRef as PythonParsedFile;
     const importerFilePath = pythonFilePathOf(file, catalog, site.ownerHash);
     const to = resolvePythonModuleSpecifier(site.specifier, importerFilePath, moduleInitByFilePath);
@@ -175,6 +185,7 @@ function resolveDependencies(
       existing.push(edge);
     }
   }
+  throwIfGraphAdapterAborted(signal, 'Python dependency resolution');
   return out;
 }
 

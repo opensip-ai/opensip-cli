@@ -1,12 +1,19 @@
 import { resolveStepArguments } from '../model/argument-resolution.js';
 import { makeStepRecord, type ArmLegRecord, type ToolInvoker } from '../model/record.js';
-import { type RunLeg, type ScopedAnswerAssertions, type StrategyStep } from '../model/task.js';
+import {
+  type ResolvedStrategyStep,
+  type RunLeg,
+  type ScopedAnswerAssertions,
+  type StrategyStep,
+} from '../model/task.js';
 import {
   appendStepRecord,
   canAnswer,
   createAnswerState,
   type AnswerState,
 } from '../scorer/answer-state.js';
+
+import { safeErrorDetail } from './error-detail.js';
 
 /** Dependencies and semantic contract for executing one strategy leg. */
 export interface ExecuteArmInput {
@@ -16,6 +23,8 @@ export interface ExecuteArmInput {
   readonly invoker: ToolInvoker;
   /** Defaults to the assertion scope and is stamped onto every invocation. */
   readonly leg?: RunLeg;
+  /** Paths removed from any rejected-invocation detail before it becomes durable. */
+  readonly sensitivePaths?: readonly string[];
   readonly steps: readonly StrategyStep[];
 }
 
@@ -69,6 +78,25 @@ function bindingFailureRecord(step: StrategyStep, leg: RunLeg, state: AnswerStat
   };
 }
 
+async function invokeStep(input: ExecuteArmInput, step: ResolvedStrategyStep, leg: RunLeg) {
+  const startedAt = performance.now();
+  try {
+    return await input.invoker(step);
+  } catch (error) {
+    return makeStepRecord({
+      failure: {
+        code: 'tool-invocation-failure',
+        kind: 'infrastructure',
+        message: safeErrorDetail(error, input.sensitivePaths) || 'Tool invocation failed.',
+      },
+      leg,
+      renderedResponse: '',
+      step,
+      wallMs: Math.max(0, performance.now() - startedAt),
+    });
+  }
+}
+
 /**
  * Execute one strategy leg in order. Every call owns a fresh append-only answer
  * state; only normalized facts from earlier steps in this call can bind later
@@ -82,7 +110,9 @@ export async function executeArm(input: ExecuteArmInput): Promise<ArmLegRecord> 
   for (const candidate of input.steps) {
     const step = scopeStep(candidate, leg);
     const resolution = bindingFailureRecord(step, leg, state);
-    const record = resolution.ok ? await input.invoker(resolution.step) : resolution.record;
+    const record = resolution.ok
+      ? await invokeStep(input, resolution.step, leg)
+      : resolution.record;
     state = appendStepRecord(state, record);
     if (canAnswer(state, input.assertions)) break;
   }

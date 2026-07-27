@@ -27,7 +27,7 @@ export const resolveNewExpression: EdgeResolver<ts.NewExpression> = (node, ctx) 
   /* v8 ignore next */
   if (!symbol) return UNRESOLVED;
 
-  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const real = unaliasSymbol(symbol, ctx.typeChecker, ctx.recordResolutionDegradation);
   const decls = real.getDeclarations() ?? [];
   for (const d of decls) {
     /* v8 ignore next */

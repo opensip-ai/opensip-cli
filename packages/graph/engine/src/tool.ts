@@ -45,6 +45,7 @@ import { graphConfigDeclaration } from './cli/graph-config-schema.js';
 import { graphRunWorkerCommandSpec } from './cli/graph-worker.js';
 import { buildGraphRecipeCatalog, buildGraphRuleCatalog } from './cli/report-data.js';
 import { createContextRunState } from './context-run-state.js';
+import { graphErrorCatalog } from './errors/graph-error-catalog.js';
 import { createGraphCatalogThunk } from './graph-catalog-thunk.js';
 import { GRAPH_IDENTITY, GRAPH_STABLE_ID } from './identity.js';
 import { createAdapterRegistry, currentAdapterRegistry } from './lang-adapter/registry.js';
@@ -179,6 +180,7 @@ export const graphTool: Tool = defineTool({
   },
   commandSpecs: graphCommandSpecs,
   extensionPoints: {
+    errorCatalog: graphErrorCatalog,
     contractVersions: {
       graph: GRAPH_CONTRACT_VERSION,
     },

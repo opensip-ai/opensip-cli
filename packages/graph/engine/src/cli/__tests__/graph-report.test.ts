@@ -191,5 +191,36 @@ describe('buildLiveGraphOutput', () => {
     expect(text).toContain('== Catalog ==');
     expect(text).toContain('== Findings (1) ==');
     expect(text).not.toContain('== Summary ==');
+    expect(out.degradations).toBeUndefined();
+  });
+
+  it('carries partial catalog coverage across the live worker boundary', async () => {
+    const catalog = {
+      ...catalogOf([occ()]),
+      buildCoverage: {
+        status: 'partial' as const,
+        discoveredFiles: 3,
+        parseErrorFiles: 2,
+        filesIdentity: 'sha256:test',
+      },
+    };
+    const out = await runWithScope(makeGraphTestScope(), () =>
+      buildLiveGraphOutput(
+        {
+          catalog,
+          indexes: buildIndexes(catalog),
+          signals: [],
+          cacheHit: false,
+        },
+        tmpdir(),
+      ),
+    );
+    expect(out.degradations).toEqual([
+      {
+        errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+        condition: 'parse-errors',
+        count: 2,
+      },
+    ]);
   });
 });

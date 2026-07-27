@@ -13,27 +13,12 @@
 
 import { formatScore } from '@opensip-cli/format';
 
+import { computeCheckStats, normalizeCheckEntry } from './check-catalog-data.js';
 import { el } from './el.js';
 import { paginateGroupedRows, renderPageButtons, wirePagination } from './pagination.js';
 import { registerSortRefreshHandler } from './sortable.js';
 
-/** A check catalog entry (tool domain vocabulary, read structurally). */
-interface CheckEntry {
-  slug: string;
-  name: string;
-  source: string;
-  confidence: string;
-  tags?: string[];
-  longDescription?: string;
-}
-
-/** Aggregated run stats for one check, derived from the session payloads. */
-interface CheckStat {
-  runs: number;
-  passed: number;
-  failed: number;
-  lastRun: string | null;
-}
+import type { CheckEntry, CheckStat } from './check-catalog-data.js';
 
 const DIM = 'color:var(--text-dim)';
 const EM_DASH = '—';
@@ -107,28 +92,6 @@ function paginateFilteredGroups(pag: HTMLElement, groups: HTMLElement[][]): void
   wirePagination(pag, (p) => renderFilteredPage(pag, groups, p, totalPages));
   renderFilteredPage(pag, groups, 0, totalPages);
 }
-
-function computeCheckStats(): Record<string, CheckStat> {
-  const stats: Record<string, CheckStat> = {};
-  for (const s of sessions) {
-    if (s.tool !== 'fit') continue;
-    // Per-session detail lives in the tool-owned opaque payload; fitness
-    // sessions carry { summary, checks }. Sessions without checks (graph, sim)
-    // contribute nothing here.
-    const checks =
-      (s.payload?.checks as { checkSlug: string; passed?: boolean }[] | undefined) ?? [];
-    for (const ch of checks) {
-      stats[ch.checkSlug] ??= { runs: 0, passed: 0, failed: 0, lastRun: null };
-      const st = stats[ch.checkSlug];
-      st.runs++;
-      if (ch.passed) st.passed++;
-      else st.failed++;
-      if (!st.lastRun || s.startedAt > st.lastRun) st.lastRun = s.startedAt;
-    }
-  }
-  return stats;
-}
-const checkStats = computeCheckStats();
 
 /** Render longDescription as DOM nodes with bold and code formatting. Safe — no innerHTML. */
 function renderLongDesc(text: string | undefined): HTMLElement {
@@ -210,7 +173,12 @@ function buildLastRunCell(lastRun: string | null): HTMLElement {
 }
 
 /** Build one catalog data row (+ its expander row when it has a long description). */
-function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[] {
+function buildCheckRow(
+  check: CheckEntry,
+  i: number,
+  uid: string,
+  checkStats: Readonly<Record<string, CheckStat>>,
+): HTMLElement[] {
   const st = checkStats[check.slug] ?? EMPTY_STAT;
   const rate = st.runs > 0 ? Math.round((st.passed / st.runs) * 100) : -1;
   const hasDesc = !!check.longDescription;
@@ -290,10 +258,49 @@ function buildCheckRow(check: CheckEntry, i: number, uid: string): HTMLElement[]
 }
 
 export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly unknown[]): void {
-  const entries = catalogData as readonly CheckEntry[];
+  const catalogValues = Array.isArray(catalogData) ? catalogData : [];
+  const entries = catalogValues
+    .map((entry) => normalizeCheckEntry(entry))
+    .filter((entry): entry is CheckEntry => entry !== null);
+  const omittedEntries = catalogValues.length - entries.length;
   if (entries.length === 0) {
-    panel.append(el('div', { class: 'empty', text: 'No checks registered.' }));
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          omittedEntries === 0
+            ? 'No checks registered.'
+            : 'The checks catalog could not be rendered because its entries are malformed.',
+      }),
+    );
     return;
+  }
+
+  if (omittedEntries > 0) {
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          omittedEntries +
+          ' malformed check catalog ' +
+          (omittedEntries === 1 ? 'entry was' : 'entries were') +
+          ' omitted.',
+      }),
+    );
+  }
+
+  const { stats: checkStats, malformedSessions } = computeCheckStats();
+  if (malformedSessions > 0) {
+    panel.append(
+      el('div', {
+        class: 'empty',
+        text:
+          'Run statistics omit ' +
+          malformedSessions +
+          (malformedSessions === 1 ? ' session' : ' sessions') +
+          ' with malformed check detail.',
+      }),
+    );
   }
 
   const allTags = new Set<string>();
@@ -333,7 +340,7 @@ export function renderChecksCatalog(panel: HTMLElement, catalogData: readonly un
   const uid = 'cc-' + Math.random().toString(36).slice(2, 8);
 
   sorted.forEach((check, i) => {
-    buildCheckRow(check, i, uid).forEach((r) => tbody.append(r));
+    buildCheckRow(check, i, uid, checkStats).forEach((r) => tbody.append(r));
   });
 
   table.append(tbody);

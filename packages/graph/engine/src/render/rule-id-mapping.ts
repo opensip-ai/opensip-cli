@@ -23,6 +23,11 @@
 
 import { ValidationError } from '@opensip-cli/core';
 
+import { GRAPH_PARTIAL_COVERAGE_SLUG } from '../degradation.js';
+
+/** Engine diagnostics that intentionally are not contributed graph rules. */
+export const GRAPH_DIAGNOSTIC_SLUGS: readonly string[] = [GRAPH_PARTIAL_COVERAGE_SLUG];
+
 /**
  * Mapping from engine `Rule.slug` to OpenSIP-convention rule ID.
  *
@@ -43,6 +48,7 @@ export const RULE_ID_MAPPING: Readonly<Record<string, string>> = Object.freeze({
   'graph:high-blast-untested': 'graph.coverage.high-blast-untested',
   'graph:cycle': 'graph.architecture.cycle',
   'graph:unexpected-coupling': 'graph.architecture.unexpected-coupling',
+  [GRAPH_PARTIAL_COVERAGE_SLUG]: 'graph.resilience.catalog-partial-coverage',
 });
 
 /**

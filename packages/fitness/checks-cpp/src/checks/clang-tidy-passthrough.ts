@@ -12,6 +12,15 @@ import { defineCheck, type CheckViolation } from '@opensip-cli/fitness';
 
 const CLANG_TIDY_LINE =
   /^(.+?):(\d+):(\d+):\s+(warning|error|note):\s+(.+?)(?:\s+\[([\w\-,.]+)\])?$/;
+const CLANG_DIAGNOSTIC_ERROR = 'clang-diagnostic-error';
+const ENVIRONMENT_DIAGNOSTIC = /(?:file not found|no such file or directory)/iu;
+
+class ClangTidyEnvironmentError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = 'ClangTidyEnvironmentError';
+  }
+}
 
 /**
  * Resolve a captured clang-tidy file path against `cwd` and convert it
@@ -58,9 +67,16 @@ function mergeClangTidyStreams(stdout: string, stderr: string): string {
   return `${stdout}\n${stderr}`;
 }
 
+/**
+ * Convert one parsed diagnostic into a fitness violation.
+ *
+ * @throws {ClangTidyEnvironmentError} When clang-tidy reports that the translation-unit
+ *   environment is incomplete, rather than reporting a source-code diagnostic.
+ */
 function violationFromClangTidyMatch(
   match: RegExpExecArray,
   cwd: string,
+  exitCode: number,
 ): CheckViolation | undefined {
   const filePath = match[1];
   const lineStr = match[2];
@@ -69,6 +85,16 @@ function violationFromClangTidyMatch(
   const message = match[5];
   const lintName = match[6];
   if (severity === 'note') return undefined;
+  if (
+    exitCode !== 0 &&
+    lintName === CLANG_DIAGNOSTIC_ERROR &&
+    message !== undefined &&
+    ENVIRONMENT_DIAGNOSTIC.test(message)
+  ) {
+    throw new ClangTidyEnvironmentError(
+      `clang-tidy could not analyze the translation unit: ${message}`,
+    );
+  }
   // The regex guarantees groups 1 (filePath), 2 (lineStr), 3 (colStr), 4
   // (severity) and 5 (message) are non-empty captures when it matches; the
   // `?` / `??` fallbacks below exist for type-narrowing of `match[n]` (which
@@ -91,7 +117,7 @@ function violationFromClangTidyMatch(
 export function parseClangTidyOutput(
   stdout: string,
   stderr: string,
-  _exitCode: number,
+  exitCode: number,
   _files: readonly string[],
   cwd: string,
 ): CheckViolation[] {
@@ -100,7 +126,7 @@ export function parseClangTidyOutput(
   for (const line of lines) {
     const match = CLANG_TIDY_LINE.exec(line);
     if (!match) continue;
-    const violation = violationFromClangTidyMatch(match, cwd);
+    const violation = violationFromClangTidyMatch(match, cwd, exitCode);
     if (violation !== undefined) violations.push(violation);
   }
   return violations;

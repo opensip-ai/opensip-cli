@@ -30,21 +30,45 @@
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { configureLogger, logger, runWithScope } from '@opensip-cli/core';
+import {
+  configureLogger,
+  createToolError,
+  logger,
+  normalizeFailure,
+  runWithScope,
+  type ErrorDefinition,
+  type RunScope,
+} from '@opensip-cli/core';
 import { compareCodePointStrings } from '@opensip-cli/graph/read';
 
+import { mcpErrorCatalog } from './errors/mcp-error-catalog.js';
 import { sanitizeMcpErrorMessage } from './mcp-error.js';
 
 import type { GraphReadPort } from './graph-read-port.js';
 import type { ResultsReadPort } from './results-read-port.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import type { RunScope } from '@opensip-cli/core';
 
 /** Server identity advertised in the MCP `initialize` handshake. */
 const SERVER_NAME = 'opensip-cli-mcp';
 /** `module` field stamped on every structured logger event from this file. */
 const LOG_MODULE = 'mcp:server';
 const MCP_CLOSE_GRACE_MS = 1000;
+const MCP_STDIO_PROTOCOL = mcpErrorCatalog.require('MCP.STDIO.PROTOCOL');
+const MCP_STDIO_TRANSPORT_FAILED = mcpErrorCatalog.require('MCP.STDIO.TRANSPORT_FAILED');
+
+function classifiedBoundaryError(
+  error: unknown,
+  boundary: ErrorDefinition,
+  message: string,
+  reason: 'connect-failed' | 'tool-dispatch',
+): Error {
+  const original = normalizeFailure(error);
+  const definition = original.known === 'known' ? original.definition : boundary;
+  return createToolError(definition, message, {
+    cause: error,
+    metadata: { reason },
+  });
+}
 
 function safeLog(level: 'info' | 'error', entry: Readonly<Record<string, unknown>>): void {
   try {
@@ -233,11 +257,13 @@ export class McpStdioServer {
           outcome: 'thrown',
           durationMs: Math.max(0, Date.now() - started),
         });
-        throw new Error(
+        throw classifiedBoundaryError(
+          error,
+          MCP_STDIO_PROTOCOL,
           sanitizeMcpErrorMessage(error, {
             projectRoot: this.scope.projectContext?.projectRoot,
           }),
-          { cause: error },
+          'tool-dispatch',
         );
       }
     });
@@ -247,6 +273,8 @@ export class McpStdioServer {
    * Serve until the stdio transport closes. Resolves on stdin EOF (or a
    * SIGINT-driven graceful close). Never calls `process.exit` — the host command
    * handler resolves cleanly and owns the final exit code (ADR-0084).
+   *
+   * @throws {ToolError} When the stdio transport cannot connect or start serving.
    */
   async serve(): Promise<void> {
     // Route the structured logger sink to stderr for the serve lifetime: stdout
@@ -321,9 +349,15 @@ export class McpStdioServer {
       await closed;
     } catch (error) {
       // A partially connected transport still receives the same bounded close
-      // attempt; preserve the original connect failure after cleanup.
+      // attempt; retain the cause for local operators but expose only the
+      // registered transport classification to the host boundary.
       shutdown();
-      throw error;
+      throw classifiedBoundaryError(
+        error,
+        MCP_STDIO_TRANSPORT_FAILED,
+        'MCP stdio transport could not be started.',
+        'connect-failed',
+      );
     } finally {
       process.stdin.removeListener('end', shutdown);
       process.stdin.removeListener('close', shutdown);

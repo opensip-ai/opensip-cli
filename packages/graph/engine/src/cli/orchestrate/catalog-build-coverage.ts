@@ -5,7 +5,9 @@ import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { compareCodePoint } from '@opensip-cli/contracts';
 import { currentLogger, tryCatch } from '@opensip-cli/core';
 
-import type { CatalogBuildCoverage, ParseError } from '../../types.js';
+import { mergeGraphDegradations } from '../../degradation.js';
+
+import type { CatalogBuildCoverage, GraphRunDegradation, ParseError } from '../../types.js';
 
 const MODULE_NAME = 'graph:catalog-build-coverage';
 
@@ -22,6 +24,11 @@ function boundedParseMessage(message: string): string {
     : singleLine;
 }
 
+function parseErrorLogEntry(error: ParseError): string {
+  const codePrefix = error.code === undefined ? '' : `[${error.code}] `;
+  return `${error.filePath}: ${codePrefix}${boundedParseMessage(error.message)}`;
+}
+
 /**
  * Name every file the parser dropped, in the run log only. The persisted
  * coverage payload stays count-only (privacy-safe); this local diagnostic is
@@ -33,9 +40,7 @@ function logDroppedParseFiles(parseErrors: readonly ParseError[]): void {
     evt: 'graph.catalog.parse.dropped',
     module: MODULE_NAME,
     count: parseErrors.length,
-    files: parseErrors
-      .slice(0, PARSE_DROP_FILE_CAP)
-      .map((error) => `${error.filePath}: ${boundedParseMessage(error.message)}`),
+    files: parseErrors.slice(0, PARSE_DROP_FILE_CAP).map(parseErrorLogEntry),
     overflow: Math.max(0, parseErrors.length - PARSE_DROP_FILE_CAP),
   });
 }
@@ -71,6 +76,7 @@ export function catalogBuildCoverage(input: {
   readonly files: readonly string[];
   readonly parseErrors: readonly ParseError[];
   readonly status?: CatalogBuildCoverage['status'];
+  readonly degradations?: readonly GraphRunDegradation[];
 }): CatalogBuildCoverage {
   let status = input.status ?? 'complete';
   let canonicalRoot = resolve(input.projectRoot);
@@ -107,10 +113,13 @@ export function catalogBuildCoverage(input: {
       .filter((file): file is string => file !== undefined)
       .filter((file) => fileSet.has(file)),
   );
+  const degradations = mergeGraphDegradations([input.degradations ?? []]);
+  if (degradations.length > 0) status = 'partial';
   return {
     status,
     discoveredFiles: fileSet.size,
     parseErrorFiles: parseErrorFiles.size,
     filesIdentity: graphInputFilesIdentity(relativeFiles),
+    ...(degradations.length === 0 ? {} : { degradations }),
   };
 }

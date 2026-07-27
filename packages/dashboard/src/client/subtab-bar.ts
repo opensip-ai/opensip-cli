@@ -61,15 +61,30 @@ export function renderSubtabBar(
   subtabBar.addEventListener('click', (e) => {
     const tab = (e.target as Element | null)?.closest<HTMLElement>('.subtab');
     if (!tab) return;
+    const targetId = tab.dataset.subtab;
+    const targetPanel = targetId === undefined ? undefined : panels[targetId];
+    if (!targetPanel) return;
     subtabBar.querySelectorAll('.subtab').forEach((t) => t.classList.remove('active'));
     tab.classList.add('active');
     subtabs.forEach((t) => panels[t.id].classList.remove('active'));
-    panels[tab.dataset.subtab!].classList.add('active');
+    targetPanel.classList.add('active');
   });
 
   // Render each subpanel's body. Done after mounting so renderers can safely
   // measure their host (the panel is in the document).
-  subtabs.forEach((t) => t.render(panels[t.id]));
+  subtabs.forEach((t) => {
+    const targetPanel = panels[t.id];
+    try {
+      t.render(targetPanel);
+    } catch {
+      targetPanel.replaceChildren(
+        el('div', {
+          class: 'empty',
+          text: t.label + ' could not be rendered. Other sections remain available.',
+        }),
+      );
+    }
+  });
 
   return panels;
 }

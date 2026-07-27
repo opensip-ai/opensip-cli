@@ -24,8 +24,10 @@
 
 import { relative, sep } from 'node:path';
 
+import { isToolErrorLike, projectRelativePath } from '@opensip-cli/core';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { visitArrowFunction } from './inventory-visitors/arrow-function.js';
 import { visitClassStaticBlock } from './inventory-visitors/class-static-init.js';
 import { visitConstructorDeclaration } from './inventory-visitors/constructor-declaration.js';
@@ -157,6 +159,7 @@ export interface WalkInput {
   readonly sourceFiles: Iterable<ts.SourceFile>;
   readonly files: readonly string[];
   readonly projectDirAbs: string;
+  readonly signal?: AbortSignal;
 }
 
 export interface WalkOutput {
@@ -167,35 +170,93 @@ export interface WalkOutput {
   readonly parseErrors: readonly ParseError[];
 }
 
+const MAX_WALK_DEPTH = 512;
+
+class WalkDepthExceededError extends Error {
+  public constructor() {
+    super('TypeScript graph walk exceeded its guarded AST depth.');
+    this.name = 'WalkDepthExceededError';
+  }
+}
+
+interface WalkSinks {
+  readonly functions: Record<string, FunctionOccurrence[]>;
+  readonly callSites: CallSiteRecord[];
+  readonly dependencySites: DependencySiteRecord[];
+  readonly reExports: ReExportRecord[];
+}
+
+function createWalkSinks(): WalkSinks {
+  return {
+    functions: Object.create(null) as Record<string, FunctionOccurrence[]>,
+    callSites: [],
+    dependencySites: [],
+    reExports: [],
+  };
+}
+
 export function walkProgram(input: WalkInput): WalkOutput {
-  const functions: Record<string, FunctionOccurrence[]> = Object.create(null) as Record<
-    string,
-    FunctionOccurrence[]
-  >;
-  const callSites: CallSiteRecord[] = [];
-  const dependencySites: DependencySiteRecord[] = [];
-  const reExports: ReExportRecord[] = [];
+  const output = createWalkSinks();
   const parseErrors: ParseError[] = [];
   const filesSet = new Set(input.files.map(normalizeForCompare));
 
   for (const sf of input.sourceFiles) {
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
     if (sf.isDeclarationFile) continue;
     const sfPath = normalizeForCompare(sf.fileName);
     if (!filesSet.has(sfPath)) continue;
-    try {
-      walkFile(sf, input.projectDirAbs, functions, callSites, dependencySites);
-      collectReExports(sf, input.projectDirAbs, reExports);
-    } catch (error) {
-      /* v8 ignore start */
-      parseErrors.push({
-        filePath: relative(input.projectDirAbs, sf.fileName),
-        message: error instanceof Error ? error.message : String(error),
-      });
-      /* v8 ignore stop */
-    }
+    const error = walkSourceFile(input, sf, output);
+    if (error !== undefined) parseErrors.push(error);
   }
 
-  return { functions, callSites, dependencySites, reExports, parseErrors };
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
+
+  return { ...output, parseErrors };
+}
+
+function walkSourceFile(
+  input: WalkInput,
+  sourceFile: ts.SourceFile,
+  output: WalkSinks,
+): ParseError | undefined {
+  const staged = createWalkSinks();
+  try {
+    walkFile(sourceFile, input.projectDirAbs, staged, input.signal);
+    collectReExports(sourceFile, input.projectDirAbs, staged.reExports);
+    throwIfGraphAdapterAborted(input.signal, 'TypeScript walk');
+    commitStagedWalk(output, staged);
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
+    const depthExceeded = error instanceof WalkDepthExceededError;
+    return {
+      filePath: safeProjectRelativePath(input.projectDirAbs, sourceFile.fileName),
+      message: depthExceeded
+        ? 'TypeScript source exceeds the supported graph AST nesting depth.'
+        : 'TypeScript graph inventory failed for this source file.',
+      code: depthExceeded ? 'GRAPH.TS.WALK_DEPTH_EXCEEDED' : 'GRAPH.TS.WALK_FAULT',
+    };
+  }
+}
+
+function commitStagedWalk(output: WalkSinks, staged: WalkSinks): void {
+  for (const [name, occurrences] of Object.entries(staged.functions)) {
+    const existing = output.functions[name];
+    if (existing === undefined) output.functions[name] = occurrences;
+    else existing.push(...occurrences);
+  }
+  output.callSites.push(...staged.callSites);
+  output.dependencySites.push(...staged.dependencySites);
+  output.reExports.push(...staged.reExports);
+}
+
+function safeProjectRelativePath(projectDirAbs: string, fileName: string): string {
+  return projectRelativePath(fileName.split(sep).join('/'), projectDirAbs.split(sep).join('/'));
+}
+
+/** @throws {WalkDepthExceededError | ToolError} When traversal is too deep or is cancelled. */
+function guardWalk(signal: AbortSignal | undefined, depth: number): void {
+  throwIfGraphAdapterAborted(signal, 'TypeScript walk');
+  if (depth > MAX_WALK_DEPTH) throw new WalkDepthExceededError();
 }
 
 /**
@@ -215,6 +276,7 @@ function collectDependencySites(
   sourceFile: ts.SourceFile,
   moduleInit: FunctionOccurrence,
   out: DependencySiteRecord[],
+  signal: AbortSignal | undefined,
 ): void {
   const push = (node: ts.Node, specifier: string, form: DependencyForm, role: DependencyRole) => {
     const lineChar = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
@@ -263,7 +325,8 @@ function collectDependencySites(
   }
 
   // Dynamic forms anywhere in the file: literal `import('…')` and `require('…')`.
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node, depth: number): void => {
+    guardWalk(signal, depth);
     if (ts.isCallExpression(node)) {
       if (node.expression.kind === ts.SyntaxKind.ImportKeyword) {
         const arg = node.arguments[0];
@@ -279,9 +342,13 @@ function collectDependencySites(
         push(node, node.arguments[0].text, 'commonjs-require', 'runtime');
       }
     }
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => {
+      visit(child, depth + 1);
+    });
   };
-  ts.forEachChild(sourceFile, visit);
+  ts.forEachChild(sourceFile, (child) => {
+    visit(child, 1);
+  });
 }
 
 /** Executable role of an `import …` declaration, from its clause. */
@@ -411,9 +478,8 @@ function pushReExportsFromStmt(
 function walkFile(
   sourceFile: ts.SourceFile,
   projectDirAbs: string,
-  out: Record<string, FunctionOccurrence[]>,
-  callSites: CallSiteRecord[],
-  dependencySites: DependencySiteRecord[],
+  out: WalkSinks,
+  signal: AbortSignal | undefined,
 ): void {
   const filePathProjectRel = relative(projectDirAbs, sourceFile.fileName).split(sep).join('/');
 
@@ -429,10 +495,10 @@ function walkFile(
   // One synthesized module-init per file. Its hash owns top-level
   // call sites discovered before any function-shape descent.
   const moduleInit = synthesizeModuleInit(sourceFile, baseCtx);
-  record(out, moduleInit);
+  record(out.functions, moduleInit);
 
   // Phase 4 (DEC-498): walk top-level imports as dependency sites.
-  collectDependencySites(sourceFile, moduleInit, dependencySites);
+  collectDependencySites(sourceFile, moduleInit, out.dependencySites, signal);
 
   // The owner threaded through the descent is the FULL occurrence identity
   // (hash + declaration line/column), not just the hash, so call/creation sites
@@ -444,13 +510,15 @@ function walkFile(
     ownerHash: string,
     ownerLine: number,
     ownerColumn: number,
+    depth: number,
   ): void {
+    guardWalk(signal, depth);
     const occ = dispatchVisitor(node, ctx);
     let childOwnerHash = ownerHash;
     let childOwnerLine = ownerLine;
     let childOwnerColumn = ownerColumn;
     if (occ) {
-      record(out, occ);
+      record(out.functions, occ);
       childOwnerHash = occ.bodyHash;
       childOwnerLine = occ.line;
       childOwnerColumn = occ.column;
@@ -459,7 +527,7 @@ function walkFile(
       // call edge to be reachable, which is what makes the orphan
       // rule catch genuinely unused top-level functions.
       if (isInlineCallable(node) && ownerHash !== childOwnerHash) {
-        callSites.push({
+        out.callSites.push({
           node,
           sourceFile,
           ownerHash,
@@ -472,7 +540,7 @@ function walkFile(
     }
 
     if (isResolverCandidate(node)) {
-      callSites.push({ node, sourceFile, ownerHash, ownerLine, ownerColumn, kind: 'call' });
+      out.callSites.push({ node, sourceFile, ownerHash, ownerLine, ownerColumn, kind: 'call' });
     }
 
     if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
@@ -481,7 +549,7 @@ function walkFile(
       const childCtx: VisitorContext = { ...ctx, enclosingClass: className };
       // @graph-ignore-next-line graph:cycle -- intentional recursive descent; forEachChild re-enters the visitor (descend)
       ts.forEachChild(node, (c) => {
-        descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn);
+        descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn, depth + 1);
       });
       return;
     }
@@ -494,7 +562,7 @@ function walkFile(
     // `enclosingClass` via the branch above.
     const childCtx: VisitorContext = occ ? { ...ctx, enclosingClass: null } : ctx;
     ts.forEachChild(node, (c) => {
-      descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn);
+      descend(c, childCtx, childOwnerHash, childOwnerLine, childOwnerColumn, depth + 1);
     });
   }
 
@@ -502,7 +570,7 @@ function walkFile(
   // Descend its children directly with module-init as the initial
   // owner (line 1, column 0).
   ts.forEachChild(sourceFile, (c) => {
-    descend(c, baseCtx, moduleInit.bodyHash, moduleInit.line, moduleInit.column);
+    descend(c, baseCtx, moduleInit.bodyHash, moduleInit.line, moduleInit.column, 1);
   });
 }
 

@@ -73,6 +73,39 @@ describe('parseProjectFast', () => {
     expect(out.project.sourceFiles.size).toBe(1);
   });
 
+  it('reports unreadable source files without exposing their absolute path', () => {
+    const missing = join(dir, 'private', 'missing.ts');
+
+    const out = parseProjectFast({
+      projectDirAbs: dir,
+      files: [missing],
+      resolutionMode: 'fast',
+    });
+
+    expect(out.parseErrors).toEqual([
+      {
+        filePath: 'private/missing.ts',
+        message: 'Source file was unavailable when graph parsing began.',
+        code: 'GRAPH.TS.SOURCE_UNREADABLE',
+      },
+    ]);
+    expect(out.parseErrors[0]?.message).not.toContain(dir);
+  });
+
+  it('bounds retained TypeScript diagnostics per source file', () => {
+    const broken = join(dir, 'many-errors.ts');
+    writeFileSync(broken, Array.from({ length: 100 }, () => 'const = ;').join('\n'), 'utf8');
+
+    const out = parseProjectFast({
+      projectDirAbs: dir,
+      files: [broken],
+      resolutionMode: 'fast',
+    });
+
+    expect(out.parseErrors.length).toBeLessThanOrEqual(21);
+    expect(out.parseErrors.at(-1)?.message).toMatch(/additional TypeScript parse diagnostic/);
+  });
+
   it('parses .tsx as JSX (ScriptKind derived from extension)', () => {
     const tsx = join(dir, 'view.tsx');
     writeFileSync(tsx, 'export const View = () => <div className="x">hi</div>;\n', 'utf8');

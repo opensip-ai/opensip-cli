@@ -76,6 +76,11 @@ export function buildWorkspaceJsonDocument(
       displayPath: r.displayPath,
       exitCode: r.exitCode,
       signals: r.signals,
+      ...(r.failureReason === undefined ? {} : { failureReason: r.failureReason }),
+      ...(r.errorCode === undefined ? {} : { errorCode: r.errorCode }),
+      ...(r.failureClass === undefined ? {} : { failureClass: r.failureClass }),
+      ...(r.failureCondition === undefined ? {} : { failureCondition: r.failureCondition }),
+      ...(r.errno === undefined ? {} : { errno: r.errno }),
     })),
     totalFindings: perUnit.reduce((n, r) => n + r.signals.length, 0),
   };
@@ -96,7 +101,8 @@ export function renderWorkspaceJson(
 function renderWorkspaceStatusLines(perUnit: readonly WorkspaceUnitRunResult[]): readonly string[] {
   const out: string[] = [];
   for (const r of perUnit) {
-    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)})`;
+    const failureLabel = r.errorCode === undefined ? '' : `, ${r.errorCode}`;
+    const status = r.exitCode === 0 ? 'ok' : `FAILED (exit ${String(r.exitCode)}${failureLabel})`;
     const display = unitDisplay(r);
     out.push(`  ${display}: ${String(r.signals.length)} finding(s) — ${status}`);
     if (r.exitCode !== 0 && r.stderr.length > 0) {

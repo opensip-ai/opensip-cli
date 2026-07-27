@@ -17,9 +17,12 @@ import {
   persistReport,
   requireExplicitPairAvailable,
 } from './cli-artifacts.js';
+import { installAgentEvalProcessBoundary } from './process-boundary.js';
 import { contractFingerprint } from './report/contract-fingerprint.js';
 import { EVAL_REPORT_SCHEMA_VERSION } from './report/model.js';
+import { safeErrorDetail } from './runner/error-detail.js';
 import { resolveGitProvenance } from './runner/git-provenance.js';
+import { registerInterruptCleanup } from './runner/interrupt-cleanup.js';
 import { runTaskArm } from './runner/run-task.js';
 import {
   HarnessPrerequisiteError,
@@ -54,6 +57,29 @@ const DEFAULT_RESULTS_ROOT = join(PACKAGE_ROOT, 'results');
 const MAX_DIAGNOSTIC_BYTES = 2 * 1024;
 const VERSION_OUTPUT_BYTES = 4 * 1024;
 const VERSION_TIMEOUT_MS = 30_000;
+
+interface ProcessTextStream {
+  write(text: string): unknown;
+}
+
+function downstreamClosed(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | undefined)?.code;
+  return code === 'EPIPE' || code === 'ERR_STREAM_DESTROYED';
+}
+
+/** Drop output after a normal downstream pipe close; preserve every other fault. */
+export function createTolerantProcessWriter(stream: ProcessTextStream): (text: string) => void {
+  let unavailable = false;
+  return (text) => {
+    if (unavailable) return;
+    try {
+      stream.write(text);
+    } catch (error) {
+      if (!downstreamClosed(error)) throw error;
+      unavailable = true;
+    }
+  };
+}
 
 export interface CliDependencies {
   readonly artifactFileSystem: ArtifactFileSystem;
@@ -122,8 +148,8 @@ export const DEFAULT_CLI_DEPENDENCIES: CliDependencies = Object.freeze({
   resultsRoot: DEFAULT_RESULTS_ROOT,
   runArm: (task: GoldTask, arm: Arm, target: CliTarget) =>
     runTaskArm(task, arm, { cliTarget: target }),
-  stderr: (text: string) => process.stderr.write(text),
-  stdout: (text: string) => process.stdout.write(text),
+  stderr: createTolerantProcessWriter(process.stderr),
+  stdout: createTolerantProcessWriter(process.stdout),
 });
 
 function buildRequestedPaths(
@@ -250,6 +276,9 @@ async function runEvaluation(
     baseDefaultPath,
     dependencies.artifactFileSystem,
   );
+  for (const warning of paths.warnings ?? []) {
+    void dependencies.stderr(`agent-eval: warning: ${warning}\n`);
+  }
   void dependencies.stderr('agent-eval: report artifacts complete\n');
   printSuccess(paths, report, dependencies);
   return 0;
@@ -261,6 +290,25 @@ function boundedOneLine(message: string): string {
     .replace(/\s{2,}/gu, ' ')
     .trim();
   return bounded.length === 0 ? 'required evaluation inputs are unavailable.' : bounded;
+}
+
+function unclassifiedHarnessDetail(error: unknown, dependencies: CliDependencies): string {
+  const sensitivePaths = [dependencies.resultsRoot];
+  try {
+    sensitivePaths.push(dependencies.cwd());
+  } catch {
+    // The original failure remains authoritative if cwd resolution is itself unavailable.
+  }
+  let identity = 'UnknownFailure';
+  if (error instanceof Error) {
+    try {
+      identity = error.name.trim() || 'Error';
+    } catch {
+      identity = 'Error';
+    }
+  }
+  const detail = safeErrorDetail(error, sensitivePaths) || 'failure detail unavailable';
+  return safeErrorDetail(new Error(`${identity}: ${detail}`), sensitivePaths);
 }
 
 function handleError(error: unknown, dependencies: CliDependencies): number {
@@ -276,7 +324,9 @@ function handleError(error: unknown, dependencies: CliDependencies): number {
     void dependencies.stderr(`agent-eval: ${boundedOneLine(error.message)}\n`);
     return 1;
   }
-  void dependencies.stderr('agent-eval: harness error; inspect the reported task and retry.\n');
+  void dependencies.stderr(
+    `agent-eval: harness error: ${boundedOneLine(unclassifiedHarnessDetail(error, dependencies))}\n`,
+  );
   return 1;
 }
 
@@ -296,6 +346,13 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
   // Construct the one immutable CLI target once, after help/list have returned, so
   // every version/init/graph/MCP spawn in this run measures the same build.
   const target = buildCliTarget(options.opensipEntrypoint);
+  let targetCleaned = false;
+  const cleanupTarget = (): void => {
+    if (targetCleaned) return;
+    targetCleaned = true;
+    cleanupCliTarget(target);
+  };
+  const releaseInterruptCleanup = registerInterruptCleanup(cleanupTarget);
   try {
     const requestedPaths = buildRequestedPaths(options, dependencies);
     if (requestedPaths !== undefined) {
@@ -303,7 +360,8 @@ async function mainImpl(argv: readonly string[], dependencies: CliDependencies):
     }
     return await runEvaluation(tasks, arms, requestedPaths, target, dependencies);
   } finally {
-    cleanupCliTarget(target);
+    releaseInterruptCleanup();
+    cleanupTarget();
   }
 }
 
@@ -321,5 +379,17 @@ export async function main(
 
 const invokedPath = process.argv[1];
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
-  process.exitCode = await main(process.argv.slice(2));
+  const uninstallProcessBoundary = installAgentEvalProcessBoundary((reason, kind) =>
+    handleError(
+      new CliHarnessError(
+        `fatal ${kind}: ${unclassifiedHarnessDetail(reason, DEFAULT_CLI_DEPENDENCIES)}`,
+      ),
+      DEFAULT_CLI_DEPENDENCIES,
+    ),
+  );
+  try {
+    process.exitCode = await main(process.argv.slice(2));
+  } finally {
+    uninstallProcessBoundary();
+  }
 }

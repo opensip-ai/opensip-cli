@@ -186,6 +186,63 @@ describe('runGraph orchestrator', () => {
     });
   });
 
+  it('stops before launching a stage when the host scope is cancelled', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const cancelledScope = makeGraphTestScope({ abortSignal: controller.signal });
+    try {
+      await runWithScope(cancelledScope, async () => {
+        currentAdapterRegistry().register(fakeAdapter({ projectDir }));
+        await expect(runGraph({ cwd: projectDir, noCache: true, rules: [] })).rejects.toMatchObject(
+          { code: 'CORE.SYSTEM.CANCELLED' },
+        );
+      });
+    } finally {
+      cancelledScope.dispose();
+    }
+  });
+
+  it('threads the host signal through every adapter operation', async () => {
+    const controller = new AbortController();
+    const signalledScope = makeGraphTestScope({ abortSignal: controller.signal });
+    const base = fakeAdapter({ projectDir });
+    const seen: AbortSignal[] = [];
+    const adapter: GraphLanguageAdapter = {
+      ...base,
+      discoverFiles: (input) => {
+        if (input.signal !== undefined) seen.push(input.signal);
+        return base.discoverFiles(input);
+      },
+      parseProject: (input) => {
+        if (input.signal !== undefined) seen.push(input.signal);
+        return base.parseProject(input);
+      },
+      walkProject: (input) => {
+        if (input.signal !== undefined) seen.push(input.signal);
+        return base.walkProject(input);
+      },
+      resolveCallSites: async (input) => {
+        if (input.signal !== undefined) seen.push(input.signal);
+        return await base.resolveCallSites(input);
+      },
+      cacheKey: (input) => {
+        if (input.signal !== undefined) seen.push(input.signal);
+        return base.cacheKey(input);
+      },
+    };
+
+    try {
+      await runWithScope(signalledScope, async () => {
+        currentAdapterRegistry().register(adapter);
+        await runGraph({ cwd: projectDir, noCache: true, rules: [] });
+      });
+      expect(seen.length).toBeGreaterThanOrEqual(6);
+      expect(seen.every((signal) => signal === controller.signal)).toBe(true);
+    } finally {
+      signalledScope.dispose();
+    }
+  });
+
   it('writes the catalog to the datastore when one is provided and cache is enabled', async () => {
     await inGraphScope(async () => {
       currentAdapterRegistry().register(

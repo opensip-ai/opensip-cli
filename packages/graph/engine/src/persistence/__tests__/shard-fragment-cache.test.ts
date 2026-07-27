@@ -9,13 +9,17 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { logger } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
+import { sql } from 'drizzle-orm';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { stampEngineVersion } from '../../cache/engine-version.js';
 import { computeFilesFingerprint } from '../../cache/invalidate.js';
 import { planShardWork } from '../../cli/orchestrate/shard-runner.js';
 import { CatalogRepo } from '../catalog-repo.js';
+import { graphShardFragment } from '../schema.js';
 
 import type { Shard, ShardBuildResult } from '../../cli/orchestrate/shard-model.js';
 import type { GraphLanguageAdapter } from '../../lang-adapter/types.js';
@@ -48,12 +52,58 @@ describe('CatalogRepo shard-fragment cache', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     datastore.close?.();
   });
+
+  function replacePayload(payload: unknown): void {
+    requireDrizzleHandle(datastore)
+      .db.update(graphShardFragment)
+      .set({ payload })
+      .where(sql`shard_id = ${'pkg:a'}`)
+      .run();
+  }
 
   it('round-trips a fragment and validates on matching key + fingerprint', () => {
     repo.upsertShardFragment(result('pkg:a', 'key-1', 'fp-1'));
     expect(repo.loadValidShardFragment('pkg:a', 'key-1', 'fp-1')).not.toBeNull();
+  });
+
+  it('round-trips bounded boundary-call and parse-error evidence', () => {
+    const populated: ShardBuildResult = {
+      ...result('pkg:a', 'key-1', 'fp-1'),
+      boundaryCalls: [
+        {
+          ownerHash: 'owner-hash',
+          ownerFile: 'src/a.ts',
+          ownerLine: 1,
+          ownerColumn: 0,
+          calleeName: 'called',
+          importSpecifier: '@scope/pkg',
+          line: 4,
+          column: 2,
+          text: 'called(\n  value\n)',
+          discarded: false,
+        },
+      ],
+      parseErrors: [
+        {
+          filePath: 'src/b.ts',
+          message: 'line one\nline two',
+          code: 'GRAPH.TS.SOURCE_UNREADABLE',
+        },
+      ],
+      degradations: [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition: 'typescript-exact-resolution',
+          count: 2,
+        },
+      ],
+    };
+    repo.upsertShardFragment(populated);
+
+    expect(repo.loadValidShardFragment('pkg:a', 'key-1', 'fp-1')).toEqual(populated);
   });
 
   it('returns null on a stale fingerprint or a stale cache key', () => {
@@ -79,6 +129,56 @@ describe('CatalogRepo shard-fragment cache', () => {
     repo.pruneShardFragmentsExcept(['pkg:b']);
     expect(repo.loadValidShardFragment('pkg:a', 'k', 'f')).toBeNull();
     expect(repo.loadValidShardFragment('pkg:b', 'k', 'f')).not.toBeNull();
+  });
+
+  it('rejects a malformed persisted fragment and reports the registered integrity code', () => {
+    const valid = result('pkg:a', 'key-1', 'fp-1');
+    repo.upsertShardFragment(valid);
+    replacePayload({
+      ...valid,
+      fragment: { ...valid.fragment, functions: { broken: 'not-an-array' } },
+    });
+    const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    expect(repo.loadValidShardFragment('pkg:a', 'key-1', 'fp-1')).toBeNull();
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'GRAPH.CATALOG.UNREADABLE',
+        metadata: { condition: 'shard-fragment-malformed', shard: 'pkg:a' },
+      }),
+    );
+  });
+
+  it.each([
+    ['payload identity', (valid: ShardBuildResult) => ({ ...valid, shardId: 'pkg:other' })],
+    [
+      'boundary-call container',
+      (valid: ShardBuildResult) => ({ ...valid, boundaryCalls: [{ ownerHash: 'missing-fields' }] }),
+    ],
+    [
+      'parse-error container',
+      (valid: ShardBuildResult) => ({ ...valid, parseErrors: [{ filePath: 'a.ts' }] }),
+    ],
+    [
+      'degradation code-condition mismatch',
+      (valid: ShardBuildResult) => ({
+        ...valid,
+        degradations: [
+          {
+            errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+            condition: 'typescript-exact-resolution',
+            count: 1,
+          },
+        ],
+      }),
+    ],
+  ])('rejects a malformed %s', (_label, mutate) => {
+    const valid = result('pkg:a', 'key-1', 'fp-1');
+    repo.upsertShardFragment(valid);
+    replacePayload(mutate(valid));
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+
+    expect(repo.loadValidShardFragment('pkg:a', 'key-1', 'fp-1')).toBeNull();
   });
 });
 

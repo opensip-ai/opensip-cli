@@ -30,14 +30,18 @@
 import { readFileSync } from 'node:fs';
 import { join, posix } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { logger, normalizeFailure } from '@opensip-cli/core';
 import {
   appendEdge,
   createMutableStats,
   pushCreationEdge,
   truncateForCallEdge,
 } from '@opensip-cli/graph';
-import { buildNameIndex, sameLanguageFileFilter } from '@opensip-cli/graph-adapter-common';
+import {
+  buildNameIndex,
+  sameLanguageFileFilter,
+  throwIfGraphAdapterAborted,
+} from '@opensip-cli/graph-adapter-common';
 
 import type { GoParsedFile, GoParsedProject } from './parse.js';
 import type {
@@ -51,6 +55,8 @@ import type {
   ResolveOutput,
 } from '@opensip-cli/graph';
 import type { Node } from '@opensip-cli/tree-sitter';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- language adapters keep position helpers local because each reads parser-specific node locations.
 function goPosition(
@@ -70,6 +76,7 @@ function goPosition(
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- call-site resolution loops are intentionally parallel across language adapters for adapter-local grammar handling.
 export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveOutput {
+  throwIfGraphAdapterAborted(input.signal, 'Go call resolution');
   logger.info({ evt: 'graph.edges.start', module: 'graph:edges:go' });
   // Same-language only: on the exact build the merged catalog holds every
   // language, so a Go call must not pin a same-named TS/Python/… occurrence.
@@ -79,6 +86,7 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   const sink: EdgeSink = { edgesByOwner, stats };
 
   for (const r of input.callSites) {
+    throwIfGraphAdapterAborted(input.signal, 'Go call resolution');
     const node = r.nodeRef as Node;
     const file = r.sourceFileRef as GoParsedFile;
     if (r.kind === 'creation') {
@@ -101,14 +109,24 @@ export function resolveCallSites(input: ResolveInput<GoParsedProject>): ResolveO
   // Phase 4 (DEC-498): resolve dependency sites if any. Mirrors the
   // Python adapter's resolveDependencies pattern, adapted to Go's
   // `go.mod`-mediated module-path resolution.
-  const dependenciesByOwner =
+  const dependencyResolution =
     input.dependencySites && input.dependencySites.length > 0
-      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs)
+      ? resolveDependencies(input.dependencySites, input.catalog, input.projectDirAbs, input.signal)
       : undefined;
 
-  return dependenciesByOwner === undefined
+  return dependencyResolution === undefined
     ? { edgesByOwner, stats: finalStats }
-    : { edgesByOwner, dependenciesByOwner, stats: finalStats };
+    : {
+        edgesByOwner,
+        dependenciesByOwner: dependencyResolution.edgesByOwner,
+        degradations: dependencyResolution.degradations,
+        stats: finalStats,
+      };
+}
+
+interface DependencyResolution {
+  readonly edgesByOwner: ReadonlyMap<string, readonly DependencyEdge[]>;
+  readonly degradations: readonly GraphRunDegradation[];
 }
 
 /**
@@ -149,13 +167,16 @@ function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
   projectDirAbs: string,
-): ReadonlyMap<string, readonly DependencyEdge[]> {
-  const modulePath = readGoModulePath(projectDirAbs);
+  signal?: AbortSignal,
+): DependencyResolution {
+  throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
+  const moduleRead = readGoModulePath(projectDirAbs);
 
   // Build filePath → module-init bodyHash map. Catalog occurrences carry
   // project-relative POSIX filePath; module-init kind is filtered.
   const moduleInitByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
     if (!occs) continue;
     for (const o of occs) {
       if (o.kind === 'module-init') moduleInitByFilePath.set(o.filePath, o.bodyHash);
@@ -164,7 +185,8 @@ function resolveDependencies(
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
-    const to = resolveGoImportPath(site.specifier, modulePath, moduleInitByFilePath);
+    throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
+    const to = resolveGoImportPath(site.specifier, moduleRead.modulePath, moduleInitByFilePath);
     const edge: DependencyEdge = {
       to,
       line: site.line,
@@ -178,7 +200,13 @@ function resolveDependencies(
       existing.push(edge);
     }
   }
-  return out;
+  throwIfGraphAdapterAborted(signal, 'Go dependency resolution');
+  return { edgesByOwner: out, degradations: moduleRead.degradations };
+}
+
+interface GoModuleReadResult {
+  readonly modulePath: string | null;
+  readonly degradations: readonly GraphRunDegradation[];
 }
 
 /**
@@ -192,12 +220,30 @@ function resolveDependencies(
  * a module path, `go.work` multi-module workspaces (each module's own
  * `go.mod` is read independently in this v1).
  */
-function readGoModulePath(projectDirAbs: string): string | null {
+function readGoModulePath(projectDirAbs: string): GoModuleReadResult {
   let content: string;
   try {
     content = readFileSync(join(projectDirAbs, 'go.mod'), 'utf8');
-  } catch {
-    return null;
+  } catch (error) {
+    const failure = normalizeFailure(error);
+    if (failure.code === 'NOT_FOUND') return { modulePath: null, degradations: [] };
+    logger.warn({
+      evt: 'graph.adapter.manifest.degraded',
+      module: 'graph:edges:go',
+      errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+      condition: 'go-module-manifest',
+      ...(typeof failure.metadata.errno === 'string' ? { errno: failure.metadata.errno } : {}),
+    });
+    return {
+      modulePath: null,
+      degradations: [
+        {
+          errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+          condition: 'go-module-manifest',
+          count: 1,
+        },
+      ],
+    };
   }
   for (const rawLine of content.split('\n')) {
     const line = rawLine.trim();
@@ -206,9 +252,24 @@ function readGoModulePath(projectDirAbs: string): string | null {
     // `module <path>` — capture the bare path. Quoted form `module "<path>"`
     // is legal in go.mod; strip optional quotes.
     const match = /^module\s+("([^"]+)"|(\S+))\s*$/.exec(line);
-    if (match) return match[2] ?? match[3] ?? null;
+    if (match) return { modulePath: match[2] ?? match[3] ?? null, degradations: [] };
   }
-  return null;
+  logger.warn({
+    evt: 'graph.adapter.manifest.degraded',
+    module: 'graph:edges:go',
+    errorCode: 'GRAPH.ADAPTER.MANIFEST_INVALID',
+    condition: 'go-module-manifest-invalid',
+  });
+  return {
+    modulePath: null,
+    degradations: [
+      {
+        errorCode: 'GRAPH.ADAPTER.MANIFEST_INVALID',
+        condition: 'go-module-manifest-invalid',
+        count: 1,
+      },
+    ],
+  };
 }
 
 /**

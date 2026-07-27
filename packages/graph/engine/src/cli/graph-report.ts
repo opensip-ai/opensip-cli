@@ -12,11 +12,13 @@
  * here anymore.
  */
 
+import { catalogGraphDegradations } from '../degradation.js';
 import { inferEntryPoints } from '../rules/_entry-points.js';
 import { currentRules } from '../rules/registry.js';
 
 import { finalizeGraphSignals } from './apply-suppressions.js';
 
+import type { GraphRunDegradation } from '../degradation.js';
 import type { EntryPoint } from '../rules/_entry-points.js';
 import type { Catalog, Indexes } from '../types.js';
 import type { Signal } from '@opensip-cli/core';
@@ -30,6 +32,8 @@ export interface UnifiedReportInput {
   readonly indexes: Indexes | null;
   readonly signals: readonly Signal[];
   readonly cacheHit: boolean;
+  readonly degradations?: readonly GraphRunDegradation[];
+  readonly runFaulted?: boolean;
 }
 
 /**
@@ -68,6 +72,10 @@ export interface LiveGraphOutput {
    * the static path's `RunPresentation.banners`. Absent / `0` ⇒ no banner.
    */
   readonly parseErrorFiles?: number;
+  /** Structured coverage markers carried into the live SignalEnvelope. */
+  readonly degradations?: readonly GraphRunDegradation[];
+  /** Genuine pre-unit fault bit carried into the live SignalEnvelope. */
+  readonly runFaulted?: boolean;
 }
 
 /**
@@ -92,6 +100,7 @@ export async function buildLiveGraphOutput(
   };
   const resolutionMode = input.catalog?.resolutionMode;
   const parseErrorFiles = input.catalog?.buildCoverage?.parseErrorFiles;
+  const degradations = input.degradations ?? catalogGraphDegradations(input.catalog);
   return {
     signals: finalized.signals,
     suppressedCount: finalized.suppressedCount,
@@ -100,6 +109,8 @@ export async function buildLiveGraphOutput(
     }),
     ...(resolutionMode === undefined ? {} : { resolutionMode }),
     ...(parseErrorFiles === undefined || parseErrorFiles === 0 ? {} : { parseErrorFiles }),
+    ...(degradations.length === 0 ? {} : { degradations }),
+    ...(input.runFaulted === true ? { runFaulted: true } : {}),
   };
 }
 

@@ -7,7 +7,14 @@
 
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 
-import { isPathInside, err, ok, type Result, type LanguageAdapter } from '@opensip-cli/core';
+import {
+  currentScope,
+  isPathInside,
+  err,
+  ok,
+  type Result,
+  type LanguageAdapter,
+} from '@opensip-cli/core';
 
 import { stampEngineVersion } from '../cache/engine-version.js';
 import { computeFilesFingerprint, parseFilesFingerprint } from '../cache/invalidate.js';
@@ -23,6 +30,8 @@ import {
 import { compareCodePointStrings } from '../code-point-order.js';
 import { isSafeGraphAdapterDescriptor } from '../lang-adapter/descriptor-validation.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
+
+import { failGraphRead } from './read-boundary-failure.js';
 
 import type {
   FreshnessChangeSummary,
@@ -213,13 +222,15 @@ export async function verifyCatalogInputs(
     return ok(
       complete(false, 'files-changed', 'Source files changed since catalog build', changes),
     );
-  } catch {
-    return err(
-      graphReadError(
-        'catalog-unreadable',
-        'Catalog input verification failed due to infrastructure error',
-      ),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'catalog-verification',
+      module: 'graph:read:catalog-freshness',
+      reason: 'catalog-unreadable',
+      operation: 'catalog-generation',
+      message: 'Catalog input verification failed due to infrastructure error',
+    });
   }
 }
 
@@ -351,10 +362,15 @@ function selectAdapter(
         ? selector.pick({ cwd: projectRoot, language: selection.requestedId })
         : selector.pick({ cwd: projectRoot }),
     );
-  } catch {
-    return err(
-      graphReadError('verify-selection', 'Adapter selection failed during catalog verification'),
-    );
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'infrastructure',
+      condition: 'adapter-selection',
+      module: 'graph:read:catalog-freshness',
+      reason: 'verify-selection',
+      operation: 'catalog-generation',
+      message: 'Adapter selection failed during catalog verification',
+    });
   }
 }
 
@@ -382,6 +398,7 @@ async function recomputeCatalogInputs(
   const discovery = await input.adapter.discoverFiles({
     cwd: input.projectRoot,
     diagnosticIntent: 'quiet',
+    signal: currentScope()?.abortSignal,
   });
   const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
   if (!discoveryCheck.ok) return discoveryCheck;
@@ -390,6 +407,7 @@ async function recomputeCatalogInputs(
     configPathAbs: discovery.configPathAbs,
     compilerOptions: discovery.compilerOptions,
     resolutionMode: input.catalog.resolutionMode ?? 'exact',
+    signal: currentScope()?.abortSignal,
   });
   const validated = validateRawCacheKey(raw);
   return validated.ok
@@ -429,6 +447,7 @@ async function recomputeShardedInputs(
       ...(anchor.value.configPath === undefined
         ? {}
         : { configPathOverride: anchor.value.configPath }),
+      signal: currentScope()?.abortSignal,
     });
     const discoveryCheck = validateDiscovery(discovery, input.projectRoot);
     if (!discoveryCheck.ok) return discoveryCheck;
@@ -437,6 +456,7 @@ async function recomputeShardedInputs(
       projectDirAbs: anchor.value.rootDir,
       configPathAbs: anchor.value.configPath ?? discovery.configPathAbs,
       resolutionMode: input.catalog.resolutionMode ?? 'exact',
+      signal: currentScope()?.abortSignal,
     });
     const validated = validateRawCacheKey(raw);
     if (!validated.ok) return validated;

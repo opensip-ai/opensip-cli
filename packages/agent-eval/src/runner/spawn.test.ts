@@ -118,6 +118,14 @@ describe('spawnProcess', () => {
     });
   });
 
+  it('retains the native code when process creation fails', async () => {
+    const missingCommand = join(temporaryDirectory(), 'missing-command');
+    const result = await spawnProcess(missingCommand, []);
+
+    expect(result.errorCode).toBe('ENOENT');
+    expect(result.error).toBeTypeOf('string');
+  });
+
   it('terminates a child that exceeds the time bound', async () => {
     const result = await spawnProcess(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
       timeoutMs: 50,
@@ -136,6 +144,21 @@ describe('spawnProcess', () => {
       { maxOutputBytes: 128 },
     );
     expect(result.outputLimitExceeded).toBe(true);
+    expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(128);
+  });
+
+  it('settles with degraded evidence when terminal cleanup rejects', async () => {
+    const result = await spawnProcess(
+      process.execPath,
+      ['-e', "require('node:fs').writeSync(1,'x'.repeat(100000))"],
+      {
+        maxOutputBytes: 128,
+        terminateProcessTree: () => Promise.reject(new Error('simulated cleanup rejection')),
+      },
+    );
+
+    expect(result.outputLimitExceeded).toBe(true);
+    expect(result.error).toMatch(/cleanup failed.*simulated cleanup rejection/u);
     expect(Buffer.byteLength(result.stdout, 'utf8')).toBeLessThanOrEqual(128);
   });
 

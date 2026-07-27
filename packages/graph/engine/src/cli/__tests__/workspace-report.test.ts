@@ -113,4 +113,35 @@ describe('renderWorkspaceJson', () => {
     expect(parsed.units.map((u) => u.unitId)).toEqual(['core', 'cli']);
     expect(parsed.units[0]?.signals).toHaveLength(1);
   });
+
+  it('carries registered child-failure identity on the machine surface', () => {
+    const parsed = JSON.parse(
+      renderWorkspaceJson(
+        [
+          unit({
+            exitCode: 1,
+            failureReason: 'output-malformed',
+            errorCode: 'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED',
+            failureClass: 'stdout_parse',
+            failureCondition: 'invalid-envelope',
+          }),
+        ],
+        5,
+      ),
+    ) as {
+      units: {
+        failureReason?: string;
+        errorCode?: string;
+        failureClass?: string;
+        failureCondition?: string;
+      }[];
+    };
+
+    expect(parsed.units[0]).toMatchObject({
+      failureReason: 'output-malformed',
+      errorCode: 'GRAPH.WORKSPACE.CHILD_OUTPUT_MALFORMED',
+      failureClass: 'stdout_parse',
+      failureCondition: 'invalid-envelope',
+    });
+  });
 });

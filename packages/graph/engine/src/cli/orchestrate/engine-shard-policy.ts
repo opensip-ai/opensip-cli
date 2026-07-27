@@ -1,4 +1,9 @@
-import { currentLogger, type LanguageAdapter } from '@opensip-cli/core';
+import {
+  currentLogger,
+  currentScope,
+  isToolErrorLike,
+  type LanguageAdapter,
+} from '@opensip-cli/core';
 
 import { discoverPolyglotUnits } from '../workspace-runner.js';
 
@@ -46,7 +51,8 @@ async function resolveWorkspaceShards(input: DefaultEngineShardPolicyInput): Pro
   let units: Awaited<ReturnType<typeof discoverPolyglotUnits>>;
   try {
     units = await discoverPolyglotUnits(input.projectRoot, input.languageAdapters);
-  } catch {
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
     return recoverShardPolicyFailure(input, [], 'workspace-discovery');
   }
   if (units.length <= 1) return [];
@@ -54,6 +60,7 @@ async function resolveWorkspaceShards(input: DefaultEngineShardPolicyInput): Pro
     const discovery = await input.graphAdapter.discoverFiles({
       cwd: input.projectRoot,
       diagnosticIntent: 'quiet',
+      signal: currentScope()?.abortSignal,
     });
     return partitionFilesIntoShards({
       canonicalFiles: resolveCanonicalFileSet(discovery.files),
@@ -65,7 +72,8 @@ async function resolveWorkspaceShards(input: DefaultEngineShardPolicyInput): Pro
       projectRoot: discovery.projectDirAbs,
       rootConfigPathAbs: discovery.configPathAbs,
     });
-  } catch {
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
     return recoverShardPolicyFailure(input, [], 'workspace-file-discovery');
   }
 }
@@ -79,8 +87,10 @@ async function resolveSyntheticShards(
     discovery = await input.graphAdapter.discoverFiles({
       cwd: input.projectRoot,
       diagnosticIntent: 'quiet',
+      signal: currentScope()?.abortSignal,
     });
-  } catch {
+  } catch (error) {
+    if (isToolErrorLike(error)) throw error;
     return recoverShardPolicyFailure(input, { shards: [] }, 'synthetic-file-discovery');
   }
   const canonicalFiles = resolveCanonicalFileSet(discovery.files);

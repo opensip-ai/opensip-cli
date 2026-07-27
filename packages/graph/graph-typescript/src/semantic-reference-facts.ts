@@ -38,6 +38,7 @@ import {
 } from '@opensip-cli/graph';
 import ts from 'typescript';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 import { unaliasSymbol } from './edge-helpers/unalias-symbol.js';
 
 import type { CrossPackageContext } from './edge-helpers/cross-package-context.js';
@@ -50,6 +51,7 @@ export interface CollectSemanticFactsInput {
   readonly projectRootAbs: string;
   readonly crossPackage: CrossPackageContext;
   readonly limits?: SemanticFactLimits;
+  readonly signal?: AbortSignal;
 }
 
 interface MutableCoverage {
@@ -76,6 +78,7 @@ interface CollectScope {
   readonly crossPackage: CrossPackageContext;
   readonly limits: SemanticFactLimits;
   readonly coverage: MutableCoverage;
+  readonly signal?: AbortSignal;
 }
 
 /** Mutable sinks + shared scope for phase-1 declaration collection. */
@@ -101,6 +104,7 @@ interface FileDeclarationCtx {
   readonly coverage: MutableCoverage;
   readonly decls: DeclarationFact[];
   readonly declBySymbol: Map<ts.Symbol, DeclRecord>;
+  readonly signal?: AbortSignal;
 }
 
 /** Per-source-file reference walk context (wide params collapsed). */
@@ -116,7 +120,10 @@ interface FileReferenceCtx {
   readonly limits: SemanticFactLimits;
   readonly coverage: MutableCoverage;
   readonly refs: CrossFileReferenceFact[];
+  readonly signal?: AbortSignal;
 }
+
+const MAX_SEMANTIC_WALK_DEPTH = 512;
 
 /**
  * Collect bounded declaration + cross-file reference facts from an exact
@@ -126,6 +133,7 @@ interface FileReferenceCtx {
 export function collectSemanticReferenceFacts(
   input: CollectSemanticFactsInput,
 ): SemanticFactBundle {
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic fact collection');
   const limits = input.limits ?? DEFAULT_SEMANTIC_FACT_LIMITS;
   const coverage: MutableCoverage = {
     inspectedDeclarations: 0,
@@ -156,12 +164,14 @@ export function collectSemanticReferenceFacts(
     crossPackage: input.crossPackage,
     limits,
     coverage,
+    signal: input.signal,
   };
 
   // Phase 1: collect declarations from project source files.
   const declBySymbol = new Map<ts.Symbol, DeclRecord>();
   const decls: DeclarationFact[] = [];
   collectDeclarations({ ...scope, decls, declBySymbol });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic declaration collection');
 
   // Unique exported-declaration index for workspace .d.ts joins.
   const exportIndex = buildUniqueExportIndex(decls, input.crossPackage);
@@ -169,6 +179,7 @@ export function collectSemanticReferenceFacts(
   // Phase 2: collect cross-file references.
   const refs: CrossFileReferenceFact[] = [];
   collectReferences({ ...scope, declBySymbol, exportIndex, refs });
+  throwIfGraphAdapterAborted(input.signal, 'TypeScript semantic reference collection');
 
   return applySemanticFactCaps(
     decls,
@@ -190,6 +201,7 @@ export function collectSemanticReferenceFacts(
 /** Phase 1: collect declaration facts from discovered project source files. */
 function collectDeclarations(ctx: DeclarationCollectCtx): void {
   for (const sf of ctx.program.getSourceFiles()) {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic declaration collection');
     if (sf.isDeclarationFile) continue;
     if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
     const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);
@@ -204,6 +216,7 @@ function collectDeclarations(ctx: DeclarationCollectCtx): void {
       coverage: ctx.coverage,
       decls: ctx.decls,
       declBySymbol: ctx.declBySymbol,
+      signal: ctx.signal,
     };
     visitDeclarations(sf, fileCtx);
     if (ctx.decls.length >= ctx.limits.maxDeclarations) {
@@ -216,6 +229,7 @@ function collectDeclarations(ctx: DeclarationCollectCtx): void {
 /** Phase 2: collect cross-file reference facts from discovered project source files. */
 function collectReferences(ctx: ReferenceCollectCtx): void {
   for (const sf of ctx.program.getSourceFiles()) {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic reference collection');
     if (sf.isDeclarationFile) continue; // omit reference sites inside .d.ts
     if (!ctx.discoveredSet.has(normalizeAbs(sf.fileName))) continue;
     const filePath = toProjectRel(sf.fileName, ctx.projectRootReal, ctx.coverage);
@@ -233,6 +247,7 @@ function collectReferences(ctx: ReferenceCollectCtx): void {
       limits: ctx.limits,
       coverage: ctx.coverage,
       refs: ctx.refs,
+      signal: ctx.signal,
     });
     if (ctx.refs.length >= ctx.limits.maxReferences) {
       ctx.coverage.reasons.push('reference-cap');
@@ -241,7 +256,12 @@ function collectReferences(ctx: ReferenceCollectCtx): void {
   }
 }
 
-function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
+function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx, depth = 0): void {
+  throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic declaration collection');
+  if (depth > MAX_SEMANTIC_WALK_DEPTH) {
+    ctx.coverage.reasons.push('semantic-walk-depth');
+    return;
+  }
   const kind = declarationKindOf(node);
   if (kind !== undefined) {
     ctx.coverage.inspectedDeclarations++;
@@ -255,20 +275,27 @@ function visitDeclarations(node: ts.Node, ctx: FileDeclarationCtx): void {
     } else {
       ctx.decls.push(fact);
       ctx.coverage.emittedDeclarations++;
-      const sym = symbolOfDeclaration(node, ctx.checker);
+      const sym = symbolOfDeclaration(node, ctx.checker, ctx.coverage);
       if (sym !== undefined) {
-        const real = unaliasSymbol(sym, ctx.checker);
+        const real = unaliasSymbol(sym, ctx.checker, () => {
+          ctx.coverage.reasons.push('semantic-checker-fault');
+        });
         if (!ctx.declBySymbol.has(real)) ctx.declBySymbol.set(real, { fact, symbol: real });
       }
     }
   }
   ts.forEachChild(node, (child) => {
-    visitDeclarations(child, ctx);
+    visitDeclarations(child, ctx, depth + 1);
   });
 }
 
 function visitReferences(ctx: FileReferenceCtx): void {
-  const visit = (node: ts.Node): void => {
+  const visit = (node: ts.Node, depth: number): void => {
+    throwIfGraphAdapterAborted(ctx.signal, 'TypeScript semantic reference collection');
+    if (depth > MAX_SEMANTIC_WALK_DEPTH) {
+      ctx.coverage.reasons.push('semantic-walk-depth');
+      return;
+    }
     if (ctx.refs.length >= ctx.limits.maxReferences) return;
 
     // Identifier / type-reference / heritage / import-export sites.
@@ -284,9 +311,11 @@ function visitReferences(ctx: FileReferenceCtx): void {
       // Walk children for identifiers; kind inferred at identifier site.
     }
 
-    ts.forEachChild(node, visit);
+    ts.forEachChild(node, (child) => {
+      visit(child, depth + 1);
+    });
   };
-  visit(ctx.sourceFile);
+  visit(ctx.sourceFile, 0);
 }
 
 /** Resolve the identifier a reference site keys on (identifier or member name). */
@@ -370,7 +399,8 @@ function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
   try {
     symbol = file.checker.getSymbolAtLocation(id);
   } catch {
-    // @swallow-ok the TypeScript checker throws on some synthetic nodes; no symbol means no semantic fact, and the occurrence is still recorded from syntax
+    // @swallow-ok a checker fault drops only this semantic fact; coverage records the degradation
+    file.coverage.reasons.push('semantic-checker-fault');
     symbol = undefined;
   }
   if (symbol === undefined) {
@@ -378,7 +408,9 @@ function maybeEmitReference(node: ts.Node, file: FileReferenceCtx): void {
     return;
   }
 
-  const real = unaliasSymbol(symbol, file.checker);
+  const real = unaliasSymbol(symbol, file.checker, () => {
+    file.coverage.reasons.push('semantic-checker-fault');
+  });
   const span = nodeSpan(id, file.sourceFile, file.limits, file.coverage);
   if (span === undefined) {
     file.coverage.omittedReferences++;
@@ -456,7 +488,7 @@ function emitNonLocalReference(
   }
 
   // External / lib .d.ts — label external, no target id.
-  if (isExternalDeclarationFile(declSf.fileName, ctx.projectRootReal)) {
+  if (isExternalDeclarationFile(declSf.fileName, ctx.projectRootReal, ctx.coverage)) {
     emitRefFact(ctx, {
       targetName: boundText(real.getName(), ctx.limits),
       basis: 'external',
@@ -778,12 +810,17 @@ function declarationNameNode(node: ts.Node): ts.Node | undefined {
   return undefined;
 }
 
-function symbolOfDeclaration(node: ts.Node, checker: ts.TypeChecker): ts.Symbol | undefined {
+function symbolOfDeclaration(
+  node: ts.Node,
+  checker: ts.TypeChecker,
+  coverage: MutableCoverage,
+): ts.Symbol | undefined {
   let symbol: ts.Symbol | undefined;
   try {
     symbol = checker.getSymbolAtLocation(declarationNameNode(node) ?? node);
   } catch {
-    // @swallow-ok same checker hazard on the declaration path; absence of a symbol is a valid answer here, not a failure
+    // @swallow-ok same checker hazard on the declaration path; coverage records the degradation
+    coverage.reasons.push('semantic-checker-fault');
     symbol = undefined;
   }
   return symbol;
@@ -1066,9 +1103,16 @@ function isGeneratedFile(rel: string): boolean {
   return /\bdist\/|\bbuild\/|\.generated\./.test(rel);
 }
 
-function isExternalDeclarationFile(fileName: string, projectRootReal: string): boolean {
+export function isExternalDeclarationFile(
+  fileName: string,
+  projectRootReal: string,
+  coverage: Pick<MutableCoverage, 'reasons'>,
+): boolean {
   const real = safeRealpath(fileName);
-  if (real === undefined) return true;
+  if (real === undefined) {
+    coverage.reasons.push('declaration-realpath-unresolvable');
+    return true;
+  }
   if (!isPathInside(real, projectRootReal)) return true;
   const norm = real.split(sep).join('/');
   return (

@@ -12,27 +12,55 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import type { Catalog, DependencyEdge, DependencySiteRecord } from '@opensip-cli/graph';
+import { logger, normalizeFailure } from '@opensip-cli/core';
+import { throwIfGraphAdapterAborted } from '@opensip-cli/graph-adapter-common';
+
+import type {
+  Catalog,
+  DependencyEdge,
+  DependencySiteRecord,
+  ResolveOutput,
+} from '@opensip-cli/graph';
+
+type GraphRunDegradation = NonNullable<ResolveOutput['degradations']>[number];
+
+export interface RustDependencyResolution {
+  readonly edgesByOwner: ReadonlyMap<string, readonly DependencyEdge[]>;
+  readonly degradations: readonly GraphRunDegradation[];
+}
 
 export function resolveDependencies(
   sites: readonly DependencySiteRecord[],
   catalog: Catalog,
   projectDirAbs: string,
-): ReadonlyMap<string, readonly DependencyEdge[]> {
-  const packageName = readCargoPackageName(projectDirAbs);
-  const { moduleInitByModulePath, modulePathByFilePath } = buildCrateModuleIndex(catalog);
+  signal?: AbortSignal,
+): RustDependencyResolution {
+  throwIfGraphAdapterAborted(signal, 'Rust dependency resolution');
+  const packageRead = readCargoPackageName(projectDirAbs);
+  const { moduleInitByModulePath, modulePathByFilePath } = buildCrateModuleIndex(catalog, signal);
 
   const out = new Map<string, DependencyEdge[]>();
   for (const site of sites) {
+    throwIfGraphAdapterAborted(signal, 'Rust dependency resolution');
     const importerModulePath = lookupImporterModulePath(
       catalog,
       modulePathByFilePath,
       site.ownerHash,
     );
-    const edge = buildDependencyEdge(site, packageName, importerModulePath, moduleInitByModulePath);
+    const edge = buildDependencyEdge(
+      site,
+      packageRead.packageName,
+      importerModulePath,
+      moduleInitByModulePath,
+    );
     appendDependencyEdge(out, site.ownerHash, edge);
   }
-  return out;
+  return { edgesByOwner: out, degradations: packageRead.degradations };
+}
+
+interface CargoPackageReadResult {
+  readonly packageName: string | null;
+  readonly degradations: readonly GraphRunDegradation[];
 }
 
 /**
@@ -41,13 +69,17 @@ export function resolveDependencies(
  * `filePath → modulePath` (used to rewrite `super::` / `self::` paths
  * relative to the importer's own module).
  */
-function buildCrateModuleIndex(catalog: Catalog): {
+function buildCrateModuleIndex(
+  catalog: Catalog,
+  signal?: AbortSignal,
+): {
   readonly moduleInitByModulePath: ReadonlyMap<string, string>;
   readonly modulePathByFilePath: ReadonlyMap<string, string>;
 } {
   const moduleInitByModulePath = new Map<string, string>();
   const modulePathByFilePath = new Map<string, string>();
   for (const occs of Object.values(catalog.functions)) {
+    throwIfGraphAdapterAborted(signal, 'Rust dependency indexing');
     if (!occs) continue;
     for (const o of occs) {
       if (o.kind !== 'module-init') continue;
@@ -140,12 +172,30 @@ function filePathOfOwner(catalog: Catalog, ownerHash: string): string | null {
  *   - Multi-line table arrays / nested tables that re-open `[package]`.
  *   - Dev-dependencies / feature flags — irrelevant to resolution.
  */
-function readCargoPackageName(projectDirAbs: string): string | null {
+function readCargoPackageName(projectDirAbs: string): CargoPackageReadResult {
   let content: string;
   try {
     content = readFileSync(join(projectDirAbs, 'Cargo.toml'), 'utf8');
-  } catch {
-    return null;
+  } catch (error) {
+    const failure = normalizeFailure(error);
+    if (failure.code === 'NOT_FOUND') return { packageName: null, degradations: [] };
+    logger.warn({
+      evt: 'graph.adapter.manifest.degraded',
+      module: 'graph:edges:rust',
+      errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+      condition: 'rust-cargo-manifest',
+      ...(typeof failure.metadata.errno === 'string' ? { errno: failure.metadata.errno } : {}),
+    });
+    return {
+      packageName: null,
+      degradations: [
+        {
+          errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+          condition: 'rust-cargo-manifest',
+          count: 1,
+        },
+      ],
+    };
   }
   let inPackage = false;
   for (const rawLine of content.split('\n')) {
@@ -158,9 +208,9 @@ function readCargoPackageName(projectDirAbs: string): string | null {
     }
     if (!inPackage) continue;
     const match = /^name\s*=\s*(?:"([^"]+)"|'([^']+)')\s*(?:#.*)?$/.exec(line);
-    if (match) return match[1] ?? match[2] ?? null;
+    if (match) return { packageName: match[1] ?? match[2] ?? null, degradations: [] };
   }
-  return null;
+  return { packageName: null, degradations: [] };
 }
 
 /**

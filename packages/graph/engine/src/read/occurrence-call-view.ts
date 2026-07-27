@@ -1,6 +1,6 @@
 /** Public occurrence-precise / body-twin call views over the canonical graph. */
 
-import { err, ok, type Result } from '@opensip-cli/core';
+import { ok, type Result } from '@opensip-cli/core';
 
 import { compareCodePointStrings, sortedStringAdjacency } from '../code-point-order.js';
 import { occurrenceCallGraphFor } from '../pipeline/occurrence-call-graph.js';
@@ -12,6 +12,7 @@ import {
   type GraphSourceFilter,
   type GraphSymbolRef,
 } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
@@ -21,9 +22,6 @@ import type {
   UnresolvedOccurrenceCall,
 } from '../pipeline/occurrence-call-graph.js';
 import type { Catalog, FunctionOccurrence, Indexes } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /** Traversal, identity, and source-selection options for an occurrence call view. */
 export interface OccurrenceCallViewQuery {
@@ -97,10 +95,6 @@ interface CachedOccurrenceIndex {
 
 const occurrenceIndexCache = new WeakMap<Indexes, CachedOccurrenceIndex>();
 
-function viewError(message: string): GraphReadError {
-  return { code: 'query-invalid', operation: 'analysis', message };
-}
-
 /** Build an occurrence or body-twin-union call view from canonical read indexes. */
 export function buildOccurrenceCallView(
   _catalog: Catalog,
@@ -110,8 +104,15 @@ export function buildOccurrenceCallView(
 ): Result<OccurrenceCallView, GraphReadError> {
   try {
     return ok(new ViewCollector(cachedOccurrenceIndex(indexes), query, matcher).collect());
-  } catch {
-    return err(viewError('Failed to build occurrence call view'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'occurrence-call-view',
+      module: 'graph:read:occurrence-calls',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to build occurrence call view',
+    });
   }
 }
 

@@ -19,10 +19,12 @@
  *                                     language and is passed in.
  */
 
-import { relative } from 'node:path';
+import { sep } from 'node:path';
 
-import { withSpan } from '@opensip-cli/core';
+import { isToolErrorLike, projectRelativePath, scrubText, withSpan } from '@opensip-cli/core';
 import { nameOf, childrenOf, namedChildrenOf } from '@opensip-cli/tree-sitter';
+
+import { throwIfGraphAdapterAborted } from './cancellation.js';
 
 import type { TreeSitterParsedFile, TreeSitterParsedProject } from './parse.js';
 import type {
@@ -97,6 +99,15 @@ export interface WalkSinks {
   readonly dependencySites: DependencySiteRecord[];
 }
 
+/** Per-node cooperative cancellation and recursion-capacity guard for adapter visitors. */
+export interface WalkTraversalGuard {
+  /** Check host cancellation and reject a tree deeper than the synchronous visitor can handle. */
+  readonly checkpoint: (depth: number) => void;
+}
+
+// Leave ample room for real syntax while staying safely below ordinary JavaScript stack limits.
+const MAX_WALK_DEPTH = 512;
+
 /** Inputs to the shared `walkProject` driver. */
 export interface RunWalkParams<P extends TreeSitterParsedProject> {
   readonly input: WalkInput<P>;
@@ -109,6 +120,7 @@ export interface RunWalkParams<P extends TreeSitterParsedProject> {
     file: P['files'] extends ReadonlyMap<string, infer F> ? F : never,
     projectDirAbs: string,
     sinks: WalkSinks,
+    traversal: WalkTraversalGuard,
   ) => void;
 }
 
@@ -128,6 +140,7 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
   const dependencySites: DependencySiteRecord[] = [];
   const parseErrors: ParseError[] = [];
   const sinks: WalkSinks = { occurrences, callSites, dependencySites };
+  const traversal = createTraversalGuard(input.signal);
 
   const sortedPaths = [...input.files].filter((p) => input.project.files.has(p)).sort();
 
@@ -136,22 +149,30 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
     'graph.walk',
     () => {
       for (const path of sortedPaths) {
+        throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
         const file = input.project.files.get(path);
         if (!file) continue;
+        const fileSinks = createWalkSinks();
         try {
           walkFile(
             path,
             file as P['files'] extends ReadonlyMap<string, infer F> ? F : never,
             input.projectDirAbs,
-            sinks,
+            fileSinks,
+            traversal,
           );
+          throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
+          commitWalkSinks(sinks, fileSinks);
         } catch (error) {
+          if (isToolErrorLike(error)) throw error;
           parseErrors.push({
-            filePath: relative(input.projectDirAbs, path),
-            message: error instanceof Error ? error.message : String(error),
+            filePath: safeProjectRelativePath(input.projectDirAbs, path),
+            message: walkErrorMessage(error, input.projectDirAbs, path),
           });
         }
       }
+
+      throwIfGraphAdapterAborted(input.signal, 'tree-sitter walk');
 
       return { occurrences, callSites, dependencySites, parseErrors };
     },
@@ -159,6 +180,47 @@ export function runWalk<P extends TreeSitterParsedProject>(params: RunWalkParams
       'graph.walk.file_count': sortedPaths.length,
     },
   );
+}
+
+function createTraversalGuard(signal: AbortSignal | undefined): WalkTraversalGuard {
+  return {
+    /** @throws {RangeError | ToolError} When traversal exceeds its bound or is cancelled. */
+    checkpoint(depth): void {
+      throwIfGraphAdapterAborted(signal, 'tree-sitter walk');
+      if (depth > MAX_WALK_DEPTH) {
+        throw new RangeError(`tree-sitter walk exceeded depth ${String(MAX_WALK_DEPTH)}`);
+      }
+    },
+  };
+}
+
+function createWalkSinks(): WalkSinks {
+  return {
+    occurrences: Object.create(null) as Record<string, FunctionOccurrence[]>,
+    callSites: [],
+    dependencySites: [],
+  };
+}
+
+function commitWalkSinks(target: WalkSinks, source: WalkSinks): void {
+  for (const occurrences of Object.values(source.occurrences)) {
+    for (const occurrence of occurrences) record(target.occurrences, occurrence);
+  }
+  target.callSites.push(...source.callSites);
+  target.dependencySites.push(...source.dependencySites);
+}
+
+function walkErrorMessage(error: unknown, projectDirAbs: string, path: string): string {
+  if (error instanceof RangeError) {
+    return 'walker recursion capacity exceeded; no evidence retained for this file';
+  }
+  const message = error instanceof Error ? error.message : String(error);
+  const filePath = safeProjectRelativePath(projectDirAbs, path);
+  return scrubText(message.replaceAll(path, filePath).replaceAll(projectDirAbs, '[project]'), 1000);
+}
+
+function safeProjectRelativePath(projectDirAbs: string, path: string): string {
+  return projectRelativePath(path.split(sep).join('/'), projectDirAbs.split(sep).join('/'));
 }
 
 // ── module-init synthesis ─────────────────────────────────────────

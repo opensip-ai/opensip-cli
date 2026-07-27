@@ -1,7 +1,8 @@
-import { createSignal } from '@opensip-cli/core';
+import { createSignal, ToolError } from '@opensip-cli/core';
 import {
   asArray,
   asObject,
+  externalToolErrorCatalog,
   getNumber,
   getString,
   parseJsonLines,
@@ -10,6 +11,8 @@ import {
 
 import type { Signal, SignalSeverity } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
+
+const ARTIFACT_INVALID = externalToolErrorCatalog.require('EXTERNAL.SCANNER.ARTIFACT_INVALID');
 
 interface FindingContext {
   readonly file: string;
@@ -116,11 +119,10 @@ function normalize(
  */
 export function parseGovulncheckJsonLines(
   raw: ParsedScannerOutput,
-  _ctx: AdapterRunContext,
+  ctx: AdapterRunContext,
 ): readonly Signal[] {
-  const values = parseJsonLines(raw.raw, { tolerateNonJson: true }).values.map(
-    (line) => line.value,
-  );
+  const decoded = parseJsonLines(raw.raw, { tolerateNonJson: true });
+  const values = decoded.values.map((line) => line.value);
   const advisories = osvMap(values);
   // Per OSV id, keep the "best" finding: a reachable trace beats an import-only one,
   // and among equals the first-seen wins (stable).
@@ -136,7 +138,28 @@ export function parseGovulncheckJsonLines(
       best.set(osv, { finding, reachable });
     }
   }
-  return [...best.entries()].map(([osv, { finding, reachable }]) =>
+  const signals = [...best.entries()].map(([osv, { finding, reachable }]) =>
     normalize(osv, finding, reachable, advisories),
   );
+  if (decoded.errors.length > 0 && signals.length === 0) {
+    throw new ToolError(
+      'govulncheck produced an unusable JSON-lines report.',
+      ARTIFACT_INVALID.code,
+      {
+        definition: ARTIFACT_INVALID,
+        metadata: { condition: 'malformed-json-line', scanner: 'govulncheck' },
+      },
+    );
+  }
+  if (decoded.errors.length > 0) {
+    ctx.logger.warn({
+      evt: 'external.scanner.report.partial',
+      module: '@opensip-cli/tool-govulncheck',
+      scanner: 'govulncheck',
+      condition: 'malformed-json-line',
+      parseErrorCount: decoded.errors.length,
+      findingCount: signals.length,
+    });
+  }
+  return signals;
 }

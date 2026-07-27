@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyEditScript } from './edit-applier.js';
+import { WorkspacePreparationError } from './workspace-preparation-error.js';
 
 const roots: string[] = [];
 
@@ -54,5 +55,35 @@ describe('applyEditScript', () => {
       }),
     ).toThrow(/escapes/u);
     expect(existsSync(outside)).toBe(false);
+  });
+
+  it('classifies a failed operation and stops before later edits', () => {
+    const root = workspace();
+    const laterPath = join(root, 'must-not-run.txt');
+
+    const error = (() => {
+      try {
+        applyEditScript(root, {
+          operations: [
+            { kind: 'write', path: 'first.txt', content: 'applied' },
+            { kind: 'delete', path: 'missing.txt' },
+            { kind: 'write', path: 'must-not-run.txt', content: 'bad' },
+          ],
+        });
+        return undefined;
+      } catch (error_) {
+        return error_;
+      }
+    })();
+
+    expect(error).toBeInstanceOf(WorkspacePreparationError);
+    expect(error).toMatchObject({
+      condition: 'workspace-edit',
+      nativeCode: 'ENOENT',
+      operationIndex: 1,
+    });
+    expect(String(error)).not.toContain(root);
+    expect(readFileSync(join(root, 'first.txt'), 'utf8')).toBe('applied');
+    expect(existsSync(laterPath)).toBe(false);
   });
 });

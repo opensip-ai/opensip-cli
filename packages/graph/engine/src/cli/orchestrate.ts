@@ -23,7 +23,13 @@
  * public type surface.
  */
 
-import { logger, withSpanAsync, type Signal } from '@opensip-cli/core';
+import {
+  createCancelledError,
+  currentScope,
+  logger,
+  withSpanAsync,
+  type Signal,
+} from '@opensip-cli/core';
 
 import { currentAdapterRegistry } from '../lang-adapter/registry.js';
 import { GraphAdapterSelector } from '../lang-adapter/selector.js';
@@ -43,6 +49,7 @@ import { obtainCatalog } from './orchestrate/cache-orchestrator.js';
 import { resolveCanonicalFileSet } from './orchestrate/canonical-file-set.js';
 import { createPressureMonitor } from './pressure-monitor.js';
 
+import type { GraphRunDegradation } from '../degradation.js';
 import type {
   AdapterSelectionEvidence,
   Catalog,
@@ -144,6 +151,10 @@ export interface RunGraphResult {
    * (`runGraph`) single-program path leaves it undefined.
    */
   readonly shardStats?: ShardRunStats;
+  /** Explicit aggregate coverage evidence; authoritative when present. */
+  readonly degradations?: readonly GraphRunDegradation[];
+  /** Genuine pre-unit runtime fault, distinct from partial coverage. */
+  readonly runFaulted?: boolean;
 }
 
 /**
@@ -160,6 +171,7 @@ function yieldToEventLoop(): Promise<void> {
 
 async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   const { stage, onProgress, monitor, fn, detailFn, attrsFn } = args;
+  throwIfGraphCancelled(stage);
   monitor?.setStage(stage);
   // Sample BEFORE the stage starts. The previous stage may have left
   // the heap near the threshold; bail out before doing more work that
@@ -170,6 +182,7 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
   // row) before a synchronous stage blocks the loop. The cooperative resolve
   // stage yields again internally, so its spinner keeps ticking throughout.
   await yieldToEventLoop();
+  throwIfGraphCancelled(stage);
   const startedAt = Date.now();
   // Emit one span per stage. withSpanAsync keeps the span open across the
   // (possibly async) stage work and is a no-op when no SDK is registered.
@@ -178,6 +191,7 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
     `opensip_cli.graph.${stage}`,
     async (span) => {
       const out = await fn();
+      throwIfGraphCancelled(stage);
       if (attrsFn) span.setAttributes(attrsFn(out));
       return out;
     },
@@ -194,6 +208,17 @@ async function runStage<T>(args: RunStageArgs<T>): Promise<T> {
 }
 
 /**
+ * Stage-boundary cancellation checkpoint using the one core cancellation definition (D5).
+ *
+ * @throws {ToolError} When the active graph invocation has been cancelled.
+ */
+function throwIfGraphCancelled(stage: string): void {
+  if (currentScope()?.abortSignal?.aborted === true) {
+    throw createCancelledError(`Graph pipeline cancelled at the ${stage} stage.`);
+  }
+}
+
+/**
  * Run the pipeline end-to-end. Each stage runs in isolation; the
  * orchestrator wires their outputs together and consults the cache
  * before redoing stages 1+2.
@@ -206,6 +231,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
   const catalogRepo = input.datastore ? new CatalogRepo(input.datastore) : null;
   // Normalize the tier once at the boundary; absence ⇒ exact (historical).
   const resolutionMode: ResolutionMode = input.resolution ?? 'exact';
+  const adapterSignal = currentScope()?.abortSignal;
 
   const monitor = createPressureMonitor();
   const discoveryStarted = Date.now();
@@ -228,6 +254,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
             cwd: input.cwd,
             configPathOverride: input.tsConfigPath,
             diagnosticIntent: 'normal',
+            signal: adapterSignal,
           });
           return { ...raw, files: resolveCanonicalFileSet(raw.files) };
         },
@@ -265,6 +292,7 @@ export async function runGraph(input: RunGraphInput): Promise<RunGraphResult> {
       projectRoot: input.cwd,
       onProgress: input.onProgress,
       monitor,
+      signal: adapterSignal,
     });
 
     const indexes: Indexes = await runStage({

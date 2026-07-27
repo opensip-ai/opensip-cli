@@ -5,6 +5,7 @@
  * the verdict counts, and `resolutionMode` passthrough.
  */
 
+import { RunScope, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
 import { buildGraphEnvelope } from '../build-envelope.js';
@@ -29,6 +30,12 @@ function signal(over: Partial<Signal> = {}): Signal {
 }
 
 const BASE = { runId: 'run-1', createdAt: '2026-06-04T00:00:00.000Z' };
+
+function withGraphConfig<T>(graph: Record<string, unknown>, fn: () => T): T {
+  const scope = new RunScope();
+  Object.assign(scope, { toolConfig: { graph } });
+  return runWithScopeSync(scope, fn);
+}
 
 describe('buildGraphEnvelope', () => {
   it('maps engine slug → OpenSIP rule ID on both ruleId and source', () => {
@@ -85,6 +92,93 @@ describe('buildGraphEnvelope', () => {
     expect(
       buildGraphEnvelope({ ...BASE, signals: [], resolutionMode: 'fast' }).resolutionMode,
     ).toBe('fast');
+  });
+
+  it('carries partial coverage as a registered marker, not a runtime fault', () => {
+    const env = buildGraphEnvelope({
+      ...BASE,
+      signals: [],
+      degradations: [
+        {
+          errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+          condition: 'parse-errors',
+          count: 2,
+        },
+      ],
+    });
+
+    expect(env.verdict).toMatchObject({ passed: false, faulted: false });
+    expect(env.signals).toEqual([
+      expect.objectContaining({
+        ruleId: 'graph.resilience.catalog-partial-coverage',
+        severity: 'medium',
+        metadata: {
+          degradation: true,
+          errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE',
+          condition: 'parse-errors',
+          count: 2,
+        },
+      }),
+    ]);
+  });
+
+  it('honours failOnDegraded independently of the warning threshold', () => {
+    const degradation = [
+      {
+        errorCode: 'GRAPH.CATALOG.PARTIAL_COVERAGE' as const,
+        condition: 'parse-errors' as const,
+        count: 1,
+      },
+    ];
+    const markerOnly = withGraphConfig({ failOnDegraded: false, failOnWarnings: 1 }, () =>
+      buildGraphEnvelope({ ...BASE, signals: [], degradations: degradation }),
+    );
+    expect(markerOnly.verdict.passed).toBe(true);
+
+    const realWarning = withGraphConfig({ failOnDegraded: false, failOnWarnings: 1 }, () =>
+      buildGraphEnvelope({
+        ...BASE,
+        signals: [signal()],
+        degradations: degradation,
+      }),
+    );
+    expect(realWarning.verdict.passed).toBe(false);
+  });
+
+  it('retains a condition-specific registered degradation code', () => {
+    const env = buildGraphEnvelope({
+      ...BASE,
+      signals: [],
+      degradations: [
+        {
+          errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+          condition: 'typescript-exact-resolution',
+          count: 4,
+        },
+      ],
+    });
+
+    expect(env.signals[0]?.metadata).toMatchObject({
+      degradation: true,
+      errorCode: 'GRAPH.ANALYSIS.SEMANTIC_RESOLUTION_DEGRADED',
+      condition: 'typescript-exact-resolution',
+      count: 4,
+    });
+  });
+
+  it('threads genuine pre-unit faults separately from degradation', () => {
+    const env = buildGraphEnvelope({ ...BASE, signals: [], runFaulted: true });
+    expect(env.verdict).toMatchObject({ passed: false, faulted: true });
+    expect(env.signals).toEqual([]);
+  });
+
+  it('attributes the supplied whole-run duration to each emitted unit', () => {
+    const env = buildGraphEnvelope({
+      ...BASE,
+      signals: [signal(), signal({ ruleId: 'graph:cycle' })],
+      durationMs: 321,
+    });
+    expect(env.units.map((unit) => unit.durationMs)).toEqual([321, 321]);
   });
 });
 

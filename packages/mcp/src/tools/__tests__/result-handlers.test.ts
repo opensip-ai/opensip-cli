@@ -305,6 +305,7 @@ describe('get_latest_findings handler', () => {
 describe('repair_apply_verify handler', () => {
   it('forwards apply-verify input to the repair write port', async () => {
     let seen: RepairApplyVerifyInput | undefined;
+    const controller = new AbortController();
     const repairWrite: RepairWritePort = {
       applyVerify: (input) => {
         seen = input;
@@ -319,22 +320,26 @@ describe('repair_apply_verify handler', () => {
     });
 
     const out = parseResult(
-      await handlers.get('repair_apply_verify')!({
-        ref: 'latest',
-        tool: 'fit',
-        signal: 'index:0',
-        action: 'replace-ts-ignore',
-        force: true,
-      }),
+      await handlers.get('repair_apply_verify')!(
+        {
+          ref: 'latest',
+          tool: 'fit',
+          signal: 'index:0',
+          action: 'replace-ts-ignore',
+          force: true,
+        },
+        { signal: controller.signal },
+      ),
     );
 
-    expect(seen).toEqual({
+    expect(seen).toMatchObject({
       ref: 'latest',
       tool: 'fit',
       signal: 'index:0',
       action: 'replace-ts-ignore',
       force: true,
     });
+    expect(seen?.abortSignal).toBe(controller.signal);
     expect(out.body.type).toBe('repair-apply-verify');
   });
 

@@ -107,6 +107,12 @@ function gvMultiSelect(opts: MultiSelectOpts): HTMLElement {
     open = true;
     panel.style.display = 'block';
     docHandler = (e: MouseEvent) => {
+      if (!wrap.isConnected) {
+        if (docHandler) document.removeEventListener('mousedown', docHandler);
+        docHandler = null;
+        open = false;
+        return;
+      }
       if (!wrap.contains(e.target as Node)) close();
     };
     document.addEventListener('mousedown', docHandler);

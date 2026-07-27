@@ -270,7 +270,7 @@ describe('@opensip-cli/graph/read catalog Results', () => {
     }
   });
 
-  it('bounds identity/generation failures and logs only an allowlisted catalog code', () => {
+  it('bounds identity/generation failures and retains registered operator evidence', () => {
     const store = DataStoreFactory.open({ backend: 'memory' });
     store.close();
     const error = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
@@ -284,7 +284,16 @@ describe('@opensip-cli/graph/read catalog Results', () => {
         message: 'Failed to read graph catalog identity',
       },
     });
-    expect(error).not.toHaveBeenCalled();
+    expect(error).toHaveBeenCalledOnce();
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.read.failed',
+        code: 'GRAPH.READ.INFRASTRUCTURE_FAILED',
+        boundaryCode: 'GRAPH.READ.INFRASTRUCTURE_FAILED',
+        condition: 'catalog-identity',
+      }),
+    );
+    error.mockClear();
 
     const generation = read.loadCatalogGeneration(store);
     expect(generation).toEqual({
@@ -295,9 +304,9 @@ describe('@opensip-cli/graph/read catalog Results', () => {
         message: 'Failed to load graph catalog generation',
       },
     });
-    expect(error).toHaveBeenCalledTimes(1);
-    // Fail-loud: the read error carries its cause (`err`, plus a bounded
-    // stack when available) beside the stable allowlisted code.
+    expect(error).toHaveBeenCalledTimes(2);
+    // The repository records the failing source, and the public boundary records which fixed
+    // Result projection contained it. Neither changes the cause-free DTO returned above.
     expect(error).toHaveBeenCalledWith(
       expect.objectContaining({
         evt: 'graph.catalog.read.error',
@@ -310,8 +319,15 @@ describe('@opensip-cli/graph/read catalog Results', () => {
         err: expect.any(String) as string,
       }),
     );
-    expect(JSON.stringify(error.mock.calls)).not.toContain('secret');
-    expect(JSON.stringify(error.mock.calls)).not.toContain('sqlite');
+    expect(error).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.read.failed',
+        code: 'GRAPH.READ.INFRASTRUCTURE_FAILED',
+        boundaryCode: 'GRAPH.READ.INFRASTRUCTURE_FAILED',
+        condition: 'catalog-generation',
+      }),
+    );
+    expect(JSON.stringify({ identity, generation })).not.toMatch(/secret|sqlite|stack|cause/iu);
   });
 });
 
@@ -377,17 +393,14 @@ describe('@opensip-cli/graph/read rebuild Result', () => {
     }
   });
 
-  it('maps persistence failures without returning an unpersisted generation', async () => {
+  it('preserves the rebuilt generation when persistence fails afterward', async () => {
     const store = DataStoreFactory.open({ backend: 'memory' });
     store.close();
-    runGraphMock.mockResolvedValue({ catalog: makeCatalog() });
+    const catalog = makeCatalog();
+    runGraphMock.mockResolvedValue({ catalog });
     await expect(read.rebuildCatalog({ cwd: '/project', datastore: store })).resolves.toEqual({
-      ok: false,
-      error: {
-        code: 'rebuild-failed',
-        operation: 'rebuild',
-        message: 'Graph rebuild failed due to infrastructure error',
-      },
+      ok: true,
+      value: catalog,
     });
   });
 

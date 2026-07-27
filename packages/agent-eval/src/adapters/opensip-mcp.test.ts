@@ -53,9 +53,16 @@ const MCP_SETUP_TOOL_NAMES = [
   'get_context_status',
 ] as const;
 
+function mcpRequestTimeoutError(): Error & { readonly code: number } {
+  const error = new Error('MCP error -32001: Request timed out');
+  error.name = 'McpError';
+  return Object.assign(error, { code: -32_001 });
+}
+
 interface FakeConnectionOptions {
   readonly catalog?: Readonly<Record<string, unknown>>;
   readonly catalogResult?: unknown;
+  readonly closeError?: Error;
   readonly connectError?: Error;
   readonly listedNames?: readonly string[];
   readonly serverVersion?: { readonly name: string; readonly version: string };
@@ -140,7 +147,9 @@ function fakeConnection(root: string, options: FakeConnectionOptions = {}): Fake
   }[] = [];
   const toolResults = [...(options.toolResults ?? [])];
   const stderr = new PassThrough();
-  const close = vi.fn(() => Promise.resolve());
+  const close = vi.fn(() =>
+    options.closeError === undefined ? Promise.resolve() : Promise.reject(options.closeError),
+  );
   const connection: McpConnection = {
     callTool: (input) => {
       calls.push(input);
@@ -178,6 +187,7 @@ async function connectFake(
     readonly maxResponseBytes?: number;
     readonly maxStderrBytes?: number;
     readonly maxToolCalls?: number;
+    readonly removeOwnedHome?: (path: string) => void;
     readonly targetStabilityCheck?: () => void;
   } = {},
 ): Promise<{
@@ -458,6 +468,53 @@ describe('McpArmSession handshake', () => {
     expect(harness.close).toHaveBeenCalledOnce();
   });
 
+  it('preserves connect and rollback failures when installed-target verification also fails', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root, {
+      closeError: new Error('process tree did not terminate'),
+      connectError: new Error('server offline'),
+    });
+    let checks = 0;
+    let ownedHome: string | undefined;
+    let observed: unknown;
+
+    try {
+      await McpArmSession.connect({
+        cliDistResolver: () => '/built/opensip.js',
+        connectionFactory: (options) => {
+          ownedHome = options.env.HOME;
+          return harness.connection;
+        },
+        removeOwnedHome: (path) => {
+          throw new Error(`cleanup busy at ${path}`);
+        },
+        targetStabilityCheck: () => {
+          checks += 1;
+          if (checks > 1) {
+            throw new HarnessPrerequisiteError('The installed CLI snapshot changed.');
+          }
+        },
+        workspaceRoot: root,
+      });
+    } catch (error) {
+      observed = error;
+    } finally {
+      if (ownedHome !== undefined) rmSync(ownedHome, { force: true, recursive: true });
+    }
+
+    expect(observed).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((observed as Error).message).toMatch(/installed CLI snapshot changed/u);
+    expect((observed as Error).message).toMatch(/connect: server offline/u);
+    expect((observed as Error).message).toMatch(
+      /connection-close: process tree did not terminate/u,
+    );
+    expect((observed as Error).message).toMatch(
+      /owned-home-remove: cleanup busy at \[redacted-path\]/u,
+    );
+    expect(harness.close).toHaveBeenCalledOnce();
+    expect(checks).toBe(2);
+  });
+
   it('owns and cleans a unique default HOME even when connection construction fails', async () => {
     const root = temporaryRoot();
     let ownedHome: string | undefined;
@@ -487,6 +544,43 @@ describe('McpArmSession handshake', () => {
     expect(existsSync(ownedHome)).toBe(true);
     await session.close();
     expect(existsSync(ownedHome)).toBe(false);
+  });
+
+  it('preserves close, stability, and owned-HOME cleanup failures together', async () => {
+    const root = temporaryRoot();
+    const harness = fakeConnection(root, {
+      closeError: new Error('stdio containment failed'),
+    });
+    let checks = 0;
+    const { captured, session } = await connectFake(root, harness, {
+      removeOwnedHome: (path) => {
+        throw new Error(`cleanup denied at ${path}`);
+      },
+      targetStabilityCheck: () => {
+        checks += 1;
+        if (checks > 1) {
+          throw new HarnessPrerequisiteError('The installed CLI snapshot changed during close.');
+        }
+      },
+    });
+    const ownedHome = captured.env.HOME;
+    let observed: unknown;
+
+    try {
+      await session.close();
+    } catch (error) {
+      observed = error;
+    } finally {
+      if (ownedHome !== undefined) rmSync(ownedHome, { force: true, recursive: true });
+    }
+
+    expect(observed).toBeInstanceOf(HarnessPrerequisiteError);
+    expect((observed as Error).message).toMatch(/snapshot changed during close/u);
+    expect((observed as Error).message).toMatch(/connection-close: stdio containment failed/u);
+    expect((observed as Error).message).toMatch(
+      /owned-home-remove: cleanup denied at \[redacted-path\]/u,
+    );
+    expect(checks).toBe(2);
   });
 });
 
@@ -1071,23 +1165,44 @@ describe('McpArmSession tool record mapping', () => {
     await session.close();
   });
 
-  it('surfaces a dead server as a prerequisite error', async () => {
-    const root = temporaryRoot();
-    const harness = fakeConnection(root, {
-      toolResults: [],
-    });
-    const original = harness.connection.callTool.bind(harness.connection);
-    let calls = 0;
-    harness.connection.callTool = (input, timeoutMs) => {
-      calls += 1;
-      if (calls === 1) return original(input, timeoutMs);
-      return Promise.reject(new Error('transport closed'));
-    };
-    const { session } = await connectFake(root, harness);
+  it.each([
+    {
+      code: 'mcp-request-timeout',
+      error: mcpRequestTimeoutError(),
+      message: /request timed out.*Request timed out/u,
+      title: 'request timeout',
+    },
+    {
+      code: 'mcp-transport-unavailable',
+      error: new Error('transport closed'),
+      message: /became unavailable.*transport closed/u,
+      title: 'dead transport',
+    },
+  ] as const)(
+    'records a $title as infrastructure failure data',
+    async ({ code, error, message }) => {
+      const root = temporaryRoot();
+      const harness = fakeConnection(root, {
+        toolResults: [],
+      });
+      const original = harness.connection.callTool.bind(harness.connection);
+      let calls = 0;
+      harness.connection.callTool = (input, timeoutMs) => {
+        calls += 1;
+        if (calls === 1) return original(input, timeoutMs);
+        return Promise.reject(error);
+      };
+      const { session } = await connectFake(root, harness);
 
-    await expect(session.invoker()(resolvedStep())).rejects.toThrow(
-      /became unavailable.*transport closed/u,
-    );
-    await session.close();
-  });
+      const record = await session.invoker()(resolvedStep());
+
+      expect(record).toMatchObject({
+        failure: { code, kind: 'infrastructure', retryable: true },
+        noneOutcome: 'failed',
+        responseBytes: 0,
+      });
+      expect(record.failure?.message).toMatch(message);
+      await session.close();
+    },
+  );
 });

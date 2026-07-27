@@ -64,6 +64,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
+  type WalkTraversalGuard,
 } from '@opensip-cli/graph-adapter-common';
 
 import { digestJavaBody, digestSyntheticBody } from './body-digest.js';
@@ -121,6 +122,7 @@ function walkFile(
   file: JavaParsedFile,
   projectDirAbs: string,
   sinks: WalkSinks,
+  traversal: WalkTraversalGuard,
 ): void {
   const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
@@ -152,6 +154,7 @@ function walkFile(
     definedInGenerated,
     out,
     callSites,
+    traversal,
   };
   const initialFrame: Frame = {
     ownerHash: moduleInit.bodyHash,
@@ -159,7 +162,7 @@ function walkFile(
     inTestScope: inTestFile,
   };
 
-  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx, 1);
 }
 
 interface Frame {
@@ -176,31 +179,33 @@ interface WalkCtx {
   readonly definedInGenerated: boolean;
   readonly out: Record<string, FunctionOccurrence[]>;
   readonly callSites: CallSiteRecord[];
+  readonly traversal: WalkTraversalGuard;
 }
 
 // @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor; the cycle is the traversal (visit re-enters via the type/member helpers)
-function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
+  ctx.traversal.checkpoint(depth);
   if (TYPE_DECL_NODES.has(node.type)) {
-    visitTypeDeclaration(node, frame, ctx);
+    visitTypeDeclaration(node, frame, ctx, depth);
     return;
   }
   if (node.type === 'method_declaration') {
-    visitMethodOrConstructor(node, frame, ctx, 'method');
+    visitMethodOrConstructor(node, frame, ctx, depth, 'method');
     return;
   }
   if (node.type === 'annotation_type_element_declaration') {
-    visitMethodOrConstructor(node, frame, ctx, 'method');
+    visitMethodOrConstructor(node, frame, ctx, depth, 'method');
     return;
   }
   if (node.type === 'constructor_declaration') {
-    visitMethodOrConstructor(node, frame, ctx, 'constructor');
+    visitMethodOrConstructor(node, frame, ctx, depth, 'constructor');
     return;
   }
   if (node.type === 'compact_constructor_declaration') {
-    visitMethodOrConstructor(node, frame, ctx, 'constructor');
+    visitMethodOrConstructor(node, frame, ctx, depth, 'constructor');
     return;
   }
-  if (node.type === 'lambda_expression' && visitLambda(node, frame, ctx)) {
+  if (node.type === 'lambda_expression' && visitLambda(node, frame, ctx, depth)) {
     return;
   }
   if (CALL_NODES.has(node.type)) {
@@ -211,21 +216,22 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of childrenOf(node)) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx, depth + 1);
 }
 
-function visitTypeDeclaration(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitTypeDeclaration(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const typeName = nameOf(node) ?? '<anon-type>';
   // Type declarations don't emit a function — their bodies' methods do.
   // Keep the same owner hash but update enclosingClass for children.
   const childFrame: Frame = { ...frame, enclosingClass: typeName };
-  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx, depth + 1);
 }
 
 function visitMethodOrConstructor(
   node: Node,
   frame: Frame,
   ctx: WalkCtx,
+  depth: number,
   kind: 'method' | 'constructor',
 ): void {
   const occ = buildMethodOccurrence(node, frame, ctx, kind);
@@ -238,12 +244,12 @@ function visitMethodOrConstructor(
   };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx, depth + 1);
   }
 }
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- Java lambda and Python lambda-node visitors share adapter bookkeeping but differ by grammar.
-function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
+function visitLambda(node: Node, frame: Frame, ctx: WalkCtx, depth: number): boolean {
   const occ = buildLambdaOccurrence(node, frame, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -262,6 +268,7 @@ function visitLambda(node: Node, frame: Frame, ctx: WalkCtx): boolean {
       body,
       { ownerHash: occ.bodyHash, enclosingClass: null, inTestScope: occ.inTestFile },
       ctx,
+      depth + 1,
     );
   }
   return true;

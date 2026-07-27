@@ -25,6 +25,7 @@ export interface WalkResult {
 interface WalkState {
   readonly limits: WalkLimits;
   readonly paths: string[];
+  readonly shouldStop: () => boolean;
   truncated: boolean;
   visitedDirectories: number;
   visitedEntries: number;
@@ -121,6 +122,10 @@ function boundedDirectoryEntries(
   const entries: Dirent<string>[] = [];
   try {
     while (true) {
+      if (state.shouldStop()) {
+        state.truncated = true;
+        return [];
+      }
       if (
         entries.length >= state.limits.maxEntriesPerDirectory ||
         state.visitedEntries >= state.limits.maxVisitedEntries
@@ -188,16 +193,22 @@ export function walkFiles(
   workspaceRoot: string,
   maxFiles: number,
   limits: WalkLimits = defaultWalkLimits(maxFiles),
+  shouldStop: () => boolean = () => false,
 ): WalkResult {
   const state: WalkState = {
     limits,
     paths: [],
+    shouldStop,
     truncated: false,
     visitedDirectories: 0,
     visitedEntries: 0,
   };
   const stack: PendingWork[] = [{ depth: 0, relativeDirectory: '', type: 'directory' }];
   while (stack.length > 0 && !state.truncated) {
+    if (state.shouldStop()) {
+      state.truncated = true;
+      break;
+    }
     const work = stack.pop();
     if (work !== undefined) visitWork(workspaceRoot, work, stack, state);
   }

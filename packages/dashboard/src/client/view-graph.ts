@@ -29,47 +29,25 @@
 
 import { el } from './el.js';
 import { makeSectionHeading } from './function-row.js';
+import { graphVisualizationDegradation } from './graph-visualization-degradation.js';
 import { fuzzyMatch } from './search.js';
 import { gvBuildFunctionElements, gvRenderControls } from './view-graph-controls.js';
-import { gvBuildElements, type GraphElement, type GraphViewModel } from './view-graph-elements.js';
+import { gvBuildElements, type GraphElement } from './view-graph-elements.js';
 import { GRAPH_VIEW_HELP } from './view-graph-help.js';
+import {
+  gvLayoutOptions,
+  gvRegisterGraphLayouts,
+  gvReportDagreUnavailable,
+  gvReportLayoutInitializationFallback,
+  gvRunLayout,
+} from './view-graph-layout.js';
+import { gvLoadViewModel } from './view-graph-model.js';
 import { gvState } from './view-graph-state.js';
 import { gvStylesheet } from './view-graph-stylesheet.js';
 import { views } from './views-registry.js';
 
 import type { CatalogLike, IndexesLike } from './code-paths-types.js';
-import type { CyCollection, CyElement, CyEvent } from './cytoscape-types.js';
-
-// Register the dagre layout extension once. Called LAZILY at first render (not
-// at module load) so it does not depend on the vendored `cytoscape` global
-// being defined before this bundle — the vendor blob may be inlined after it.
-// Guarded so a double-call is harmless.
-function gvRegisterGraphLayouts(): void {
-  try {
-    if (
-      typeof cytoscape === 'function' &&
-      typeof cytoscapeDagre !== 'undefined' &&
-      !cytoscape.__gvDagreRegistered
-    ) {
-      cytoscape.use(cytoscapeDagre);
-      cytoscape.__gvDagreRegistered = true;
-    }
-  } catch {
-    // @swallow-ok extension already registered or unavailable.
-  }
-}
-
-function gvLoadViewModel(): GraphViewModel | null {
-  const blob = document.querySelector('#graph-view-model');
-  if (!blob?.textContent) return null;
-  try {
-    return JSON.parse(blob.textContent) as GraphViewModel;
-  } catch {
-    // @swallow-ok a malformed embedded blob is treated as "no view-model" — the
-    // caller renders the empty state. There is no logger in the browser bundle.
-    return null;
-  }
-}
+import type { CyCollection, CyCore, CyElement, CyEvent } from './cytoscape-types.js';
 
 // The init loop renders EVERY Code Graph panel, not just the active one — the
 // row-table views re-render in O(rows), but a full Cytoscape mount + dagre
@@ -83,23 +61,6 @@ function gvPanelHidden(container: HTMLElement): boolean {
   return !!(
     container?.classList?.contains('code-paths-view') && !container.classList.contains('active')
   );
-}
-
-function gvLayoutOptions(layoutId: string): Record<string, unknown> {
-  if (layoutId === 'dagre') {
-    return { name: 'dagre', rankDir: 'LR', nodeSep: 24, rankSep: 64, fit: true, padding: 24 };
-  }
-  if (layoutId === 'breadthfirst') {
-    return { name: 'breadthfirst', directed: true, spacingFactor: 1.2, fit: true, padding: 24 };
-  }
-  return { name: 'cose', animate: false, fit: true, padding: 24, nodeRepulsion: 6000 };
-}
-
-function gvRunLayout(layoutId: string): void {
-  if (!gvState.cy) return;
-  gvState.currentLayout = layoutId;
-  const layout = gvState.cy.layout(gvLayoutOptions(layoutId));
-  layout.run();
 }
 
 // Emphasize cross-package cyclic clusters on the live graph. A node is "in a
@@ -250,9 +211,20 @@ function gvResolveElements(container: HTMLElement, indexes: IndexesLike): GraphE
     }
     return elements;
   }
-  const vm = gvLoadViewModel();
-  if (!vm?.nodes || vm.nodes.length === 0) return gvEmpty(container, 'No graph to display.');
-  if (typeof cytoscape !== 'function') return gvEmpty(container, 'Graph renderer unavailable.');
+  const loaded = gvLoadViewModel();
+  if (loaded.state === 'malformed') {
+    return gvEmpty(container, 'Graph data in this report could not be read.');
+  }
+  if (loaded.state === 'absent') {
+    const degradation = graphVisualizationDegradation('catalog-projection-failed');
+    return gvEmpty(container, degradation?.message ?? 'No graph to display.');
+  }
+  const vm = loaded.value;
+  if (vm.nodes.length === 0) return gvEmpty(container, 'No graph to display.');
+  if (typeof cytoscape !== 'function') {
+    const degradation = graphVisualizationDegradation('renderer-asset-unavailable');
+    return gvEmpty(container, degradation?.message ?? 'Graph renderer unavailable.');
+  }
   const elements = gvBuildElements(vm);
   if (elements.length === 0) return gvEmpty(container, 'No packages to display.');
   return elements;
@@ -262,23 +234,39 @@ function gvResolveElements(container: HTMLElement, indexes: IndexesLike): GraphE
 // successful mount (gvState.cy set), false if the renderer could not initialize
 // (e.g. a headless test runner without a real 2D canvas) — in which case the
 // rest of the page stays usable.
+function gvCreateCanvasCore(
+  canvas: HTMLElement,
+  elements: GraphElement[],
+  layoutId: string,
+): CyCore {
+  return cytoscape({
+    container: canvas,
+    elements,
+    style: gvStylesheet(),
+    layout: gvLayoutOptions(layoutId),
+    wheelSensitivity: 0.2,
+    minZoom: 0.05,
+    maxZoom: 4,
+  });
+}
+
 function gvMountCanvas(container: HTMLElement, elements: GraphElement[]): boolean {
   const canvas = el('div', { class: 'code-paths-graph-canvas', id: 'code-paths-graph-canvas' });
   container.append(canvas);
   try {
-    gvState.cy = cytoscape({
-      container: canvas,
-      elements,
-      style: gvStylesheet(),
-      layout: gvLayoutOptions(gvState.currentLayout),
-      wheelSensitivity: 0.2,
-      minZoom: 0.05,
-      maxZoom: 4,
-    });
+    gvState.cy = gvCreateCanvasCore(canvas, elements, gvState.currentLayout);
   } catch {
-    // @swallow-ok cytoscape mounting throws in environments without a real 2D
-    // canvas (e.g. headless test runners); fail soft with an inline notice so the
-    // rest of the page stays usable. No browser-bundle logger to record it.
+    if (gvState.currentLayout !== 'cose') {
+      try {
+        canvas.replaceChildren();
+        gvState.cy = gvCreateCanvasCore(canvas, elements, 'cose');
+        gvState.currentLayout = 'cose';
+        gvReportLayoutInitializationFallback(container);
+        return true;
+      } catch {
+        // The fixed renderer notice below owns both initialization failures.
+      }
+    }
     gvState.cy = null;
     canvas.append(
       el('div', {
@@ -329,7 +317,10 @@ function gvRenderGraph(
 
   // Register the dagre layout on first render (the vendored cytoscape global is
   // present by render time even if it was inlined after this bundle).
-  gvRegisterGraphLayouts();
+  const registration =
+    gvState.currentLayout === 'dagre' ? gvRegisterGraphLayouts() : { ok: true as const };
+  const dagreUnavailable = !registration.ok;
+  if (dagreUnavailable) gvState.currentLayout = 'cose';
 
   // Section heading + ⓘ help button, consistent with the Coupling and Functions
   // views (makeSectionHeading wires the button to openHelpDrawer for this view's
@@ -340,13 +331,16 @@ function gvRenderGraph(
   // into view-graph (one-directional dependency, no module cycle).
   gvRenderControls(container, catalog, indexes, {
     rerender: () => gvRenderGraph(container, catalog, indexes),
-    runLayout: gvRunLayout,
+    runLayout: (layoutId) => gvRunLayout(container, layoutId),
     applySccHighlight: gvApplySccHighlight,
     renderSearchBox: gvRenderSearchBox,
   });
 
   const elements = gvResolveElements(container, indexes);
   if (!elements) return;
+  if (dagreUnavailable) {
+    gvReportDagreUnavailable(container, registration.condition);
+  }
   if (!gvMountCanvas(container, elements)) return;
   gvWireInteractions();
 

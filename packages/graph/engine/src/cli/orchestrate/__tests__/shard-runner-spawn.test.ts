@@ -33,6 +33,18 @@ if (id.startsWith('fail:')) {
   process.stderr.write('boom for ' + id + '\n');
   process.exit(3);
 }
+if (id.startsWith('typed:')) {
+  process.stdout.write(JSON.stringify({
+    kind: 'failure',
+    failure: {
+      wireVersion: 1,
+      message: 'typed fixture missing',
+      code: 'NOT_FOUND',
+      failureClass: 'exit_nonzero',
+    },
+  }));
+  process.exit(3);
+}
 const result = {
   shardId: id,
   fragment: {
@@ -134,6 +146,28 @@ describe('runShardsInParallel', () => {
     expect(out.failures[0]?.shardId).toBe('fail:x');
     expect(out.failures[0]?.exitCode).toBe(3);
     expect(out.failures[0]?.stderr).toContain('boom for fail:x');
+  });
+
+  it('reconstructs a definition-backed failure from the worker wire', async () => {
+    const out = await runShardsInParallel({
+      shards: [shard('typed:x')],
+      projectRoot: dir,
+      cliScript,
+      resolutionMode: 'exact',
+    });
+
+    expect(out.fragments).toEqual([]);
+    expect(out.failures[0]).toMatchObject({
+      shardId: 'typed:x',
+      exitCode: 3,
+      failureClass: 'exit_nonzero',
+      errorCode: 'NOT_FOUND',
+      failure: {
+        code: 'NOT_FOUND',
+        kind: 'not-found',
+      },
+    });
+    expect(out.failures[0]?.stderr).toBe('');
   });
 
   it('handles an empty shard set', async () => {

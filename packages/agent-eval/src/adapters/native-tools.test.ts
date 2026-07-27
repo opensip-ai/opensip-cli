@@ -116,6 +116,58 @@ describe('native tools', () => {
     expect(record.completeness).toBe('complete');
   });
 
+  it('retains prior matches when a walked file disappears before it can be read', async () => {
+    const root = fixture();
+    const record = await createNativeInvoker(root, {
+      allowedPaths: ['src/a.ts', 'src/vanished.ts'],
+    })(
+      step('contentSearch', { pattern: 'needle' }, (payload) =>
+        (payload as { matches: { path: string }[] }).matches.map((match): AnswerFact => ({
+          kind: 'file',
+          path: match.path,
+        })),
+      ),
+    );
+
+    expect(record.facts).toEqual([{ kind: 'file', path: 'src/a.ts' }]);
+    expect(record.truncated).toBe(true);
+    expect(record.completeness).toBe('incomplete');
+  });
+
+  it('marks cooperative deadline exhaustion as incomplete without discarding prior matches', async () => {
+    let tick = 0;
+    const record = await createNativeInvoker(fixture(), {
+      allowedPaths: ['src/a.ts', 'src/b.ts'],
+      maxStepWallMs: 3,
+      monotonicNow: () => tick++,
+    })(
+      step('contentSearch', { pattern: 'needle' }, (payload) =>
+        (payload as { matches: { path: string }[] }).matches.map((match): AnswerFact => ({
+          kind: 'file',
+          path: match.path,
+        })),
+      ),
+    );
+
+    expect(record.facts).toEqual([{ kind: 'file', path: 'src/a.ts' }]);
+    expect(record.truncated).toBe(true);
+    expect(record.completeness).toBe('incomplete');
+  });
+
+  it('does not downgrade containment refusals into recoverable file skips', async () => {
+    const record = await createNativeInvoker(fixture(), { allowedPaths: ['../outside.ts'] })(
+      step('contentSearch', { pattern: 'needle' }),
+    );
+
+    expect(record).toMatchObject({
+      failure: {
+        code: 'native-tool-failure',
+        message: expect.stringContaining('escapes'),
+      },
+      noneOutcome: 'failed',
+    });
+  });
+
   it('confines dogfood search, glob, and reads to an admitted Git-visible path view', async () => {
     const root = fixture();
     writeFileSync(join(root, '.env'), 'needle\n', 'utf8');

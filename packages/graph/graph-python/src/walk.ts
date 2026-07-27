@@ -46,6 +46,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
+  type WalkTraversalGuard,
 } from '@opensip-cli/graph-adapter-common';
 
 import { digestPythonBody, digestSyntheticBody } from './body-digest.js';
@@ -77,6 +78,7 @@ function walkFile(
   file: PythonParsedFile,
   projectDirAbs: string,
   sinks: WalkSinks,
+  traversal: WalkTraversalGuard,
 ): void {
   const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
@@ -110,9 +112,10 @@ function walkFile(
     definedInGenerated,
     out,
     callSites,
+    traversal,
   };
 
-  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx, 1);
 }
 
 interface Frame {
@@ -127,19 +130,21 @@ interface WalkCtx {
   readonly definedInGenerated: boolean;
   readonly out: Record<string, FunctionOccurrence[]>;
   readonly callSites: CallSiteRecord[];
+  readonly traversal: WalkTraversalGuard;
 }
 
 // @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor; the cycle is the traversal (visit re-enters via the class/function helpers)
-function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
+  ctx.traversal.checkpoint(depth);
   if (node.type === 'class_definition') {
-    visitClass(node, frame, ctx);
+    visitClass(node, frame, ctx, depth);
     return;
   }
   if (node.type === 'function_definition') {
-    visitFunction(node, frame, ctx);
+    visitFunction(node, frame, ctx, depth);
     return;
   }
-  if (node.type === 'lambda' && visitLambdaNode(node, frame, ctx)) {
+  if (node.type === 'lambda' && visitLambdaNode(node, frame, ctx, depth)) {
     return;
   }
   if (node.type === 'call') {
@@ -150,21 +155,21 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of childrenOf(node)) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx, depth + 1);
 }
 
-function visitClass(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitClass(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const className = nameOf(node) ?? '<anon-class>';
   // Don't emit a function for the class itself — Python classes are
   // declarations whose top-level statements run at module load. Keep
   // the module-init as the owner; descend with class context for
   // nested function_definitions to be tagged as methods.
   const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass: className };
-  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx, depth + 1);
 }
 
 // @graph-ignore-next-line graph:near-duplicate-function-body -- function visitors stay parser-local even when traversal bookkeeping is parallel across adapters.
-function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitFunction(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const occ = visitFunctionDefinition(node, frame.enclosingClass, ctx);
   if (!occ) return;
   record(ctx.out, occ);
@@ -174,16 +179,16 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   // dropped entirely because the body descent never reaches `parameters`.
   const params = node.childForFieldName('parameters');
   if (params) {
-    for (const child of childrenOf(params)) visit(child, frame, ctx);
+    for (const child of childrenOf(params)) visit(child, frame, ctx, depth + 1);
   }
   const childFrame: Frame = { ownerHash: occ.bodyHash, enclosingClass: null };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx, depth + 1);
   }
 }
 
-function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
+function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx, depth: number): boolean {
   const occ = visitLambda(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -200,11 +205,11 @@ function visitLambdaNode(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   // scope when the lambda expression creates its function object.
   const params = node.childForFieldName('parameters');
   if (params) {
-    for (const child of childrenOf(params)) visit(child, frame, ctx);
+    for (const child of childrenOf(params)) visit(child, frame, ctx, depth + 1);
   }
   const body = node.childForFieldName('body');
   if (body) {
-    visit(body, { ownerHash: occ.bodyHash, enclosingClass: null }, ctx);
+    visit(body, { ownerHash: occ.bodyHash, enclosingClass: null }, ctx, depth + 1);
   }
   return true;
 }

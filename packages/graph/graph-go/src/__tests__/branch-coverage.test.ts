@@ -14,7 +14,7 @@
  *     already drive in isolation.
  */
 
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -48,6 +48,7 @@ function runAdapter(): {
   readonly dependenciesByOwner:
     | ReadonlyMap<string, readonly { readonly to: readonly string[]; readonly specifier: string }[]>
     | undefined;
+  readonly degradations: ReturnType<typeof goGraphAdapter.resolveCallSites>['degradations'];
 } {
   const discovery = goGraphAdapter.discoverFiles({ cwd: dir, diagnosticIntent: 'quiet' });
   const parsed = goGraphAdapter.parseProject({
@@ -77,10 +78,58 @@ function runAdapter(): {
     projectDirAbs: discovery.projectDirAbs,
     resolutionMode: 'exact',
   });
-  return { catalog, dependenciesByOwner: resolved.dependenciesByOwner };
+  return {
+    catalog,
+    dependenciesByOwner: resolved.dependenciesByOwner,
+    degradations: resolved.degradations,
+  };
 }
 
 describe('graph-go branch coverage', () => {
+  it('keeps a missing go.mod benign while dependency edges remain unresolved', () => {
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nimport "github.com/example/project/pkg"\nfunc main() {}\n`,
+      'utf8',
+    );
+
+    expect(runAdapter().degradations).toEqual([]);
+  });
+
+  it('surfaces a readable go.mod without a module directive as degraded', () => {
+    writeFileSync(join(dir, 'go.mod'), 'go 1.22\n', 'utf8');
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nimport "github.com/example/project/pkg"\nfunc main() {}\n`,
+      'utf8',
+    );
+
+    expect(runAdapter().degradations).toEqual([
+      {
+        errorCode: 'GRAPH.ADAPTER.MANIFEST_INVALID',
+        condition: 'go-module-manifest-invalid',
+        count: 1,
+      },
+    ]);
+  });
+
+  it('surfaces an unreadable go.mod as degraded', () => {
+    mkdirSync(join(dir, 'go.mod'));
+    writeFileSync(
+      join(dir, 'main.go'),
+      `package main\nimport "github.com/example/project/pkg"\nfunc main() {}\n`,
+      'utf8',
+    );
+
+    expect(runAdapter().degradations).toEqual([
+      {
+        errorCode: 'GRAPH.ADAPTER.MANIFEST_UNREADABLE',
+        condition: 'go-module-manifest',
+        count: 1,
+      },
+    ]);
+  });
+
   it('readGoModulePath skips blank lines and // comments before the module directive', () => {
     // Blank line + `//` comment line + the module directive. This drives
     // both operands of the `length === 0 || startsWith('//')` short-circuit

@@ -46,6 +46,8 @@ export type GraphReadReason =
   | 'impact-files-cap'
   | 'impact-index-generation-mismatch'
   | 'query-invalid'
+  | 'rebuild-cancelled'
+  | 'rebuild-configuration'
   | 'rebuild-empty'
   | 'rebuild-failed'
   | 'test-selection-cancelled'

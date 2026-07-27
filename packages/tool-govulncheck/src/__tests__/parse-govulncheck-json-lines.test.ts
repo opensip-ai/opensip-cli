@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseGovulncheckJsonLines } from '../parse-govulncheck-json-lines.js';
 
@@ -180,8 +180,48 @@ describe('parseGovulncheckJsonLines', () => {
     expect(parseGovulncheckJsonLines(raw, CTX)).toEqual([]);
   });
 
-  it('tolerates malformed / non-JSON lines without throwing', () => {
+  it('tolerates non-JSON chatter outside the JSON-lines protocol', () => {
     expect(parseGovulncheckJsonLines(output(['not json']), CTX)).toEqual([]);
     expect(parseGovulncheckJsonLines(output(['']), CTX)).toEqual([]);
+  });
+
+  it('faults on a malformed JSON record instead of returning a clean scan', () => {
+    expect(() => parseGovulncheckJsonLines(output(['{"finding":']), CTX)).toThrow(
+      expect.objectContaining({
+        code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
+        metadata: { condition: 'malformed-json-line', scanner: 'govulncheck' },
+      }),
+    );
+  });
+
+  it('retains valid findings and reports a partially malformed stream', () => {
+    const warn = vi.fn();
+    const ctx = { ...CTX, logger: { warn } } as unknown as AdapterRunContext;
+    const raw = output([
+      osv('GO-2024-0005', 'Retained vulnerability'),
+      JSON.stringify({
+        finding: {
+          osv: 'GO-2024-0005',
+          trace: [
+            {
+              module: 'm',
+              package: 'p',
+              function: 'F',
+              position: { filename: 'main.go', line: 1 },
+            },
+          ],
+        },
+      }),
+      '{"finding":',
+    ]);
+
+    expect(parseGovulncheckJsonLines(raw, ctx)).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: 'malformed-json-line',
+        parseErrorCount: 1,
+        findingCount: 1,
+      }),
+    );
   });
 });

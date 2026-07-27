@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseCargoClippyJsonLines } from '../parse-cargo-clippy-json-lines.js';
 
@@ -203,5 +203,37 @@ describe('parseCargoClippyJsonLines', () => {
   it('returns no signals for a clean run and tolerates non-JSON', () => {
     expect(parseCargoClippyJsonLines(output(['']), CTX)).toEqual([]);
     expect(parseCargoClippyJsonLines(output(['not json']), CTX)).toEqual([]);
+  });
+
+  it('faults when malformed JSON records leave no trustworthy findings', () => {
+    expect(() => parseCargoClippyJsonLines(output(['{"reason":']), CTX)).toThrow(
+      expect.objectContaining({
+        code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
+        metadata: { condition: 'malformed-json-line', scanner: 'cargo-clippy' },
+      }),
+    );
+  });
+
+  it('retains valid findings and reports a partially malformed stream', () => {
+    const warn = vi.fn();
+    const ctx = { ...CTX, logger: { warn } } as unknown as AdapterRunContext;
+    const raw = output([
+      compilerMessage({
+        message: 'valid lint',
+        level: 'warning',
+        code: { code: 'clippy::valid' },
+        spans: [{ file_name: 'src/lib.rs', is_primary: true }],
+      }),
+      '{"reason":',
+    ]);
+
+    expect(parseCargoClippyJsonLines(raw, ctx)).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: 'malformed-json-line',
+        parseErrorCount: 1,
+        findingCount: 1,
+      }),
+    );
   });
 });

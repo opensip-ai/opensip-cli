@@ -41,6 +41,7 @@ import { buildIndexes } from '../../pipeline/indexes.js';
 import { evaluateRules, resolveRuleSet } from '../../rules/evaluate-rules.js';
 import { GRAPH_TRACER } from '../graph-tracer.js';
 
+import { assertShardedBuildUsable } from './shard-completeness.js';
 import {
   boundedShardFailureEvidence,
   catalogBuildCoverage,
@@ -151,6 +152,7 @@ async function buildShardedGraph(
   //     single-program walk: it assembles the per-file occurrences into one
   //     catalog, so its sub-label reports the resulting function count.
   const fragments = [...plan.cached, ...built.fragments];
+  const shardFailures = built.failures.map(boundedShardFailureEvidence);
   // Structured merge milestone (subprocess-correlation Event Catalog): the
   // fragment count being merged + the ids of any shards whose worker failed,
   // stamped with the run/trace ids so it pivots to the same run as the runner's
@@ -171,6 +173,15 @@ async function buildShardedGraph(
     ...(mergeTraceId === undefined ? {} : { traceId: mergeTraceId }),
     fragmentCount: fragments.length,
     failedShardIds: built.failures.map((f) => f.shardId),
+  });
+  // A partial catalog is useful and remains explicitly marked below. Zero
+  // fragments are different: mergeShardFragments would otherwise fabricate a
+  // structurally valid TypeScript catalog from no parser evidence and persist
+  // it before the outer caller could reject it.
+  assertShardedBuildUsable({
+    failedShardIds: built.failures.map((failure) => failure.shardId),
+    shardFailures,
+    successfulShardCount: fragments.length,
   });
   // The export linker keys packages by name; build the manifest index once from
   // the resolved shard set (each shard.rootDir holds a package.json) so the
@@ -253,6 +264,7 @@ async function buildShardedGraph(
       projectRoot,
       files: allFiles,
       parseErrors: fragments.flatMap((fragment) => fragment.parseErrors),
+      degradations: fragments.flatMap((fragment) => fragment.degradations ?? []),
       status: built.failures.length === 0 ? 'complete' : 'partial',
     }),
   };
@@ -342,7 +354,7 @@ async function buildShardedGraph(
     resolutionStats: boundaryStats,
     cacheHit: plan.toBuild.length === 0,
     failedShardIds: built.failures.map((f) => f.shardId),
-    shardFailures: built.failures.map(boundedShardFailureEvidence),
+    shardFailures,
     features,
     shardStats,
   };

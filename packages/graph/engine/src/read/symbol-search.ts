@@ -34,13 +34,11 @@ import {
   type GraphSourceFilter,
   type GraphSymbolRef,
 } from './query-contracts.js';
+import { failGraphRead } from './read-boundary-failure.js';
 import { matchesGraphSourceFilterWithRoles, type SourceRoleMatcher } from './source-filter.js';
 
 import type { GraphReadError } from './types.js';
 import type { Catalog, Indexes } from '../types.js';
-
-// Plan 01: the `GRAPH` head was mapped by nothing, so every one of these resolved to
-// UNKNOWN_FAILURE — fatal and operator-only — for conditions MCP consumers branch on.
 
 /** Fallback page size when a caller-supplied `limit` is absent/non-finite —
  * matches the documented identity-search default (20 nodes). */
@@ -71,10 +69,6 @@ export interface SymbolSearchView {
   readonly effectiveFilter: EffectiveGraphSourceFilter;
   readonly coverage: GraphReadCoverage;
   readonly groups?: readonly ReadGroupSummary[];
-}
-
-function searchError(message: string): GraphReadError {
-  return { code: 'query-invalid', operation: 'analysis', message };
 }
 
 /**
@@ -244,7 +238,14 @@ export function searchSymbolOccurrences(
         reasons,
       },
     });
-  } catch {
-    return err(searchError('Failed to search symbol occurrences'));
+  } catch (error) {
+    return failGraphRead(error, {
+      boundary: 'projection',
+      condition: 'symbol-search',
+      module: 'graph:read:symbol-search',
+      reason: 'query-invalid',
+      operation: 'analysis',
+      message: 'Failed to search symbol occurrences',
+    });
   }
 }

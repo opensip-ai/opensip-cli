@@ -50,6 +50,7 @@ import {
   runWalk,
   synthesizeModuleInit as buildModuleInit,
   type WalkSinks,
+  type WalkTraversalGuard,
 } from '@opensip-cli/graph-adapter-common';
 
 import { digestSyntheticBody } from './body-digest.js';
@@ -88,6 +89,7 @@ function walkFile(
   file: RustParsedFile,
   projectDirAbs: string,
   sinks: WalkSinks,
+  traversal: WalkTraversalGuard,
 ): void {
   const { occurrences: out, callSites, dependencySites } = sinks;
   const filePathProjectRel = relative(projectDirAbs, absPath).split(sep).join('/');
@@ -114,6 +116,7 @@ function walkFile(
     definedInGenerated,
     out,
     callSites,
+    traversal,
   };
   const initialFrame: Frame = {
     ownerHash: moduleInit.bodyHash,
@@ -121,24 +124,25 @@ function walkFile(
     enclosingTrait: null,
   };
 
-  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx);
+  for (const child of childrenOf(file.tree.rootNode)) visit(child, initialFrame, ctx, 1);
 }
 
 // @graph-ignore-next-line graph:cycle -- intentional recursive-descent AST visitor
-function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visit(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
+  ctx.traversal.checkpoint(depth);
   if (node.type === 'impl_item') {
-    visitImpl(node, frame, ctx);
+    visitImpl(node, frame, ctx, depth);
     return;
   }
   if (node.type === 'trait_item') {
-    visitTrait(node, frame, ctx);
+    visitTrait(node, frame, ctx, depth);
     return;
   }
   if (node.type === 'function_item') {
-    visitFunction(node, frame, ctx);
+    visitFunction(node, frame, ctx, depth);
     return;
   }
-  if (node.type === 'closure_expression' && visitClosure(node, frame, ctx)) {
+  if (node.type === 'closure_expression' && visitClosure(node, frame, ctx, depth)) {
     return;
   }
   if (node.type === 'call_expression' || node.type === 'macro_invocation') {
@@ -149,20 +153,20 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx): void {
       kind: 'call',
     });
   }
-  for (const child of childrenOf(node)) visit(child, frame, ctx);
+  for (const child of childrenOf(node)) visit(child, frame, ctx, depth + 1);
 }
 
-function visitImpl(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitImpl(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const typeName = implTargetName(node);
   const childFrame: Frame = {
     ownerHash: frame.ownerHash,
     enclosingImpl: typeName,
     enclosingTrait: null,
   };
-  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx, depth + 1);
 }
 
-function visitTrait(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitTrait(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const childFrame: Frame = {
     ownerHash: frame.ownerHash,
     enclosingImpl: null,
@@ -171,10 +175,10 @@ function visitTrait(node: Node, frame: Frame, ctx: WalkCtx): void {
       exported: hasExportedVisibility(node),
     },
   };
-  for (const child of childrenOf(node)) visit(child, childFrame, ctx);
+  for (const child of childrenOf(node)) visit(child, childFrame, ctx, depth + 1);
 }
 
-function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
+function visitFunction(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
   const occ = buildFunctionOccurrence(node, frame, ctx);
   if (!occ) return;
   record(ctx.out, occ);
@@ -185,11 +189,11 @@ function visitFunction(node: Node, frame: Frame, ctx: WalkCtx): void {
   };
   const body = node.childForFieldName('body');
   if (body) {
-    for (const child of childrenOf(body)) visit(child, childFrame, ctx);
+    for (const child of childrenOf(body)) visit(child, childFrame, ctx, depth + 1);
   }
 }
 
-function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
+function visitClosure(node: Node, frame: Frame, ctx: WalkCtx, depth: number): boolean {
   const occ = buildClosureOccurrence(node, ctx);
   if (!occ) return false;
   record(ctx.out, occ);
@@ -204,7 +208,12 @@ function visitClosure(node: Node, frame: Frame, ctx: WalkCtx): boolean {
   }
   const body = node.childForFieldName('body');
   if (body) {
-    visit(body, { ownerHash: occ.bodyHash, enclosingImpl: null, enclosingTrait: null }, ctx);
+    visit(
+      body,
+      { ownerHash: occ.bodyHash, enclosingImpl: null, enclosingTrait: null },
+      ctx,
+      depth + 1,
+    );
   }
   return true;
 }

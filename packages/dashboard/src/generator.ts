@@ -15,78 +15,24 @@ import { formatScore } from '@opensip-cli/format';
 // live in that bundle (src/client/*.ts).
 import { boundChangeImpactRuns, projectChangeImpactRuns } from './change-impact/project.js';
 import { DASHBOARD_CLIENT_BUNDLE } from './client-bundle.generated.js';
-import { boundGraphCatalog } from './code-paths/bound-catalog.js';
-import { projectCatalogToGraphViewModel } from './code-paths/graph-view-model.js';
-import { dashboardCodePathsVendorJs } from './code-paths.js';
 import { dashboardCss } from './css.js';
 import { renderDeclaredInputs } from './declared-inputs-html.js';
+import {
+  codePathsVendor,
+  graphArtifacts,
+  projectBrowserSessions,
+  projectOverviewRuns,
+} from './generator-artifacts.js';
 import { REPORT_CUP_FAVICON_DATA_URI, REPORT_CUP_HEADER_HTML } from './report-cup-icon.js';
 import { normalizeReportViewSelection } from './report-selection.js';
 import { serializeJsonForScriptContext } from './script-context-json.js';
 import { FIRST_PARTY_TOOL_TABS } from './tool-tabs-registrations.js';
 
+import type { DashboardRun } from './generator-artifacts.js';
 import type { ReportSelectionEvidence, ReportViewSelection } from './report-selection.js';
-import type {
-  StoredRun,
-  StoredRunStep,
-  StoredSession,
-  GraphCatalog,
-  DeclaredInputs,
-} from '@opensip-cli/contracts';
+import type { StoredSession, GraphCatalog, DeclaredInputs } from '@opensip-cli/contracts';
 
-/** A persisted host-owned run plus its ordered steps for dashboard rendering. */
-export interface DashboardRun extends StoredRun {
-  readonly steps: readonly StoredRunStep[];
-}
-
-type OverviewDashboardRun = Pick<
-  DashboardRun,
-  | 'aggregate'
-  | 'completedAt'
-  | 'durationMs'
-  | 'exitCode'
-  | 'id'
-  | 'legacySuiteRunId'
-  | 'name'
-  | 'source'
-  | 'startedAt'
-  | 'steps'
->;
-
-/** Keep the Overview ledger lean; Change Impact owns the bounded ReviewBrief copy. */
-function projectOverviewRuns(runs: readonly DashboardRun[]): readonly OverviewDashboardRun[] {
-  return runs.map((run) => ({
-    id: run.id,
-    name: run.name,
-    source: run.source,
-    startedAt: run.startedAt,
-    completedAt: run.completedAt,
-    durationMs: run.durationMs,
-    exitCode: run.exitCode,
-    aggregate: run.aggregate,
-    steps: run.steps,
-    ...(run.legacySuiteRunId === undefined ? {} : { legacySuiteRunId: run.legacySuiteRunId }),
-  }));
-}
-
-/** Remove impact's duplicate opaque copy after the bounded Change Impact model is projected. */
-function projectBrowserSessions(sessions: readonly StoredSession[]): readonly StoredSession[] {
-  return sessions.map((session) => {
-    const payload = session.payload;
-    if (
-      session.tool !== 'graph' ||
-      typeof payload !== 'object' ||
-      payload === null ||
-      Array.isArray(payload)
-    ) {
-      return session;
-    }
-    const browserPayload = Object.fromEntries(
-      Object.entries(payload).filter(([key]) => key !== 'impact' && key !== 'impactStatus'),
-    );
-    return { ...session, payload: browserPayload };
-  });
-}
+export type { DashboardRun } from './generator-artifacts.js';
 
 /**
  * Inputs to the dashboard HTML generator.
@@ -253,7 +199,8 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // one. Inlining it whole produced a 293 MB report on this repo. Project it to
   // the client's contract and bound what remains — truncation is surfaced to
   // the page (see `graphCatalogOmittedFunctions`), never silent.
-  const boundedCatalog = boundGraphCatalog(graphCatalog, maxGraphCatalogBytes);
+  const graph = graphArtifacts(graphCatalog, maxGraphCatalogBytes);
+  const boundedCatalog = graph.boundedCatalog;
   const graphCatalogBlock = serializeOptionalBlob('graph-catalog', boundedCatalog.catalog, 'json');
   // The Visualization view (view-graph.ts) consumes a slim, pre-projected
   // view-model rather than the raw catalog: projection aggregates the
@@ -261,8 +208,21 @@ export function generateDashboardHtml(input: DashboardInput): string {
   // coupling weights + cross-package SCCs) here at generation time and embeds
   // it as its own JSON blob, sized for the renderer rather than for storage.
   // See code-paths/graph-view-model.ts.
-  const graphViewModel = graphCatalog ? projectCatalogToGraphViewModel(graphCatalog) : null;
-  const graphViewModelBlock = serializeOptionalBlob('graph-view-model', graphViewModel, 'json');
+  const graphViewModelBlock = serializeOptionalBlob(
+    'graph-view-model',
+    graph.graphViewModel,
+    'json',
+  );
+  const vendor = codePathsVendor();
+  const graphVisualizationDegradations = [
+    ...graph.degradations,
+    ...(vendor.degradation === undefined ? [] : [vendor.degradation]),
+  ];
+  const graphVisualizationDegradationsBlock = serializeOptionalBlob(
+    'graph-visualization-degradations',
+    graphVisualizationDegradations.length === 0 ? null : graphVisualizationDegradations,
+    'json',
+  );
   const editorProtocolJs = serializeOptionalBlob('EDITOR_PROTOCOL', editorProtocol, 'literal');
   const projectRootJs = serializeOptionalBlob('PROJECT_ROOT', projectRoot, 'literal');
   const reportSelectionJs = serializeOptionalBlob(
@@ -271,7 +231,7 @@ export function generateDashboardHtml(input: DashboardInput): string {
     'literal',
   );
   const normalizedSelection = normalizeReportViewSelection(selection);
-  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graphCatalog);
+  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graph.catalog);
   const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
   const safeChangeImpactJson = serializeJsonForScriptContext(boundedImpact.runs);
 
@@ -307,17 +267,27 @@ export function generateDashboardHtml(input: DashboardInput): string {
       : []),
   ].join('\n');
   const toolTabRenderCalls = [
-    ...toolTabs.map((t) => `${t.renderFunctionName}();`),
-    ...(hasExternalSessions ? ['renderExternalTab();'] : []),
+    ...toolTabs.map(
+      (t) =>
+        `renderDashboardPanel(${serializeJsonForScriptContext('panel-' + t.id)}, ${serializeJsonForScriptContext(t.label)}, () => ${t.renderFunctionName}());`,
+    ),
+    ...(hasExternalSessions
+      ? [
+          `renderDashboardPanel(${serializeJsonForScriptContext('panel-' + EXTERNAL_TAB_ID)}, ${serializeJsonForScriptContext(EXTERNAL_TAB_LABEL)}, () => renderExternalTab());`,
+        ]
+      : []),
   ].join('\n');
   // Overview's `tool → badge style` and `tool → tab id` maps, derived from the
   // same descriptors and injected as page globals so the bundled overview renderer
   // (src/client/overview.ts) reads them as ambient data — the descriptor
   // derivation stays type-checked Node code rather than a string template (F1/F8).
-  const toolBadgeStylesJson = JSON.stringify(
+  const toolBadgeStylesJson = serializeJsonForScriptContext(
     Object.fromEntries(toolTabs.map((t) => [t.tool, t.badgeStyle])),
   );
-  const tabMapJson = JSON.stringify(Object.fromEntries(toolTabs.map((t) => [t.tool, t.id])));
+  const tabMapJson = serializeJsonForScriptContext(
+    Object.fromEntries(toolTabs.map((t) => [t.tool, t.id])),
+  );
+  const externalTabIdJson = serializeJsonForScriptContext(EXTERNAL_TAB_ID);
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -326,8 +296,6 @@ export function generateDashboardHtml(input: DashboardInput): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>OpenSIP CLI${latest ? ` — Pass Rate: ${latestScoreLabel}` : ''}</title>
 <link rel="icon" type="image/svg+xml" href="${REPORT_CUP_FAVICON_DATA_URI}">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@100..900&family=Geist:wght@100..900&display=swap" rel="stylesheet">
 <style>
 ${dashboardCss()}
 </style>
@@ -346,6 +314,8 @@ ${dashboardCss()}
   ${renderDeclaredInputs(declaredInputs)}
 </div>
 
+<div id="report-degradation-banner" class="report-degradation-banner" role="status" aria-live="polite" hidden></div>
+
 <div class="tab-bar" id="tab-bar" role="tablist" aria-label="Report views">
   <button type="button" id="tab-overview" class="tab active" role="tab" aria-selected="true" aria-controls="panel-overview" tabindex="0" data-tab="overview"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg> Overview</button>
   <button type="button" id="tab-change-impact" class="tab" role="tab" aria-selected="false" aria-controls="panel-change-impact" tabindex="-1" data-tab="change-impact">${CHANGE_IMPACT_ICON} Change Impact</button>
@@ -360,6 +330,38 @@ ${toolTabPanels}
 
 ${graphCatalogBlock}
 ${graphViewModelBlock}
+${graphVisualizationDegradationsBlock}
+<script>
+// This host-owned guard is deliberately defined before any vendored or client
+// code. It reports fixed, non-sensitive degradation text even when client
+// module initialization fails before an individual panel can render.
+const dashboardDegradedAreas = new Set();
+function showDashboardDegradation(label) {
+  dashboardDegradedAreas.add(label);
+  const banner = document.getElementById('report-degradation-banner');
+  if (!banner) return;
+  banner.textContent = 'Some report content could not render. Unavailable areas: ' +
+    Array.from(dashboardDegradedAreas).join(', ') + '. The remaining report content is still available.';
+  banner.hidden = false;
+}
+function renderDashboardPanel(panelId, label, render) {
+  try {
+    render();
+  } catch {
+    showDashboardDegradation(label);
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const notice = document.createElement('div');
+    notice.className = 'empty';
+    notice.textContent = label + ' could not render. The rest of the report remains available.';
+    panel.replaceChildren(notice);
+  }
+}
+globalThis.addEventListener('error', () => showDashboardDegradation('A report component'));
+globalThis.addEventListener('unhandledrejection', () =>
+  showDashboardDegradation('A report component'),
+);
+</script>
 <script>
 const sessions = ${safeDataJson};
 const runs = ${safeRunsJson};
@@ -389,20 +391,20 @@ const tabMap = ${tabMapJson};
 // (external-adapter scans). Rendered in the "External Tools" tab; the overview
 // row-click handler routes unclaimed-tool rows to externalTabId.
 const externalSessions = sessions.filter(s => !(s.tool in tabMap));
-const externalTabId = ${JSON.stringify(EXTERNAL_TAB_ID)};
+const externalTabId = ${externalTabIdJson};
 
 // The vendored Cytoscape renderer (defines the cytoscape / cytoscapeDagre
 // browser globals the Visualization view consumes). Inlined BEFORE the bundle so
 // those globals are present; it is a third-party UMD blob, not our client JS.
-${dashboardCodePathsVendorJs()}
+${vendor.javascript}
 ${DASHBOARD_CLIENT_BUNDLE}
 
 // =======================================================
 // RENDER TABS
 // =======================================================
-renderOverview();
+renderDashboardPanel('panel-overview', 'Overview', () => renderOverview());
 ${toolTabRenderCalls}
-renderChangeImpact();
+renderDashboardPanel('panel-change-impact', 'Change Impact', () => renderChangeImpact());
 </script>
 </body>
 </html>`;

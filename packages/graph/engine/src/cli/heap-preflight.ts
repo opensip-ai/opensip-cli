@@ -27,8 +27,10 @@ import v8 from 'node:v8';
 import {
   CORRELATION_ENV,
   correlationToEnv,
+  coreErrorCatalog,
   createToolLogger,
   currentScope,
+  ToolError,
   type RunCorrelation,
 } from '@opensip-cli/core';
 
@@ -39,6 +41,7 @@ const log = createToolLogger('graph:cli');
 const SENTINEL_ENV = 'OPENSIP_HEAP_ELEVATED';
 const OS_HEADROOM_MB = 2048; // RAM we keep available for the OS + other apps.
 const BYTES_PER_MB = 1024 * 1024;
+const WORKER_SPAWN_FAILED = coreErrorCatalog.require('CORE.WORKER.SPAWN_FAILED');
 
 export interface HeapTarget {
   readonly fileThreshold: number;
@@ -122,6 +125,7 @@ export async function runHeapPreflight(
     cwd: input.cwd,
     configPathOverride: input.configPathOverride,
     diagnosticIntent: 'quiet',
+    signal: currentScope()?.abortSignal,
   });
   const fileCount = discovery.files.length;
   const targetMb = decideHeapTargetMb(fileCount);
@@ -209,7 +213,20 @@ async function reExecWithHeap(
     stdio: 'inherit',
   });
 
-  await new Promise<void>((resolve) => {
+  await new Promise<void>((resolve, reject) => {
+    child.once('error', (error) => {
+      reject(
+        new ToolError(WORKER_SPAWN_FAILED, 'The elevated graph process could not be started.', {
+          cause: error,
+          metadata: {
+            condition: 'heap-elevation',
+            ...(typeof (error as NodeJS.ErrnoException).code === 'string'
+              ? { errno: (error as NodeJS.ErrnoException).code }
+              : {}),
+          },
+        }),
+      );
+    });
     child.on('exit', (code, signal) => {
       if (signal) {
         process.kill(process.pid, signal);

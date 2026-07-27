@@ -320,20 +320,40 @@ describe('gitleaks tool — projectRootFromRuntimeExclude fallback', () => {
 });
 
 describe('gitleaks tool — readProjectConfig fallback (oversized / unreadable project config)', () => {
-  it('falls back to the default ruleset when the project config exceeds the byte cap', () => {
+  it('falls back visibly when the project config exceeds the byte cap', () => {
     const dir = mkdtempSync(join(tmpdir(), 'gitleaks-oversized-cfg-'));
     // MAX_GITLEAKS_CONFIG_BYTES (1_048_576) + 1 byte — deliberately over the
     // cap so the size guard rejects the file before ever reading its contents.
     writeFileSync(join(dir, '.gitleaks.toml'), Buffer.alloc(1_048_577, 0x61));
-    const withProject = buildGitleaksExclude({
-      excludePath: join(dir, 'opensip-cli', '.runtime'),
-      configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
-    });
+    const logs: { level: string; message: string | Record<string, unknown> }[] = [];
+    const logger: Logger = {
+      debug: (message) => logs.push({ level: 'debug', message }),
+      info: (message) => logs.push({ level: 'info', message }),
+      warn: (message) => logs.push({ level: 'warn', message }),
+      error: (message) => logs.push({ level: 'error', message }),
+    };
+    const withProject = withScopeSync(makeTestScope({ logger }), () =>
+      buildGitleaksExclude({
+        excludePath: join(dir, 'opensip-cli', '.runtime'),
+        configPath: (name) => join(dir, 'opensip-cli', '.runtime', name),
+      }),
+    );
     // Same shape as "no project config at all" — the oversized file's content
     // is never inlined into the generated exclude config.
     expect(withProject.configFile.contents).toContain('useDefault = true');
     expect(withProject.configFile.contents).not.toMatch(/^path\s*=/m);
     expect(withProject.configFile.contents).not.toContain('a'.repeat(64));
+    expect(logs).toEqual([
+      {
+        level: 'warn',
+        message: expect.objectContaining({
+          condition: 'config-too-large',
+          config: '.gitleaks.toml',
+          limit: 1_048_576,
+          size: 1_048_577,
+        }),
+      },
+    ]);
   });
 
   it('falls back to the default ruleset and logs the swallow when the project config is unreadable', () => {
@@ -363,14 +383,15 @@ describe('gitleaks tool — readProjectConfig fallback (oversized / unreadable p
     expect(withProject.configFile.contents).toContain('useDefault = true');
     expect(withProject.configFile.contents).toMatch(/(?:^|\n)\[allowlist\](?:\n|$)/);
     expect(logs).toHaveLength(1);
-    expect(logs[0]?.level).toBe('debug');
+    expect(logs[0]?.level).toBe('warn');
     expect(logs[0]?.message).toMatchObject({
-      evt: 'gitleaks.project_config.read_failed',
+      evt: 'gitleaks.project_config.degraded',
       module: 'tool-gitleaks',
-      path: configPath,
+      condition: 'config-read-failed',
+      config: '.gitleaks.toml',
+      errorCode: 'EISDIR',
     });
-    const message = logs[0]?.message as Record<string, unknown>;
-    expect(String(message.error)).toMatch(/EISDIR/);
+    expect(JSON.stringify(logs[0]?.message)).not.toContain(configPath);
   });
 });
 

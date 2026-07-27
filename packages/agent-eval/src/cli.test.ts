@@ -18,6 +18,7 @@ import {
   DEFAULT_CLI_DEPENDENCIES,
   InvocationError,
   USAGE,
+  createTolerantProcessWriter,
   defaultJsonPath,
   main,
   markdownPathFor,
@@ -27,6 +28,10 @@ import {
   type ArtifactFileSystem,
   type CliDependencies,
 } from './cli.js';
+import {
+  resetInterruptCleanupsForTests,
+  runInterruptCleanups,
+} from './runner/interrupt-cleanup.js';
 import { HarnessPrerequisiteError } from './runner/spawn.js';
 
 import type { Arm, GoldTask } from './model/task.js';
@@ -42,6 +47,7 @@ const TASK_TWO = makeTask('orient.customer-ts');
 const temporaryDirectories: string[] = [];
 
 afterEach(() => {
+  resetInterruptCleanupsForTests();
   for (const directory of temporaryDirectories.splice(0)) {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -343,6 +349,71 @@ describe('parseGitProvenance', () => {
       HarnessPrerequisiteError,
     );
   });
+
+  it('distinguishes bounded Git query failures without echoing child diagnostics', async () => {
+    const success = {
+      durationMs: 1,
+      exitCode: 0,
+      outputLimitExceeded: false,
+      signal: null,
+      stderr: '',
+      stdout: '# branch.oid abcdef1234567890abcdef1234567890abcdef12\n',
+      timedOut: false,
+    } as const;
+    const failStatus = (_command: string, args: readonly string[]) =>
+      Promise.resolve(
+        args[0] === 'status'
+          ? {
+              ...success,
+              error: 'spawn /private/repository/git ENOENT secret-token',
+              errorCode: 'ENOENT',
+              exitCode: null,
+            }
+          : success,
+      );
+
+    await expect(
+      resolveGitProvenance('/private/repository', { spawn: failStatus }),
+    ).rejects.toThrow('Git status query could not start (ENOENT).');
+    await expect(
+      resolveGitProvenance('/private/repository', { spawn: failStatus }),
+    ).rejects.not.toThrow(/private|secret-token/u);
+
+    const timeoutInventory = (_command: string, args: readonly string[]) =>
+      Promise.resolve(args[0] === 'status' ? success : { ...success, timedOut: true });
+    await expect(resolveGitProvenance('/repository', { spawn: timeoutInventory })).rejects.toThrow(
+      'Git ignored-source inventory query timed out.',
+    );
+  });
+});
+
+describe('process output boundary', () => {
+  it.each(['EPIPE', 'ERR_STREAM_DESTROYED'] as const)(
+    'latches a normal downstream %s close',
+    (code) => {
+      let writes = 0;
+      const writer = createTolerantProcessWriter({
+        write: () => {
+          writes += 1;
+          throw Object.assign(new Error('downstream closed'), { code });
+        },
+      });
+
+      expect(() => writer('first')).not.toThrow();
+      expect(() => writer('second')).not.toThrow();
+      expect(writes).toBe(1);
+    },
+  );
+
+  it('preserves unrelated stream failures for the process error boundary', () => {
+    const writer = createTolerantProcessWriter({
+      write: () => {
+        throw Object.assign(new Error('stream failed'), { code: 'EIO' });
+      },
+    });
+
+    expect(() => writer('failure')).toThrow(/stream failed/u);
+  });
 });
 
 describe('main', () => {
@@ -470,6 +541,32 @@ describe('main', () => {
       { entrypoint: realEntrypoint, phase: 'version', source: 'installed' },
       { entrypoint: realEntrypoint, phase: 'arm', source: 'installed' },
     ]);
+  });
+
+  it('registers an installed target snapshot for process-boundary cleanup', async () => {
+    const root = temporaryDirectory();
+    const entrypoint = installedCliEntrypoint(root);
+    let snapshotRoot: string | undefined;
+    const harness = dependencyHarness(root, {
+      runArm: (task, arm, target) => {
+        if (target.source !== 'installed') throw new TypeError('expected an installed target');
+        snapshotRoot = target.snapshotRoot;
+        expect(existsSync(snapshotRoot)).toBe(true);
+        runInterruptCleanups();
+        expect(existsSync(snapshotRoot)).toBe(false);
+        return Promise.resolve(armResult(task, arm));
+      },
+    });
+
+    await expect(
+      main(
+        ['--task', TASK_ONE.id, '--arm', 'opensip', '--opensip-entrypoint', entrypoint],
+        harness.dependencies,
+      ),
+    ).resolves.toBe(2);
+
+    expect(snapshotRoot).toBeDefined();
+    expect(snapshotRoot === undefined ? true : existsSync(snapshotRoot)).toBe(false);
   });
 
   it('rejects an installed entrypoint that is not a usable JS bin with exit two', async () => {
@@ -731,6 +828,36 @@ describe('main', () => {
     expect(harness.stderr()).toContain('already exists');
   });
 
+  it('preserves a collision and reports failed rollback while trying the next default pair', async () => {
+    const root = temporaryDirectory();
+    const files = new Map<string, string>();
+    let writeCount = 0;
+    const fileSystem: ArtifactFileSystem = {
+      exists: () => Promise.resolve(false),
+      mkdir: () => Promise.resolve(),
+      remove: () => Promise.reject(Object.assign(new Error('read-only'), { code: 'EACCES' })),
+      writeExclusive: (path, content) => {
+        writeCount += 1;
+        if (writeCount === 2) {
+          return Promise.reject(
+            Object.assign(new Error('simulated collision'), { code: 'EEXIST' }),
+          );
+        }
+        files.set(path, content);
+        return Promise.resolve();
+      },
+    };
+    const harness = dependencyHarness(root, { artifactFileSystem: fileSystem });
+
+    await expect(main(['--task', TASK_ONE.id], harness.dependencies)).resolves.toBe(0);
+
+    expect(writeCount).toBe(4);
+    expect(files.size).toBe(3);
+    expect(harness.stdout()).toContain('-2.json');
+    expect(harness.stderr()).toContain('partial JSON');
+    expect(harness.stderr()).toContain('manual cleanup may be required');
+  });
+
   it('maps invalid invocation and unknown tasks to exit two with usage and known ids', async () => {
     const root = temporaryDirectory();
     for (const argv of [['--wat'], ['--arm', 'hostile'], ['--task']] as const) {
@@ -762,14 +889,17 @@ describe('main', () => {
     expect(harness.stderr()).toContain('Run pnpm build');
   });
 
-  it('maps unexpected harness failures to exit one without leaking error or environment secrets', async () => {
+  it('maps unexpected harness failures to exit one with bounded redacted detail', async () => {
     const root = temporaryDirectory();
     const canary = 'canary-not-a-real-secret';
     const previous = process.env.OPENSIP_API_KEY;
     process.env.OPENSIP_API_KEY = canary;
     try {
       const harness = dependencyHarness(root, {
-        runArm: () => Promise.reject(new Error(`child capture contained ${canary}`)),
+        runArm: () =>
+          Promise.reject(
+            new Error(`child capture for ${root} contained ${canary} token=literal-secret\nretry`),
+          ),
       });
 
       await expect(
@@ -777,7 +907,18 @@ describe('main', () => {
       ).resolves.toBe(1);
       expect(harness.stdout()).not.toContain(canary);
       expect(harness.stderr()).not.toContain(canary);
+      expect(harness.stderr()).not.toContain(root);
+      expect(harness.stderr()).not.toContain('literal-secret');
       expect(harness.stderr()).toContain('harness error');
+      expect(harness.stderr()).toContain('Error: child capture for [redacted-path]');
+      expect(harness.stderr()).toContain('[redacted-credential]');
+      const diagnosticLines = harness
+        .stderr()
+        .trim()
+        .split('\n')
+        .filter((line) => line.includes('harness error'));
+      expect(diagnosticLines).toHaveLength(1);
+      expect(diagnosticLines[0]).toContain('retry');
       expect(existsSync(join(root, 'secret.json'))).toBe(false);
     } finally {
       if (previous === undefined) delete process.env.OPENSIP_API_KEY;
@@ -802,6 +943,7 @@ describe('main', () => {
     expect(existsSync(jsonPath)).toBe(false);
     expect(existsSync(markdownPathFor(jsonPath))).toBe(false);
     expect(harness.stderr()).toContain('invalid report');
+    expect(harness.stderr()).toContain('tasks[0].arms.control.record.taskId');
   });
 
   it('creates a missing requested directory before writing the complete pair', async () => {

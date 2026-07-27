@@ -19,10 +19,15 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { resolve, sep } from 'node:path';
 
-import { logger } from '@opensip-cli/core';
+import { createToolError, isToolErrorLike, logger, normalizeFailure } from '@opensip-cli/core';
+import { graphErrorCatalog } from '@opensip-cli/graph';
 import { glob, Ignore, type IgnoreLike } from 'glob';
 
+import { throwIfGraphAdapterAborted } from './cancellation.js';
+
 import type { DiscoverInput, DiscoverOutput } from '@opensip-cli/graph';
+
+const ADAPTER_DISCOVERY_FAILED = graphErrorCatalog.require('GRAPH.ADAPTER.DISCOVERY_FAILED');
 
 /** Per-language inputs to the shared discover template. */
 export interface TreeSitterDiscoverConfig {
@@ -58,14 +63,23 @@ export function createDiscover(
     void input.diagnosticIntent;
     void module;
     void logger;
+    throwIfGraphAdapterAborted(input.signal, `${languageId} discovery`);
 
-    const projectDirAbs = normalizeProjectDir(input.cwd);
+    const projectDirAbs = normalizeProjectDir(input.cwd, languageId);
     const configPathAbs = resolveConfigPath(
       projectDirAbs,
       input.configPathOverride,
       configCandidates,
     );
-    const files = collectFiles(projectDirAbs, pattern, excludedDirGlobs, preserveExcludedPath);
+    const files = collectFiles(
+      projectDirAbs,
+      pattern,
+      excludedDirGlobs,
+      preserveExcludedPath,
+      input.signal,
+      languageId,
+    );
+    throwIfGraphAdapterAborted(input.signal, `${languageId} discovery`);
 
     const out: DiscoverOutput =
       configPathAbs === undefined
@@ -75,16 +89,15 @@ export function createDiscover(
   };
 }
 
-/* v8 ignore start */
-function normalizeProjectDir(projectDir: string): string {
+/** @throws {Error} When the project root cannot be canonicalized for discovery. */
+function normalizeProjectDir(projectDir: string, languageId: string): string {
   const abs = resolve(projectDir);
   try {
     return realpathSync(abs);
-  } catch {
-    return abs;
+  } catch (error) {
+    throw discoveryError(error, 'project-root-realpath', languageId);
   }
 }
-/* v8 ignore stop */
 
 function resolveConfigPath(
   projectDirAbs: string,
@@ -112,24 +125,33 @@ function realpathOrPath(p: string): string {
 }
 /* v8 ignore stop */
 
+/** @throws {Error} When source discovery fails or the host cancels the walk. */
 function collectFiles(
   projectDirAbs: string,
   pattern: string,
   excludedDirGlobs: readonly string[],
   preserveExcludedPath: ((projectRelativePath: string) => boolean) | undefined,
+  signal: AbortSignal | undefined,
+  languageId: string,
 ): readonly string[] {
   const ignore = buildIgnore(excludedDirGlobs, preserveExcludedPath);
-  const matches: string[] = glob.sync(pattern, {
-    cwd: projectDirAbs,
-    absolute: true,
-    ignore,
-    nodir: true,
-    follow: false,
-    dot: false,
-  });
+  let matches: string[];
+  try {
+    matches = glob.sync(pattern, {
+      cwd: projectDirAbs,
+      absolute: true,
+      ignore,
+      nodir: true,
+      follow: false,
+      dot: false,
+    });
+  } catch (error) {
+    throw discoveryError(error, 'source-walk', languageId);
+  }
   const seen = new Set<string>();
   const out: string[] = [];
   for (const m of matches) {
+    throwIfGraphAdapterAborted(signal, `${languageId} discovery`);
     let real: string = m;
     /* v8 ignore start */
     try {
@@ -145,6 +167,21 @@ function collectFiles(
   }
   out.sort();
   return out;
+}
+
+/** Preserve registered native classifications; classify only unknown discovery I/O here. */
+function discoveryError(error: unknown, condition: string, languageId: string): Error {
+  if (isToolErrorLike(error)) return error;
+  const failure = normalizeFailure(error);
+  const definition = failure.known === 'known' ? failure.definition : ADAPTER_DISCOVERY_FAILED;
+  return createToolError(definition, 'Graph source discovery failed.', {
+    cause: error,
+    metadata: {
+      condition,
+      language: languageId,
+      ...(typeof failure.metadata.errno === 'string' ? { errno: failure.metadata.errno } : {}),
+    },
+  });
 }
 
 function buildIgnore(

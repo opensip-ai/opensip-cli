@@ -48,6 +48,8 @@ export interface ObtainCatalogInput {
   readonly projectRoot: string;
   readonly onProgress?: GraphProgressCallback;
   readonly monitor?: PressureMonitor;
+  /** Host cancellation/deadline signal threaded into every adapter stage. */
+  readonly signal?: AbortSignal;
 }
 
 export interface ObtainCatalogOutput {
@@ -70,6 +72,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
       configPathAbs: input.discovery.configPathAbs,
       compilerOptions: input.discovery.compilerOptions,
       resolutionMode: input.resolutionMode,
+      signal: input.signal,
     }),
   );
   const initialFilesFingerprint = computeFilesFingerprint(input.discovery.files);
@@ -107,6 +110,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
             onProgress: input.onProgress,
             monitor: input.monitor,
             emitBoundaryCalls: true,
+            signal: input.signal,
           })
         : await buildAndResolveCatalog({
             runStage: input.runStage,
@@ -116,6 +120,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
             onProgress: input.onProgress,
             monitor: input.monitor,
             emitBoundaryCalls: true,
+            signal: input.signal,
           });
 
       // ONE resolution model (Phase 3, Option A): the single-program (exact)
@@ -142,6 +147,7 @@ export async function obtainCatalog(input: ObtainCatalogInput): Promise<ObtainCa
         projectRoot: input.projectRoot,
         files: input.discovery.files,
         parseErrors: built.parseErrors,
+        degradations: built.degradations,
         // Wave 4 incremental rebuild is byte-identical to a `--no-cache` full
         // rebuild (see `buildAndResolveCatalogIncremental`'s correctness note
         // and docs/public/40-graph/01-stages-and-catalog.md#incremental-rebuild):

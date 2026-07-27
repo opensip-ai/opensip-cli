@@ -38,7 +38,7 @@ export const resolveJsxElement: EdgeResolver<JsxOpeningLike> = (node, ctx) => {
   // Identifier or PropertyAccessExpression — both resolvable via the type checker.
   const symbol = ctx.typeChecker.getSymbolAtLocation(tagName);
   if (!symbol) return UNRESOLVED;
-  const real = unaliasSymbol(symbol, ctx.typeChecker);
+  const real = unaliasSymbol(symbol, ctx.typeChecker, ctx.recordResolutionDegradation);
   const decls = real.getDeclarations() ?? [];
 
   const candidateName = jsxTargetName(tagName);

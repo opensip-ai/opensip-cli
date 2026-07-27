@@ -477,7 +477,11 @@ describe('step records', () => {
     expect(
       makeStepRecord({
         ...common,
-        failure: { code: 'timeout', kind: 'tool', message: 'timed out' },
+        failure: {
+          code: 'mcp-request-timeout',
+          kind: 'infrastructure',
+          message: 'timed out',
+        },
         renderedResponse: '',
       }).noneOutcome,
     ).toBe('failed');

@@ -17,7 +17,13 @@
 
 import v8 from 'node:v8';
 
-import { EnvRegistry, ToolError, type EnvVarSpec, type ToolErrorOptions } from '@opensip-cli/core';
+import {
+  coreSystemErrorCatalog,
+  EnvRegistry,
+  ToolError,
+  type EnvVarSpec,
+  type ToolErrorOptions,
+} from '@opensip-cli/core';
 
 /**
  * Graph-engine environment variables (launch, §5.12). Read through the
@@ -66,6 +72,7 @@ export function readGraphEnv<T = string>(canonical: string): T | undefined {
 
 const DEFAULT_THRESHOLD = 0.9;
 const DEFAULT_POLL_INTERVAL_MS = 1000;
+const RESOURCE_EXHAUSTED = coreSystemErrorCatalog.require('CORE.SYSTEM.RESOURCE');
 
 /** Thrown when heap usage crosses the configured pressure threshold during graph work. */
 export class MemoryPressureError extends ToolError {
@@ -78,7 +85,7 @@ export class MemoryPressureError extends ToolError {
     details: { usedBytes: number; limitBytes: number; stage: string },
     options?: ToolErrorOptions,
   ) {
-    super(message, options?.code ?? 'MEMORY_PRESSURE', options);
+    super(RESOURCE_EXHAUSTED, message, options);
     this.name = 'MemoryPressureError';
     this.usedBytes = details.usedBytes;
     this.limitBytes = details.limitBytes;
@@ -169,7 +176,7 @@ function formatMessage(stage: string, usedBytes: number, limitBytes: number): st
   const limitGb = (limitBytes / BYTES_PER_GB).toFixed(2);
   return (
     `Heap headroom exhausted at stage "${stage}" (used ${usedGb} GB of ${limitGb} GB cap). ` +
-    `Aborted before V8 OOM. Try \`opensip graph --package <name>\` to scope to a single ` +
-    `workspace package, or \`--packages\` to fan out per-package (each child gets its own heap).`
+    `Aborted before V8 OOM. Try \`opensip graph <path>\` to scope the run, or ` +
+    `\`opensip graph --workspace\` to fan out workspace units into separate processes.`
   );
 }
