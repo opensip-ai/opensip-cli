@@ -12,7 +12,7 @@
  *     would have made an O(N²) rule visible immediately).
  */
 
-import { logger, type Signal } from '@opensip-cli/core';
+import { NotFoundError, RunScope, logger, runWithScopeSync, type Signal } from '@opensip-cli/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { createGraphSignal } from '../create-graph-signal.js';
@@ -107,6 +107,104 @@ describe('evaluateRules', () => {
       );
     expect(evaluated.map((e) => e.rule)).toEqual(['graph:a', 'graph:b']);
     expect(evaluated.every((e) => typeof e.durationMs === 'number')).toBe(true);
+  });
+
+  it('isolates a throwing rule, fails visibly, and continues with later rules', () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const before = sig('graph:a', 'before');
+    const after = sig('graph:c', 'after');
+    const throwing: Rule = {
+      slug: 'graph:b',
+      defaultSeverity: 'warning',
+      evaluate: () => {
+        throw new Error('unsafe implementation detail');
+      },
+    };
+
+    const out = evaluateRules(
+      [fakeRule('graph:a', [before]), throwing, fakeRule('graph:c', [after])],
+      {
+        catalog: CATALOG,
+        indexes: INDEXES,
+        config: CONFIG,
+      },
+    );
+
+    expect(out).toHaveLength(3);
+    expect(out[0]).toBe(before);
+    expect(out[2]).toBe(after);
+    expect(out[1]).toMatchObject({
+      ruleId: 'graph:b',
+      severity: 'high',
+      category: 'error',
+      metadata: {
+        condition: 'rule-threw',
+        rule: 'graph:b',
+        errorCode: 'GRAPH.RULE.EVALUATION_FAILED',
+        boundaryCode: 'GRAPH.RULE.EVALUATION_FAILED',
+      },
+    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        evt: 'graph.rule.evaluation-failed',
+        rule: 'graph:b',
+        boundaryCode: 'GRAPH.RULE.EVALUATION_FAILED',
+      }),
+    );
+  });
+
+  it('preserves an existing definition-backed cause code', () => {
+    vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    const throwing: Rule = {
+      slug: 'graph:a',
+      defaultSeverity: 'warning',
+      evaluate: () => {
+        throw new NotFoundError('fixture missing');
+      },
+    };
+
+    const [failure] = evaluateRules([throwing], {
+      catalog: CATALOG,
+      indexes: INDEXES,
+      config: CONFIG,
+    });
+
+    expect(failure?.metadata).toMatchObject({
+      errorCode: 'NOT_FOUND',
+      boundaryCode: 'GRAPH.RULE.EVALUATION_FAILED',
+    });
+  });
+
+  it('treats host cancellation as control flow and does not launch another rule', () => {
+    const controller = new AbortController();
+    const scope = new RunScope({ abortSignal: controller.signal });
+    const second = vi.fn(() => []);
+    const first: Rule = {
+      slug: 'graph:a',
+      defaultSeverity: 'warning',
+      evaluate: () => {
+        controller.abort();
+        return [];
+      },
+    };
+
+    try {
+      expect(() =>
+        runWithScopeSync(scope, () =>
+          evaluateRules(
+            [first, { slug: 'graph:b', defaultSeverity: 'warning', evaluate: second }],
+            {
+              catalog: CATALOG,
+              indexes: INDEXES,
+              config: CONFIG,
+            },
+          ),
+        ),
+      ).toThrow(expect.objectContaining({ code: 'CORE.SYSTEM.CANCELLED' }));
+      expect(second).not.toHaveBeenCalled();
+    } finally {
+      scope.dispose();
+    }
   });
 
   it('WARNs graph.rule.slow when one rule dominates a non-trivial stage', () => {

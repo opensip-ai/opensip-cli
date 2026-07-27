@@ -24,7 +24,19 @@
  * it is NOT a parallelism seam.
  */
 
-import { logger, type Signal } from '@opensip-cli/core';
+import {
+  createCancelledError,
+  createSignal,
+  createToolError,
+  currentScope,
+  logger,
+  normalizeFailure,
+  scrubText,
+  toOperatorFailureProjection,
+  type Signal,
+} from '@opensip-cli/core';
+
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 
 import { currentRules } from './registry.js';
 
@@ -39,6 +51,7 @@ const MODULE_GRAPH_RULES = 'graph:rules';
  */
 const SLOW_RULE_MS_FLOOR = 750;
 const SLOW_RULE_STAGE_SHARE = 0.5;
+const RULE_EVALUATION_FAILED = graphErrorCatalog.require('GRAPH.RULE.EVALUATION_FAILED');
 
 /** The frozen pipeline data a rule's `evaluate` consumes. */
 export interface RuleEvaluationInput {
@@ -66,8 +79,17 @@ export function evaluateRules(ruleSet: readonly Rule[], data: RuleEvaluationInpu
   let stageMs = 0;
 
   for (const rule of ruleSet) {
+    throwIfRuleEvaluationCancelled();
     const startedAt = performance.now();
-    const ruleSignals = rule.evaluate(catalog, indexes, config, hints, features);
+    let ruleSignals: readonly Signal[];
+    let status: 'passed' | 'failed' = 'passed';
+    try {
+      ruleSignals = rule.evaluate(catalog, indexes, config, hints, features);
+      throwIfRuleEvaluationCancelled();
+    } catch (error) {
+      ruleSignals = [ruleEvaluationFailureSignal(rule, error)];
+      status = 'failed';
+    }
     // Indexed append rather than spread-in-loop — avoids re-allocating the
     // accumulator on every rule (O(n²)) over a potentially large rule set.
     for (const signal of ruleSignals) signals.push(signal);
@@ -78,6 +100,7 @@ export function evaluateRules(ruleSet: readonly Rule[], data: RuleEvaluationInpu
       evt: 'graph.rule.evaluated',
       module: MODULE_GRAPH_RULES,
       rule: rule.slug,
+      status,
       durationMs: round1(durationMs),
       signalCount: ruleSignals.length,
     });
@@ -99,6 +122,61 @@ export function evaluateRules(ruleSet: readonly Rule[], data: RuleEvaluationInpu
   }
 
   return signals;
+}
+
+/** Cancellation is control flow, never a rule defect to isolate as a finding. */
+function throwIfRuleEvaluationCancelled(): void {
+  if (currentScope()?.abortSignal?.aborted === true) {
+    throw createCancelledError('Graph rule evaluation cancelled by the host.');
+  }
+}
+
+/**
+ * Convert one rule exception into visible partial evidence without leaking the throwable.
+ * Definition-backed causes keep their primary code (D6); unknown causes are normalized at this
+ * boundary onto GRAPH.RULE.EVALUATION_FAILED. Both forms carry the boundary code for grouping.
+ */
+function ruleEvaluationFailureSignal(rule: Rule, error: unknown): Signal {
+  const original = normalizeFailure(error);
+  if (original.definition.kind === 'cancelled') throw error;
+
+  const safeRule = scrubText(rule.slug, 128);
+  const boundaryError = createToolError(
+    RULE_EVALUATION_FAILED,
+    `Graph rule "${safeRule}" could not be evaluated.`,
+    {
+      cause: error,
+      metadata: {
+        condition: 'rule-threw',
+        rule: safeRule,
+        causeCode: original.code,
+      },
+    },
+  );
+  const failure = original.known === 'known' ? original : normalizeFailure(boundaryError);
+
+  logger.error({
+    evt: 'graph.rule.evaluation-failed',
+    module: MODULE_GRAPH_RULES,
+    rule: safeRule,
+    boundaryCode: RULE_EVALUATION_FAILED.code,
+    failure: toOperatorFailureProjection(failure),
+  });
+
+  return createSignal({
+    source: 'graph',
+    ruleId: rule.slug,
+    severity: 'high',
+    category: 'error',
+    message: `Graph rule "${safeRule}" could not be evaluated.`,
+    suggestion: RULE_EVALUATION_FAILED.operatorAction,
+    metadata: {
+      condition: 'rule-threw',
+      rule: safeRule,
+      errorCode: failure.code,
+      boundaryCode: RULE_EVALUATION_FAILED.code,
+    },
+  });
 }
 
 /** Round to one decimal — enough to spot a pathological rule, not noise. */

@@ -198,5 +198,29 @@ export const graphErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['condition', 'unit'],
     },
+
+    /**
+     * One contributed graph rule threw while evaluating an otherwise usable catalog.
+     *
+     * The shared rule boundary isolates the bad rule and emits a high-severity signal, so
+     * evidence from rules before and after it survives while the run still fails visibly. One
+     * code covers every rule (D9); `metadata.rule` identifies the contribution. An existing
+     * definition-backed cause remains the primary cause code rather than being downgraded.
+     */
+    'GRAPH.RULE.EVALUATION_FAILED': {
+      code: 'GRAPH.RULE.EVALUATION_FAILED',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Disable or fix the named graph rule, then re-run; other rules completed and their evidence was retained.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'rule', 'causeCode'],
+    },
   },
 );
