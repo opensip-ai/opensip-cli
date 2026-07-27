@@ -1,4 +1,4 @@
-import { createSignal } from '@opensip-cli/core';
+import { createSignal, ToolError } from '@opensip-cli/core';
 import {
   asArray,
   asObject,
@@ -6,11 +6,36 @@ import {
   getString,
   nativeLabelToSeverity,
   parseJsonLines,
+  externalToolErrorCatalog,
   withNativeSeverity,
 } from '@opensip-cli/external-tool-adapter';
 
 import type { Signal, SignalCategory } from '@opensip-cli/core';
 import type { AdapterRunContext, ParsedScannerOutput } from '@opensip-cli/external-tool-adapter';
+
+const ARTIFACT_INVALID = externalToolErrorCatalog.require('EXTERNAL.SCANNER.ARTIFACT_INVALID');
+
+function reportParseErrors(ctx: AdapterRunContext, errorCount: number, signalCount: number): void {
+  if (errorCount === 0) return;
+  if (signalCount === 0) {
+    throw new ToolError(
+      'cargo-deny produced an unusable JSON-lines report.',
+      ARTIFACT_INVALID.code,
+      {
+        definition: ARTIFACT_INVALID,
+        metadata: { condition: 'malformed-json-line', scanner: 'cargo-deny' },
+      },
+    );
+  }
+  ctx.logger.warn({
+    evt: 'external.scanner.report.partial',
+    module: '@opensip-cli/tool-cargo-deny',
+    scanner: 'cargo-deny',
+    condition: 'malformed-json-line',
+    parseErrorCount: errorCount,
+    findingCount: signalCount,
+  });
+}
 
 /**
  * cargo-deny `--format json check` emits NDJSON `{ type, fields }` messages. Only
@@ -177,12 +202,14 @@ function normalize(value: unknown): Signal | undefined {
  */
 export function parseCargoDenyJsonLines(
   raw: ParsedScannerOutput,
-  _ctx: AdapterRunContext,
+  ctx: AdapterRunContext,
 ): readonly Signal[] {
+  const decoded = parseJsonLines(raw.raw, { tolerateNonJson: true });
   const signals: Signal[] = [];
-  for (const line of parseJsonLines(raw.raw, { tolerateNonJson: true }).values) {
+  for (const line of decoded.values) {
     const signal = normalize(line.value);
     if (signal !== undefined) signals.push(signal);
   }
+  reportParseErrors(ctx, decoded.errors.length, signals.length);
   return signals;
 }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseCargoDenyJsonLines } from '../parse-cargo-deny-json-lines.js';
 
@@ -111,6 +111,33 @@ describe('parseCargoDenyJsonLines', () => {
       fields: { advisories: { errors: 0 } },
     });
     expect(parseCargoDenyJsonLines(output(raw), CTX)).toEqual([]);
+  });
+
+  it('faults when malformed JSON records leave no trustworthy findings', () => {
+    expect(() => parseCargoDenyJsonLines(output('{"type":'), CTX)).toThrow(
+      expect.objectContaining({
+        code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID',
+        metadata: { condition: 'malformed-json-line', scanner: 'cargo-deny' },
+      }),
+    );
+  });
+
+  it('retains valid findings and reports a partially malformed stream', () => {
+    const warn = vi.fn();
+    const ctx = { ...CTX, logger: { warn } } as unknown as AdapterRunContext;
+    const raw = [
+      diagnostic({ severity: 'error', message: 'valid', code: 'L001', labels: [] }),
+      '{"type":',
+    ].join('\n');
+
+    expect(parseCargoDenyJsonLines(output(raw), ctx)).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: 'malformed-json-line',
+        parseErrorCount: 1,
+        findingCount: 1,
+      }),
+    );
   });
 
   it('tolerates a diagnostic with no labels (empty file token, no line/column)', () => {

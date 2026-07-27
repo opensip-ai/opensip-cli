@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { parseGolangciLintJson } from '../parse-golangci-lint-json.js';
 
@@ -106,8 +106,36 @@ describe('parseGolangciLintJson', () => {
     ).toEqual([]);
   });
 
-  it('tolerates malformed / non-JSON output without throwing', () => {
-    expect(parseGolangciLintJson(output('not json at all'), CTX)).toEqual([]);
-    expect(parseGolangciLintJson(output('{"Issues":[1,"x",null]}'), CTX)).toEqual([]);
+  it('faults when malformed output would otherwise read as a clean scan', () => {
+    expect(() => parseGolangciLintJson(output('not json at all'), CTX)).toThrow(
+      expect.objectContaining({ code: 'EXTERNAL.SCANNER.ARTIFACT_INVALID' }),
+    );
+    expect(() => parseGolangciLintJson(output('{"Issues":[1,"x",null]}'), CTX)).toThrow(
+      expect.objectContaining({
+        metadata: { condition: 'invalid-issue-record', scanner: 'golangci-lint' },
+      }),
+    );
+  });
+
+  it('retains valid issues and reports invalid sibling records', () => {
+    const warn = vi.fn();
+    const ctx = { ...CTX, logger: { warn } } as unknown as AdapterRunContext;
+    const raw = report([
+      {
+        FromLinter: 'errcheck',
+        Text: 'valid issue',
+        Pos: { Filename: 'main.go', Line: 1, Column: 1 },
+      },
+      null,
+    ]);
+
+    expect(parseGolangciLintJson(output(raw), ctx)).toHaveLength(1);
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        condition: 'invalid-issue-record',
+        droppedIssueCount: 1,
+        findingCount: 1,
+      }),
+    );
   });
 });

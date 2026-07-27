@@ -119,19 +119,9 @@ function normalize(
  */
 export function parseGovulncheckJsonLines(
   raw: ParsedScannerOutput,
-  _ctx: AdapterRunContext,
+  ctx: AdapterRunContext,
 ): readonly Signal[] {
   const decoded = parseJsonLines(raw.raw, { tolerateNonJson: true });
-  if (decoded.errors.length > 0) {
-    throw new ToolError(
-      'govulncheck produced a malformed JSON-lines report.',
-      ARTIFACT_INVALID.code,
-      {
-        definition: ARTIFACT_INVALID,
-        metadata: { condition: 'malformed-json-line', scanner: 'govulncheck' },
-      },
-    );
-  }
   const values = decoded.values.map((line) => line.value);
   const advisories = osvMap(values);
   // Per OSV id, keep the "best" finding: a reachable trace beats an import-only one,
@@ -148,7 +138,28 @@ export function parseGovulncheckJsonLines(
       best.set(osv, { finding, reachable });
     }
   }
-  return [...best.entries()].map(([osv, { finding, reachable }]) =>
+  const signals = [...best.entries()].map(([osv, { finding, reachable }]) =>
     normalize(osv, finding, reachable, advisories),
   );
+  if (decoded.errors.length > 0 && signals.length === 0) {
+    throw new ToolError(
+      'govulncheck produced an unusable JSON-lines report.',
+      ARTIFACT_INVALID.code,
+      {
+        definition: ARTIFACT_INVALID,
+        metadata: { condition: 'malformed-json-line', scanner: 'govulncheck' },
+      },
+    );
+  }
+  if (decoded.errors.length > 0) {
+    ctx.logger.warn({
+      evt: 'external.scanner.report.partial',
+      module: '@opensip-cli/tool-govulncheck',
+      scanner: 'govulncheck',
+      condition: 'malformed-json-line',
+      parseErrorCount: decoded.errors.length,
+      findingCount: signals.length,
+    });
+  }
+  return signals;
 }
