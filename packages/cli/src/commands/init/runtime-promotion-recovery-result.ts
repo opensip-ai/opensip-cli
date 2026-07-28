@@ -1,3 +1,5 @@
+import { recoveryEvidenceMismatch } from './runtime-promotion-root-authority.js';
+
 import type { AuthoredStateSummary } from './authored-state-transaction.js';
 import type {
   RuntimePromotionJournal,
@@ -202,7 +204,10 @@ export function recoveredTerminalResult(
 ): RuntimeAdoptionResult {
   const terminal = input.journal.terminal;
   if (terminal === null) {
-    throw new Error('A recovered terminal result requires terminal journal evidence');
+    recoveryEvidenceMismatch(
+      'A recovered terminal result requires terminal journal evidence',
+      'terminal-result-journal-evidence-absent',
+    );
   }
   return terminal.outcome === 'rolled-back'
     ? recoveredRolledBackResult(input, terminal)

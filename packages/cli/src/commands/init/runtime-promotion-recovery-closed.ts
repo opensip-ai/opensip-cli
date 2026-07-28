@@ -29,7 +29,10 @@ function assertDirectoryLocation(
 ): void {
   const observed = operation.dependencies.classifyPath(path);
   if (observed.status !== 'directory') {
-    recoveryEvidenceMismatch(`${description} no longer has a safe directory location`);
+    recoveryEvidenceMismatch(
+      `${description} no longer has a safe directory location`,
+      'recovery-location-unsafe',
+    );
   }
 }
 
@@ -41,7 +44,11 @@ function assertDirectoryLocation(
 function assertClosedCurrentAuthority(operation: RuntimePromotionRecoveryOperation): void {
   assertRecoveryProjectRoot(operation);
   const terminal = operation.journal.terminal;
-  if (terminal === null) recoveryEvidenceMismatch('Closed recovery lacks terminal authority');
+  if (terminal === null)
+    recoveryEvidenceMismatch(
+      'Closed recovery lacks terminal authority',
+      'closed-recovery-terminal-authority',
+    );
   const authority = recoveryRuntimeAuthority({
     journal: operation.journal,
     outcome: terminal.outcome,
@@ -78,7 +85,10 @@ async function cleanupRuntimeSlot(
   if (pending === null) {
     await recordCleanupIntent(operation, slot);
   } else if (pending.kind !== 'owned-slot-cleanup' || pending.slot !== slot) {
-    recoveryEvidenceMismatch('Closed recovery found another unresolved cleanup intent');
+    recoveryEvidenceMismatch(
+      'Closed recovery found another unresolved cleanup intent',
+      'closed-recovery-unresolved-cleanup-intent',
+    );
   }
   assertClosedCurrentAuthority(operation);
   const authority = await operation.dependencies.authorizeFilesystem({
@@ -93,7 +103,10 @@ async function cleanupRuntimeSlot(
   });
   const result = await operation.dependencies.cleanupOwnedSlot(authority);
   if (result.slot !== slot) {
-    recoveryEvidenceMismatch('Closed recovery cleaned a different owned slot');
+    recoveryEvidenceMismatch(
+      'Closed recovery cleaned a different owned slot',
+      'closed-recovery-cleaned-different-owned',
+    );
   }
   assertClosedCurrentAuthority(operation);
   operation.receipt = await operation.writer.recordCleanupPostcondition(
@@ -157,7 +170,10 @@ function assertCleanupComplete(journal: RuntimePromotionJournal): void {
     journal.progress.pendingIntent !== null ||
     Object.values(journal.cleanup).includes('pending')
   ) {
-    recoveryEvidenceMismatch('Closed recovery still has owned cleanup work');
+    recoveryEvidenceMismatch(
+      'Closed recovery still has owned cleanup work',
+      'closed-recovery-owned-cleanup-work',
+    );
   }
 }
 
@@ -174,7 +190,10 @@ export async function cleanupRecoveredClosedRuntimePromotion(
   operation.receipt = expectedReceipt;
   await refreshRecoveryJournal(operation, expectedReceipt);
   if (operation.receipt.state !== 'closed') {
-    recoveryEvidenceMismatch('Closed cleanup received an open promotion journal');
+    recoveryEvidenceMismatch(
+      'Closed cleanup received an open promotion journal',
+      'closed-cleanup-open-promotion-journal',
+    );
   }
   assertClosedCurrentAuthority(operation);
   const runtimeCleaned = await cleanupRuntimeSlots(operation);

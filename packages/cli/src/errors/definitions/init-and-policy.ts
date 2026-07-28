@@ -168,4 +168,29 @@ export const initAndPolicyDefinitions = {
       'Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
     publicMetadataKeys: ['condition'],
   },
+
+  /**
+   * A scaffold asset this build ships is internally inconsistent.
+   *
+   * The agent-guidance snapshots, their render targets, and the authored-plan blobs are static
+   * tables compiled into the CLI. A missing snapshot, an unknown target, a duplicate, or an
+   * unresolvable blob therefore means the SHIPPED BUILD disagrees with itself — no user input and
+   * no environment state can cause or fix it.
+   *
+   * `HOST_WIRING` axes with one deliberate override: `exposure` is `public`, not the base's
+   * `redacted`. The message names the exact asset (`asset` metadata), which is precisely what a
+   * bug report needs, and a relative path of a file the build ships leaks nothing. Redacted here
+   * would replace "Missing agent-guidance snapshot: AGENTS.md" — a complete diagnosis — with
+   * "The operation failed."
+   *
+   * `defaultResponsibility` stays `tool-author`: the operator's only action is to report it.
+   */
+  'CLI.INIT.SCAFFOLD_ASSET_INVALID': {
+    ...HOST_WIRING,
+    code: 'CLI.INIT.SCAFFOLD_ASSET_INVALID',
+    exposure: 'public',
+    operatorAction:
+      'A scaffold asset shipped with this build is missing, duplicated, or unknown. This is a defect in the release, not in your project. Report it with the named asset and the run id.',
+    publicMetadataKeys: ['condition', 'asset'],
+  },
 } as const;

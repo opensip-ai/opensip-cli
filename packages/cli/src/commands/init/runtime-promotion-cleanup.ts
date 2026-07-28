@@ -5,6 +5,7 @@ import {
 import {
   assertFreshRuntimePromotionProjectRoot,
   reportInitFailure,
+  recoveryEvidenceMismatch,
 } from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
@@ -48,7 +49,10 @@ async function cleanupRuntimeSlot(
   const result = await operation.dependencies.cleanupOwnedSlot(authority);
   assertFreshRuntimePromotionProjectRoot(operation);
   if (result.slot !== slot) {
-    throw new Error('Runtime promotion cleanup returned a different owned slot');
+    recoveryEvidenceMismatch(
+      'Runtime promotion cleanup returned a different owned slot',
+      'cleanup-returned-different-slot',
+    );
   }
   return operation.writer.recordCleanupPostcondition(
     receipt,
@@ -100,7 +104,7 @@ async function assertReadyToUnlink(
     (slot) => current.cleanup[slot] === 'pending',
   );
   if (current.progress.pendingIntent !== null || pendingSlots.length > 0) {
-    throw new Error('Runtime promotion cleanup remains incomplete');
+    recoveryEvidenceMismatch('Runtime promotion cleanup remains incomplete', 'cleanup-incomplete');
   }
 }
 

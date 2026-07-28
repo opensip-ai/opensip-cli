@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **24**
-- Definitions: **237**
+- Definitions: **238**
 
 ## Catalogs
 
@@ -28,7 +28,7 @@ generated: true
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 8 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-surfaces.ts` | 11 |
 | `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
@@ -66,6 +66,7 @@ generated: true
 | `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` | `opensip-cli` |  |  | conflict |  |  |  |  | Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it. |
 | `CLI.INIT.PROMOTION_SOURCE_UNVERIFIED` | `opensip-cli` |  | environment | integrity |  |  |  |  | The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
 | `CLI.INIT.RECOVERY_EVIDENCE_MISMATCH` | `opensip-cli` |  | environment | integrity |  |  |  |  | Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
+| `CLI.INIT.SCAFFOLD_ASSET_INVALID` | `opensip-cli` |  |  |  |  |  |  |  | A scaffold asset shipped with this build is missing, duplicated, or unknown. This is a defect in the release, not in your project. Report it with the named asset and the run id. |
 | `CLI.POLICY.DENIED` | `opensip-cli` |  | operator | permission |  |  |  |  | Policy denied this operation. Change the policy deliberately, or run an operation the policy allows. |
 | `CLI.PROFILE.ARTIFACT_INVALID` | `opensip-cli` |  | tool-author | integrity |  |  | runtime |  | Profile artifact metadata failed its integrity check. Capture the run id and report a bug; do not construct profile metadata by hand. |
 | `CLI.PROFILE.CAPTURE_FAILED` | `opensip-cli` |  | environment | I/O | caller-policy |  |  |  | CPU profiling failed to capture a profile. Re-run with profiling enabled; if it persists, report a bug with the run id. |
