@@ -5,6 +5,7 @@ import {
   type LanguageAdapter,
 } from '@opensip-cli/core';
 
+import { graphBuildError } from '../../errors/graph-build-error.js';
 import { discoverPolyglotUnits } from '../workspace-runner.js';
 
 import { resolveCanonicalFileSet } from './canonical-file-set.js';
@@ -134,7 +135,10 @@ async function resolveSyntheticShards(
  */
 function throwWhenVerificationStrict(input: DefaultEngineShardPolicyInput): void {
   if (input.failureMode === 'verification-error') {
-    throw new Error('Graph engine-shard discovery failed during verification');
+    throw graphBuildError(
+      'shard-discovery-verification',
+      'Graph engine-shard discovery failed during verification',
+    );
   }
 }
 

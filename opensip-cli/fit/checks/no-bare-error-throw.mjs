@@ -54,15 +54,22 @@ const MIGRATED_PACKAGES = [
   'packages/codebase/',
   'packages/config/',
   'packages/contracts/',
+  'packages/dashboard/',
   'packages/datastore/',
   'packages/external-tool-adapter/',
+  // Engine only — check packs and graph language adapters are Wave 4.
+  'packages/fitness/engine/',
   'packages/format/',
+  'packages/graph/engine/',
   'packages/languages/',
+  'packages/mcp/',
   'packages/output/',
   'packages/session-store/',
   'packages/shared-analysis/',
+  'packages/simulation/engine/',
   'packages/targeting/',
   'packages/tool-test-kit/',
+  'packages/yagni/engine/',
 ];
 
 /** Tests construct unclassified failures on purpose — that is what they are proving. */

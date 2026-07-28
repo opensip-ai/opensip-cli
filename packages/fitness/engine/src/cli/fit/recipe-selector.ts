@@ -15,6 +15,7 @@ import {
 } from '@opensip-cli/contracts';
 import { createToolLogger, normalizeFailure, toPublicFailureProjection } from '@opensip-cli/core';
 
+import { fitnessScopeError } from '../../errors/fitness-scope-error.js';
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
@@ -118,7 +119,8 @@ export async function runRecipeOrAdHoc(
     // args.tags are present — both of which return earlier in this function.
     // Guard explicitly so the type system tracks the narrowing without `!`.
     if (recipeName == null) {
-      throw new Error(
+      throw fitnessScopeError(
+        'recipe-selection-invariant',
         'runRecipeOrAdHoc: recipeName must be defined when args.check/args.tags are absent',
       );
     }

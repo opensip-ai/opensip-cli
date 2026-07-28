@@ -5,8 +5,14 @@
  * Production injects GraphReadPort.resolveStaticHandlerDeclarations for lookup.
  */
 
+import { createToolError } from '@opensip-cli/core';
+
+import { mcpErrorCatalog } from './errors/mcp-error-catalog.js';
+
 import type { RuntimeWiringEdge, RuntimeWiringNode } from './runtime-wiring-read-port.js';
 import type { StaticHandlerDescriptor } from '@opensip-cli/core';
+
+const STATIC_BRIDGE_CAP = mcpErrorCatalog.require('MCP.WIRING.STATIC_BRIDGE_CAP');
 
 /** Max descriptors accepted in one batch join. */
 export const MAX_STATIC_HANDLER_DESCRIPTORS = 2000;
@@ -112,8 +118,15 @@ export function dedupeStaticHandlerRefs(
   limits: StaticHandlerBridgeLimits = DEFAULT_STATIC_HANDLER_BRIDGE_LIMITS,
 ): readonly StaticHandlerRef[] {
   if (refs.length > limits.maxDescriptors) {
-    throw new Error(
+    throw createToolError(
+      STATIC_BRIDGE_CAP,
       `static handler bridge exceeds maxDescriptors (${String(limits.maxDescriptors)}); got ${String(refs.length)}.`,
+      {
+        metadata: {
+          condition: 'max-descriptors',
+          maxDescriptors: limits.maxDescriptors,
+        },
+      },
     );
   }
   const seen = new Set<string>();

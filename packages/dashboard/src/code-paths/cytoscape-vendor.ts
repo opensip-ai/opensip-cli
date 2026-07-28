@@ -21,6 +21,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { DashboardVendorAssetError } from '../errors/dashboard-vendor-error.js';
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -56,7 +58,7 @@ function readVendorBundle(): string {
       continue;
     }
   }
-  throw new Error(
+  throw new DashboardVendorAssetError(
     'cytoscape-bundle.js not found. Run `pnpm --filter=@opensip-cli/dashboard vendor:cytoscape`.',
   );
 }

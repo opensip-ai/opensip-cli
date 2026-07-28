@@ -17,6 +17,8 @@
  */
 import { readFileSync, statSync } from 'node:fs';
 
+import { graphSourceTooLargeError } from '../errors/graph-build-error.js';
+
 /**
  * Maximum bytes a single source file may occupy when read for parsing (10 MB).
  * Mirrors the fitness engine's `FileAccessor` `FILE_TOO_LARGE` ceiling.
@@ -42,7 +44,11 @@ export function readSourceFileGuarded(
 ): string {
   const { size } = statSync(path);
   if (size > maxBytes) {
-    throw new Error(`source file exceeds ${maxBytes}-byte size guard (${size} bytes): ${path}`);
+    throw graphSourceTooLargeError(
+      'stat-size',
+      `source file exceeds ${maxBytes}-byte size guard (${size} bytes): ${path}`,
+      maxBytes,
+    );
   }
   const text = readFileSync(path, 'utf8');
   // Use UTF-8 byte length, not JS string length: multi-byte code units make
@@ -50,8 +56,10 @@ export function readSourceFileGuarded(
   // file slip past the post-read TOCTOU check.
   const byteLength = Buffer.byteLength(text, 'utf8');
   if (byteLength > maxBytes) {
-    throw new Error(
+    throw graphSourceTooLargeError(
+      'read-size',
       `source file exceeds ${maxBytes}-byte size guard after read (${byteLength} bytes): ${path}`,
+      maxBytes,
     );
   }
   return text;

@@ -34,6 +34,7 @@ import {
   type StoredSession,
 } from '@opensip-cli/contracts';
 import { resolveSession } from '@opensip-cli/session-store';
+import { InvalidArgumentError } from 'commander';
 
 import { GRAPH_LIVE_VIEW_KEY as GRAPH_LIVE_KEY } from '../../identity.js';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
@@ -543,7 +544,7 @@ function sessionReplayResult(
 function parseConcurrency(v: string): number {
   const n = Number(v);
   if (!/^\d+$/.test(v) || !Number.isSafeInteger(n) || n < 1) {
-    throw new Error(`--concurrency must be a positive integer (received '${v}')`);
+    throw new InvalidArgumentError(`--concurrency must be a positive integer (received '${v}')`);
   }
   return n;
 }

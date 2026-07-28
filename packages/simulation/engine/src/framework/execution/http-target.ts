@@ -17,6 +17,8 @@ import { createDeadlineError, ValidationError } from '@opensip-cli/core';
 
 import { simulationErrorCatalog } from '../../errors/simulation-error-catalog.js';
 
+import { ScenarioHttpTargetError } from './scenario-domain-error.js';
+
 import type { Target, TargetContext } from './target.js';
 
 /** Options for {@link httpTarget}. */
@@ -101,7 +103,7 @@ export function httpTarget(opts: HttpTargetOptions): Target {
       // @swallow-ok best-effort body drain; an already-consumed body is harmless.
     }
     if (!isOk(res.status)) {
-      throw new Error(`httpTarget: ${opts.url} returned ${res.status}`);
+      throw new ScenarioHttpTargetError(opts.url, res.status);
     }
   }
   return request;

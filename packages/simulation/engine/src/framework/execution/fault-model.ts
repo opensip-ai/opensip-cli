@@ -19,6 +19,8 @@
  * deterministic without consuming extra RNG draws.
  */
 
+import { ScenarioFaultError } from './scenario-domain-error.js';
+
 import type { Fault, FaultKind, FaultSpec } from './fault-spec.js';
 import type { Target, TargetContext } from './target.js';
 
@@ -102,11 +104,11 @@ export function createFaultModel(spec: FaultSpec, deps: FaultModelDeps = {}): Fa
         } catch {
           // @swallow-ok target observed the abort (or otherwise failed); we throw fault:abort below regardless.
         }
-        throw new Error('fault:abort');
+        throw new ScenarioFaultError('fault:abort');
       }
       case 'drop': {
         // Never reach the target; the driver counts a client-observed failure.
-        throw new Error('fault:drop');
+        throw new ScenarioFaultError('fault:drop');
       }
     }
   }

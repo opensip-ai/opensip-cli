@@ -1,4 +1,7 @@
+import { createToolError, type Signal } from '@opensip-cli/core';
+
 import { yagniFingerprintStrategy } from '../baseline-strategy.js';
+import { yagniErrorCatalog } from '../errors/yagni-error-catalog.js';
 
 import { readYagniSessionPayload } from './session-payload.js';
 
@@ -10,7 +13,6 @@ import type {
   ToolSessionReplay,
   UnitResult,
 } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
 
 /**
  * Project a stored yagni session back into a SignalEnvelope/RunPresentation.
@@ -24,7 +26,11 @@ import type { Signal } from '@opensip-cli/core';
 export function yagniReplayFromSession(stored: StoredSession): ToolSessionReplay<RunPresentation> {
   const payload = readYagniSessionPayload(stored.payload);
   if (payload === undefined) {
-    throw new Error('yagni session has no replay payload');
+    throw createToolError(
+      yagniErrorCatalog.require('YAGNI.SESSION.PAYLOAD_MISSING'),
+      'yagni session has no replay payload',
+      { metadata: { condition: 'missing-payload' } },
+    );
   }
 
   const units: UnitResult[] = payload.checks.map((check) => ({

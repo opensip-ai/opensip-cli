@@ -107,5 +107,46 @@ export const simulationErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
     },
+
+    /**
+     * A simulation scope accessor ran without an entered RunScope or without the
+     * simulation subscope the tool must install.
+     *
+     * One code (D9); `metadata.condition` names not-entered vs subscope-missing.
+     */
+    'SIMULATION.SCOPE.MISSING': {
+      code: 'SIMULATION.SCOPE.MISSING',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Enter a RunScope that has run simulationTool.contributeScope before reading simulation registries (production: the pre-action hook; tests: makeTestScope + contributeScope).',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A simulation capability worker received a request kind it does not implement.
+     */
+    'SIMULATION.CAPABILITY.UNKNOWN_WORKER_REQUEST': {
+      code: 'SIMULATION.CAPABILITY.UNKNOWN_WORKER_REQUEST',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Ensure the host and sim-pack worker share the same opensip-cli build, then report the unknown worker request if it recurs.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

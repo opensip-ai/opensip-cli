@@ -16,6 +16,7 @@ import { requireDrizzleHandle, type DrizzleDataStore } from '@opensip-cli/datast
 import { sql } from 'drizzle-orm';
 
 import { isSafeShardedCacheAnchor } from '../cache/sharded-cache-key.js';
+import { catalogPayloadError } from '../errors/catalog-payload-error.js';
 import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { CALL_EDGE_TEXT_MAX } from '../lang-adapter/edge-helpers.js';
 import { isValidDependencyFormRole } from '../types.js';
@@ -175,17 +176,20 @@ function isSafeShardCacheInputs(value: unknown): value is NonNullable<Catalog['s
  */
 function validateOptionalProvenance(payload: Record<string, unknown>): void {
   if (payload.adapterSelection !== undefined && !isSafeAdapterSelection(payload.adapterSelection)) {
-    throw new Error('Malformed catalog adapter-selection provenance');
+    throw catalogPayloadError(
+      'adapter-selection-provenance',
+      'Malformed catalog adapter-selection provenance',
+    );
   }
   if (
     payload.engineMode !== undefined &&
     payload.engineMode !== 'exact' &&
     payload.engineMode !== 'sharded'
   ) {
-    throw new Error('Malformed catalog engine-mode provenance');
+    throw catalogPayloadError('engine-mode-provenance', 'Malformed catalog engine-mode provenance');
   }
   if (payload.shardCacheInputs !== undefined && !isSafeShardCacheInputs(payload.shardCacheInputs)) {
-    throw new Error('Malformed catalog shard-cache provenance');
+    throw catalogPayloadError('shard-cache-provenance', 'Malformed catalog shard-cache provenance');
   }
   if (
     payload.buildCoverage !== undefined &&
@@ -212,7 +216,7 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
         payload.buildCoverage.degradations.length > 0 &&
         payload.buildCoverage.status !== 'partial'))
   ) {
-    throw new Error('Malformed catalog build coverage');
+    throw catalogPayloadError('build-coverage', 'Malformed catalog build coverage');
   }
 }
 
@@ -225,7 +229,7 @@ function validateOptionalProvenance(payload: Record<string, unknown>): void {
  * @throws {Error} when the payload shape or provenance is invalid.
  */
 function validateCatalogShape(value: unknown): asserts value is CatalogRowPayload {
-  if (!isRecord(value)) throw new Error('Malformed catalog payload');
+  if (!isRecord(value)) throw catalogPayloadError('payload-shape', 'Malformed catalog payload');
   if (
     value.version !== '3.0' ||
     value.tool !== 'graph' ||
@@ -240,7 +244,7 @@ function validateCatalogShape(value: unknown): asserts value is CatalogRowPayloa
       value.resolutionMode !== 'fast') ||
     !isRecord(value.functions)
   ) {
-    throw new Error('Malformed catalog payload');
+    throw catalogPayloadError('payload-shape', 'Malformed catalog payload');
   }
   validateOptionalProvenance(value);
   if (value.semanticFacts !== undefined) {
@@ -271,19 +275,20 @@ function validateCatalogShape(value: unknown): asserts value is CatalogRowPayloa
  */
 function validateFunctionContainers(value: CatalogRowPayload): void {
   const entries = Object.entries(value.functions);
-  if (entries.length > MAX_FUNCTION_BUCKETS) throw new Error('Malformed catalog payload');
+  if (entries.length > MAX_FUNCTION_BUCKETS)
+    throw catalogPayloadError('function-container-bound', 'Malformed catalog payload');
   let occurrenceCount = 0;
   const nestedCounts = { edges: 0, targets: 0 };
   for (const [name, bucket] of entries) {
     if (!isSafeCatalogText(name) || !Array.isArray(bucket)) {
-      throw new Error('Malformed catalog function container');
+      throw catalogPayloadError('function-container', 'Malformed catalog function container');
     }
     occurrenceCount += bucket.length;
     if (
       occurrenceCount > MAX_OCCURRENCES ||
       !bucket.every((occurrence) => hasBoundedOccurrenceContainers(occurrence, nestedCounts))
     ) {
-      throw new Error('Malformed catalog function container');
+      throw catalogPayloadError('function-container', 'Malformed catalog function container');
     }
   }
 }
@@ -391,7 +396,7 @@ function validateShardBuildResult(
     value.shardId !== row.shardId ||
     value.fingerprint !== row.shardFingerprint
   ) {
-    throw new Error('Malformed shard fragment identity');
+    throw catalogPayloadError('shard-fragment-identity', 'Malformed shard fragment identity');
   }
   validateCatalogShape(value.fragment);
   validateFunctionContainers(value.fragment);
@@ -402,7 +407,7 @@ function validateShardBuildResult(
     !isSafeParseErrors(value.parseErrors) ||
     !isSafeGraphDegradations(value.degradations)
   ) {
-    throw new Error('Malformed shard fragment payload');
+    throw catalogPayloadError('shard-fragment-payload', 'Malformed shard fragment payload');
   }
 }
 

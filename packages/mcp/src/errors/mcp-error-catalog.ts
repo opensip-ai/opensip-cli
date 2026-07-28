@@ -57,5 +57,46 @@ export const mcpErrorCatalog = defineErrorCatalog(
       stability: 'public',
       lifecycle: 'active',
     },
+
+    /**
+     * An MCP tool registration request is unusable (empty name, control chars,
+     * duplicate, or over the registration cap).
+     *
+     * One code (D9); `metadata.condition` names the registration branch.
+     */
+    'MCP.TOOL.REGISTRATION_INVALID': {
+      code: 'MCP.TOOL.REGISTRATION_INVALID',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Correct the MCP tool name or reduce the registration surface, then reconnect.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A static-handler bridge batch exceeded its descriptor bound.
+     */
+    'MCP.WIRING.STATIC_BRIDGE_CAP': {
+      code: 'MCP.WIRING.STATIC_BRIDGE_CAP',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'resource',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Reduce the static handler bridge descriptor count below the configured maxDescriptors bound.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'maxDescriptors'],
+    },
   },
 );

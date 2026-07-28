@@ -615,5 +615,93 @@ export const graphErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['condition', 'rule', 'causeCode'],
     },
+
+    /**
+     * A graph scope accessor ran without an entered RunScope, or without the graph
+     * subscope the tool's `contributeScope` must install.
+     *
+     * One code (D9): both arms are host/test wiring bugs with the same audience and
+     * recovery. `metadata.condition` names whether the scope or the graph subscope
+     * is missing.
+     */
+    'GRAPH.SCOPE.MISSING': {
+      code: 'GRAPH.SCOPE.MISSING',
+      source: 'application',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Enter a RunScope that has run graphTool.contributeScope before reading graph registries (production: the pre-action hook; tests: makeTestScope + contributeScope).',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * A single source file exceeds the guarded size bound for adapter parse.
+     *
+     * `resource` + `warning`/`success`: adapter loops already catch per-file and
+     * record a parse diagnostic, so one oversized file must not fail the run.
+     */
+    'GRAPH.SOURCE.FILE_TOO_LARGE': {
+      code: 'GRAPH.SOURCE.FILE_TOO_LARGE',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'resource',
+      retry: 'never',
+      severity: 'warning',
+      exposure: 'public',
+      exitClass: 'success',
+      operatorAction:
+        'Exclude or split the oversized source file, then rebuild the graph. The size guard matches the fitness engine ceiling.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'maxBytes'],
+    },
+
+    /**
+     * User-supplied graph CLI input is unusable (budget file, non-shardable target,
+     * equivalence precondition).
+     *
+     * Clustered (D9): the operator action is always "correct the named input". Flag
+     * parsers that must stay Commander-shaped use InvalidArgumentError instead.
+     */
+    'GRAPH.CONFIG.INVALID': {
+      code: 'GRAPH.CONFIG.INVALID',
+      source: 'application',
+      defaultResponsibility: 'user',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'configuration',
+      operatorAction: 'Correct the named graph configuration or command input, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
+
+    /**
+     * An internal graph-build precondition failed (partition parameters, path identity,
+     * strict shard verification, missing exact catalog for equivalence).
+     */
+    'GRAPH.BUILD.INVARIANT': {
+      code: 'GRAPH.BUILD.INVARIANT',
+      source: 'application',
+      defaultResponsibility: TOOL_AUTHOR_RESPONSIBILITY,
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Capture the run id and the build condition, then report the graph build invariant failure.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

@@ -55,6 +55,7 @@ const LOG_MODULE = 'mcp:server';
 const MCP_CLOSE_GRACE_MS = 1000;
 const MCP_STDIO_PROTOCOL = mcpErrorCatalog.require('MCP.STDIO.PROTOCOL');
 const MCP_STDIO_TRANSPORT_FAILED = mcpErrorCatalog.require('MCP.STDIO.TRANSPORT_FAILED');
+const MCP_TOOL_REGISTRATION_INVALID = mcpErrorCatalog.require('MCP.TOOL.REGISTRATION_INVALID');
 
 function classifiedBoundaryError(
   error: unknown,
@@ -209,22 +210,40 @@ export class McpStdioServer {
    */
   private assertRegistrableName(name: string): void {
     if (typeof name !== 'string' || name.length === 0) {
-      throw new Error('MCP tool name must be a non-empty string.');
+      throw createToolError(
+        MCP_TOOL_REGISTRATION_INVALID,
+        'MCP tool name must be a non-empty string.',
+        {
+          metadata: { condition: 'empty-name' },
+        },
+      );
     }
     if (name.length > MAX_MCP_TOOL_NAME_LENGTH) {
-      throw new Error(
+      throw createToolError(
+        MCP_TOOL_REGISTRATION_INVALID,
         `MCP tool name exceeds ${String(MAX_MCP_TOOL_NAME_LENGTH)} characters (never truncated).`,
+        { metadata: { condition: 'name-too-long' } },
       );
     }
     if (/\p{Cc}/u.test(name) || name.includes('\0')) {
-      throw new Error('MCP tool name must not contain NUL or control characters.');
+      throw createToolError(
+        MCP_TOOL_REGISTRATION_INVALID,
+        'MCP tool name must not contain NUL or control characters.',
+        { metadata: { condition: 'control-characters' } },
+      );
     }
     if (this.registeredNames.includes(name)) {
-      throw new Error(`MCP tool name already registered: ${name}`);
+      throw createToolError(
+        MCP_TOOL_REGISTRATION_INVALID,
+        `MCP tool name already registered: ${name}`,
+        { metadata: { condition: 'duplicate-name' } },
+      );
     }
     if (this.registeredNames.length >= MAX_MCP_REGISTERED_TOOLS) {
-      throw new Error(
+      throw createToolError(
+        MCP_TOOL_REGISTRATION_INVALID,
         `MCP registration cap (${String(MAX_MCP_REGISTERED_TOOLS)}) exceeded; registration rejected.`,
+        { metadata: { condition: 'registration-cap' } },
       );
     }
   }

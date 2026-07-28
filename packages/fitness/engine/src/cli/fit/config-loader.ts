@@ -10,6 +10,7 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { createToolLogger } from '@opensip-cli/core';
 
+import { fitnessScopeError } from '../../errors/fitness-scope-error.js';
 import { loadSignalersConfig } from '../../signalers/index.js';
 import { loadTargetsConfig } from '../../targets/index.js';
 
@@ -88,7 +89,8 @@ export async function validateLanguagesAgainstAdapters(
   const { currentScope, isRecognizedNonCodeFormat } = await import('@opensip-cli/core');
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw fitnessScopeError(
+      'scope-not-entered',
       'validateLanguagesAgainstAdapters() called outside runWithScope. ' +
         'fit pipeline must run inside a RunScope so language adapters resolve via cli.scope.languages.',
     );

@@ -285,5 +285,43 @@ export const fitnessErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['condition', 'component'],
     },
+
+    /**
+     * A fitness capability worker request named a check the pack does not export.
+     */
+    'FIT.CAPABILITY.CHECK_NOT_FOUND': {
+      code: 'FIT.CAPABILITY.CHECK_NOT_FOUND',
+      source: 'external',
+      defaultResponsibility: 'tool-author',
+      kind: 'not-found',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'plugin-incompatible',
+      operatorAction:
+        'Correct the capability pack contribution so its advertised check id is exported.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['packageName', 'checkId'],
+    },
+
+    /**
+     * A fitness capability worker received a request kind it does not implement.
+     */
+    'FIT.CAPABILITY.UNKNOWN_WORKER_REQUEST': {
+      code: 'FIT.CAPABILITY.UNKNOWN_WORKER_REQUEST',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction:
+        'Ensure the host and fit-pack worker share the same opensip-cli build, then report the unknown worker request if it recurs.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );
