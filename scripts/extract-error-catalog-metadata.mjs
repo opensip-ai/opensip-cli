@@ -62,12 +62,14 @@ export const CATALOG_SOURCES = [
   // Split for the same reason core's is: the host catalog outgrew the file-length bound as a
   // single unit. Each module is listed because this manifest is the repository-wide code
   // uniqueness authority and must see every definition, not just every catalog.
-  ...['host-wiring', 'suite-and-runs', 'init-and-policy', 'uninstall'].map((domain) => ({
-    packageName: 'opensip-cli',
-    ownerId: 'opensip-cli',
-    file: `packages/cli/src/errors/definitions/${domain}.ts`,
-    exportName: 'hostErrorCatalog',
-  })),
+  ...['host-wiring', 'suite-and-runs', 'init-and-policy', 'uninstall', 'host-surfaces'].map(
+    (domain) => ({
+      packageName: 'opensip-cli',
+      ownerId: 'opensip-cli',
+      file: `packages/cli/src/errors/definitions/${domain}.ts`,
+      exportName: 'hostErrorCatalog',
+    }),
+  ),
   {
     packageName: '@opensip-cli/output',
     ownerId: '@opensip-cli/output',
