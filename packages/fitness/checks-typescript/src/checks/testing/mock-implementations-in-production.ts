@@ -212,7 +212,7 @@ export const mockImplementationsInProduction = defineCheck({
   slug: 'mock-implementations-in-production',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
   // 'raw', not 'strip-strings': STUB_IMPL_PATTERN matches the exact sentinel
-  // string inside `throw new Error("Not implemented")` (and MOCK_DATA looks
+  // string inside a newly constructed and thrown `Error("Not implemented")` (and MOCK_DATA looks
   // for keys in object returns). Stripping blanks the string content in the
   // parsed source used for body.getText(), so the patterns would never match
   // even for real placeholder stubs in prod code.
@@ -226,7 +226,7 @@ export const mockImplementationsInProduction = defineCheck({
 - Classes named with Mock/Fake/Stub/Dummy prefixes or suffixes via \`/^(?:(?:Mock|Fake|Stub|Dummy)[A-Z]|[A-Z]\\w{0,100}(?:Mock|Fake|Stub|Dummy))$/\`
 - Methods prefixed with mock/fake/stub/dummy via \`/^(?:mock|fake|stub|dummy)/i\`
 - Functions named \`mockXxx\`, \`fakeXxx\`, \`createMock\`, \`createFake\`, etc. via \`/^(?:(?:mock|fake|stub|dummy)[A-Z]|create(?:Mock|Fake|Stub|Dummy))/i\`
-- Stub methods that \`throw new Error('Not implemented')\`
+- Stub methods that throw a newly constructed \`Error('Not implemented')\`
 - Methods returning hardcoded objects with \`mock\`, \`test\`, or \`fake\` keys
 
 **Why it matters:** Mock implementations in production code indicate incomplete refactoring or testing artifacts leaking into shipped code, leading to unreliable runtime behavior.

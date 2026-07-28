@@ -139,7 +139,7 @@ function createParameterViolation(options: CreateParameterViolationOptions): Che
     message: `Numeric parameter '${paramName}' lacks NaN/Infinity validation`,
     severity: 'warning',
     type: 'unvalidated-numeric',
-    suggestion: `Add validation at the start of the function: if (!Number.isFinite(${paramName})) { throw new Error('Invalid ${paramName}: must be a finite number'); }`,
+    suggestion: `Add validation at the start of the function: if (!Number.isFinite(${paramName})) { throw new RangeError('Invalid ${paramName}: must be a finite number'); }`,
     match: matchText,
   };
 }
