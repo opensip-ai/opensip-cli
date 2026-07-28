@@ -147,7 +147,7 @@ export const fitnessErrorCatalog = defineErrorCatalog(
         'The named file is larger than opensip will analyze and was skipped. Exclude it from the target set, or split it.',
       stability: 'public',
       lifecycle: 'active',
-      publicMetadataKeys: ['maxBytes'],
+      publicMetadataKeys: ['actualBytes', 'condition', 'maxBytes'],
     },
 
     /**

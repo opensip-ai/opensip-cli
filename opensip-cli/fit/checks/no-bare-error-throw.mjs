@@ -57,7 +57,8 @@ const MIGRATED_PACKAGES = [
   'packages/dashboard/',
   'packages/datastore/',
   'packages/external-tool-adapter/',
-  // Engine only — check packs and graph language adapters are Wave 4.
+  'packages/fitness/checks-typescript/',
+  'packages/fitness/checks-universal/',
   'packages/fitness/engine/',
   'packages/format/',
   'packages/graph/engine/',

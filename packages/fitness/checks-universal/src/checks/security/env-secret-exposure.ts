@@ -45,7 +45,7 @@ const EXPOSURE_PATTERNS = [
     ),
     message: 'Sensitive environment variable in error message may expose secrets',
     suggestion:
-      'Do not include secret values in error messages. Log only that the secret was missing or invalid, not its value: throw new Error("API key validation failed");',
+      'Do not include secret values in error messages. Log only that the secret was missing or invalid, not its value: throw new TypeError("API key validation failed");',
     severity: 'error' as const,
   },
   // Stringifying env vars (JSON.stringify(process.env)) - fixed pattern, no variable repetition

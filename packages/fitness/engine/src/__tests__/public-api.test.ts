@@ -24,6 +24,7 @@ import * as barrel from '../index.js';
 const EXPECTED_VALUE_EXPORTS = [
   'applyCheckDisplay',
   'buildImportGraph',
+  'checkFileTooLargeError',
   'clearCurrentRecipeCheckConfig',
   'collectCheckObjects',
   'createPathMatcher',

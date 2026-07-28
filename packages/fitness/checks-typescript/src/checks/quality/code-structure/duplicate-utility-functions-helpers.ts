@@ -245,7 +245,10 @@ function extractUtilityFunctionsWithBody(
 function createIdenticalViolation(name: string, locations: FunctionInfo[]): CheckViolation {
   const first = locations[0];
   if (!first) {
-    throw new Error(`createIdenticalViolation called with empty locations array for '${name}'`);
+    throw new TypeError(
+      `Check 'duplicate-utility-functions' could not analyze '${name}': ` +
+        'the identical-implementation group was empty.',
+    );
   }
   const otherFilesStr = formatOtherFiles(locations);
 
@@ -263,7 +266,10 @@ function createIdenticalViolation(name: string, locations: FunctionInfo[]): Chec
 function createSimilarViolation(name: string, uniqueImpls: FunctionInfo[]): CheckViolation {
   const first = uniqueImpls[0];
   if (!first) {
-    throw new Error(`createSimilarViolation called with empty uniqueImpls array for '${name}'`);
+    throw new TypeError(
+      `Check 'duplicate-utility-functions' could not analyze '${name}': ` +
+        'the similar-implementation group was empty.',
+    );
   }
   const otherFilesStr = formatOtherFiles(uniqueImpls);
   const numImplementations = uniqueImpls.length;
