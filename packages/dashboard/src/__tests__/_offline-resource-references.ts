@@ -4,8 +4,12 @@ const REMOTE_CSS_REFERENCE =
 
 const RESOURCE_ATTRIBUTES = [
   { selector: '[src]', attribute: 'src' },
-  { selector: 'link[href]', attribute: 'href' },
+  // Navigation anchors are inert until activated. Other href-bearing
+  // elements can affect rendering (link/base/SVG image or use references).
+  { selector: '[href]:not(a):not(area)', attribute: 'href' },
   { selector: 'object[data]', attribute: 'data' },
+  { selector: '[poster]', attribute: 'poster' },
+  { selector: '[background]', attribute: 'background' },
 ] as const;
 
 /**
@@ -34,8 +38,14 @@ export function findRemoteRenderDependencies(html: string): readonly string[] {
     }
   }
 
-  for (const style of parsed.querySelectorAll('style')) {
-    for (const match of style.textContent?.matchAll(REMOTE_CSS_REFERENCE) ?? []) {
+  const cssSources = [
+    ...[...parsed.querySelectorAll('style')].map((style) => style.textContent ?? ''),
+    ...[...parsed.querySelectorAll('[style]')].map(
+      (element) => element.getAttribute('style') ?? '',
+    ),
+  ];
+  for (const css of cssSources) {
+    for (const match of css.matchAll(REMOTE_CSS_REFERENCE)) {
       const value = match[1];
       if (value) dependencies.add(value);
     }

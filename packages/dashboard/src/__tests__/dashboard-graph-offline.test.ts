@@ -60,6 +60,9 @@ describe('Graph view — offline render guarantee', () => {
       <a href="https://opensip.ai">navigation is inert until clicked</a>
       <script src="https://cdn.example.test/cytoscape.js"></script>
       <link rel="stylesheet" href="//cdn.example.test/report.css">
+      <svg><image href="https://cdn.example.test/graph.svg"></image></svg>
+      <video poster="https://cdn.example.test/poster.png"></video>
+      <div style="background: url('https://cdn.example.test/inline-background.png')"></div>
       <style>.remote { background: url('https://cdn.example.test/background.png'); }</style>
     `);
 
@@ -67,6 +70,9 @@ describe('Graph view — offline render guarantee', () => {
       '//cdn.example.test/report.css',
       'https://cdn.example.test/background.png',
       'https://cdn.example.test/cytoscape.js',
+      'https://cdn.example.test/graph.svg',
+      'https://cdn.example.test/inline-background.png',
+      'https://cdn.example.test/poster.png',
     ]);
   });
 });
