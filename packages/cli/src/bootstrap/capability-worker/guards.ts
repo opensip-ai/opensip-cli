@@ -18,9 +18,14 @@ import module, { createRequire } from 'node:module';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isPathInside } from '@opensip-cli/core';
+import { isPathInside, PluginIncompatibleError } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import type { CapabilityBridgeResourceDecision } from '@opensip-cli/core';
+
+
+const RESOURCE_DENIED = hostErrorCatalog.require('CLI.CAPABILITY.RESOURCE_DENIED');
 
 const require = createRequire(import.meta.url);
 
@@ -36,12 +41,18 @@ function hasResource(
  * message is explicit that this is the advisory guard, not enforcement — the
  * admission decision is the boundary.
  *
- * @throws {Error} always; this is the patched builtin failure path.
+ * @throws {PluginIncompatibleError} always; this is the patched builtin failure path.
  */
 function denied(resource: string): never {
-  throw new Error(
+  throw new PluginIncompatibleError(
     `capability worker denied undeclared ${resource} access ` +
       '(advisory guard — admission is the enforced boundary)',
+    {
+      code: RESOURCE_DENIED.code,
+      definition: RESOURCE_DENIED,
+      metadata: { condition: 'undeclared-resource', resource },
+      diagnostic: `undeclared ${resource}`,
+    },
   );
 }
 

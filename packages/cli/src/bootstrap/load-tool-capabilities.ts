@@ -26,6 +26,7 @@ import {
   currentScope,
   loadCapabilityDomain,
   logger,
+  PluginIncompatibleError,
   resolvePackageDir,
   type CapabilityBridgeContribution,
   type CapabilityContributionLoader,
@@ -37,6 +38,10 @@ import {
   type Tool,
   type ToolProvenance,
 } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+const BRIDGE_MISSING = hostErrorCatalog.require('CLI.CAPABILITY.BRIDGE_MISSING');
 
 import { BUNDLED_CAPABILITY_PACKS } from './bundled-manifest.js';
 import { runCapabilityWorkerSpec } from './capability-worker/supervisor.js';
@@ -184,8 +189,18 @@ async function loadIsolatedContribution(
   if (resourceDecision?.isolation !== 'worker') return undefined;
   const bridge = args.owningTool.extensionPoints?.capabilityIsolationBridges?.[args.domainId];
   if (bridge === undefined) {
-    throw new Error(
+    throw new PluginIncompatibleError(
       `capability domain '${args.domainId}' does not support isolated external packages`,
+      {
+        code: BRIDGE_MISSING.code,
+        definition: BRIDGE_MISSING,
+        metadata: {
+          condition: 'host-bridge-missing',
+          domainId: args.domainId,
+          tool: args.owningTool.metadata.name ?? args.owningTool.metadata.id,
+        },
+        diagnostic: `no isolation bridge for ${args.domainId}`,
+      },
     );
   }
   const contributions = await bridge.createHostContributions({

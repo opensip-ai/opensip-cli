@@ -5,6 +5,7 @@ import {
   defineCommand,
   IpcPayloadTooLargeError,
   normalizeFailure,
+  PluginIncompatibleError,
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   startWorkerCancellationControl,
@@ -16,8 +17,11 @@ import {
 } from '@opensip-cli/core';
 
 import { type CliCommandsContext } from '../../commands/shared.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import { installCapabilityWorkerGuards } from './guards.js';
+
+const BRIDGE_MISSING = hostErrorCatalog.require('CLI.CAPABILITY.BRIDGE_MISSING');
 
 import type { CapabilityWorkerErrorPayload, CapabilityWorkerSpec } from './types.js';
 
@@ -70,8 +74,18 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
       );
   const bridge = tool?.extensionPoints?.capabilityIsolationBridges?.[spec.domainId];
   if (bridge === undefined) {
-    throw new Error(
+    throw new PluginIncompatibleError(
       `capability worker: no isolation bridge for domain '${spec.domainId}' on tool '${spec.ownerToolId}'`,
+      {
+        code: BRIDGE_MISSING.code,
+        definition: BRIDGE_MISSING,
+        metadata: {
+          condition: 'worker-bridge-missing',
+          domainId: spec.domainId,
+          tool: spec.ownerToolId,
+        },
+        diagnostic: `no isolation bridge for ${spec.domainId}`,
+      },
     );
   }
   return await bridge.runInWorker({
