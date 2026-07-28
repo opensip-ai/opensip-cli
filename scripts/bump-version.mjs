@@ -229,10 +229,15 @@ async function runCheck() {
   }
 
   const changelog = await readText(join(REPO_ROOT, 'CHANGELOG.md'));
-  const topEntry = changelog.match(/^##\s*\[([^\]]+)\]/m);
-  if (!topEntry) problems.push(`CHANGELOG.md: no '## [version]' entry found`);
-  else if (topEntry[1] !== core)
-    problems.push(`CHANGELOG.md: top entry [${topEntry[1]}] ≠ core ${core}`);
+  // Keep-a-Changelog allows a leading `## [Unreleased]` for post-release notes.
+  // The gate binds the first *versioned* entry to core, not the optional Unreleased header.
+  const changelogEntries = [...changelog.matchAll(/^##\s*\[([^\]]+)\]/gm)].map((m) => m[1]);
+  const topVersioned = changelogEntries.find((name) => name !== 'Unreleased');
+  if (topVersioned === undefined) {
+    problems.push(`CHANGELOG.md: no versioned '## [version]' entry found`);
+  } else if (topVersioned !== core) {
+    problems.push(`CHANGELOG.md: top versioned entry [${topVersioned}] ≠ core ${core}`);
+  }
 
   if (problems.length === 0) {
     console.log(`[bump-version] OK — all version surfaces match core v${core}.`);
