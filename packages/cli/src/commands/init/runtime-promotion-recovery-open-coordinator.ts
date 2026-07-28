@@ -17,6 +17,7 @@ import {
   transition,
   verifyDesiredAuthored,
 } from './runtime-promotion-recovery-open.js';
+import { recoveryEvidenceMismatch } from './runtime-promotion-root-authority.js';
 
 import type { RuntimeManifestIdentity } from './runtime-promotion-journal-schema.js';
 import type { DurableClosedPromotionJournal } from './runtime-promotion-journal.js';
@@ -109,7 +110,7 @@ async function beginRollback(operation: RuntimePromotionRecoveryOperation): Prom
 async function continueAuthoredCommit(operation: RuntimePromotionRecoveryOperation): Promise<void> {
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Authored commit lacks its durable replay transaction');
+    recoveryEvidenceMismatch('Authored commit lacks its durable replay transaction');
   }
   const committed = await operation.dependencies.commitAuthored(operation.transaction);
   const committedReceipt = await operation.writer.bindAuthoredCommitted(committed.receipt);
@@ -205,7 +206,7 @@ async function continueRollback(operation: RuntimePromotionRecoveryOperation): P
   }
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Authored rollback lacks its durable transaction');
+    recoveryEvidenceMismatch('Authored rollback lacks its durable transaction');
   }
   const rolledBack = await operation.dependencies.rollbackAuthored(operation.transaction);
   const rolledBackReceipt = await operation.writer.bindAuthoredRolledBack(rolledBack.receipt);
@@ -221,15 +222,15 @@ async function verifyRolledBackAuthored(
   if (!recoveryAuthoredWasMaterialized(operation.journal)) return;
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Rolled-back authored verification lacks its transaction');
+    recoveryEvidenceMismatch('Rolled-back authored verification lacks its transaction');
   }
   const transaction = await bindRecoveryAuthoredReceipt(operation);
   if (transaction === null) {
-    throw new Error('Rolled-back authored verification lost its durable transaction');
+    recoveryEvidenceMismatch('Rolled-back authored verification lost its durable transaction');
   }
   operation.authoredSummary = await operation.dependencies.verifyAuthored(transaction, 'preimage');
   if (!operation.authoredSummary.verified) {
-    throw new Error('Recovered authored preimage authority was not verified');
+    recoveryEvidenceMismatch('Recovered authored preimage authority was not verified');
   }
 }
 
@@ -318,12 +319,12 @@ async function continueIdleOpen(operation: RuntimePromotionRecoveryOperation): P
         return;
       }
       default: {
-        throw new Error(`Unsupported forward recovery phase: ${phase}`);
+        recoveryEvidenceMismatch(`Unsupported forward recovery phase: ${phase}`);
       }
     }
   }
   if (direction !== 'rollback') {
-    throw new Error('Open recovery has an invalid direction');
+    recoveryEvidenceMismatch('Open recovery has an invalid direction');
   }
   switch (phase) {
     case 'rollback-started':
@@ -340,7 +341,7 @@ async function continueIdleOpen(operation: RuntimePromotionRecoveryOperation): P
       return;
     }
     default: {
-      throw new Error(`Unsupported rollback recovery phase: ${phase}`);
+      recoveryEvidenceMismatch(`Unsupported rollback recovery phase: ${phase}`);
     }
   }
 }
@@ -357,7 +358,7 @@ async function recoverOpenStep(
   step: number,
 ): Promise<DurableClosedPromotionJournal> {
   if (step >= MAX_RECOVERY_STEPS) {
-    throw new Error('Runtime promotion recovery exceeded its bounded transition count');
+    recoveryEvidenceMismatch('Runtime promotion recovery exceeded its bounded transition count');
   }
   const journal = await refreshRecoveryJournal(operation);
   if (operation.receipt.state === 'closed') return operation.receipt;

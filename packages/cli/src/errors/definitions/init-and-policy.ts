@@ -142,4 +142,30 @@ export const initAndPolicyDefinitions = {
       'The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
     publicMetadataKeys: ['condition', 'releaseSafe'],
   },
+  /**
+   * Recovery of an interrupted runtime promotion found state that disagrees with the durable
+   * evidence describing it.
+   *
+   * One code across ~26 refusals in the recovery plane (D9): "Recovered runtime stage differs
+   * from the selected source", "Authored commit lacks its durable replay transaction", "Closed
+   * recovery still has owned cleanup work". They differ in WHICH invariant broke; the operator's
+   * action is identical, because recovery refuses to continue in every one of them.
+   *
+   * Each was a bare `Error`, so each reached the user as "The operation failed." — after an
+   * interrupted `init`, which is exactly when an operator most needs to know what state their
+   * runtime is in.
+   *
+   * `integrity` and `environment`: nothing malfunctioned and the caller passed nothing wrong —
+   * the on-disk evidence and the recovered state disagree, and only inspection or a fresh
+   * attempt resolves that.
+   */
+  'CLI.INIT.RECOVERY_EVIDENCE_MISMATCH': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.RECOVERY_EVIDENCE_MISMATCH',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const;

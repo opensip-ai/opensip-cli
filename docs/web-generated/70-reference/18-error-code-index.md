@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-27
+last_verified: 2026-07-28
 release: v0.8.5
 title: "Error code index"
 audience: [contributors, operators, agents]
@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **23**
-- Definitions: **225**
+- Definitions: **226**
 
 ## Catalogs
 
@@ -28,7 +28,7 @@ generated: true
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 7 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 8 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
 | `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
@@ -62,6 +62,7 @@ generated: true
 | `CLI.INIT.PROMOTION_JOURNAL_INVALID` | `opensip-cli` |  |  | integrity |  |  |  |  | The promotion journal is not readable. Re-run `opensip init`; if it repeats, remove the runtime directory and initialize again. |
 | `CLI.INIT.PROMOTION_RECOVERY_REQUIRED` | `opensip-cli` |  |  | conflict |  |  |  |  | Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it. |
 | `CLI.INIT.PROMOTION_SOURCE_UNVERIFIED` | `opensip-cli` |  | environment | integrity |  |  |  |  | The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
+| `CLI.INIT.RECOVERY_EVIDENCE_MISMATCH` | `opensip-cli` |  | environment | integrity |  |  |  |  | Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
 | `CLI.POLICY.DENIED` | `opensip-cli` |  | operator | permission |  |  |  |  | Policy denied this operation. Change the policy deliberately, or run an operation the policy allows. |
 | `CLI.REPORT.RUN_UNAVAILABLE` | `opensip-cli` |  |  | not-found |  |  |  |  | Pick a run that exists — `opensip runs list` shows them — and one that recorded the data this report needs. |
 | `CLI.RUN_EVIDENCE.INVALID` | `opensip-cli` |  |  | validation |  |  |  |  | The tool contributed an evidence snapshot the host cannot store. Report it to the tool author with the run id. |

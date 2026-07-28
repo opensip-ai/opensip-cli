@@ -12,6 +12,7 @@ import {
   refreshRecoveryJournal,
   requireManifest,
 } from './runtime-promotion-recovery-common.js';
+import { recoveryEvidenceMismatch } from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type { VerifiedRuntimeManifest } from './runtime-manifest.js';
@@ -107,7 +108,7 @@ async function copyOrReuseStage(operation: RuntimePromotionRecoveryOperation): P
     return { manifest: reconciled.manifest, outcome: 'already-satisfied' };
   }
   if (operation.sourceRuntime === undefined) {
-    throw new Error('Runtime-stage recovery lost its canonical source');
+    recoveryEvidenceMismatch('Runtime-stage recovery lost its canonical source');
   }
   const current = await operation.controller.verifyOpen(asRecoveryOpen(operation));
   const copied = await operation.dependencies.copyStage({
@@ -121,7 +122,7 @@ async function copyOrReuseStage(operation: RuntimePromotionRecoveryOperation): P
     lease: operation.lease,
   });
   if (!runtimeManifestIdentityEqual(copied.stage.identity, source.identity)) {
-    throw new Error('Recovered runtime stage differs from the selected source');
+    recoveryEvidenceMismatch('Recovered runtime stage differs from the selected source');
   }
   return { manifest: copied.stage, outcome: 'applied' };
 }
@@ -145,7 +146,7 @@ async function reconcileDestinationBackup(
   const authority = await authorizeFilesystem(operation, 'destination-backup-create');
   const result = await operation.dependencies.backupDestination(authority, expected);
   if (!runtimeManifestIdentityEqual(result.manifest.identity, expected)) {
-    throw new Error('Recovered destination backup differs from durable evidence');
+    recoveryEvidenceMismatch('Recovered destination backup differs from durable evidence');
   }
   await transition(operation, () =>
     operation.writer.recordDestinationBackedUp(
@@ -163,7 +164,7 @@ async function reconcileDestinationInstall(
   const authority = await authorizeFilesystem(operation, 'destination-install');
   const result = await operation.dependencies.installStage(authority, expected);
   if (!runtimeManifestIdentityEqual(result.manifest.identity, expected)) {
-    throw new Error('Recovered destination install differs from durable evidence');
+    recoveryEvidenceMismatch('Recovered destination install differs from durable evidence');
   }
   await transition(operation, () =>
     operation.writer.recordRuntimeInstalled(
@@ -198,7 +199,7 @@ async function reconcileAuthoredCommit(
 ): Promise<void> {
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Recovered authored commit lacks its durable transaction');
+    recoveryEvidenceMismatch('Recovered authored commit lacks its durable transaction');
   }
   const committed = await operation.dependencies.commitAuthored(operation.transaction);
   operation.receipt = committed.receipt;
@@ -215,15 +216,15 @@ export async function verifyDesiredAuthored(
   operation.journal = expectedJournal;
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Recovered authored authority lacks its durable transaction');
+    recoveryEvidenceMismatch('Recovered authored authority lacks its durable transaction');
   }
   const transaction = await bindRecoveryAuthoredReceipt(operation);
   if (transaction === null) {
-    throw new Error('Recovered authored authority lost its durable transaction');
+    recoveryEvidenceMismatch('Recovered authored authority lost its durable transaction');
   }
   operation.authoredSummary = await operation.dependencies.verifyAuthored(transaction, 'desired');
   if (!operation.authoredSummary.verified) {
-    throw new Error('Recovered authored desired authority was not verified');
+    recoveryEvidenceMismatch('Recovered authored desired authority was not verified');
   }
   assertRecoveryProjectRoot(operation);
 }
@@ -238,7 +239,7 @@ async function reconcileSourceRetirement(
   const authority = await authorizeFilesystem(operation, 'source-retire');
   const result = await operation.dependencies.retireSource(authority, expected);
   if (!runtimeManifestIdentityEqual(result.manifest.identity, expected)) {
-    throw new Error('Recovered source tombstone differs from durable evidence');
+    recoveryEvidenceMismatch('Recovered source tombstone differs from durable evidence');
   }
   await transition(operation, () =>
     operation.writer.recordSourceRetired(
@@ -281,7 +282,7 @@ async function reconcileAuthoredRollback(
 ): Promise<void> {
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    throw new Error('Recovered authored rollback lacks its durable transaction');
+    recoveryEvidenceMismatch('Recovered authored rollback lacks its durable transaction');
   }
   const rolledBack = await operation.dependencies.rollbackAuthored(operation.transaction);
   operation.receipt = rolledBack.receipt;
@@ -333,7 +334,7 @@ export async function reconcilePendingIntent(
       break;
     }
     case 'owned-slot-cleanup': {
-      throw new Error('An open promotion cannot contain a cleanup intent');
+      recoveryEvidenceMismatch('An open promotion cannot contain a cleanup intent');
     }
   }
   operation.dependencies.checkpoint?.('after-open-intent-reconciled');

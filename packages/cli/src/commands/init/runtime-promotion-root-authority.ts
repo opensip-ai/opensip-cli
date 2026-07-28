@@ -6,7 +6,10 @@ import {
   currentLogger,
   normalizeFailure,
   toOperatorFailureProjection,
+  SystemError,
 } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import {
   runtimePromotionPathSnapshot,
@@ -16,6 +19,8 @@ import {
 import { RuntimePromotionPreflightError } from './runtime-promotion-preflight-error.js';
 
 import type { RuntimeExclusiveLease, RuntimeExclusivePosture } from '@opensip-cli/core';
+
+const RECOVERY_EVIDENCE_MISMATCH = hostErrorCatalog.require('CLI.INIT.RECOVERY_EVIDENCE_MISMATCH');
 
 const CHANGED_AFTER_PREFLIGHT = 'changed-after-preflight' as const;
 
@@ -316,4 +321,19 @@ export function reportInitFailure(condition: string, error: unknown): void {
   } catch {
     // @swallow-ok a diagnostic must not fail the recovery path it exists to explain.
   }
+}
+
+/**
+ * Refuse recovery because the recovered state disagrees with its durable evidence.
+ *
+ * ~26 sites across the recovery plane raised this as a bare `Error`, so each reached the user as
+ * "The operation failed." after an interrupted `init` — the moment an operator most needs to know
+ * what state their runtime is in. One code (D9): the action is the same for all of them, and the
+ * message names which invariant broke.
+ */
+export function recoveryEvidenceMismatch(message: string): never {
+  throw new SystemError(message, {
+    code: RECOVERY_EVIDENCE_MISMATCH.code,
+    definition: RECOVERY_EVIDENCE_MISMATCH,
+  });
 }
