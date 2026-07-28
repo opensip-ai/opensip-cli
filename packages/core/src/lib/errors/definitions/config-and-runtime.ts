@@ -250,4 +250,65 @@ export const configAndRuntimeDefinitions = {
       'Run inside a git repository, install git, or pass explicit --files instead of --changed/--since.',
     publicMetadataKeys: ['condition'],
   },
+
+  /**
+   * The platform-support registry failed fail-closed validation at module load.
+   *
+   * One code (D9): every branch is a host-authored table defect with the same audience.
+   * `metadata.condition` names the invariant.
+   */
+  'CORE.PLATFORM_SUPPORT.INVALID': {
+    ...TOOL_AUTHORED_DECLARATION,
+    code: 'CORE.PLATFORM_SUPPORT.INVALID',
+    kind: 'invariant',
+    exposure: 'redacted',
+    exitClass: 'runtime',
+    operatorAction:
+      'The platform-support registry is inconsistent. Capture the condition and report a bug.',
+    publicMetadataKeys: ['condition', 'rowId'],
+  },
+
+  /**
+   * The compatibility-policy registry is incomplete or internally inconsistent.
+   */
+  'CORE.COMPATIBILITY.POLICY_INVALID': {
+    ...TOOL_AUTHORED_DECLARATION,
+    code: 'CORE.COMPATIBILITY.POLICY_INVALID',
+    kind: 'invariant',
+    exposure: 'redacted',
+    exitClass: 'runtime',
+    operatorAction:
+      'The compatibility policy table is incomplete. Capture the condition and report a bug.',
+    publicMetadataKeys: ['condition', 'className'],
+  },
+
+  /**
+   * An EnvRegistry read named a variable that was never declared.
+   *
+   * A host-spec typo surfaces here rather than as a silent `undefined`.
+   */
+  'CORE.ENV.UNKNOWN_VARIABLE': {
+    ...TOOL_AUTHORED_DECLARATION,
+    code: 'CORE.ENV.UNKNOWN_VARIABLE',
+    kind: 'invariant',
+    exposure: 'public',
+    exitClass: 'runtime',
+    operatorAction:
+      'Declare an EnvVarSpec for the named variable before reading it from EnvRegistry.',
+    publicMetadataKeys: ['condition', 'variable'],
+  },
+
+  /**
+   * An internal execution-scheduler invariant failed (unreachable control flow or an empty
+   * worker result slot).
+   */
+  'CORE.EXECUTION.INVARIANT': {
+    ...TOOL_AUTHORED_DECLARATION,
+    code: 'CORE.EXECUTION.INVARIANT',
+    kind: 'invariant',
+    exposure: 'redacted',
+    exitClass: 'runtime',
+    operatorAction: 'Capture the run id and the execution condition, then report a bug.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const satisfies Record<string, Omit<ErrorDefinition, 'owner'>>;
