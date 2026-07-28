@@ -107,7 +107,7 @@
     "@types/semver": "^7.7.1",
     "@types/update-notifier": "^6.0.8",
     "ink-testing-library": "^4.0.0",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^4.1.10",
     "zod": "^4.4.3"
   }

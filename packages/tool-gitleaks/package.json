@@ -140,7 +140,7 @@
     "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.3",
     "opensip-cli": "workspace:*",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "vitest": "^4.1.10"
   }
 }

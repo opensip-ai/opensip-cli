@@ -47,7 +47,7 @@
     "@opensip-cli/core": "workspace:*",
     "@opensip-cli/graph": "workspace:*",
     "@opensip-cli/lang-typescript": "workspace:*",
-    "typescript": "~6.0.3"
+    "typescript": "~7.0.2"
   },
   "devDependencies": {
     "@opensip-cli/datastore": "workspace:*",
