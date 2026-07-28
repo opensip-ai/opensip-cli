@@ -1,5 +1,3 @@
-import { currentLogger, normalizeFailure, toOperatorFailureProjection } from '@opensip-cli/core';
-
 import {
   isRuntimePromotionAuthorityReleaseUnsafe,
   verifyClosedTerminalReceipt,
@@ -12,7 +10,10 @@ import {
   recoveryRequiredResult,
   rolledBackResult,
 } from './runtime-promotion-result.js';
-import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
+import {
+  assertFreshRuntimePromotionProjectRoot,
+  reportInitFailure,
+} from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
@@ -283,15 +284,7 @@ export async function rollbackFreshRuntimePromotion(
     // A rollback that itself fails is the worst case on this path — the runtime is left
     // mid-promotion — and it reported identically to a clean rollback. The recovery outcome
     // is unchanged; it is no longer the only thing the operator gets.
-    try {
-      currentLogger().error({
-        evt: 'init.runtime_promotion.rollback_failed',
-        module: 'cli:runtime-promotion-rollback',
-        err: toOperatorFailureProjection(normalizeFailure(error)),
-      });
-    } catch {
-      // @swallow-ok a diagnostic must not fail the rollback it exists to explain.
-    }
+    reportInitFailure('rollback-failed', error);
     return recoveryResult(operation);
   }
 }

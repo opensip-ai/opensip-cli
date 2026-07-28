@@ -1,7 +1,12 @@
 import { realpathSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { projectCoordinationKey } from '@opensip-cli/core';
+import {
+  projectCoordinationKey,
+  currentLogger,
+  normalizeFailure,
+  toOperatorFailureProjection,
+} from '@opensip-cli/core';
 
 import {
   runtimePromotionPathSnapshot,
@@ -290,4 +295,25 @@ export function assertFreshRuntimePromotionProjectRoot(operation: {
     lease: operation.lease,
     authority: operation.projectRootAuthority,
   });
+}
+
+/**
+ * Report a failure the caller is about to convert into a recovery outcome.
+ *
+ * `condition` names WHICH boundary reported it, so two boundaries returning the same outcome
+ * shape stay distinguishable in the log.
+ */
+export function reportInitFailure(condition: string, error: unknown): void {
+  try {
+    currentLogger().error({
+      evt: 'init.runtime_promotion.failed',
+      module: 'cli:init',
+      condition,
+      // The bounded projection, not the raw error: this plane touches user paths and journal
+      // contents, and a log line is an outward surface.
+      err: toOperatorFailureProjection(normalizeFailure(error)),
+    });
+  } catch {
+    // @swallow-ok a diagnostic must not fail the recovery path it exists to explain.
+  }
 }
