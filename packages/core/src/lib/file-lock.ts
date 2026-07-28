@@ -966,16 +966,33 @@ function evaluateNonRecordContention(
   return recoverCorruptSnapshot(lockPath, snapshot, options, tracker, deadline, environment);
 }
 
-function evaluateLockContention(
-  lockPath: string,
-  metadata: FileLockMetadata,
-  options: WithFileLockOptions,
-  tracker: LockStaleTracker,
-  processInspector: SafetyBiasedProcessInspector,
-  deadline: number,
-  acquisitionStartedAt: number,
-  environment: FileLockEnvironment,
-): LockContentionOutcome {
+/**
+ * One acquire-loop iteration's inputs. Bundled so the two adjacent monotonic
+ * clocks (`deadline` / `acquisitionStartedAt`) cannot be swapped at a call site
+ * and so the shared sync/async acquisition loops pass one coherent bag.
+ */
+interface EvaluateLockContentionInput {
+  readonly lockPath: string;
+  readonly metadata: FileLockMetadata;
+  readonly options: WithFileLockOptions;
+  readonly tracker: LockStaleTracker;
+  readonly processInspector: SafetyBiasedProcessInspector;
+  readonly deadline: number;
+  readonly acquisitionStartedAt: number;
+  readonly environment: FileLockEnvironment;
+}
+
+function evaluateLockContention(input: EvaluateLockContentionInput): LockContentionOutcome {
+  const {
+    lockPath,
+    metadata,
+    options,
+    tracker,
+    processInspector,
+    deadline,
+    acquisitionStartedAt,
+    environment,
+  } = input;
   if (tryAcquireLock(lockPath, metadata)) return 'acquired';
 
   const existing = readLockSnapshot(lockPath);
@@ -1144,16 +1161,16 @@ function withFileLockInEnvironment<T>(
   let acquired = false;
 
   while (!acquired) {
-    const outcome = evaluateLockContention(
+    const outcome = evaluateLockContention({
       lockPath,
       metadata,
-      normalizedOptions,
+      options: normalizedOptions,
       tracker,
       processInspector,
       deadline,
       acquisitionStartedAt,
       environment,
-    );
+    });
     if (outcome === 'acquired') {
       acquired = true;
       break;
@@ -1237,16 +1254,16 @@ async function withFileLockAsyncInEnvironment<T>(
   let acquired = false;
 
   while (!acquired) {
-    const outcome = evaluateLockContention(
+    const outcome = evaluateLockContention({
       lockPath,
       metadata,
-      normalizedOptions,
+      options: normalizedOptions,
       tracker,
       processInspector,
       deadline,
       acquisitionStartedAt,
       environment,
-    );
+    });
     if (outcome === 'acquired') {
       acquired = true;
       break;

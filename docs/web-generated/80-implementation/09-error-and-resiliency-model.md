@@ -1,7 +1,7 @@
 ---
 status: current
 last_verified: 2026-07-23
-release: v0.8.4
+release: v0.8.5
 title: "Error and resiliency model"
 audience: [contributors, tool-authors]
 purpose: "How failures are defined, constructed, normalized, retried, cancelled, and projected across CLI, workers, logs, and JSON."
