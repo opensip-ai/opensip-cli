@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { findRemoteRenderDependencies } from './offline-resource-references.js';
+import { findRemoteRenderDependencies } from './_offline-resource-references.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST_CLI = join(HERE, '..', '..', '..', 'cli', 'dist', 'index.js');
