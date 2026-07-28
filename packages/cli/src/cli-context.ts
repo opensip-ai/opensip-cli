@@ -21,11 +21,15 @@ import { EXIT_CODES, type CommandResult } from '@opensip-cli/contracts';
 import {
   createRunTimer,
   currentScope,
+  PluginIncompatibleError,
   type RunScope,
   logger as defaultLogger,
   type Logger,
   type ToolCliContext,
 } from '@opensip-cli/core';
+
+
+const SEAM_DENIED = hostErrorCatalog.require('CLI.HOST.SEAM_DENIED');
 
 import {
   createEnsureArtifactDirSeam,
@@ -47,6 +51,7 @@ import {
 import { createDatastoreResolver, readScope } from './bootstrap/scope-access.js';
 import { resolveCurrentSessionRetentionPolicy } from './bootstrap/session-retention.js';
 import { buildStateSeams } from './bootstrap/state-seams.js';
+import { hostErrorCatalog } from './errors/host-error-catalog.js';
 
 // ---------------------------------------------------------------------------
 // No module-global bootstrap-handoff bag.
@@ -297,12 +302,18 @@ export function buildHostDispatchCtx(logger?: Logger): ToolCliContext {
  * business calling — fail loud, never a silent no-op (the worker shim already
  * denies the live-view seams; this is the host-side counterpart).
  *
- * @throws {Error} always — that is the point.
+ * @throws {PluginIncompatibleError} always — that is the point.
  */
 function deniedHookSeam(seam: string): () => never {
   return () => {
-    throw new Error(
+    throw new PluginIncompatibleError(
       `host dispatch ctx: seam '${seam}' is not available to a data-gathering hook worker`,
+      {
+        code: SEAM_DENIED.code,
+        definition: SEAM_DENIED,
+        metadata: { condition: 'hook-seam-denied', seam },
+        diagnostic: `hook worker denied seam '${seam}'`,
+      },
     );
   };
 }

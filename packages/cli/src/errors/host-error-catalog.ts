@@ -25,6 +25,7 @@
 
 import { defineErrorCatalog } from '@opensip-cli/core';
 
+import { hostSurfacesDefinitions } from './definitions/host-surfaces.js';
 import { hostWiringDefinitions } from './definitions/host-wiring.js';
 import { initAndPolicyDefinitions } from './definitions/init-and-policy.js';
 import { suiteAndRunsDefinitions } from './definitions/suite-and-runs.js';
@@ -54,5 +55,6 @@ export const hostErrorCatalog = defineErrorCatalog(
     ...hostWiringDefinitions,
     ...suiteAndRunsDefinitions,
     ...initAndPolicyDefinitions,
+    ...hostSurfacesDefinitions,
   },
 );

@@ -26,12 +26,16 @@ import { fileURLToPath } from 'node:url';
 import { BUILTIN_TRUST_POLICY } from '@opensip-cli/config';
 import {
   LanguageRegistry,
+  SystemError,
   ToolRegistry,
   logger,
   readPackageVersion,
   getMeter,
 } from '@opensip-cli/core';
 import { Command } from 'commander';
+
+
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 
 import { buildRuntimeCommandInventory } from './bootstrap/build-runtime-command-inventory.js';
 import { runCommandDispatchBoundary } from './bootstrap/command-dispatch-boundary.js';
@@ -73,6 +77,7 @@ import {
 } from './commands/host-subcommand-groups.js';
 import { registerCliCommands } from './commands/index.js';
 import { handleFatalBootstrapError, handleParseError } from './error-handler.js';
+import { hostErrorCatalog } from './errors/host-error-catalog.js';
 import { resolvedCommandLabel } from './telemetry/command-label.js';
 import { runWithTelemetryContext, shutdownTelemetry } from './telemetry/sdk-init.js';
 import { printWelcome } from './welcome.js';
@@ -232,10 +237,17 @@ async function main(): Promise<void> {
           cliEntryUrl: import.meta.url,
           argv: userArgv,
           runtimeMode,
-          /** @throws {Error} When standard discovery lacks its required runtime lease. */
+          /** @throws {SystemError} When standard discovery lacks its required runtime lease. */
           assertExternalDiscoveryProtected: (projectRoot) => {
             if (startupRuntimeLease === undefined) {
-              throw new Error('Standard startup reached discovery without its runtime lease.');
+              throw new SystemError(
+                'Standard startup reached discovery without its runtime lease.',
+                {
+                  code: WIRING_INVALID.code,
+                  definition: WIRING_INVALID,
+                  metadata: { condition: 'startup-lease-missing' },
+                },
+              );
             }
             startupRuntimeLease.assertDiscoveryProtected(projectRoot);
           },

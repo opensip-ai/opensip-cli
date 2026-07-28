@@ -16,12 +16,14 @@
  * host crash, never a silent no-op.
  */
 
-import { canonicalToolErrorCode, ToolError } from '@opensip-cli/core';
+import { canonicalToolErrorCode, SystemError, ToolError } from '@opensip-cli/core';
 import { datastoreErrorCatalog } from '@opensip-cli/datastore';
 
 import { hostErrorCatalog } from '../errors/host-error-catalog.js';
 
 import { HOST_PLANE_METHODS } from './tool-command-dispatch-types.js';
+
+const PLANE_UNAVAILABLE = hostErrorCatalog.require('CLI.HOST.PLANE_UNAVAILABLE');
 
 import type {
   DeliverSignalsOpts,
@@ -156,13 +158,17 @@ function validateHostRpcRequest(request: unknown): asserts request is HostRpcReq
  * Resolve the named host plane from the context's `hostPlanes` bag. A plane
  * absent on an OSS host is an explicit, structured failure — not a silent no-op.
  *
- * @throws {Error} when the host provides no impl for the requested plane (the
+ * @throws {SystemError} when the host provides no impl for the requested plane (the
  *   worker re-throws it into the handler as a normal thrown error).
  */
 function resolvePlane(ctx: ToolCliContext, plane: HostPlaneKind): HostPlaneImpl {
   const impl = ctx.hostPlanes?.[plane] as HostPlaneImpl | undefined;
   if (impl === undefined) {
-    throw new Error(`host-RPC: hostPlanes.${plane} is not provided by this host`);
+    throw new SystemError(`host-RPC: hostPlanes.${plane} is not provided by this host`, {
+      code: PLANE_UNAVAILABLE.code,
+      definition: PLANE_UNAVAILABLE,
+      metadata: { condition: 'plane-absent', plane },
+    });
   }
   return impl;
 }
