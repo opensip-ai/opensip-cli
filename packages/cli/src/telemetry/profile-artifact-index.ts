@@ -2,6 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import { linkSync, lstatSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
+import { ConfigurationError, SystemError } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+const CONTAINMENT_REFUSED = hostErrorCatalog.require('CLI.PROFILE.CONTAINMENT_REFUSED');
+const ARTIFACT_INVALID = hostErrorCatalog.require('CLI.PROFILE.ARTIFACT_INVALID');
+
 const SERVICE_NAME = 'opensip-cli';
 const MAX_LABEL_LENGTH = 128;
 const MAX_SLUG_LENGTH = 48;
@@ -99,13 +106,17 @@ function sealMetadata(value: ProfileArtifactMetadata): ProfileArtifactMetadata {
   return metadata;
 }
 
-/** @throws {Error} When metadata is foreign or fails its directory binding. */
+/** @throws {SystemError} When metadata is foreign or fails its directory binding. */
 function assertArtifactPair(metadata: ProfileArtifactMetadata): {
   readonly baseDir: string;
   readonly containmentRoot: string;
 } {
   if (!indexedMetadata.has(metadata)) {
-    throw new Error('profile artifact metadata was not created by the artifact index');
+    throw new SystemError('profile artifact metadata was not created by the artifact index', {
+      code: ARTIFACT_INVALID.code,
+      definition: ARTIFACT_INVALID,
+      metadata: { condition: 'foreign-metadata' },
+    });
   }
   const baseDir = resolve(metadata.directory);
   const containmentRoot = resolve(metadata.containmentRoot);
@@ -123,7 +134,11 @@ function assertArtifactPair(metadata: ProfileArtifactMetadata): {
     !labelsName.endsWith('.labels.json') ||
     profileName.slice(0, -'.cpuprofile'.length) !== labelsName.slice(0, -'.labels.json'.length)
   ) {
-    throw new Error('profile artifact metadata failed its directory binding');
+    throw new SystemError('profile artifact metadata failed its directory binding', {
+      code: ARTIFACT_INVALID.code,
+      definition: ARTIFACT_INVALID,
+      metadata: { condition: 'binding-failed' },
+    });
   }
   return { baseDir, containmentRoot };
 }
@@ -136,10 +151,14 @@ function isPathWithin(root: string, candidate: string): boolean {
   );
 }
 
-/** @throws {Error} When `baseDir` escapes the containment root or a component is not a real directory. */
+/** @throws {ConfigurationError} When `baseDir` escapes the containment root or a component is not a real directory. */
 function ensurePrivateArtifactDirectory(baseDir: string, containmentRoot: string): void {
   if (!isPathWithin(containmentRoot, baseDir)) {
-    throw new Error('profile artifact directory escaped its containment root');
+    throw new ConfigurationError('profile artifact directory escaped its containment root', {
+      code: CONTAINMENT_REFUSED.code,
+      definition: CONTAINMENT_REFUSED,
+      metadata: { condition: 'directory-escape' },
+    });
   }
   ensureDirectory(containmentRoot, true);
   const pathFromRoot = relative(containmentRoot, baseDir);
@@ -150,7 +169,7 @@ function ensurePrivateArtifactDirectory(baseDir: string, containmentRoot: string
   }
 }
 
-/** @throws {Error} When `path` exists but is a symlink or non-directory. */
+/** @throws {ConfigurationError} When `path` exists but is a symlink or non-directory. */
 function ensureDirectory(path: string, recursive: boolean): void {
   let stats;
   try {
@@ -161,7 +180,14 @@ function ensureDirectory(path: string, recursive: boolean): void {
     stats = lstatSync(path);
   }
   if (stats.isSymbolicLink() || !stats.isDirectory()) {
-    throw new Error(`profile artifact directory component is not a real directory: ${path}`);
+    throw new ConfigurationError(
+      `profile artifact directory component is not a real directory: ${path}`,
+      {
+        code: CONTAINMENT_REFUSED.code,
+        definition: CONTAINMENT_REFUSED,
+        metadata: { condition: 'not-directory' },
+      },
+    );
   }
 }
 
@@ -170,17 +196,27 @@ function ensureDirectory(path: string, recursive: boolean): void {
  * directory. Command/run labels never become path components without slugging and
  * bounding first; the original bounded values live only in the JSON sidecar.
  *
- * @throws {Error} When the directory is empty, escapes containment, or path construction fails.
+ * @throws {ConfigurationError} When the directory is empty, escapes containment, or path construction fails.
  * @throws {RangeError} When processId/startedAt inputs are invalid.
  */
 export function createProfileArtifactIndex(
   input: CreateProfileArtifactIndexInput,
 ): ProfileArtifactMetadata {
-  if (input.baseDir.trim().length === 0) throw new Error('profile artifact directory is empty');
+  if (input.baseDir.trim().length === 0) {
+    throw new ConfigurationError('profile artifact directory is empty', {
+      code: CONTAINMENT_REFUSED.code,
+      definition: CONTAINMENT_REFUSED,
+      metadata: { condition: 'empty-base-dir' },
+    });
+  }
   let baseDir = resolve(input.baseDir.trim());
   let containmentRoot = resolve(input.containmentRoot ?? dirname(baseDir));
   if (!isPathWithin(containmentRoot, baseDir)) {
-    throw new Error('profile artifact directory escaped its containment root');
+    throw new ConfigurationError('profile artifact directory escaped its containment root', {
+      code: CONTAINMENT_REFUSED.code,
+      definition: CONTAINMENT_REFUSED,
+      metadata: { condition: 'directory-escape' },
+    });
   }
   try {
     if (lstatSync(containmentRoot).isSymbolicLink()) {
@@ -217,7 +253,11 @@ export function createProfileArtifactIndex(
   // A final containment assertion makes the security property independent of the
   // slug implementation above. Both candidates must be direct children.
   if (dirname(profilePath) !== baseDir || dirname(labelsPath) !== baseDir) {
-    throw new Error('profile artifact path escaped the selected directory');
+    throw new ConfigurationError('profile artifact path escaped the selected directory', {
+      code: CONTAINMENT_REFUSED.code,
+      definition: CONTAINMENT_REFUSED,
+      metadata: { condition: 'path-escape' },
+    });
   }
 
   const labels = Object.freeze({ service: SERVICE_NAME, runId, command });
@@ -233,7 +273,7 @@ export function createProfileArtifactIndex(
 }
 
 /**
- * @throws {Error} When metadata fails its directory binding.
+ * @throws {SystemError} When metadata fails its directory binding.
  * @throws {RangeError} When `completedAt` is not a valid Date.
  */
 function completeProfileArtifactIndex(
@@ -268,7 +308,8 @@ export function writeProfileArtifactLabels(metadata: ProfileArtifactMetadata): v
 /**
  * Atomically publish the CPU profile and only then return complete metadata.
  *
- * @throws {Error} When metadata fails its directory binding or the temp path escapes.
+ * @throws {SystemError} When metadata fails its directory binding.
+ * @throws {ConfigurationError} When the temp path escapes the selected directory.
  * @throws {TypeError} When `profile` is not JSON-serializable.
  * @throws {RangeError} When `completedAt` is not a valid Date.
  */
@@ -289,7 +330,11 @@ export function writeCpuProfileArtifact(
     `.${basename(metadata.profilePath)}.${randomUUID().replaceAll('-', '')}.tmp`,
   );
   if (dirname(temporaryPath) !== baseDir) {
-    throw new Error('temporary profile artifact escaped the selected directory');
+    throw new ConfigurationError('temporary profile artifact escaped the selected directory', {
+      code: CONTAINMENT_REFUSED.code,
+      definition: CONTAINMENT_REFUSED,
+      metadata: { condition: 'temp-path-escape' },
+    });
   }
   try {
     writeFileSync(temporaryPath, serialized, {

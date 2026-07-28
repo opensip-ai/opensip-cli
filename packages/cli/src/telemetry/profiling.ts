@@ -22,9 +22,12 @@
 import { Session } from 'node:inspector';
 import { dirname, join, resolve } from 'node:path';
 
-import { logger, resolveEphemeralProjectPaths, type RunScope } from '@opensip-cli/core';
+import { logger, resolveEphemeralProjectPaths, SystemError, type RunScope } from '@opensip-cli/core';
 
 import { hostEnv } from '../env/host-env-specs.js';
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+const PROFILE_CAPTURE_FAILED = hostErrorCatalog.require('CLI.PROFILE.CAPTURE_FAILED');
 
 import {
   createProfileArtifactIndex,
@@ -321,7 +324,11 @@ export function stopProfiling(scope?: RunScope): Promise<ProfileArtifactMetadata
 
       const result = await postStop(state.session);
       if (result.profile === undefined || !state.artifacts) {
-        throw new Error('Profiler.stop returned no CPU profile');
+        throw new SystemError('Profiler.stop returned no CPU profile', {
+          code: PROFILE_CAPTURE_FAILED.code,
+          definition: PROFILE_CAPTURE_FAILED,
+          metadata: { condition: 'stop-empty' },
+        });
       }
       completedArtifacts = writeCpuProfileArtifact(state.artifacts, result.profile);
       profilePublished = true;
