@@ -1,11 +1,13 @@
 import {
   capabilityCoContributionValues,
+  createToolError,
   importCapabilityPackageModule,
   readCapabilityArrayExport,
   type CapabilityBridgeContribution,
   type CapabilityIsolationBridge,
 } from '@opensip-cli/core';
 
+import { fitnessErrorCatalog } from '../errors/fitness-error-catalog.js';
 import { isCheck, type Check, type CheckConfig } from '../framework/check-types.js';
 import { PathMatcher } from '../framework/path-matcher.js';
 
@@ -125,7 +127,11 @@ async function runWorkerCheck(
   const checks = readCapabilityArrayExport(mod, args.descriptor.exportName).filter(isCheck);
   const check = checks.find((candidate) => candidate.config.id === request.checkId);
   if (check === undefined) {
-    throw new Error(`capability pack ${args.pkg.name} has no check '${request.checkId}'`);
+    throw createToolError(
+      fitnessErrorCatalog.require('FIT.CAPABILITY.CHECK_NOT_FOUND'),
+      `capability pack ${args.pkg.name} has no check '${request.checkId}'`,
+      { metadata: { packageName: args.pkg.name, checkId: request.checkId } },
+    );
   }
   return await check.run(request.cwd, request.options);
 }
@@ -155,7 +161,11 @@ async function runInWorker(
   const request = context.request as FitnessWorkerRequest;
   if (request.kind === 'fitness.discover') return await discoverWorkerContributions(context);
   if (request.kind === 'fitness.run') return await runWorkerCheck(context, request);
-  throw new Error(`unknown fitness capability worker request`);
+  throw createToolError(
+    fitnessErrorCatalog.require('FIT.CAPABILITY.UNKNOWN_WORKER_REQUEST'),
+    'unknown fitness capability worker request',
+    { metadata: { condition: 'unknown-request-kind' } },
+  );
 }
 
 /** Worker-isolation bridge for external fit-pack contributions. */

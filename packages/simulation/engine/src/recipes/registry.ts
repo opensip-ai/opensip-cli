@@ -17,6 +17,8 @@
 
 import { RecipeRegistry, currentScope } from '@opensip-cli/core';
 
+import { simulationScopeError } from '../errors/simulation-scope-error.js';
+
 import { builtInSimulationRecipes } from './built-in-recipes.js';
 
 import type { SimulationRecipe } from './types.js';
@@ -94,7 +96,8 @@ export function createSimulationRecipeRegistry(): SimulationRecipeRegistry {
 export function currentSimulationRecipeRegistry(): SimulationRecipeRegistry {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw simulationScopeError(
+      'not-entered',
       'simulation: currentSimulationRecipeRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + simulationTool.contributeScope or construct ' +
@@ -102,7 +105,8 @@ export function currentSimulationRecipeRegistry(): SimulationRecipeRegistry {
     );
   }
   if (!scope.simulation) {
-    throw new Error(
+    throw simulationScopeError(
+      'subscope-missing',
       'simulation: scope.simulation is missing. The simulation tool must be ' +
         'registered and its contributeScope hook must run before recipe reads. ' +
         '(production: bootstrap registers simulationTool; tests: call ' +

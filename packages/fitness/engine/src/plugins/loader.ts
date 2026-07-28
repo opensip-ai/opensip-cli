@@ -19,6 +19,7 @@ import {
   registerRecipesFromMod,
 } from '@opensip-cli/core';
 
+import { fitnessScopeError } from '../errors/fitness-scope-error.js';
 import { isCheck } from '../framework/check-types.js';
 import { currentCheckRegistry, currentRecipeRegistry } from '../framework/scope-registry.js';
 
@@ -164,7 +165,8 @@ function registerLangExports(mod: Record<string, unknown>, ctx: RegisterCtx): Re
     if (registeredAdapterIds.has(id)) return;
     const scope = currentScope();
     if (!scope) {
-      throw new Error(
+      throw fitnessScopeError(
+        'plugin-loader-scope-missing',
         'fitness plugin loader: language adapter registration attempted outside runWithScope. ' +
           'Plugin loading must run inside a RunScope so adapters land in cli.scope.languages.',
       );

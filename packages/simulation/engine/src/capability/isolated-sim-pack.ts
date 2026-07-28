@@ -184,7 +184,11 @@ async function runInWorker(
   const request = context.request as SimWorkerRequest;
   if (request.kind === 'simulation.discover') return await discoverWorkerContributions(context);
   if (request.kind === 'simulation.run') return await runWorkerScenario(context, request);
-  throw new Error('unknown simulation capability worker request');
+  throw createToolError(
+    simulationErrorCatalog.require('SIMULATION.CAPABILITY.UNKNOWN_WORKER_REQUEST'),
+    'unknown simulation capability worker request',
+    { metadata: { condition: 'unknown-request-kind' } },
+  );
 }
 
 /** Worker-isolation bridge for external sim-pack contributions. */

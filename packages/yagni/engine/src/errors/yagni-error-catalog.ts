@@ -43,5 +43,62 @@ export const yagniErrorCatalog = defineErrorCatalog(
       lifecycle: 'active',
       publicMetadataKeys: ['detector'],
     },
+
+    /**
+     * A detector descriptor fails the defineDetector contract (id/slug/description).
+     *
+     * One code (D9); `metadata.condition` names which field failed.
+     */
+    'YAGNI.DETECTOR.INVALID_DEFINITION': {
+      code: 'YAGNI.DETECTOR.INVALID_DEFINITION',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'validation',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'plugin-incompatible',
+      operatorAction:
+        'Correct the detector id (kebab-case), slug (yagni:<id>), or non-empty description.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition', 'detectorId'],
+    },
+
+    /**
+     * The clone-detection substrate returned a duplicate group with no members.
+     */
+    'YAGNI.INVARIANT.EMPTY_DUPLICATE_GROUP': {
+      code: 'YAGNI.INVARIANT.EMPTY_DUPLICATE_GROUP',
+      source: 'application',
+      defaultResponsibility: 'tool-author',
+      kind: 'invariant',
+      retry: 'never',
+      severity: 'error',
+      exposure: 'redacted',
+      exitClass: 'runtime',
+      operatorAction:
+        'Capture the run id and report the empty duplicate group to the clone-detection author.',
+      stability: 'public',
+      lifecycle: 'active',
+    },
+
+    /**
+     * A stored yagni session cannot be replayed because its payload is missing.
+     */
+    'YAGNI.SESSION.PAYLOAD_MISSING': {
+      code: 'YAGNI.SESSION.PAYLOAD_MISSING',
+      source: 'infrastructure',
+      defaultResponsibility: 'environment',
+      kind: 'integrity',
+      retry: 'caller-policy',
+      severity: 'error',
+      exposure: 'public',
+      exitClass: 'runtime',
+      operatorAction: 'Re-run yagni to capture a session with a replay payload, then retry.',
+      stability: 'public',
+      lifecycle: 'active',
+      publicMetadataKeys: ['condition'],
+    },
   },
 );

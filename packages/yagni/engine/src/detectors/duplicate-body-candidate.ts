@@ -11,8 +11,9 @@
  */
 
 import { findDuplicateBodies } from '@opensip-cli/clone-detection';
-import { currentScope, namespacedRuleId, withSpan } from '@opensip-cli/core';
+import { createToolError, currentScope, namespacedRuleId, withSpan } from '@opensip-cli/core';
 
+import { yagniErrorCatalog } from '../errors/yagni-error-catalog.js';
 import { buildTsInventory } from '../lib/build-ts-inventory.js';
 import { severityForConfidence } from '../scoring/confidence.js';
 
@@ -44,7 +45,12 @@ function span(occ: CloneCandidate): number {
 function groupSignal(group: DuplicateGroup): Signal {
   const primary = group.members[0];
   /* v8 ignore next */
-  if (!primary) throw new Error('duplicate group with no members');
+  if (!primary) {
+    throw createToolError(
+      yagniErrorCatalog.require('YAGNI.INVARIANT.EMPTY_DUPLICATE_GROUP'),
+      'duplicate group with no members',
+    );
+  }
   const count = group.members.length;
   const netEstimate = span(primary) * (count - 1);
   const peers = group.members

@@ -25,6 +25,8 @@
 
 import { Registry, currentScope } from '@opensip-cli/core';
 
+import { simulationScopeError } from '../errors/simulation-scope-error.js';
+
 import type { RunnableScenario } from './runnable-scenario.js';
 import type { SimulationLoadState } from '../scope-augmentation.js';
 import type { ScenarioKind } from '../types/kind-types.js';
@@ -45,7 +47,8 @@ export function createSimulationLoadState(): SimulationLoadState {
 export function currentSimulationLoadState(): SimulationLoadState {
   const scope = currentScope();
   if (!scope?.simulation) {
-    throw new Error(
+    throw simulationScopeError(
+      'subscope-missing',
       'simulation: currentSimulationLoadState() requires an active RunScope with a ' +
         'simulation subscope (production: the pre-action-hook; tests: makeTestScope + ' +
         'simulationTool.contributeScope()).',
@@ -79,7 +82,8 @@ export function createScenarioRegistry(): Registry<RunnableScenario> {
 export function currentScenarioRegistry(): Registry<RunnableScenario> {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw simulationScopeError(
+      'not-entered',
       'simulation: currentScenarioRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + simulationTool.contributeScope or construct ' +
@@ -87,7 +91,8 @@ export function currentScenarioRegistry(): Registry<RunnableScenario> {
     );
   }
   if (!scope.simulation) {
-    throw new Error(
+    throw simulationScopeError(
+      'subscope-missing',
       'simulation: scope.simulation is missing. The simulation tool must be ' +
         'registered and its contributeScope hook must run before scenario reads. ' +
         '(production: bootstrap registers simulationTool; tests: call ' +
