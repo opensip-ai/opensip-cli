@@ -197,6 +197,96 @@ test('bounded stdio transport reports a non-closing root as cleanup residue', as
   assert.equal(transport.residualDescendants(), 1);
 });
 
+test('parent signal relay waits for a killed descendant to leave the process table', async () => {
+  // eslint-disable-next-line unicorn/prefer-event-target -- coordinator test seam uses Node process-style on/off signals.
+  const signalSource = new EventEmitter();
+  let resolveRelayed;
+  const relayed = new Promise((resolve) => {
+    resolveRelayed = resolve;
+  });
+  const coordinator = createParentSignalCoordinator({
+    signalSource,
+    cleanupTimeoutMs: 1000,
+    reraiseSignal: resolveRelayed,
+  });
+
+  // eslint-disable-next-line unicorn/prefer-event-target -- child-process test doubles expose EventEmitter seams.
+  const child = new EventEmitter();
+  // eslint-disable-next-line unicorn/prefer-event-target -- stdio test doubles expose EventEmitter seams.
+  child.stdin = new EventEmitter();
+  // eslint-disable-next-line unicorn/prefer-event-target -- stdio test doubles expose EventEmitter seams.
+  child.stdout = new EventEmitter();
+  // eslint-disable-next-line unicorn/prefer-event-target -- stdio test doubles expose EventEmitter seams.
+  child.stderr = new EventEmitter();
+  child.pid = 83_456;
+  child.kill = () => true;
+  child.stdin.write = () => true;
+
+  const root = {
+    pid: child.pid,
+    ppid: 1,
+    processGroupId: child.pid,
+    sessionToken: String(child.pid),
+    startedAt: 'root-start',
+    command: '/usr/bin/node',
+    rssBytes: 1024,
+  };
+  const descendant = {
+    pid: child.pid + 1,
+    ppid: child.pid,
+    processGroupId: child.pid,
+    sessionToken: String(child.pid),
+    startedAt: 'descendant-start',
+    command: '/usr/bin/node',
+    rssBytes: 1024,
+  };
+  let rootClosed = false;
+  let killDelivered = false;
+  let postKillSamples = 0;
+  const transport = new BoundedStdioClientTransport({
+    args: [],
+    command: 'synthetic-mcp',
+    cwd: process.cwd(),
+    env: {},
+    maxStderrBytes: 1024,
+    maxStdoutBytes: 1024,
+    parentSignalCoordinator: coordinator,
+    platform: 'linux',
+    closeGraceMs: 10,
+    closeKillMs: 100,
+    killProcess: (_pid, signal) => {
+      if (signal === 'SIGTERM' && !rootClosed) {
+        rootClosed = true;
+        queueMicrotask(() => {
+          child.emit('exit', null, 'SIGTERM');
+          child.emit('close', null, 'SIGTERM');
+        });
+      } else if (signal === 'SIGKILL') {
+        killDelivered = true;
+      }
+    },
+    readProcessTable: async () => {
+      if (!rootClosed) return [root, descendant];
+      if (!killDelivered) return [descendant];
+      postKillSamples += 1;
+      return postKillSamples < 3 ? [descendant] : [];
+    },
+    spawnChild: () => {
+      queueMicrotask(() => child.emit('spawn'));
+      return child;
+    },
+    ...jsonCodecs(),
+  });
+
+  await transport.start();
+  signalSource.emit('SIGTERM');
+  assert.equal(await relayed, 'SIGTERM');
+  assert.equal(killDelivered, true);
+  assert.ok(postKillSamples >= 3);
+  assert.equal(transport.residualDescendants(), 0);
+  await transport.close();
+});
+
 test(
   'parent signal waits for bounded TERM-to-KILL cleanup before relaying',
   { skip: process.platform === 'win32' },

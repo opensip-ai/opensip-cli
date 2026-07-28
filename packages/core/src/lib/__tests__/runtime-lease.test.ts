@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import {
+import fs, {
   chmodSync,
   existsSync,
   linkSync,
@@ -14,6 +14,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -2470,6 +2471,70 @@ describe('runtime lease coordination', () => {
     expect(existsSync(mutexTemp)).toBe(false);
     release(reader);
   });
+
+  it.each([
+    ['directory validation', 'assertPrivateRecordEntry'],
+    ['orphan cleanup', 'targetIdentity'],
+  ] as const)(
+    'treats a concurrently unlinked mutex temp snapshot during %s as contention',
+    async (_stage, faultFrame) => {
+      await createScaffold();
+      const paths = resolveCoordinationPaths();
+      const reader = track(await acquireRuntimeReadLease({ projectDir: project, policy: POLICY }));
+      const mutexTemp = join(
+        paths.coordinationDir,
+        '.coordination.lock.tmp-12345678-1234-4234-8234-123456789015',
+      );
+      privateWrite(mutexTemp, {
+        ownerToken: 'unlinking-mutex-owner-0001',
+        pid: 999_999_999,
+        hostname: hostId(hostname()),
+        hostIdentityProven: false,
+        acquiredAt: Date.now(),
+        lastHeartbeatAt: Date.now(),
+        staleMs: 60_000,
+      });
+
+      const originalLstatSync = fs.lstatSync;
+      let injectedUnlinkedSnapshot = false;
+      const patchedLstatSync = ((...arguments_: Parameters<typeof fs.lstatSync>) => {
+        const stat = Reflect.apply(originalLstatSync, fs, arguments_);
+        if (stat === undefined) return stat;
+        const stack = new Error('capture lstat fault frame').stack ?? '';
+        const reachedFault =
+          faultFrame === 'assertPrivateRecordEntry'
+            ? stack.includes('validateCoordinationRootEntries') &&
+              stack.includes('withCoordinationMutex')
+            : stack.includes(faultFrame);
+        if (!injectedUnlinkedSnapshot && String(arguments_[0]) === mutexTemp && reachedFault) {
+          injectedUnlinkedSnapshot = true;
+          return new Proxy(stat, {
+            get(target, property) {
+              if (property === 'nlink') return 0n;
+              const value = Reflect.get(target, property, target);
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          });
+        }
+        return stat;
+      }) as typeof fs.lstatSync;
+      Reflect.set(fs, 'lstatSync', patchedLstatSync);
+      syncBuiltinESMExports();
+
+      try {
+        release(reader);
+        expect(injectedUnlinkedSnapshot).toBe(true);
+        expect(existsSync(mutexTemp)).toBe(true);
+      } finally {
+        Reflect.set(fs, 'lstatSync', originalLstatSync);
+        syncBuiltinESMExports();
+      }
+
+      const cleanup = track(await acquireRuntimeReadLease({ projectDir: project, policy: POLICY }));
+      expect(existsSync(mutexTemp)).toBe(false);
+      release(cleanup);
+    },
+  );
 
   it('reclaims a fresh same-host reader only when its owner process is dead', async () => {
     await createScaffold();
