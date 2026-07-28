@@ -29,7 +29,7 @@ const CATALOG_SOURCES = [
   },
   {
     packageName: '@opensip-cli/simulation',
-    ownerId: 'simulation',
+    ownerId: '715d32c2-692c-4ed4-985b-a35deaf186aa',
     file: 'packages/simulation/engine/src/errors/simulation-error-catalog.ts',
     exportName: 'simulationErrorCatalog',
   },
@@ -41,13 +41,13 @@ const CATALOG_SOURCES = [
   },
   {
     packageName: '@opensip-cli/external-tool-adapter',
-    ownerId: 'external-tool-adapter',
+    ownerId: '@opensip-cli/external-tool-adapter',
     file: 'packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts',
     exportName: 'externalToolErrorCatalog',
   },
   {
     packageName: '@opensip-cli/mcp',
-    ownerId: 'mcp',
+    ownerId: 'f313c020-5b48-4e17-a579-e303907b6392',
     file: 'packages/mcp/src/errors/mcp-error-catalog.ts',
     exportName: 'mcpErrorCatalog',
   },

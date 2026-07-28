@@ -4,11 +4,18 @@
 
 import { defineErrorCatalog } from '@opensip-cli/core';
 
+/** Substrate catalogs are keyed on the npm package name (ruling D1). */
+export const EXTERNAL_TOOL_ERROR_OWNER_ID = '@opensip-cli/external-tool-adapter';
+
 export const externalToolErrorCatalog = defineErrorCatalog(
   {
-    id: 'external-tool-adapter',
-    displayName: 'external-tool-adapter',
-    packageName: '@opensip-cli/external-tool-adapter',
+    // The npm package name, not a short label. A substrate's owner id IS its package name under
+    // D1, and the aggregate rejects a contribution whose declared owner disagrees with the name
+    // it is registered under — so a short id silently kept this catalog out of the runtime
+    // registry, where its codes then resolved to UNKNOWN_FAILURE.
+    id: EXTERNAL_TOOL_ERROR_OWNER_ID,
+    displayName: '@opensip-cli/external-tool-adapter',
+    packageName: EXTERNAL_TOOL_ERROR_OWNER_ID,
   },
   {
     'EXTERNAL.SCANNER.BINARY_MISSING': {

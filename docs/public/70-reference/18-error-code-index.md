@@ -21,10 +21,10 @@ generated: true
 |---|---|---|---:|
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/error-definition.ts` | 13 |
 | `@opensip-cli/fitness` | `afd68bd3-ff3c-4935-a5b6-76d8fc7a5224` | `packages/fitness/engine/src/errors/fitness-error-catalog.ts` | 13 |
-| `@opensip-cli/simulation` | `simulation` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 5 |
+| `@opensip-cli/simulation` | `715d32c2-692c-4ed4-985b-a35deaf186aa` | `packages/simulation/engine/src/errors/simulation-error-catalog.ts` | 5 |
 | `@opensip-cli/yagni` | `3aba9195-2297-4f20-99d5-906945092dfc` | `packages/yagni/engine/src/errors/yagni-error-catalog.ts` | 2 |
-| `@opensip-cli/external-tool-adapter` | `external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
-| `@opensip-cli/mcp` | `mcp` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 3 |
+| `@opensip-cli/external-tool-adapter` | `@opensip-cli/external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
+| `@opensip-cli/mcp` | `f313c020-5b48-4e17-a579-e303907b6392` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 3 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
