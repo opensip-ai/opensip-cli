@@ -54,6 +54,7 @@ const MIGRATED_PACKAGES = [
   'packages/codebase/',
   'packages/config/',
   'packages/contracts/',
+  'packages/core/',
   'packages/dashboard/',
   'packages/datastore/',
   'packages/external-tool-adapter/',
@@ -69,6 +70,7 @@ const MIGRATED_PACKAGES = [
   'packages/simulation/engine/',
   'packages/targeting/',
   'packages/tool-test-kit/',
+  'packages/tree-sitter/',
   'packages/yagni/engine/',
 ];
 
