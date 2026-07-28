@@ -34,6 +34,7 @@ import {
   readProcessTable,
   reserveParentSignalCleanup,
   sumProcessTreeRss,
+  verifyResidualsWithinDeadline,
 } from '../lib/measured-process.mjs';
 
 const CLIENT_NAME = 'opensip-platform-acceptance';
@@ -375,10 +376,18 @@ export class BoundedStdioClientTransport {
         this.#child.stdout?.destroy?.();
         this.#child.stderr?.destroy?.();
       }
+      // Signal delivery is not process exit. In particular, Linux can retain a
+      // just-killed descendant in the process table until its parent/init reaps
+      // it. Keep the parent-signal reservation until a sampled absence proves
+      // cleanup, bounded by the existing KILL settlement window.
       this.#residualDescendants =
-        (await this.#terminator?.verifyResiduals({
-          includeRoot: this.#terminal === null,
-        })) ?? 1;
+        this.#terminator === undefined
+          ? 1
+          : await verifyResidualsWithinDeadline(
+              this.#terminator,
+              { includeRoot: this.#terminal === null },
+              killMs,
+            );
     } catch {
       this.#terminator?.markObservationFailure();
       try {

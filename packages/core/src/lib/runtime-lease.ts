@@ -423,6 +423,13 @@ interface AnchoredRecordMutationRuntimeOptions {
    * contention; ordinary generic mutations retain the strict single-link rule.
    */
   readonly linkedTargetCanBeBusy?: boolean;
+  /**
+   * A pathname being removed by another process can yield a final POSIX stat
+   * snapshot with `nlink === 0` before the directory entry disappears. Treat
+   * that snapshot as contention only for call sites that already permit a
+   * concurrent unlink; ordinary mutations retain the strict single-link rule.
+   */
+  readonly concurrentUnlinkCanBeBusy?: boolean;
   readonly assertPublicationAllowed?: () => void;
   readonly afterUnlink?: () => void;
   readonly linkedCreateCheckpoint?: (name: LinkedCreateCheckpoint) => void;
@@ -1264,31 +1271,42 @@ function validateCoordinationRootEntries(
         [1n, 2n],
       );
     } else if (ROOT_ENTRY_PATTERN.test(entry)) {
-      assertPrivateRecordEntry(
-        path,
-        entry.includes(USER_UNINSTALL_RECEIPT_FILE)
-          ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
-          : MAX_RECORD_BYTES,
-        [1n, 2n],
-        entry.startsWith('.coordination.lock.tmp-'),
-      );
-      if (guard !== undefined) {
-        if (MUTEX_TEMP_FILE_PATTERN.test(entry)) {
-          reconcileOrphanedMutexTemp(paths, entry, guard);
-        } else {
-          const targetBasename = ROOT_TRANSITION_TEMP_FILE_PATTERN.exec(entry)?.[1];
-          if (targetBasename !== undefined) {
-            reconcileOrphanedTransitionTemp(
-              paths.coordinationDir,
-              entry,
-              targetBasename,
-              targetBasename === USER_UNINSTALL_RECEIPT_FILE
-                ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
-                : MAX_RECORD_BYTES,
-              guard,
-            );
+      const mutexTemporary = MUTEX_TEMP_FILE_PATTERN.test(entry);
+      try {
+        assertPrivateRecordEntry(
+          path,
+          entry.includes(USER_UNINSTALL_RECEIPT_FILE)
+            ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
+            : MAX_RECORD_BYTES,
+          [1n, 2n],
+          mutexTemporary,
+        );
+        if (guard !== undefined) {
+          if (mutexTemporary) {
+            reconcileOrphanedMutexTemp(paths, entry, guard);
+          } else {
+            const targetBasename = ROOT_TRANSITION_TEMP_FILE_PATTERN.exec(entry)?.[1];
+            if (targetBasename !== undefined) {
+              reconcileOrphanedTransitionTemp(
+                paths.coordinationDir,
+                entry,
+                targetBasename,
+                targetBasename === USER_UNINSTALL_RECEIPT_FILE
+                  ? RUNTIME_RECOVERY_RECORD_MAX_BYTES
+                  : MAX_RECORD_BYTES,
+                guard,
+              );
+            }
           }
         }
+      } catch (error) {
+        // A mutex creator can remove or publish its temp after readdir exposed
+        // the basename. The mutex owner may defer that transient entry to the
+        // next bounded scan; unrelated corruption still fails closed.
+        if (guard !== undefined && mutexTemporary && error instanceof RuntimeSnapshotChangedError) {
+          continue;
+        }
+        throw error;
       }
     } else {
       throw unsafeCoordination('Runtime coordination root contains an unexpected entry');
@@ -1556,12 +1574,20 @@ export function anchoredRecordTemporaryBasename(
   return temporary;
 }
 
-/** @throws {SystemError} When an existing record cannot be inspected or proven safe. */
+interface TargetIdentityOptions {
+  readonly linkedCreateCanBeBusy?: boolean;
+  readonly concurrentUnlinkCanBeBusy?: boolean;
+}
+
+/**
+ * @throws {SystemError} When an existing record cannot be inspected or proven safe.
+ * @throws {RuntimeSnapshotChangedError} When an allowed link transition is still in progress.
+ */
 function targetIdentity(
   path: string,
   maxBytes: number,
   permissionPosture: 'private' | 'owner-controlled' = 'private',
-  linkedCreateCanBeBusy = false,
+  options: TargetIdentityOptions = {},
 ): RecordIdentity | undefined {
   let stat;
   try {
@@ -1570,9 +1596,12 @@ function targetIdentity(
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw coordinationProbeFailed('Runtime coordination record cannot be inspected', 'probe');
   }
-  if (linkedCreateCanBeBusy && (stat.nlink === 0n || stat.nlink === 2n)) {
+  if (
+    (options.concurrentUnlinkCanBeBusy === true && stat.nlink === 0n) ||
+    (options.linkedCreateCanBeBusy === true && stat.nlink === 2n)
+  ) {
     assertRecordStatMetadata(stat, maxBytes, permissionPosture);
-    throw new RuntimeSnapshotChangedError('Anchored create publication is still in progress');
+    throw new RuntimeSnapshotChangedError('Anchored record link transition is still in progress');
   }
   assertRegularRecordStat(stat, maxBytes, permissionPosture);
   return recordIdentity(stat);
@@ -2243,6 +2272,10 @@ function performAnchoredRecordMutation(
   const target = join(input.parentDir, input.basename);
   const linkedTargetCanBeBusy =
     input.operation === 'create' || runtime.linkedTargetCanBeBusy === true;
+  const targetIdentityOptions: TargetIdentityOptions = {
+    linkedCreateCanBeBusy: linkedTargetCanBeBusy,
+    concurrentUnlinkCanBeBusy: linkedTargetCanBeBusy || runtime.concurrentUnlinkCanBeBusy === true,
+  };
   const parent = openAnchoredParentIdentity(input.parentDir, input.trustedAnchorDir, parentPosture);
   try {
     if (input.operation === 'create') {
@@ -2267,7 +2300,7 @@ function performAnchoredRecordMutation(
         parent,
       );
     }
-    const beforeTarget = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+    const beforeTarget = targetIdentity(target, maxBytes, recordPosture, targetIdentityOptions);
     /** @throws {SystemError} When the observed record digest differs from the expected digest. */
     const assertExpectedDigest = (): void => {
       if (input.expectedContentSha256 === undefined) return;
@@ -2336,7 +2369,7 @@ function performAnchoredRecordMutation(
         if (beforeTarget === undefined) {
           throw unsafeCoordination('Runtime coordination record disappeared before replacement');
         }
-        const current = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+        const current = targetIdentity(target, maxBytes, recordPosture, targetIdentityOptions);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before replacement',
@@ -2356,7 +2389,7 @@ function performAnchoredRecordMutation(
           target,
           maxBytes,
           recordPosture,
-          linkedTargetCanBeBusy,
+          targetIdentityOptions,
         );
         if (
           immediatelyBefore === undefined ||
@@ -2367,7 +2400,7 @@ function performAnchoredRecordMutation(
           );
         }
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture, targetIdentityOptions);
         if (afterDigest === undefined || !sameRecordIdentity(immediatelyBefore, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
@@ -2384,7 +2417,7 @@ function performAnchoredRecordMutation(
         if (beforeTarget === undefined) {
           return { strategy: COORDINATION_MUTATION_STRATEGY };
         }
-        const current = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+        const current = targetIdentity(target, maxBytes, recordPosture, targetIdentityOptions);
         if (current === undefined || !sameRecordIdentity(beforeTarget, current)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed before unlink',
@@ -2398,7 +2431,7 @@ function performAnchoredRecordMutation(
           parentPosture,
         );
         assertExpectedDigest();
-        const afterDigest = targetIdentity(target, maxBytes, recordPosture, linkedTargetCanBeBusy);
+        const afterDigest = targetIdentity(target, maxBytes, recordPosture, targetIdentityOptions);
         if (afterDigest === undefined || !sameRecordIdentity(current, afterDigest)) {
           throw new RuntimeSnapshotChangedError(
             'Runtime coordination record changed after CAS verification',
@@ -2410,7 +2443,7 @@ function performAnchoredRecordMutation(
           target,
           maxBytes,
           recordPosture,
-          linkedTargetCanBeBusy,
+          targetIdentityOptions,
         );
         if (
           immediatelyBeforeUnlink === undefined ||
@@ -3458,6 +3491,9 @@ function reconcileOrphanedMutexTemp(
         expectedContentSha256: observed.sha256,
       },
       guard,
+      undefined,
+      undefined,
+      { concurrentUnlinkCanBeBusy: true },
     );
   } catch (error) {
     if (isLinkedOwnedMutexTemporary(paths, entry)) {
