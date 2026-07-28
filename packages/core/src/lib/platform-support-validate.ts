@@ -1,3 +1,4 @@
+// @fitness-ignore-file file-length-limit -- Single fail-closed platform-support registry validator; Plan 01 multi-line classified throws grew the soft line count while keeping one reviewable unit. Hard limit remains clear.
 /**
  * Platform-support registry validation (Plan 02 — macOS GA qualification).
  *
@@ -11,6 +12,8 @@
  * module has no data dependency and cannot form an import cycle with the data
  * module that consumes it.
  */
+
+import { platformSupportError } from './platform-support-error.js';
 
 import type {
   PlatformSupportEvidence,
@@ -51,18 +54,28 @@ const EVIDENCE_RELEASE_PREFIX = '/opensip-ai/opensip-cli/releases/download/';
  */
 export function assertPlatformSupportRowsValid(rows: readonly PlatformSupportRow[]): void {
   if (!isArrayValue(rows) || rows.length === 0) {
-    throw new Error('Platform-support registry must contain at least one row');
+    throw platformSupportError(
+      'empty-registry',
+      'Platform-support registry must contain at least one row',
+    );
   }
   const ids = new Set<string>();
   const discriminators = new Set<string>();
   for (const [index, row] of rows.entries()) {
     const discriminator = assertRowValid(row, index);
     if (ids.has(row.id)) {
-      throw new Error(`Duplicate platform-support row id: ${row.id}`);
+      throw platformSupportError(
+        'duplicate-id',
+        `Duplicate platform-support row id: ${row.id}`,
+        row.id,
+      );
     }
     ids.add(row.id);
     if (discriminators.has(discriminator)) {
-      throw new Error(`Overlapping platform-support rows for tuple ${discriminator}`);
+      throw platformSupportError(
+        'overlapping-tuple',
+        `Overlapping platform-support rows for tuple ${discriminator}`,
+      );
     }
     discriminators.add(discriminator);
   }
@@ -79,7 +92,11 @@ function assertRowValid(row: PlatformSupportRow, index: number): string {
   }
   assertStableId(row.id, `Platform-support row at index ${String(index)} has an invalid id`);
   if (!SUPPORT_STATUSES.includes(row.status)) {
-    throw new Error(`Unknown platform-support status on row ${row.id}: ${String(row.status)}`);
+    throw platformSupportError(
+      'unknown-status',
+      `Unknown platform-support status on row ${row.id}: ${String(row.status)}`,
+      row.id,
+    );
   }
   assertTupleValid(row.id, row.tuple);
   assertDocsValid(row);
@@ -100,14 +117,24 @@ function assertStatusMetadataValid(row: PlatformSupportRow): void {
     assertSupportedQualificationValid(row);
   }
   if (row.status === 'preview' && row.profile === undefined) {
-    throw new Error(`Preview platform-support row ${row.id} lacks a qualification profile`);
+    throw platformSupportError(
+      'preview-profile-missing',
+      `Preview platform-support row ${row.id} lacks a qualification profile`,
+      row.id,
+    );
   }
   if (row.status === 'preview' && row.evidence === undefined) {
-    throw new Error(`Preview platform-support row ${row.id} lacks an evidence artifact policy`);
+    throw platformSupportError(
+      'preview-evidence-missing',
+      `Preview platform-support row ${row.id} lacks an evidence artifact policy`,
+      row.id,
+    );
   }
   if (row.status !== 'supported' && row.qualification !== undefined) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-qualification-missing',
       `Only a supported platform-support row may carry qualification metadata: ${row.id}`,
+      row.id,
     );
   }
 }
@@ -118,7 +145,11 @@ function assertStatusMetadataValid(row: PlatformSupportRow): void {
  */
 function assertTupleValid(rowId: string, tuple: PlatformSupportTuple): void {
   if (tuple === null || typeof tuple !== 'object') {
-    throw new Error(`Platform-support row ${rowId} has an invalid tuple`);
+    throw platformSupportError(
+      'invalid-tuple',
+      `Platform-support row ${rowId} has an invalid tuple`,
+      rowId,
+    );
   }
   assertLowercaseToken(tuple.osPlatform, `row ${rowId} tuple osPlatform`);
   assertBoundedText(tuple.osName, MAX_NAME_LENGTH, `row ${rowId} tuple osName`);
@@ -134,7 +165,11 @@ function assertTupleValid(rowId: string, tuple: PlatformSupportTuple): void {
   assertLowercaseToken(tuple.arch, `row ${rowId} tuple arch`);
   assertPositiveSafeInteger(tuple.nodeVersionMajor, `row ${rowId} tuple nodeVersionMajor`);
   if (typeof tuple.nodeAbi !== 'string' || !NODE_ABI.test(tuple.nodeAbi)) {
-    throw new Error(`Platform-support row ${rowId} has an invalid tuple nodeAbi`);
+    throw platformSupportError(
+      'invalid-node-abi',
+      `Platform-support row ${rowId} has an invalid tuple nodeAbi`,
+      rowId,
+    );
   }
   assertPositiveSafeInteger(tuple.npmVersionMajor, `row ${rowId} tuple npmVersionMajor`);
   assertLowercaseToken(tuple.filesystemType, `row ${rowId} tuple filesystemType`);
@@ -142,13 +177,21 @@ function assertTupleValid(rowId: string, tuple: PlatformSupportTuple): void {
     throw new TypeError(`Platform-support row ${rowId} has an invalid tuple caseSensitive value`);
   }
   if (!isArrayValue(tuple.installChannels) || tuple.installChannels.length === 0) {
-    throw new Error(`Platform-support row ${rowId} must declare at least one install channel`);
+    throw platformSupportError(
+      'install-channel-empty',
+      `Platform-support row ${rowId} must declare at least one install channel`,
+      rowId,
+    );
   }
   const channels = new Set<string>();
   for (const channel of tuple.installChannels) {
     assertLowercaseToken(channel, `row ${rowId} tuple install channel`);
     if (channels.has(channel)) {
-      throw new Error(`Platform-support row ${rowId} has a duplicate install channel: ${channel}`);
+      throw platformSupportError(
+        'install-channel-duplicate',
+        `Platform-support row ${rowId} has a duplicate install channel: ${channel}`,
+        rowId,
+      );
     }
     channels.add(channel);
   }
@@ -160,7 +203,11 @@ function assertTupleValid(rowId: string, tuple: PlatformSupportTuple): void {
  */
 function assertProfileValid(rowId: string, profile: PlatformSupportProfileRef): void {
   if (profile === null || typeof profile !== 'object') {
-    throw new Error(`Platform-support row ${rowId} has an invalid qualification profile`);
+    throw platformSupportError(
+      'invalid-profile',
+      `Platform-support row ${rowId} has an invalid qualification profile`,
+      rowId,
+    );
   }
   assertStableId(profile.id, `Platform-support row ${rowId} has an invalid profile id`);
   assertPositiveSafeInteger(profile.version, `row ${rowId} profile version`);
@@ -171,10 +218,18 @@ function assertProfileValid(rowId: string, profile: PlatformSupportProfileRef): 
  */
 function assertDocsValid(row: PlatformSupportRow): void {
   if (!isSafePublicDocsPath(row.docsPath)) {
-    throw new Error(`Platform-support row ${row.id} has an invalid public docs path`);
+    throw platformSupportError(
+      'invalid-docs-path',
+      `Platform-support row ${row.id} has an invalid public docs path`,
+      row.id,
+    );
   }
   if (!isSafeHttpsUrl(row.docsUrl)) {
-    throw new Error(`Platform-support row ${row.id} has an invalid public docs URL`);
+    throw platformSupportError(
+      'invalid-docs-url',
+      `Platform-support row ${row.id} has an invalid public docs URL`,
+      row.id,
+    );
   }
 }
 
@@ -184,17 +239,29 @@ function assertDocsValid(row: PlatformSupportRow): void {
  */
 function assertEvidenceValid(rowId: string, evidence: PlatformSupportEvidence): void {
   if (evidence === null || typeof evidence !== 'object') {
-    throw new Error(`Platform-support row ${rowId} has invalid evidence metadata`);
+    throw platformSupportError(
+      'invalid-evidence-metadata',
+      `Platform-support row ${rowId} has invalid evidence metadata`,
+      rowId,
+    );
   }
   if (
     typeof evidence.artifact !== 'string' ||
     evidence.artifact.length > MAX_ID_LENGTH ||
     !EVIDENCE_ARTIFACT.test(evidence.artifact)
   ) {
-    throw new Error(`Platform-support row ${rowId} has an invalid evidence artifact filename`);
+    throw platformSupportError(
+      'invalid-evidence-artifact',
+      `Platform-support row ${rowId} has an invalid evidence artifact filename`,
+      rowId,
+    );
   }
   if (evidence.url !== null && !isSafeHttpsUrl(evidence.url)) {
-    throw new Error(`Platform-support row ${rowId} lacks an immutable HTTPS evidence URL`);
+    throw platformSupportError(
+      'evidence-url-missing',
+      `Platform-support row ${rowId} lacks an immutable HTTPS evidence URL`,
+      rowId,
+    );
   }
 }
 
@@ -207,7 +274,11 @@ function assertNotesValid(row: PlatformSupportRow): void {
     assertBoundedText(row.notes, MAX_NOTES_LENGTH, `row ${row.id} notes`);
   } catch {
     const description = row.status === 'unsupported' ? 'reason' : 'notes';
-    throw new Error(`Platform-support row ${row.id} has invalid or missing ${description}`);
+    throw platformSupportError(
+      'missing-field',
+      `Platform-support row ${row.id} has invalid or missing ${description}`,
+      row.id,
+    );
   }
 }
 
@@ -217,7 +288,7 @@ function assertNotesValid(row: PlatformSupportRow): void {
  */
 function assertStableId(value: string, message: string): void {
   if (typeof value !== 'string' || value.length > MAX_ID_LENGTH || !STABLE_ID.test(value)) {
-    throw new Error(message);
+    throw platformSupportError('bounded-text', message);
   }
 }
 
@@ -231,7 +302,7 @@ function assertLowercaseToken(value: string, field: string): void {
     value.length > MAX_TOKEN_LENGTH ||
     !LOWERCASE_TOKEN.test(value)
   ) {
-    throw new Error(`Platform-support ${field} is invalid`);
+    throw platformSupportError('bounded-text', `Platform-support ${field} is invalid`);
   }
 }
 
@@ -246,7 +317,7 @@ function assertBoundedText(value: string, maximum: number, field: string): void 
     value.length > maximum ||
     containsControlCharacter(value)
   ) {
-    throw new Error(`Platform-support ${field} is invalid`);
+    throw platformSupportError('bounded-text', `Platform-support ${field} is invalid`);
   }
 }
 
@@ -255,7 +326,10 @@ function assertBoundedText(value: string, maximum: number, field: string): void 
  */
 function assertPositiveSafeInteger(value: number, field: string): void {
   if (!Number.isSafeInteger(value) || value <= 0) {
-    throw new Error(`Platform-support ${field} must be a positive safe integer`);
+    throw platformSupportError(
+      'positive-integer',
+      `Platform-support ${field} must be a positive safe integer`,
+    );
   }
 }
 
@@ -265,7 +339,7 @@ function assertPositiveSafeInteger(value: number, field: string): void {
  */
 function assertMajorRange(value: string, major: number, field: string): void {
   if (value !== `${String(major)}.x`) {
-    throw new Error(`Platform-support ${field} must match its major`);
+    throw platformSupportError('major-mismatch', `Platform-support ${field} must match its major`);
   }
 }
 
@@ -321,45 +395,61 @@ function isArrayValue(value: unknown): boolean {
  */
 function assertSupportedQualificationValid(row: PlatformSupportRow): void {
   if (row.profile === undefined || row.evidence === undefined) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-profile-missing',
       `Supported platform-support row ${row.id} lacks a qualification profile/evidence`,
+      row.id,
     );
   }
   const qualification = row.qualification;
   if (qualification === undefined) {
-    throw new Error(`Supported platform-support row ${row.id} lacks qualification metadata`);
+    throw platformSupportError(
+      'supported-qualification-missing',
+      `Supported platform-support row ${row.id} lacks qualification metadata`,
+      row.id,
+    );
   }
   if (
     !Number.isSafeInteger(qualification.consecutiveDailyPasses) ||
     qualification.consecutiveDailyPasses < 14
   ) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-evidence-policy',
       `Supported platform-support row ${row.id} requires at least 14 consecutive daily passes`,
+      row.id,
     );
   }
   if (!isExactSemver(qualification.qualifiedVersion)) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-qualification-missing',
       `Supported platform-support row ${row.id} has an invalid exact qualified version`,
+      row.id,
     );
   }
   if (!isCanonicalIsoTimestamp(qualification.qualifiedAt)) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-qualification-missing',
       `Supported platform-support row ${row.id} has an invalid qualification timestamp`,
+      row.id,
     );
   }
   if (
     typeof qualification.profileDigest !== 'string' ||
     !SHA256.test(qualification.profileDigest)
   ) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-qualification-missing',
       `Supported platform-support row ${row.id} has an invalid qualification profile digest`,
+      row.id,
     );
   }
   if (
     !isImmutableEvidenceUrl(row.evidence.url, row.evidence.artifact, qualification.qualifiedVersion)
   ) {
-    throw new Error(
+    throw platformSupportError(
+      'supported-evidence-missing',
       `Supported platform-support row ${row.id} lacks an immutable HTTPS evidence URL`,
+      row.id,
     );
   }
 }
