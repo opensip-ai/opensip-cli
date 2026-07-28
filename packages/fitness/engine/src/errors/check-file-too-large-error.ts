@@ -8,6 +8,7 @@ import { fitnessErrorCatalog } from './fitness-error-catalog.js';
 
 const FILE_TOO_LARGE = fitnessErrorCatalog.require('FIT.FITNESS.FILE_TOO_LARGE');
 
+/** Inputs needed to classify an oversized file refusal from a check pack. */
 export interface CheckFileTooLargeErrorOptions {
   /** Check slug shown to the adopter whose project is being analyzed. */
   readonly check: string;
