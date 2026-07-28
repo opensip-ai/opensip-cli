@@ -35,6 +35,8 @@ import { envelopeToResultSummary } from '@opensip-cli/contracts';
 import { formatScore } from '@opensip-cli/format';
 import { formatSignalTableRows, formatSignalTableSummary } from '@opensip-cli/output';
 
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
+
 import { suiteResultToView } from './suite-result-to-view.js';
 import { viewConfigMigrate, viewConfigSchema, viewConfigValidate } from './views/config-views.js';
 import { viewInit } from './views/init-view.js';
@@ -143,7 +145,10 @@ function titledLinesView(title: string | undefined, lines: readonly string[]): V
 
 /** @throws {Error} When the closed command-result union and renderer drift. */
 function assertNever(result: never): never {
-  throw new Error(`Unhandled command result '${JSON.stringify(result)}'`);
+  hostWiringInvalid(
+    `Unhandled command result '${JSON.stringify(result)}'`,
+    'command-result-unrenderable',
+  );
 }
 
 // --- Envelope-derived terminal table (ADR-0011) -----------------------------

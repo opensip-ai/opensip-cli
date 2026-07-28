@@ -49,6 +49,7 @@ const BARE_ERROR_THROW = /\bthrow\s+new\s+Error\s*\(/gu;
  * `packages/languages/` covers every language adapter without naming each one.
  */
 const MIGRATED_PACKAGES = [
+  'packages/cli/',
   'packages/cli-live/',
   'packages/cli-ui/',
   'packages/codebase/',

@@ -1,3 +1,4 @@
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
 /**
  * Commander action callback helpers for the CommandSpec mount layer.
  */
@@ -60,10 +61,11 @@ export function splitActionArgs(actionArgs: readonly unknown[]): {
 
   const lastIdx = actionArgs.length - 1;
   if (!isLikelyCommanderCommand(actionArgs[lastIdx])) {
-    throw new Error(
+    hostWiringInvalid(
       'mountCommandSpec: splitActionArgs could not locate Commander Command as the final action argument. ' +
         'This indicates an incompatible Commander version or a wrapped dispatch. ' +
         'Please report this with your Commander version.',
+      'action-args-command-missing',
     );
   }
 
@@ -79,9 +81,10 @@ export function splitActionArgs(actionArgs: readonly unknown[]): {
       const positionals = actionArgs.slice(0, i);
 
       if (isLikelyCommanderCommand(opts)) {
-        throw new Error(
+        hostWiringInvalid(
           'mountCommandSpec: splitActionArgs selected a Commander Command as the parsed opts. ' +
             'Refusing to dispatch — this is a bug in argument splitting.',
+          'action-args-opts-is-command',
         );
       }
       return { opts, positionals };

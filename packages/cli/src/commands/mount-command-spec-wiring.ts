@@ -7,6 +7,8 @@
 
 import { Option } from 'commander';
 
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
+
 import { optionDefaultValue } from './assemble-opts.js';
 
 import type { ArgSpec, OptionSpec } from '@opensip-cli/core';
@@ -44,9 +46,10 @@ export function buildOption(spec: OptionSpec, commandName: string): Option {
   }
   if (spec.required === true) {
     if (valuePlaceholder === undefined) {
-      throw new Error(
+      hostWiringInvalid(
         `mountCommandSpec: command '${commandName}' option '${spec.flag}' is required but takes no value; ` +
           'only value options can be required.',
+        'required-option-takes-no-value',
       );
     }
     option.makeOptionMandatory(true);

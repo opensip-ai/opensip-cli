@@ -5,6 +5,8 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { currentScope, type OptionSpec, type ProjectContext } from '@opensip-cli/core';
 
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
+
 import { executeConfigMigrate } from './config-migrate.js';
 import { executeConfigSchema, executeConfigValidate } from './config.js';
 import {
@@ -21,7 +23,10 @@ import type { CliCommandsContext } from './shared.js';
 function requireTools(ctx: CliCommandsContext) {
   const tools = ctx.tools ?? currentScope()?.tools;
   if (tools === undefined) {
-    throw new Error('config commands require a tool registry on the command context.');
+    hostWiringInvalid(
+      'config commands require a tool registry on the command context.',
+      'tool-registry-absent',
+    );
   }
   return tools;
 }

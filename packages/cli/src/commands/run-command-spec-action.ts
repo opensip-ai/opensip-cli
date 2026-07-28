@@ -13,6 +13,7 @@ import { RunRepo } from '@opensip-cli/session-store';
 
 import { currentSuiteRunContext, type RunActionHooks } from '../bootstrap/run-plane.js';
 import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
 
 import { emitCommandResult } from './mount-result-command.js';
 import {
@@ -250,10 +251,11 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
     case 'signal-envelope': {
       if (jsonRequested) {
         if (ctx.emitEnvelope === undefined) {
-          throw new Error(
+          hostWiringInvalid(
             `mountCommandSpec: command '${spec.name}' declares output 'signal-envelope' ` +
               'but the mount context provides no emitEnvelope (host commands are ' +
               "'command-result' / 'raw-stream' only).",
+            'output-envelope-unsupported',
           );
         }
         ctx.emitEnvelope(result);
@@ -275,10 +277,11 @@ export async function dispatchOutput<TCtx extends CommandMountContext>(
       // parsed opts + trailing positionals as the args payload; the handler's
       // return value is unused for this mode (the Ink app owns rendering).
       if (ctx.renderLive === undefined) {
-        throw new Error(
+        hostWiringInvalid(
           `mountCommandSpec: command '${spec.name}' declares output 'live-view' ` +
             'but the mount context provides no renderLive (host commands are ' +
             "'command-result' / 'raw-stream' only).",
+          'output-live-view-unsupported',
         );
       }
       // Thread the host-owned runSession (via LiveViewContext) so the live
