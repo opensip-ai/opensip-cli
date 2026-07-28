@@ -1,9 +1,6 @@
 /**
  * Composition-root projector: declarative CommandSpecs → plain RuntimeCommandInventory.
- *
- * Built once from the same host/Tool surfaces used for mounting and scope
- * indexing so MCP runtime wiring never retains live handlers or CLI closures.
- * MCP cannot import this module (layer DAG); it only reads `scope.runtimeCommands`.
+ * Built once for MCP `scope.runtimeCommands` (no live handlers; MCP cannot import this module).
  */
 
 import {
@@ -17,16 +14,22 @@ import {
   type RuntimeCommandInventory,
   type RuntimeCommandInventoryLimits,
   type RuntimeCommandLeaf,
-  type StaticHandlerDescriptor,
   type Tool,
   type ToolPluginManifest,
   type ToolProvenance,
   type ToolRegistry,
 } from '@opensip-cli/core';
 
+import {
+  inventoryError,
+  readOwn,
+  readStaticHandler,
+  readString,
+  readStringArray,
+} from './runtime-command-spec-readers.js';
+
 import type { HostSubcommandGroup, ToolPluginGroup } from '../commands/host-subcommand-groups.js';
 
-/** Production limits mirrored from core constants (immutable). */
 const PRODUCTION_LIMITS: RuntimeCommandInventoryLimits = Object.freeze({
   maxLeaves: MAX_RUNTIME_COMMAND_LEAVES,
   maxGroups: MAX_RUNTIME_COMMAND_GROUPS,
@@ -47,66 +50,6 @@ export interface BuildRuntimeCommandInventoryInput {
   readonly provenance?: readonly ToolProvenance[];
   /** Injected limits for unit tests; production uses core production caps. */
   readonly limits?: RuntimeCommandInventoryLimits;
-}
-
-type OwnProperty =
-  | { readonly kind: 'data'; readonly value: unknown }
-  | { readonly kind: 'missing' | 'accessor' | 'invalid' };
-
-function readOwn(target: object, key: PropertyKey): OwnProperty {
-  try {
-    const descriptor = Object.getOwnPropertyDescriptor(target, key);
-    if (descriptor === undefined) return { kind: 'missing' };
-    if (!('value' in descriptor)) return { kind: 'accessor' };
-    return { kind: 'data', value: descriptor.value };
-  } catch {
-    return { kind: 'invalid' };
-  }
-}
-
-function ownData(target: object, key: PropertyKey): unknown {
-  const property = readOwn(target, key);
-  return property.kind === 'data' ? property.value : undefined;
-}
-
-function readString(target: object, key: PropertyKey): string | undefined {
-  const value = ownData(target, key);
-  return typeof value === 'string' && value !== '' ? value : undefined;
-}
-
-function readStringArray(target: object, key: PropertyKey): readonly string[] {
-  const value = ownData(target, key);
-  if (!Array.isArray(value)) return [];
-  const out: string[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const item = readOwn(value, String(i));
-    if (item.kind === 'data' && typeof item.value === 'string' && item.value !== '') {
-      out.push(item.value);
-    }
-  }
-  return out;
-}
-
-/**
- * Read an optional static-handler descriptor from a command-spec object.
- *
- * @throws {Error} When `staticHandler` is present but not a plain data object
- *   or is missing required package/path/declaration fields.
- */
-function readStaticHandler(target: object): StaticHandlerDescriptor | undefined {
-  const property = readOwn(target, 'staticHandler');
-  if (property.kind === 'missing') return undefined;
-  if (property.kind !== 'data' || property.value === null || typeof property.value !== 'object') {
-    throw new Error('runtime inventory: staticHandler must be own data plain object.');
-  }
-  const descriptor = property.value;
-  const pkg = readString(descriptor, 'package');
-  const path = readString(descriptor, 'path');
-  const declaration = readString(descriptor, 'declaration');
-  if (pkg === undefined || path === undefined || declaration === undefined) {
-    throw new Error('runtime inventory: staticHandler missing package/path/declaration.');
-  }
-  return { package: pkg, path, declaration };
 }
 
 interface ToolIdentityFacts {
@@ -171,11 +114,23 @@ function projectLeafFromSpec(
 ): RuntimeCommandLeaf {
   const name = readString(spec, 'name');
   if (name === undefined) {
-    throw new Error(`runtime inventory: command at '${path}' missing name.`);
+    inventoryError(
+      `runtime inventory: command at '${path}' missing name.`,
+      'command-missing-name',
+      {
+        path,
+      },
+    );
   }
   const output = readString(spec, 'output');
   if (output === undefined) {
-    throw new Error(`runtime inventory: command '${path}' missing output.`);
+    inventoryError(
+      `runtime inventory: command '${path}' missing output.`,
+      'command-missing-output',
+      {
+        path,
+      },
+    );
   }
   const scopeRaw = readString(spec, 'scope');
   const scope = scopeRaw === 'none' ? 'none' : 'project';
@@ -186,7 +141,11 @@ function projectLeafFromSpec(
   // Handler must be present as own data function for a leaf — never invoke it.
   const handlerProp = readOwn(spec, 'handler');
   if (handlerProp.kind !== 'data' || typeof handlerProp.value !== 'function') {
-    throw new Error(`runtime inventory: command '${path}' handler missing or accessor.`);
+    inventoryError(
+      `runtime inventory: command '${path}' handler missing or accessor.`,
+      'command-handler-missing',
+      { path },
+    );
   }
   return {
     path,
@@ -220,11 +179,19 @@ function projectRegistryToolLeaves(
     const specs = tool.commandSpecs ?? [];
     for (const spec of specs) {
       if (spec === null || typeof spec !== 'object') {
-        throw new Error(`runtime inventory: tool '${canonical}' has invalid commandSpecs entry.`);
+        inventoryError(
+          `runtime inventory: tool '${canonical}' has invalid commandSpecs entry.`,
+          'tool-invalid-specs',
+          { tool: canonical },
+        );
       }
       const name = readString(spec, 'name');
       if (name === undefined) {
-        throw new Error(`runtime inventory: tool '${canonical}' command missing name.`);
+        inventoryError(
+          `runtime inventory: tool '${canonical}' command missing name.`,
+          'tool-command-missing-name',
+          { tool: canonical },
+        );
       }
       const parent = readString(spec, 'parent');
       const path = parent === undefined ? name : `${parent} ${name}`;
@@ -266,11 +233,11 @@ function projectExtraToolSpecLeaves(
 function projectHostSpecLeaves(hostSpecs: readonly object[], leaves: RuntimeCommandLeaf[]): void {
   for (const spec of hostSpecs) {
     if (spec === null || typeof spec !== 'object') {
-      throw new Error('runtime inventory: invalid host command spec.');
+      inventoryError('runtime inventory: invalid host command spec.', 'host-invalid-spec');
     }
     const name = readString(spec, 'name');
     if (name === undefined) {
-      throw new Error('runtime inventory: host command missing name.');
+      inventoryError('runtime inventory: host command missing name.', 'host-missing-name');
     }
     leaves.push(projectLeafFromSpec(spec, name, 'host', 'cli'));
   }
@@ -297,7 +264,11 @@ function projectHostGroups(
     for (const leaf of group.leaves) {
       const leafName = readString(leaf, 'name');
       if (leafName === undefined) {
-        throw new Error(`runtime inventory: host group '${group.name}' leaf missing name.`);
+        inventoryError(
+          `runtime inventory: host group '${group.name}' leaf missing name.`,
+          'host-leaf-missing-name',
+          { path: group.name },
+        );
       }
       leaves.push(projectLeafFromSpec(leaf, `${group.name} ${leafName}`, 'host', 'cli'));
     }
@@ -327,7 +298,11 @@ function projectToolPluginGroups(
     for (const leaf of group.leaves) {
       const leafName = readString(leaf, 'name');
       if (leafName === undefined) {
-        throw new Error(`runtime inventory: plugin group '${groupPath}' leaf missing name.`);
+        inventoryError(
+          `runtime inventory: plugin group '${groupPath}' leaf missing name.`,
+          'plugin-leaf-missing-name',
+          { path: groupPath },
+        );
       }
       leaves.push(
         projectLeafFromSpec(

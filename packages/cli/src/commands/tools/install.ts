@@ -16,7 +16,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
-import { isPathInside } from '@opensip-cli/core';
+import { ConfigurationError, isPathInside } from '@opensip-cli/core';
 
 import { admitToolPackage } from '../../bootstrap/admit-tool-package.js';
 import { policyCiEvidenceFromCurrentEnv } from '../../bootstrap/policy-evidence.js';
@@ -26,12 +26,16 @@ import {
   policyFromCurrentScope,
 } from '../../bootstrap/policy-pep.js';
 import { recordInstalledToolTrust } from '../../bootstrap/tool-trust.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import { addToolPlugin } from '../plugin-host-ops.js';
 
 import { runToolValidation } from './validate.js';
 
 import type { ToolsInstallResult, ToolsValidateResult } from '@opensip-cli/contracts';
 import type { ToolPluginManifest } from '@opensip-cli/core';
+
+const PACK_INVALID = hostErrorCatalog.require('CLI.TOOLS.PACK_INVALID');
+const PACK_CONTAINMENT = hostErrorCatalog.require('CLI.TOOLS.PACK_CONTAINMENT');
 
 /** Options for {@link toolsInstall}. */
 export interface ToolsInstallOptions {
@@ -58,7 +62,7 @@ export function expectedNpmPackTarballName(packageName: string, version: string)
  * 1. package.json name+version → expected basename (known identity)
  * 2. basename-only of the last pack stdout line, only if it is a bare `.tgz`
  *    name with no path separators / `..` and resolves inside the staged dir
- * @throws {Error} when the pack stdout cannot be safely resolved to a tarball
+ * @throws {ConfigurationError} when the pack stdout cannot be safely resolved to a tarball
  *   inside the staged package dir (unsafe path, `..`, or outside the dir).
  */
 export function resolvePackedTarballPath(stagedPkgDir: string, packStdout: string): string {
@@ -91,15 +95,24 @@ export function resolvePackedTarballPath(stagedPkgDir: string, packStdout: strin
   // Prefer package.json identity over pack stdout when both are available.
   const name = expected ?? (stdoutSafe ? reportedBase : '');
   if (name.length === 0 || name.includes('..') || name.includes('/') || name.includes('\\')) {
-    throw new Error(
+    throw new ConfigurationError(
       'npm pack did not produce a usable tarball name (expected package.json name/version or a bare .tgz basename)',
+      {
+        code: PACK_INVALID.code,
+        definition: PACK_INVALID,
+        metadata: { condition: 'name-unresolvable' },
+      },
     );
   }
   // Bare basename + join keeps the path inside stagedPkgDir; realpath containment
   // is an extra check once the file exists (symlink escape after pack).
   const tarball = join(stagedPkgDir, name);
   if (existsSync(tarball) && !isPathInside(tarball, stagedPkgDir)) {
-    throw new Error(`npm pack tarball is outside the staged package dir: ${name}`);
+    throw new ConfigurationError(`npm pack tarball is outside the staged package dir: ${name}`, {
+      code: PACK_CONTAINMENT.code,
+      definition: PACK_CONTAINMENT,
+      metadata: { condition: 'escaped-staging' },
+    });
   }
   return tarball;
 }

@@ -7,9 +7,10 @@ import {
   type SuiteRunResult,
   type TaskContextManifest,
 } from '@opensip-cli/contracts';
-import { generatePrefixedId, readPackageVersion } from '@opensip-cli/core';
+import { generatePrefixedId, readPackageVersion, SystemError } from '@opensip-cli/core';
 
 import { authoritativeEvidenceCwd } from '../../bootstrap/evidence-cwd.js';
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 import {
   projectEnvelopeEvidence,
   projectEvidenceSnapshotEvidence,
@@ -26,6 +27,7 @@ import {
 import type { SuiteStepReviewInput } from './review-brief.js';
 import type { EvidenceBundlePrecondition, EvidenceBundleRun } from '@opensip-cli/session-store';
 
+const WIRING_INVALID = hostErrorCatalog.require('CLI.HOST.WIRING_INVALID');
 const CLI_VERSION = readPackageVersion(import.meta.url);
 const CONTEXT_RUN_ID = /^RUN_[0-9A-HJKMNP-TV-Z]{26}$/u;
 const CONTEXT_STEP_ID = /^STEP_[0-9A-HJKMNP-TV-Z]{26}$/u;
@@ -308,7 +310,11 @@ export function projectSuiteRun(input: ProjectSuiteRunInput): SuiteRunLedgerProj
     );
     const identity = input.identity.steps[position];
     if (identity?.ordinal !== step.stepIndex) {
-      throw new Error('Suite ledger identity does not match the executed step order.');
+      throw new SystemError('Suite ledger identity does not match the executed step order.', {
+        code: WIRING_INVALID.code,
+        definition: WIRING_INVALID,
+        metadata: { condition: 'suite-ledger-identity-mismatch' },
+      });
     }
     const evidence =
       step.evidenceSnapshots === undefined

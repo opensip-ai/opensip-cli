@@ -11,6 +11,13 @@
  * consume it; helpers and purge re-check as defense in depth.
  */
 
+import { ConfigurationError, PluginIncompatibleError } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../errors/host-error-catalog.js';
+
+const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
+const HOST_IDENTITY_RESERVED = hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED');
+
 /** Exact reserved prefix for host-plane storage identities. */
 export const HOST_PLANE_STATE_PREFIX = '@opensip-cli/host-plane:' as const;
 
@@ -25,16 +32,27 @@ export function isReservedHostPlaneIdentity(value: string): boolean {
 /**
  * Map a bound tool id to its reserved host-plane storage identity.
  *
- * @throws when `toolId` is empty/whitespace or already carries the reserved prefix
+ * @throws {ConfigurationError} when `toolId` is empty/whitespace
+ * @throws {PluginIncompatibleError} when `toolId` already carries the reserved prefix
  */
 export function hostPlaneStateIdentity(toolId: string): string {
   const trimmed = toolId.trim();
   if (trimmed.length === 0) {
-    throw new Error('hostPlaneStateIdentity: toolId must be non-empty');
+    throw new ConfigurationError('hostPlaneStateIdentity: toolId must be non-empty', {
+      code: OPTION_INVALID.code,
+      definition: OPTION_INVALID,
+      metadata: { condition: 'empty-tool-id', field: 'toolId' },
+    });
   }
   if (isReservedHostPlaneIdentity(trimmed)) {
-    throw new Error(
+    throw new PluginIncompatibleError(
       `hostPlaneStateIdentity: toolId already carries the reserved prefix (${HOST_PLANE_STATE_PREFIX})`,
+      {
+        code: HOST_IDENTITY_RESERVED.code,
+        definition: HOST_IDENTITY_RESERVED,
+        metadata: { condition: 'reserved-prefix', value: trimmed },
+        diagnostic: 'toolId already carries host-plane prefix',
+      },
     );
   }
   return `${HOST_PLANE_STATE_PREFIX}${trimmed}`;

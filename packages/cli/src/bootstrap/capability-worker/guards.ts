@@ -18,7 +18,7 @@ import module, { createRequire } from 'node:module';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { SystemError, isPathInside } from '@opensip-cli/core';
+import { isPathInside, PluginIncompatibleError } from '@opensip-cli/core';
 
 import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
@@ -40,20 +40,21 @@ function hasResource(
  * message is explicit that this is the advisory guard, not enforcement — the
  * admission decision is the boundary.
  *
- * @throws {SystemError} always (`CLI.CAPABILITY_WORKER.RESOURCE_DENIED`); this is the patched
- *   builtin failure path.
+ * @throws {PluginIncompatibleError} always (`CLI.CAPABILITY_WORKER.RESOURCE_DENIED`); this is the
+ *   patched builtin failure path.
  */
 function denied(resource: string): never {
   // Typed, not bare: this throws into arbitrary pack and dependency code, which may catch it
   // and continue. Without machine identity there was no way to tell a swallowed denial from
   // ordinary operation once the pack had moved on.
-  throw new SystemError(
+  throw new PluginIncompatibleError(
     `capability worker denied undeclared ${resource} access ` +
       '(advisory guard — admission is the enforced boundary)',
     {
       code: RESOURCE_DENIED.code,
       definition: RESOURCE_DENIED,
-      metadata: { resource },
+      metadata: { condition: 'undeclared-resource', resource },
+      diagnostic: `undeclared ${resource}`,
     },
   );
 }

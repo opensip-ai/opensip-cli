@@ -158,11 +158,12 @@ export const hostWiringDefinitions = {
   'CLI.CAPABILITY_WORKER.NO_ISOLATION_BRIDGE': {
     ...HOST_WIRING,
     code: 'CLI.CAPABILITY_WORKER.NO_ISOLATION_BRIDGE',
+    exitClass: 'plugin-incompatible',
     kind: 'compatibility',
     exposure: 'public',
     operatorAction:
       'The capability pack targets an isolation domain its owning tool does not provide. Report it to the pack author with the domain id.',
-    publicMetadataKeys: ['domainId', 'ownerToolId'],
+    publicMetadataKeys: ['condition', 'domainId', 'ownerToolId'],
   },
 
   /**
@@ -179,11 +180,12 @@ export const hostWiringDefinitions = {
   'CLI.CAPABILITY_WORKER.RESOURCE_DENIED': {
     ...HOST_WIRING,
     code: 'CLI.CAPABILITY_WORKER.RESOURCE_DENIED',
+    exitClass: 'plugin-incompatible',
     defaultResponsibility: 'tool-author',
     kind: 'security',
     exposure: 'public',
     operatorAction:
       'The capability pack reached for a resource it did not declare. Add it to the pack manifest, or report it to the pack author.',
-    publicMetadataKeys: ['resource'],
+    publicMetadataKeys: ['condition', 'resource'],
   },
 } as const;

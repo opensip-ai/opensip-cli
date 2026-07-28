@@ -5,10 +5,10 @@ import {
   defineCommand,
   IpcPayloadTooLargeError,
   normalizeFailure,
+  PluginIncompatibleError,
   sendWorkerIpcMessageAndDrain,
   startWorkerHeartbeat,
   startWorkerCancellationControl,
-  SystemError,
   toOperatorFailureProjection,
   toWorkerFailureWire,
   WORKER_FAILURE_WIRE_VERSION,
@@ -74,12 +74,17 @@ async function runCapabilityWorker(spec: CapabilityWorkerSpec): Promise<unknown>
       );
   const bridge = tool?.extensionPoints?.capabilityIsolationBridges?.[spec.domainId];
   if (bridge === undefined) {
-    throw new SystemError(
+    throw new PluginIncompatibleError(
       `capability worker: no isolation bridge for domain '${spec.domainId}' on tool '${spec.ownerToolId}'`,
       {
         code: NO_ISOLATION_BRIDGE.code,
         definition: NO_ISOLATION_BRIDGE,
-        metadata: { domainId: spec.domainId, ownerToolId: spec.ownerToolId },
+        metadata: {
+          condition: 'worker-bridge-missing',
+          domainId: spec.domainId,
+          ownerToolId: spec.ownerToolId,
+        },
+        diagnostic: `no isolation bridge for ${spec.domainId}`,
       },
     );
   }

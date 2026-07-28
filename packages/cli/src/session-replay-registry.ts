@@ -1,4 +1,5 @@
 import {
+  PluginIncompatibleError,
   resolveToolHooks,
   type Tool,
   type ToolProvenance,
@@ -9,8 +10,12 @@ import {
 } from '@opensip-cli/core';
 
 import { isExternalToolProvenance, provenanceRecordFor } from './bootstrap/tool-provenance.js';
+import { hostErrorCatalog } from './errors/host-error-catalog.js';
 
 import type { CommandResult, ToolSessionReplay } from '@opensip-cli/contracts';
+
+const SESSION_REPLAY_DUPLICATE = hostErrorCatalog.require('CLI.SESSION_REPLAY.DUPLICATE');
+const SESSION_REPLAY_ISOLATION = hostErrorCatalog.require('CLI.SESSION_REPLAY.ISOLATION_REFUSED');
 
 /**
  * One tool's session-replay capability as the host consumes it. `replaySession`
@@ -77,7 +82,15 @@ export class SessionReplayRegistry {
       const contribution = resolveToolHooks(tool).sessionReplay;
       if (contribution === undefined) continue;
       if (byTool.has(contribution.tool)) {
-        throw new Error(`Duplicate session replay contribution for tool '${contribution.tool}'`);
+        throw new PluginIncompatibleError(
+          `Duplicate session replay contribution for tool '${contribution.tool}'`,
+          {
+            code: SESSION_REPLAY_DUPLICATE.code,
+            definition: SESSION_REPLAY_DUPLICATE,
+            metadata: { condition: 'duplicate-contribution', tool: contribution.tool },
+            diagnostic: `duplicate session replay for ${contribution.tool}`,
+          },
+        );
       }
       byTool.set(
         contribution.tool,
@@ -130,9 +143,16 @@ function externalContribution(
     replaySession: async (stored): Promise<ToolSessionReplay<CommandResult>> => {
       const record = provenanceRecordFor(tool, provenance);
       if (record === undefined || dispatchExternalReplay === undefined) {
-        throw new Error(
-          `external tool '${tool.metadata.name ?? tool.metadata.id}' session replay ` +
+        const toolName = tool.metadata.name ?? tool.metadata.id;
+        throw new PluginIncompatibleError(
+          `external tool '${toolName}' session replay ` +
             'cannot be isolated (no provenance/dispatcher to fork the replay worker); refusing to run it in-process',
+          {
+            code: SESSION_REPLAY_ISOLATION.code,
+            definition: SESSION_REPLAY_ISOLATION,
+            metadata: { condition: 'missing-isolation', tool: toolName },
+            diagnostic: `session replay isolation refused for ${toolName}`,
+          },
         );
       }
       const result = await dispatchExternalReplay(tool, record, stored);
