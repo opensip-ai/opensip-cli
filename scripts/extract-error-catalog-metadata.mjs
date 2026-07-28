@@ -8,13 +8,13 @@
  */
 
 import { promises as fs } from 'node:fs';
-import { dirname, join, relative } from 'node:path';
+import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 
 /** Explicit inventory of package-owned catalog modules (build-time manifest). */
-const CATALOG_SOURCES = [
+export const CATALOG_SOURCES = [
   {
     packageName: '@opensip-cli/core',
     ownerId: 'opensip-cli.core',
@@ -262,7 +262,9 @@ async function main() {
   process.stdout.write(`${JSON.stringify(payload, null, 2)}\n`);
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
