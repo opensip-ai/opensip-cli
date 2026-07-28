@@ -779,7 +779,7 @@ const RESIDUAL_SETTLEMENT_MS = 1000;
 const RESIDUAL_SETTLEMENT_POLL_MS = 25;
 const RSS_SAMPLE_TIMEOUT_MS = 1000;
 
-async function verifyResidualsWithinDeadline(terminator, options, timeoutMs) {
+export async function verifyResidualsWithinDeadline(terminator, options, timeoutMs) {
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 0) {
     throw new RangeError('residual settlement timeout must be a non-negative safe integer');
   }
