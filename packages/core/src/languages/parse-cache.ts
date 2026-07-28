@@ -20,6 +20,7 @@
 
 import { logger } from '../lib/logger.js';
 import { currentScope } from '../lib/run-scope.js';
+import { scopeError } from '../lib/scope-error.js';
 
 import type { LanguageAdapter } from './adapter.js';
 
@@ -83,7 +84,8 @@ export function getParseTree<TTree>(
 export function getParseTreeForFile(filePath: string, content: string): unknown {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw scopeError(
+      'not-entered',
       'getParseTreeForFile() called outside runWithScope. ' +
         'Engine work must run inside a RunScope so language adapters resolve via cli.scope.languages.',
     );

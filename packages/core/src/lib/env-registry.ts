@@ -26,6 +26,11 @@
  * a structured `cli.env.read_deprecated` event when a deprecated alias is hit.
  */
 
+import { coreErrorCatalog } from './errors/core-error-catalog.js';
+import { SystemError } from './errors.js';
+
+const ENV_UNKNOWN_VARIABLE = coreErrorCatalog.require('CORE.ENV.UNKNOWN_VARIABLE');
+
 /**
  * A deprecation note on an env var or one of its aliases. `since` is the release
  * the deprecation began; `use` names the canonical replacement to migrate to.
@@ -125,8 +130,13 @@ export class EnvRegistry {
   read<T = string>(canonical: string): EnvReadResult<T> {
     const spec = this.byCanonical.get(canonical) as EnvVarSpec<T> | undefined;
     if (spec === undefined) {
-      throw new Error(
+      throw new SystemError(
         `EnvRegistry: unknown variable '${canonical}' — declare an EnvVarSpec before reading it.`,
+        {
+          code: ENV_UNKNOWN_VARIABLE.code,
+          definition: ENV_UNKNOWN_VARIABLE,
+          metadata: { condition: 'unknown-variable', variable: canonical },
+        },
       );
     }
 

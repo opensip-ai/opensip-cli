@@ -15,7 +15,10 @@
  * adapter's own top-level `await loadGrammar(<wasm>)`.
  */
 
+import { createToolError } from '@opensip-cli/core';
 import { Parser, Language, type Tree } from 'web-tree-sitter';
+
+import { treeSitterErrorCatalog } from './errors/tree-sitter-error-catalog.js';
 
 // One-time WASM runtime init. Top-level await — every consumer statically
 // imports this module — guarantees the runtime is ready before any adapter's
@@ -43,7 +46,12 @@ try {
  */
 export async function loadGrammar(wasmPath: string): Promise<Language> {
   /* v8 ignore next -- only reachable when Parser.init() failed above */
-  if (!runtimeReady) throw new Error('web-tree-sitter runtime is not initialized');
+  if (!runtimeReady) {
+    throw createToolError(
+      treeSitterErrorCatalog.require('TREESITTER.TREE_SITTER.NOT_INITIALIZED'),
+      'web-tree-sitter runtime is not initialized',
+    );
+  }
   return Language.load(wasmPath);
 }
 

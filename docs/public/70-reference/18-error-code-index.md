@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **24**
-- Definitions: **251**
+- Definitions: **255**
 
 ## Catalogs
 
@@ -42,7 +42,7 @@ generated: true
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/file-lock.ts` | 11 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/tool-contract.ts` | 24 |
 | `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/plugin-capability.ts` | 17 |
-| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 18 |
+| `@opensip-cli/core` | `opensip-cli.core` | `packages/core/src/lib/errors/definitions/config-and-runtime.ts` | 22 |
 
 ## Codes
 
@@ -120,9 +120,11 @@ generated: true
 | `CORE.COMMAND_SPEC.ACCESSOR_REJECTED` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Declare command spec fields as plain data properties; getters and setters are rejected during admission. |
 | `CORE.COMMAND_SPEC.MISSING_NAME` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Give the command spec a non-empty `name`. |
 | `CORE.COMMAND_SPEC.NOT_AN_OBJECT` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Pass a plain object to defineCommand. |
+| `CORE.COMPATIBILITY.POLICY_INVALID` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The compatibility policy table is incomplete. Capture the condition and report a bug. |
 | `CORE.CONFIG.EXPLICIT_PATH_MISSING` | `@opensip-cli/core` | application | user | not-found | never | error | configuration | active | Correct the --config path, or omit --config to discover the config file. |
 | `CORE.CONFIG.NOT_FOUND` | `@opensip-cli/core` | application | user | not-found | never | error | configuration | active | Run `opensip init` to create opensip-cli.config.yml, or pass --config with the path to an existing one. |
 | `CORE.CONTRIBUTION.SCHEMA_MISMATCH` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Export the capability contribution in the documented shape (an array for list-valued contributions). |
+| `CORE.ENV.UNKNOWN_VARIABLE` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Declare an EnvVarSpec for the named variable before reading it from EnvRegistry. |
 | `CORE.EPHEMERAL_CACHE.IDENTITY_CHANGED` | `@opensip-cli/core` | infrastructure | environment | integrity | never | error | configuration | active | The user cache directory changed identity while it was in use. Remove the named cache directory and re-run. |
 | `CORE.EPHEMERAL_CACHE.PREPARE_FAILED` | `@opensip-cli/core` | infrastructure | environment | I/O | caller-policy | error | runtime | active | The user cache directory could not be created. Check the reported errno, free space, and permissions on the parent directory. |
 | `CORE.EPHEMERAL_CACHE.UNSAFE_POSTURE` | `@opensip-cli/core` | infrastructure | environment | security | never | error | configuration | active | The user cache directory is not owned by this user or is world-writable. Fix its ownership and permissions, or remove it so opensip can recreate it. |
@@ -130,6 +132,7 @@ generated: true
 | `CORE.ERROR_CATALOG.INVALID` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the tool |
 | `CORE.ERROR_DEFINITION.INVALID` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Correct the error definition or catalog named in the message; see the error-code index for the required shape. |
 | `CORE.EXECUTION.INVALID_MODE` | `@opensip-cli/core` | application | tool-author | validation | never | error | plugin-incompatible | active | Set the workflow execution mode to one of the documented values. |
+| `CORE.EXECUTION.INVARIANT` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | Capture the run id and the execution condition, then report a bug. |
 | `CORE.FILE.TOO_LARGE` | `@opensip-cli/core` | application | user | resource | never | error | configuration | active | The named file is larger than opensip will read. Split it, or exclude it from the analyzed target set. |
 | `CORE.FINGERPRINT_STRATEGY.STAMP_FAILED` | `@opensip-cli/core` | application | tool-author | invariant | never | warning | success | active | The tool |
 | `CORE.GATE.MUTUALLY_EXCLUSIVE_FLAGS` | `@opensip-cli/core` | application | user | validation | never | error | configuration | active | Pass either --gate-save or --gate-compare, not both. |
@@ -142,6 +145,7 @@ generated: true
 | `CORE.LOCK.UNSAFE_PUBLICATION` | `@opensip-cli/core` | infrastructure | environment | integrity | transient | error | configuration | active | The lock record could not be published safely. Re-run; if it repeats, the runtime directory may be on a filesystem without reliable hard links. |
 | `CORE.LOCK.UNSAFE_TEMP` | `@opensip-cli/core` | infrastructure | environment | integrity | transient | error | configuration | active | The lock temporary file could not be verified as private and complete. Re-run; if it repeats, check for another process writing into the runtime directory. |
 | `CORE.LOCK.WRITE_STALLED` | `@opensip-cli/core` | infrastructure | environment | resource | caller-policy | error | runtime | active | A lock write stalled. Check free space and file-descriptor limits for the runtime directory, then retry. |
+| `CORE.PLATFORM_SUPPORT.INVALID` | `@opensip-cli/core` | application | tool-author | invariant | never | error | runtime | active | The platform-support registry is inconsistent. Capture the condition and report a bug. |
 | `CORE.PLUGINS.ENTRY_ESCAPES_PACKAGE` | `@opensip-cli/core` | application | tool-author | security | never | error | plugin-incompatible | active | Point the pack |
 | `CORE.PLUGINS.FS_PROBE_FAILED` | `@opensip-cli/core` | infrastructure | environment | I/O | caller-policy | warning | runtime | active | A plugin discovery path could not be read, so some plugins may be missing from this run. Check the reported errno and the permissions on the named directory. |
 | `CORE.PLUGINS.REQUIRED_PACK_LOAD_FAILED` | `@opensip-cli/core` | application | tool-author | compatibility | never | error | plugin-incompatible | active | A required pack has no readable entry point. Reinstall the package, or remove it from the plugins list. |
