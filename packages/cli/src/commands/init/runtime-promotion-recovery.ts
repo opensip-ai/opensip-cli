@@ -64,6 +64,7 @@ import {
 import {
   assertRuntimePromotionProjectRootAuthority,
   captureRuntimePromotionRecoveryProjectRootAuthority,
+  reportInitFailure,
 } from './runtime-promotion-root-authority.js';
 import { createRuntimePromotionTransitionWriter } from './runtime-promotion-transitions.js';
 
@@ -309,6 +310,10 @@ async function runRecoveryWithLease(input: {
       state,
     });
   } catch (error) {
+    // The classification below is sound (it reads the raiser's declared condition), but the
+    // original failure was never recorded, so every recovery outcome was opaque to an operator
+    // trying to work out why recovery was needed at all.
+    reportInitFailure('recovery-under-lease-failed', error);
     return recoveryErrorResult({
       error,
       state,

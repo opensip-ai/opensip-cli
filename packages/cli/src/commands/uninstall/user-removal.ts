@@ -24,7 +24,10 @@ import {
   discardUserUninstallReceipt,
   inspectUserUninstallRecoveryHeader,
   type GlobalRuntimeMaintenanceLease,
+  ValidationError,
 } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
 
 import { interactivePrompt } from './interactive-prompt.js';
 import { collectTargets, printUserModeTargets, type Target } from './targets.js';
@@ -32,6 +35,10 @@ import { recoveryFailure } from './user-removal-fs.js';
 import { completeUserRemovalTransaction } from './user-removal-transaction.js';
 
 import type { UninstallDoneResult } from '@opensip-cli/contracts';
+
+const REFUSED_SYMLINK_USER_ROOT = hostErrorCatalog.require(
+  'CLI.UNINSTALL.REFUSED_SYMLINK_USER_ROOT',
+);
 
 export { removeOwnedTombstone } from './user-removal-fs.js';
 
@@ -101,10 +108,24 @@ function assertSafeUserRoot(userRoot: string): void {
     return;
   }
   if (st.isSymbolicLink()) {
-    throw new Error(`Refusing user uninstall: user root is a symbolic link (${resolved}).`);
+    throw new ValidationError(
+      `Refusing user uninstall: user root is a symbolic link (${resolved}).`,
+      {
+        code: REFUSED_SYMLINK_USER_ROOT.code,
+        definition: REFUSED_SYMLINK_USER_ROOT,
+        metadata: { condition: 'symlink', path: resolved },
+      },
+    );
   }
   if (!st.isDirectory()) {
-    throw new Error(`Refusing user uninstall: user root is not a directory (${resolved}).`);
+    throw new ValidationError(
+      `Refusing user uninstall: user root is not a directory (${resolved}).`,
+      {
+        code: REFUSED_SYMLINK_USER_ROOT.code,
+        definition: REFUSED_SYMLINK_USER_ROOT,
+        metadata: { condition: 'not-a-directory', path: resolved },
+      },
+    );
   }
 }
 

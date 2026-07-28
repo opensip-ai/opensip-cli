@@ -41,7 +41,10 @@ import {
   stateFor,
   summaryFor,
 } from './authored-state-transaction-registry.js';
-import { assertRuntimePromotionProjectRootAuthority } from './runtime-promotion-root-authority.js';
+import {
+  assertRuntimePromotionProjectRootAuthority,
+  reportInitFailure,
+} from './runtime-promotion-root-authority.js';
 
 import type {
   AuthoredTransactionState,
@@ -222,7 +225,13 @@ async function finishPrepare(
       });
       assertAuthoredMaterializationAuthority(materializationAuthority);
       outcome = replayOutcome;
-    } catch {
+    } catch (error) {
+      // A bare `catch {` here meant the replay fast path fell back to full materialization on
+      // ANY failure — including EACCES or EIO, where the correct answer is not "rebuild it" but
+      // "the filesystem is not cooperating". The fallback is kept, because a replay whose
+      // preconditions no longer hold genuinely should rebuild; what changes is that the reason
+      // is no longer invisible, so a permissions fault stops looking like a slow path.
+      reportInitFailure('authored-replay-fallback', error);
       resetIncompleteAuthoredArtifacts(root, current, manifest, manifestBytes, state.paths);
       publishAuthoredReplayManifest(root, current, state.paths, plan.replayManifestBytes);
       checkpoint('after-replay-materialization');

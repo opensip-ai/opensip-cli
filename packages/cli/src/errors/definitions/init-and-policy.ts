@@ -93,4 +93,79 @@ export const initAndPolicyDefinitions = {
       'Runtime promotion needs recovery before it can continue. Re-run `opensip init` to resume it.',
     publicMetadataKeys: ['condition'],
   },
+  /**
+   * The init authored-state transaction refused to proceed.
+   *
+   * One code across ~199 refusals in the authored-state plane, because the operator's action
+   * genuinely is the same for all of them: init will not modify the authored state further, and
+   * the named path needs inspection or a fresh `init`. What differs between them is WHICH
+   * invariant broke, and each call site already says so precisely — "a foreign replay
+   * publication temporary is present", "the replay manifest bytes disagree with the durable
+   * journal", "authored preparation can no longer be aborted safely".
+   *
+   * Every one of those sentences was being replaced by "The operation failed." The code was
+   * `SYSTEM.INIT.AUTHORED_TRANSACTION`, a head no catalog declared, so it resolved to
+   * `SYSTEM_ERROR` — `exposure: 'redacted'` — and the projection discarded the message. This is
+   * the single largest instance of that loss in the codebase.
+   *
+   * `integrity` and `configuration`: these are fail-closed refusals over on-disk state, not
+   * malfunctions, and the operator resolves them by fixing or clearing that state.
+   */
+  'CLI.INIT.AUTHORED_TRANSACTION_UNSAFE': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.AUTHORED_TRANSACTION_UNSAFE',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'Init refused to modify the authored project state; nothing further was written. The message names the invariant that failed — inspect that path, or re-run `opensip init` to start a fresh attempt.',
+    publicMetadataKeys: ['condition'],
+  },
+  /**
+   * The selected runtime-promotion source could not be verified against its authority.
+   *
+   * The class that raises this extended bare `Error`, so it carried no code and normalized to
+   * `SYSTEM_ERROR` — message redacted. That matters more here than in most places: this failure
+   * decides, through its `releaseSafe` flag, whether the process-owned runtime lease may be
+   * released. An operator seeing "The operation failed." had no way to tell a source that could
+   * not be verified from one that left the lease unsafe to release.
+   *
+   * `integrity` and `environment`: the artifacts on disk disagree with the authority that
+   * should describe them, and the operator resolves it by inspecting or re-running, not by
+   * changing an argument.
+   */
+  'CLI.INIT.PROMOTION_SOURCE_UNVERIFIED': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.PROMOTION_SOURCE_UNVERIFIED',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
+    publicMetadataKeys: ['condition', 'releaseSafe'],
+  },
+  /**
+   * Recovery of an interrupted runtime promotion found state that disagrees with the durable
+   * evidence describing it.
+   *
+   * One code across ~26 refusals in the recovery plane (D9): "Recovered runtime stage differs
+   * from the selected source", "Authored commit lacks its durable replay transaction", "Closed
+   * recovery still has owned cleanup work". They differ in WHICH invariant broke; the operator's
+   * action is identical, because recovery refuses to continue in every one of them.
+   *
+   * Each was a bare `Error`, so each reached the user as "The operation failed." — after an
+   * interrupted `init`, which is exactly when an operator most needs to know what state their
+   * runtime is in.
+   *
+   * `integrity` and `environment`: nothing malfunctioned and the caller passed nothing wrong —
+   * the on-disk evidence and the recovered state disagree, and only inspection or a fresh
+   * attempt resolves that.
+   */
+  'CLI.INIT.RECOVERY_EVIDENCE_MISMATCH': {
+    ...USER_INPUT,
+    code: 'CLI.INIT.RECOVERY_EVIDENCE_MISMATCH',
+    kind: 'integrity',
+    defaultResponsibility: 'environment',
+    operatorAction:
+      'Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection.',
+    publicMetadataKeys: ['condition'],
+  },
 } as const;

@@ -24,6 +24,8 @@ import { codebaseErrorCatalog } from '@opensip-cli/codebase';
 import { configErrorCatalog } from '@opensip-cli/config';
 import { coreErrorCatalog, type SubstrateErrorCatalogContribution } from '@opensip-cli/core';
 import { datastoreErrorCatalog } from '@opensip-cli/datastore';
+import { externalToolErrorCatalog } from '@opensip-cli/external-tool-adapter';
+import { outputErrorCatalog } from '@opensip-cli/output';
 import { sessionStoreErrorCatalog } from '@opensip-cli/session-store';
 import { treeSitterErrorCatalog } from '@opensip-cli/tree-sitter';
 
@@ -46,4 +48,6 @@ export const HOST_SUBSTRATE_ERROR_CATALOGS: readonly SubstrateErrorCatalogContri
   { packageName: '@opensip-cli/datastore', catalog: datastoreErrorCatalog },
   { packageName: '@opensip-cli/session-store', catalog: sessionStoreErrorCatalog },
   { packageName: '@opensip-cli/tree-sitter', catalog: treeSitterErrorCatalog },
+  { packageName: '@opensip-cli/output', catalog: outputErrorCatalog },
+  { packageName: '@opensip-cli/external-tool-adapter', catalog: externalToolErrorCatalog },
 ];

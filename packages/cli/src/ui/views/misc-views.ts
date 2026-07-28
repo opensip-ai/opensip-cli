@@ -14,6 +14,7 @@ import {
   type Tone,
   type ViewNode,
 } from '@opensip-cli/cli-ui';
+import { inferStoredRunOutcome } from '@opensip-cli/core';
 import { formatDuration, formatScore } from '@opensip-cli/format';
 
 import { formatBytes } from '../../format-bytes.js';
@@ -112,6 +113,25 @@ function payloadCounts(payload: unknown): { passed: number; total: number } | nu
 }
 
 /** One table row (one span per column) for a stored session. */
+/**
+ * The stored 3-way outcome, not a boolean.
+ *
+ * This rendered `s.passed ? 'PASS' : 'FAIL'`, which cannot express a FAULT — so a run whose
+ * check could not COMPLETE appeared in the history identical to one that completed and found
+ * problems, beside a 100% score. The live terminal said FAULT and the durable record said FAIL:
+ * the distinction was lost exactly where it outlives the terminal, and sessions are what
+ * `report` and MCP replay.
+ *
+ * `inferStoredRunOutcome` keeps legacy rows (persisted before `runOutcome` existed) reading
+ * pass/fail rather than inventing a fault they never recorded.
+ */
+function historyStatusSpan(s: StoredSession): Span {
+  const outcome = inferStoredRunOutcome(s);
+  if (outcome === 'error') return { text: 'FAULT', tone: 'error', bold: true };
+  if (outcome === 'degraded') return { text: 'DEGRADED', tone: 'warning' };
+  return outcome === 'passed' ? { text: 'PASS', tone: 'success' } : { text: 'FAIL', tone: 'error' };
+}
+
 function historyRow(s: StoredSession): Span[] {
   const counts = payloadCounts(s.payload);
   return [
@@ -120,7 +140,7 @@ function historyRow(s: StoredSession): Span[] {
     { text: s.tool, tone: 'brand', bold: true },
     { text: new Date(s.startedAt).toLocaleString(), dim: true },
     { text: formatScore(s.score), tone: scoreTone(s.score) },
-    { text: s.passed ? 'PASS' : 'FAIL', tone: s.passed ? 'success' : 'error' },
+    historyStatusSpan(s),
     { text: counts ? `${counts.passed}/${counts.total}` : '—' },
     { text: s.recipe ?? '', dim: true },
     { text: formatDuration(s.durationMs), dim: true },

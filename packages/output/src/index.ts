@@ -42,3 +42,7 @@ export {
 } from './sink/resolve-signal-sink.js';
 export { resolveRepoIdentity } from './sink/repo-identity.js';
 export { repoSlugFromIdentity } from './sink/repo-slug.js';
+
+// Exported so the composition root can register it as a substrate catalog: without runtime
+// registration these codes resolve to UNKNOWN_FAILURE at any code-only lookup.
+export { outputErrorCatalog, OUTPUT_ERROR_OWNER_ID } from './errors/output-error-catalog.js';

@@ -68,6 +68,8 @@ export type {
 export { RUNTIME_PROMOTION_JOURNAL_FILE } from '@opensip-cli/core';
 export { handoffRuntimePromotionRecoveryOwner } from './runtime-promotion-journal-handoff.js';
 
+const FOREIGN_KEY_JOURNAL = 'The promotion journal belongs to another project key.';
+
 export type RuntimePromotionJournalCheckpoint =
   | 'after-create-mutation'
   | 'after-replace-mutation'
@@ -120,7 +122,7 @@ export function createRuntimePromotionJournalController(
     }
     const record = parseCanonicalRecord(observed.content);
     if (record.coordinationKey !== lease.coordinationKey) {
-      throw recoveryRequired('The promotion journal belongs to another project key.');
+      throw recoveryRequired(FOREIGN_KEY_JOURNAL, undefined, 'journal-key-mismatch');
     }
     if (sha256(observed.content) !== observed.sha256) {
       throw recoveryRequired('The promotion journal read digest is inconsistent.');

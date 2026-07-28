@@ -1,3 +1,7 @@
+import { SystemError } from '@opensip-cli/core';
+
+import { hostErrorCatalog } from '../../errors/host-error-catalog.js';
+
 import {
   isRuntimeManifestReleaseUnsafe,
   runtimeManifestIdentityEqual,
@@ -15,15 +19,33 @@ import type {
 } from './runtime-promotion-journal.js';
 import type { RuntimePromotionOperation } from './runtime-promotion-types.js';
 
-export class RuntimePromotionSelectedSourceError extends Error {
-  public override readonly cause: unknown;
+const SOURCE_UNVERIFIED = hostErrorCatalog.require('CLI.INIT.PROMOTION_SOURCE_UNVERIFIED');
+
+/**
+ * A selected promotion source that failed authority verification.
+ *
+ * Extends `SystemError` rather than bare `Error` so the failure carries machine identity. It
+ * previously extended `Error`, which meant no code, normalization to `SYSTEM_ERROR`, and a
+ * redacted message — on a failure whose `releaseSafe` flag decides whether the process-owned
+ * runtime lease may be released.
+ *
+ * The CLASS is kept, not replaced by a plain `SystemError`: `isRuntimePromotionAuthorityReleaseUnsafe`
+ * branches on `instanceof` to read `releaseSafe`, and that decision is not expressible as a code.
+ */
+export class RuntimePromotionSelectedSourceError extends SystemError {
   public readonly releaseSafe: boolean;
 
   public constructor(message: string, cause?: unknown) {
-    super(message);
+    const releaseSafe = !isRuntimePromotionAuthorityReleaseUnsafe(cause);
+    super(message, {
+      code: SOURCE_UNVERIFIED.code,
+      definition: SOURCE_UNVERIFIED,
+      metadata: { condition: 'selected-source-unverified', releaseSafe },
+      ...(cause === undefined ? {} : { cause }),
+    });
     this.name = 'RuntimePromotionSelectedSourceError';
-    this.cause = cause;
-    this.releaseSafe = !isRuntimePromotionAuthorityReleaseUnsafe(cause);
+    this.releaseSafe = releaseSafe;
+    Object.setPrototypeOf(this, RuntimePromotionSelectedSourceError.prototype);
   }
 }
 

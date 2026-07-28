@@ -29,7 +29,7 @@ const CATALOG_SOURCES = [
   },
   {
     packageName: '@opensip-cli/simulation',
-    ownerId: 'simulation',
+    ownerId: '715d32c2-692c-4ed4-985b-a35deaf186aa',
     file: 'packages/simulation/engine/src/errors/simulation-error-catalog.ts',
     exportName: 'simulationErrorCatalog',
   },
@@ -41,13 +41,13 @@ const CATALOG_SOURCES = [
   },
   {
     packageName: '@opensip-cli/external-tool-adapter',
-    ownerId: 'external-tool-adapter',
+    ownerId: '@opensip-cli/external-tool-adapter',
     file: 'packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts',
     exportName: 'externalToolErrorCatalog',
   },
   {
     packageName: '@opensip-cli/mcp',
-    ownerId: 'mcp',
+    ownerId: 'f313c020-5b48-4e17-a579-e303907b6392',
     file: 'packages/mcp/src/errors/mcp-error-catalog.ts',
     exportName: 'mcpErrorCatalog',
   },
@@ -62,7 +62,7 @@ const CATALOG_SOURCES = [
   // Split for the same reason core's is: the host catalog outgrew the file-length bound as a
   // single unit. Each module is listed because this manifest is the repository-wide code
   // uniqueness authority and must see every definition, not just every catalog.
-  ...['host-wiring', 'suite-and-runs', 'init-and-policy'].map((domain) => ({
+  ...['host-wiring', 'suite-and-runs', 'init-and-policy', 'uninstall'].map((domain) => ({
     packageName: 'opensip-cli',
     ownerId: 'opensip-cli',
     file: `packages/cli/src/errors/definitions/${domain}.ts`,

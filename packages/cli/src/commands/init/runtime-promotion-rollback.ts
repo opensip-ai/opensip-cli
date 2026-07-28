@@ -10,7 +10,10 @@ import {
   recoveryRequiredResult,
   rolledBackResult,
 } from './runtime-promotion-result.js';
-import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
+import {
+  assertFreshRuntimePromotionProjectRoot,
+  reportInitFailure,
+} from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type { RuntimePromotionJournal } from './runtime-promotion-journal-schema.js';
@@ -278,6 +281,10 @@ export async function rollbackFreshRuntimePromotion(
     if (isRuntimePromotionAuthorityReleaseUnsafe(error)) {
       operation.leaseDisposition.releaseSafe = false;
     }
+    // A rollback that itself fails is the worst case on this path — the runtime is left
+    // mid-promotion — and it reported identically to a clean rollback. The recovery outcome
+    // is unchanged; it is no longer the only thing the operator gets.
+    reportInitFailure('rollback-failed', error);
     return recoveryResult(operation);
   }
 }

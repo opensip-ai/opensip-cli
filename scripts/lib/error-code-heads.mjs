@@ -29,8 +29,23 @@ import { join } from 'node:path';
 /** Same grammar `assertErrorCodeShape` enforces (`error-definition.ts`). */
 const CODE_GRAMMAR = /^[A-Z][A-Z0-9]*(\.[A-Z][A-Z0-9_]*){2,}$/u;
 
-/** `code: 'HEAD.DOMAIN.CONDITION'` — a code being CONSTRUCTED, not merely mentioned. */
-const CONSTRUCTED_CODE = /\bcode:\s*(['"])([A-Z][A-Z0-9_.]+)\1/gu;
+/**
+ * A code being CONSTRUCTED, not merely mentioned.
+ *
+ * Matches the property form (`code: 'X'`, `errorCode: 'X'`) and the assignment form
+ * (`errorCode = 'X'`).
+ *
+ * `\bcode:` alone was not enough, and the gap was not theoretical. A word boundary cannot occur
+ * between `r` and `c`, so `errorCode:` never matched — and `errorCode` is exactly the property
+ * the suite-result surface uses. Two unregistered codes lived in production there
+ * (`RUN.CAPABILITY.MISMATCH`, `RUN.EVIDENCE.MISSING`) while this ratchet reported
+ * "0 known, 0 net-new". The guardrail that exists to catch unregistered codes could not see
+ * them, so they reached main and stayed there until a test caught them by accident.
+ */
+/** Must admit every form {@link CONSTRUCTED_CODE} matches; see the pre-filter note below. */
+const CODE_PREFILTER = /\b(?:error)?[Cc]ode\s*[:=]/u;
+
+const CONSTRUCTED_CODE = /\b(?:error)?[Cc]ode\s*[:=]\s*(['"])([A-Z][A-Z0-9_.]+)\1/gu;
 
 /**
  * Confirm the head-guessing switch really is gone.
@@ -96,7 +111,12 @@ export function findUnmappedCodeHeads(repoRoot, relFiles) {
     } catch {
       continue;
     }
-    if (!text.includes('code:')) continue;
+    // Cheap pre-filter, derived from the same pattern rather than hand-written. A hand-written
+    // one is how this gap arose twice: `includes('code:')` skipped files whose only
+    // construction was `errorCode = '…'`, and the obvious repair — `includes('code =')` —
+    // still misses it, because the `C` in `errorCode` is capitalised. A pre-filter that does
+    // not admit everything the real pattern matches silently narrows the scan.
+    if (!CODE_PREFILTER.test(text)) continue;
     const lines = text.split('\n');
     for (const [index, line] of lines.entries()) {
       // Skip comment lines: a code named in prose is documentation, not a construction.

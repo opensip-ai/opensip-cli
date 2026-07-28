@@ -52,6 +52,7 @@ import { rollbackFreshRuntimePromotion } from './runtime-promotion-rollback.js';
 import {
   assertRuntimePromotionProjectRootAuthority,
   bindRuntimePromotionFreshProjectRootAuthority,
+  reportInitFailure,
 } from './runtime-promotion-root-authority.js';
 import { createRuntimePromotionTransitionWriter } from './runtime-promotion-transitions.js';
 
@@ -286,6 +287,11 @@ async function runWithLease(
     if (isRuntimeManifestReleaseUnsafe(error)) {
       operation.leaseDisposition.releaseSafe = false;
     }
+    // Report before rolling back. This arm read ONE flag off the error and then dropped it:
+    // never logged, never attached to the result. So a fresh promotion that failed rolled back
+    // silently and the operator saw a recovery outcome with no cause — the failure that
+    // triggered it was unrecoverable from outside the process.
+    reportInitFailure('fresh-promotion-failed', error);
     const rollback = await rollbackFreshRuntimePromotion(operation);
     return rollback.result;
   }

@@ -2,7 +2,10 @@ import {
   isRuntimePromotionAuthorityReleaseUnsafe,
   verifyClosedTerminalOperationAuthority,
 } from './runtime-promotion-authority-verification.js';
-import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
+import {
+  assertFreshRuntimePromotionProjectRoot,
+  reportInitFailure,
+} from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
 import type { RuntimePromotionOwnedSlotName } from './runtime-promotion-journal-schema.js';
@@ -133,6 +136,10 @@ export async function cleanupFreshClosedRuntimePromotion(
     if (isRuntimePromotionAuthorityReleaseUnsafe(error)) {
       operation.leaseDisposition.releaseSafe = false;
     }
+    // Every cleanup failure — an invariant violation, an fs fault, a corrupt journal — became
+    // `cleanupPending: true` and nothing else. The flag tells the operator there is work left;
+    // it never told them what stopped.
+    reportInitFailure('cleanup-failed', error);
     return {
       cleanupPending: true,
       receipt: await claimClosedAfterFailure(operation, receipt),
