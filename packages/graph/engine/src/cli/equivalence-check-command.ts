@@ -33,6 +33,7 @@ import { dirname, resolve } from 'node:path';
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import { createToolLogger } from '@opensip-cli/core';
 
+import { graphBuildError, graphConfigError } from '../errors/graph-build-error.js';
 import { pickAdapter } from '../lang-adapter/registry.js';
 
 import { buildEquivalenceDiagnostic } from './equivalence-diagnostic.js';
@@ -101,7 +102,10 @@ function loadBudget(path: string): EquivalenceBudget {
     BUDGET_KEYS.some((k) => typeof rec[k] !== 'number')
   ) {
     const keyList = BUDGET_KEYS.map((k) => `"${k}"`).join(', ');
-    throw new Error(`Invalid budget file ${path}: expected numeric { ${keyList} }.`);
+    throw graphConfigError(
+      'equivalence-budget-invalid',
+      `Invalid budget file ${path}: expected numeric { ${keyList} }.`,
+    );
   }
   const obj = parsed as Record<(typeof BUDGET_KEYS)[number], number> & {
     note?: string;
@@ -181,13 +185,15 @@ export async function executeEquivalenceCheck(
   try {
     const cliScript = process.argv[1] ?? '';
     if (cliScript.length === 0) {
-      throw new Error(
+      throw graphBuildError(
+        'equivalence-no-cli-script',
         'graph-equivalence-check: no CLI entry script (process.argv[1]) to spawn shard workers.',
       );
     }
     const shards = await resolveShardsForCwd(cwd, cliScript, cli);
     if (shards.length <= 1) {
-      throw new Error(
+      throw graphConfigError(
+        'equivalence-not-shardable',
         `graph-equivalence-check: ${cwd} is not shardable (${String(shards.length)} shard(s)). ` +
           'The comparison requires a multi-package (shardable) repo so the sharded and ' +
           'exact engines actually diverge through real dist/*.d.ts resolution.',

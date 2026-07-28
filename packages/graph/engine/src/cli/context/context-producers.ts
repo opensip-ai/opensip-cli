@@ -21,6 +21,7 @@ import {
   type ToolRunCompletion,
 } from '@opensip-cli/core';
 
+import { graphScopeError } from '../../errors/graph-scope-error.js';
 import { GRAPH_STABLE_ID } from '../../identity.js';
 import {
   buildGraphReadIndexes,
@@ -65,7 +66,7 @@ function projectRoot(cli: ToolCliContext, fallback: string): string {
 /** @throws {Error} When the graph tool did not contribute its required RunScope services. */
 function graphScope(cli: ToolCliContext): NonNullable<ToolCliContext['scope']['graph']> {
   const scope = cli.scope.graph;
-  if (scope === undefined) throw new Error('graph scope unavailable');
+  if (scope === undefined) throw graphScopeError('subscope-missing', 'graph scope unavailable');
   return scope;
 }
 

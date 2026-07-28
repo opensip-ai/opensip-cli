@@ -29,6 +29,8 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { isAbsolute, join, relative, sep } from 'node:path';
 
+import { graphBuildError } from '../../errors/graph-build-error.js';
+
 import { chunkByCount, DEFAULT_CHUNK_SIZE } from './partition-chunk.js';
 
 import type { SyntheticPartition } from './partition-chunk.js';
@@ -197,7 +199,7 @@ export interface PartitionFlatRepoInput {
 export function partitionFlatRepo(input: PartitionFlatRepoInput): readonly SyntheticPartition[] {
   const chunkSize = input.chunkSize ?? DEFAULT_CHUNK_SIZE;
   if (chunkSize <= 0) {
-    throw new Error('partitionFlatRepo: chunkSize must be > 0');
+    throw graphBuildError('chunk-size', 'partitionFlatRepo: chunkSize must be > 0');
   }
   if (!Number.isSafeInteger(chunkSize)) {
     throw new TypeError('partitionFlatRepo: chunkSize must be a positive safe integer');
@@ -273,7 +275,7 @@ function chunkByDirectoryDepth(
   depth: number,
 ): readonly SyntheticPartition[] {
   if (depth < 1) {
-    throw new Error('chunkByDirectoryDepth: depth must be >= 1');
+    throw graphBuildError('chunk-depth', 'chunkByDirectoryDepth: depth must be >= 1');
   }
   if (!Number.isSafeInteger(depth)) {
     throw new TypeError('chunkByDirectoryDepth: depth must be a positive safe integer');

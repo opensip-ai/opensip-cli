@@ -8,8 +8,9 @@ import {
   testSelectionSnapshotIdentityMatches,
   testSelectionSnapshotSchema,
 } from '@opensip-cli/contracts';
-import { ok, type Result } from '@opensip-cli/core';
+import { createToolError, ok, type Result } from '@opensip-cli/core';
 
+import { graphErrorCatalog } from '../errors/graph-error-catalog.js';
 import { ContextSnapshotRepo } from '../persistence/context-snapshot-repo.js';
 
 import { failGraphRead } from './read-boundary-failure.js';
@@ -17,6 +18,10 @@ import { failGraphRead } from './read-boundary-failure.js';
 import type { GraphReadError } from './types.js';
 import type { ContextSnapshotPayload, ContextSnapshotRecord } from '../context-snapshot-types.js';
 import type { DataStore } from '@opensip-cli/datastore';
+
+const SNAPSHOT_PAYLOAD_MALFORMED = graphErrorCatalog.require(
+  'GRAPH.CONTEXT_SNAPSHOT.PAYLOAD_MALFORMED',
+);
 
 export type {
   ContextSnapshotAccessor,
@@ -63,7 +68,9 @@ function decode(record: ContextSnapshotRecord): ContextSnapshotLookup {
       parsed.data.snapshotId !== record.id ||
       !projectInventorySnapshotIdentityMatches(parsed.data)
     ) {
-      throw new Error('invalid payload');
+      throw createToolError(SNAPSHOT_PAYLOAD_MALFORMED, 'invalid payload', {
+        metadata: { condition: 'inventory-payload-invalid' },
+      });
     }
     return {
       status: 'available',
@@ -85,7 +92,9 @@ function decode(record: ContextSnapshotRecord): ContextSnapshotLookup {
       parsed.data.snapshotId !== record.id ||
       !testSelectionSnapshotIdentityMatches(parsed.data)
     ) {
-      throw new Error('invalid payload');
+      throw createToolError(SNAPSHOT_PAYLOAD_MALFORMED, 'invalid payload', {
+        metadata: { condition: 'test-selection-payload-invalid' },
+      });
     }
     return {
       status: 'available',

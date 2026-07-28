@@ -6,6 +6,7 @@ import { compareCodePoint } from '@opensip-cli/contracts';
 import { currentLogger, tryCatch } from '@opensip-cli/core';
 
 import { mergeGraphDegradations } from '../../degradation.js';
+import { graphBuildError } from '../../errors/graph-build-error.js';
 
 import type { CatalogBuildCoverage, GraphRunDegradation, ParseError } from '../../types.js';
 
@@ -55,7 +56,10 @@ function safeRelativePath(value: string): string {
     normalized.split('/').some((part) => part.length === 0 || part === '.' || part === '..') ||
     /\p{Cc}/u.test(normalized)
   ) {
-    throw new Error('Graph build input path is not project-relative');
+    throw graphBuildError(
+      'path-not-project-relative',
+      'Graph build input path is not project-relative',
+    );
   }
   return normalized;
 }

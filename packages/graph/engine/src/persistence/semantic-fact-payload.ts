@@ -9,6 +9,7 @@
 
 import { isPlainRecord } from '@opensip-cli/core';
 
+import { catalogPayloadError } from '../errors/catalog-payload-error.js';
 import {
   DEFAULT_SEMANTIC_FACT_LIMITS,
   MAX_REFERENCES_PER_DECLARATION,
@@ -175,19 +176,19 @@ export function validateSemanticFactBundle(
   limits: SemanticFactLimits = DEFAULT_SEMANTIC_FACT_LIMITS,
 ): asserts value is SemanticFactBundle {
   if (!isPlainRecord(value) || !exactKeys(value, BUNDLE_KEYS)) {
-    throw new Error('Malformed semanticFacts bundle');
+    throw catalogPayloadError('semantic-bundle', 'Malformed semanticFacts bundle');
   }
   if (value.referenceScope !== 'cross-file') {
-    throw new Error('Malformed semanticFacts referenceScope');
+    throw catalogPayloadError('semantic-reference-scope', 'Malformed semanticFacts referenceScope');
   }
   if (!Array.isArray(value.declarations) || !Array.isArray(value.references)) {
     throw new TypeError('Malformed semanticFacts arrays');
   }
   if (value.declarations.length > limits.maxDeclarations) {
-    throw new Error('semanticFacts declarations exceed bound');
+    throw catalogPayloadError('semantic-bound-exceeded', 'semanticFacts declarations exceed bound');
   }
   if (value.references.length > limits.maxReferences) {
-    throw new Error('semanticFacts references exceed bound');
+    throw catalogPayloadError('semantic-bound-exceeded', 'semanticFacts references exceed bound');
   }
 
   const declById = validateDeclarationEntries(value.declarations, limits);
@@ -210,7 +211,7 @@ function validateDeclarationEntries(
   for (const raw of declarations) {
     const decl = validateDeclaration(raw, limits);
     if (declIds.has(decl.declarationId)) {
-      throw new Error('Duplicate semanticFacts declarationId');
+      throw catalogPayloadError('semantic-duplicate-id', 'Duplicate semanticFacts declarationId');
     }
     declIds.add(decl.declarationId);
     declById.set(decl.declarationId, decl);
@@ -233,7 +234,7 @@ function validateReferenceEntries(
   for (const raw of references) {
     const ref = validateReference(raw, limits, declById);
     if (refIds.has(ref.referenceId)) {
-      throw new Error('Duplicate semanticFacts referenceId');
+      throw catalogPayloadError('semantic-duplicate-id', 'Duplicate semanticFacts referenceId');
     }
     refIds.add(ref.referenceId);
     if (ref.targetDeclarationId !== undefined) {
@@ -242,7 +243,10 @@ function validateReferenceEntries(
         // Fail closed on a tampered/over-limit plane (the producer already caps
         // this; a decoded catalog exceeding it is malformed). With graceful
         // degradation upstream this drops the optional plane, not the catalog.
-        throw new Error('semanticFacts references-per-declaration exceed bound');
+        throw catalogPayloadError(
+          'semantic-bound-exceeded',
+          'semanticFacts references-per-declaration exceed bound',
+        );
       }
       perDecl.set(ref.targetDeclarationId, n);
     }
@@ -254,7 +258,7 @@ function validateReferenceEntries(
  */
 function validateDeclaration(raw: unknown, limits: SemanticFactLimits): DeclarationFact {
   if (!isPlainRecord(raw) || !exactKeys(raw, DECL_KEYS)) {
-    throw new Error('Malformed semanticFacts declaration');
+    throw catalogPayloadError('semantic-declaration', 'Malformed semanticFacts declaration');
   }
   if (
     !isSafeText(raw.declarationId, limits.maxText) ||
@@ -277,7 +281,10 @@ function validateDeclaration(raw: unknown, limits: SemanticFactLimits): Declarat
     typeof raw.inTestFile !== 'boolean' ||
     typeof raw.definedInGenerated !== 'boolean'
   ) {
-    throw new Error('Malformed semanticFacts declaration fields');
+    throw catalogPayloadError(
+      'semantic-declaration-fields',
+      'Malformed semanticFacts declaration fields',
+    );
   }
   return raw as unknown as DeclarationFact;
 }
@@ -291,7 +298,7 @@ function validateReference(
   declById: ReadonlyMap<string, DeclarationFact>,
 ): CrossFileReferenceFact {
   if (!isPlainRecord(raw) || !exactKeys(raw, REF_KEYS)) {
-    throw new Error('Malformed semanticFacts reference');
+    throw catalogPayloadError('semantic-reference', 'Malformed semanticFacts reference');
   }
   if (
     !isSafeText(raw.referenceId, limits.maxText) ||
@@ -320,7 +327,10 @@ function validateReference(
     typeof raw.inTestFile !== 'boolean' ||
     typeof raw.definedInGenerated !== 'boolean'
   ) {
-    throw new Error('Malformed semanticFacts reference fields');
+    throw catalogPayloadError(
+      'semantic-reference-fields',
+      'Malformed semanticFacts reference fields',
+    );
   }
 
   const targetId = raw.targetDeclarationId as string | undefined;
@@ -331,20 +341,26 @@ function validateReference(
     targetId !== undefined &&
     (basis === 'unresolved' || basis === 'external' || basis === 'ambiguous')
   ) {
-    throw new Error('semanticFacts reference target id inconsistent with basis');
+    throw catalogPayloadError(
+      'semantic-inconsistent',
+      'semanticFacts reference target id inconsistent with basis',
+    );
   }
 
   if (targetId !== undefined) {
     const decl = declById.get(targetId);
     if (decl === undefined) {
-      throw new Error('semanticFacts dangling targetDeclarationId');
+      throw catalogPayloadError(
+        'semantic-inconsistent',
+        'semanticFacts dangling targetDeclarationId',
+      );
     }
     if (
       (raw.targetPackage !== undefined && raw.targetPackage !== decl.package) ||
       (raw.targetName !== undefined && raw.targetName !== decl.name) ||
       (raw.targetKind !== undefined && raw.targetKind !== decl.kind)
     ) {
-      throw new Error('semanticFacts target identity mismatch');
+      throw catalogPayloadError('semantic-inconsistent', 'semanticFacts target identity mismatch');
     }
   }
 
@@ -356,10 +372,13 @@ function validateReference(
  */
 function validateCoverage(raw: unknown, declCount: number, refCount: number): void {
   if (!isPlainRecord(raw) || !exactKeys(raw, COVERAGE_KEYS)) {
-    throw new Error('Malformed semanticFacts coverage');
+    throw catalogPayloadError('semantic-coverage', 'Malformed semanticFacts coverage');
   }
   if (raw.status !== 'complete' && raw.status !== 'partial') {
-    throw new Error('Malformed semanticFacts coverage status');
+    throw catalogPayloadError(
+      'semantic-coverage-status',
+      'Malformed semanticFacts coverage status',
+    );
   }
   if (
     !isNonNegInt(raw.inspectedDeclarations) ||
@@ -373,16 +392,25 @@ function validateCoverage(raw: unknown, declCount: number, refCount: number): vo
     !raw.reasons.every((r) => isSafeText(r, MAX_SEMANTIC_TEXT)) ||
     !reasonsSorted(raw.reasons)
   ) {
-    throw new Error('Malformed semanticFacts coverage fields');
+    throw catalogPayloadError(
+      'semantic-coverage-fields',
+      'Malformed semanticFacts coverage fields',
+    );
   }
   if (raw.emittedDeclarations !== declCount || raw.emittedReferences !== refCount) {
-    throw new Error('semanticFacts coverage counts inconsistent with retained facts');
+    throw catalogPayloadError(
+      'semantic-coverage-counts',
+      'semanticFacts coverage counts inconsistent with retained facts',
+    );
   }
   // Bound absolute counters so a tampered payload cannot claim unbounded inspection.
   if (
     raw.inspectedDeclarations > MAX_SEMANTIC_DECLARATIONS * 2 ||
     raw.inspectedReferences > MAX_SEMANTIC_REFERENCES * 2
   ) {
-    throw new Error('semanticFacts coverage counters exceed bound');
+    throw catalogPayloadError(
+      'semantic-coverage-counters',
+      'semanticFacts coverage counters exceed bound',
+    );
   }
 }

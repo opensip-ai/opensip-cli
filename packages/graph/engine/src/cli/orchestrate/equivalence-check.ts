@@ -38,6 +38,8 @@
  * a drifting copy. Cold + no-cache on both sides (a fresh oracle every run).
  */
 
+import { graphBuildError } from '../../errors/graph-build-error.js';
+
 import { diffCatalogs } from './cross-shard-resolve.js';
 
 import type { EdgeDifference } from './cross-shard-resolve.js';
@@ -218,7 +220,8 @@ export async function buildEquivalenceReport(
 ): Promise<EquivalenceReport> {
   const exact = await input.buildExact(input.cwd);
   if (exact === null) {
-    throw new Error(
+    throw graphBuildError(
+      'equivalence-no-exact-catalog',
       'Equivalence check: the exact (single-program) build produced no catalog ' +
         '(no parseable input). The target repo must contain analyzable source.',
     );

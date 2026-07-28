@@ -14,6 +14,8 @@
 
 import { RecipeRegistry, currentScope } from '@opensip-cli/core';
 
+import { graphScopeError } from '../errors/graph-scope-error.js';
+
 import { builtInGraphRecipes } from './built-in-recipes.js';
 
 import type { GraphRecipe } from './types.js';
@@ -45,14 +47,16 @@ export function createRecipeRegistry(): GraphRecipeRegistry {
 export function currentGraphRecipes(): GraphRecipeRegistry {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw graphScopeError(
+      'not-entered',
       'graph: currentGraphRecipes() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: pre-action-hook handles ' +
         'this; tests: use makeTestScope + graphTool.contributeScope).',
     );
   }
   if (!scope.graph) {
-    throw new Error(
+    throw graphScopeError(
+      'subscope-missing',
       'graph: scope.graph is missing. The graph tool must be registered and ' +
         'its contributeScope hook must run before recipe reads.',
     );
