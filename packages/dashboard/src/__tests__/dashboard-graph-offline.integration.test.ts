@@ -2,15 +2,11 @@
 /**
  * @vitest-environment jsdom
  *
- * Offline-render guarantee for the Graph view.
+ * Post-build proof for the real CLI -> report -> offline DOM path.
  *
- * Playwright is not part of this package's toolchain, so rather than boot a
- * real browser this test asserts the offline property at the artifact
- * level: a generated report inlines the Cytoscape renderer and the
- * projected view-model with ZERO external `<script src>` references, so it
- * renders the Graph view with the network disabled ("open an archived
- * report on a plane"). The only permitted external reference is the Google
- * Fonts stylesheet `<link>` the report already carried before this work.
+ * Fast artifact-level Graph-view assertions live in
+ * dashboard-graph-offline.test.ts so the ordinary package lane enforces the
+ * offline contract without requiring a built CLI.
  */
 
 import { spawnSync } from 'node:child_process';
@@ -29,9 +25,7 @@ import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { generateDashboardHtml } from '../generator.js';
-
-import type { GraphCatalog } from '@opensip-cli/contracts';
+import { findRemoteRenderDependencies } from './offline-resource-references.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DIST_CLI = join(HERE, '..', '..', '..', 'cli', 'dist', 'index.js');
@@ -79,21 +73,6 @@ interface IntegratedReportFixture {
 
 let integratedFixture: IntegratedReportFixture;
 let projectRoot: string;
-
-function loadFixture(): GraphCatalog {
-  const candidates = [
-    join(HERE, 'fixtures', 'catalog-small.json'),
-    join(HERE, '..', '..', 'src', '__tests__', 'fixtures', 'catalog-small.json'),
-  ];
-  for (const p of candidates) {
-    try {
-      return JSON.parse(readFileSync(p, 'utf8')) as GraphCatalog;
-    } catch {
-      // next
-    }
-  }
-  throw new Error('catalog-small.json fixture not found');
-}
 
 function git(args: readonly string[]): void {
   const result = spawnSync('git', args, {
@@ -316,40 +295,10 @@ afterAll(() => {
   if (projectRoot) rmSync(projectRoot, { recursive: true, force: true });
 });
 
-describe('Graph view — offline render guarantee', () => {
-  const html = generateDashboardHtml({ sessions: [], graphCatalog: loadFixture() });
-
-  it('inlines the Cytoscape renderer (no CDN fetch)', () => {
-    expect(html).toContain('cytoscape');
-    expect(html).toContain('cytoscapeDagre');
-  });
-
-  it('embeds the projected graph-view-model blob', () => {
-    expect(html).toContain('id="graph-view-model"');
-  });
-
-  it('registers the Graph view', () => {
-    // The view registers from the typed client bundle (L4) — esbuild emits
-    // double-quoted object keys/values, so the marker is the bundled form.
-    expect(html).toContain('id: "graph"');
-    expect(html).toContain('code-paths-graph-canvas');
-  });
-
-  it('has no external <script src> references (renders fully offline)', () => {
-    const scriptSrc = /<script[^>]*\ssrc=["'][^"']+["']/gi;
-    const matches = html.match(scriptSrc) ?? [];
-    expect(matches).toHaveLength(0);
-  });
-
-  it('has no cytoscape CDN URL', () => {
-    expect(/https?:\/\/[^"']*cytoscape/i.test(html)).toBe(false);
-  });
-});
-
 describe('Change Impact — built audit to offline report integration', () => {
-  it('renders the persisted run, trust, counts, path, risk, and action without network scripts', () => {
+  it('renders the persisted run, trust, counts, path, risk, and action fully offline', () => {
     const { audit, exactHtml } = integratedFixture;
-    expect(exactHtml.match(/<script[^>]*\ssrc=["'][^"']+["']/giu) ?? []).toHaveLength(0);
+    expect(findRemoteRenderDependencies(exactHtml)).toEqual([]);
 
     const panel = changeImpactPanel(exactHtml);
     const text = panel.textContent ?? '';
