@@ -331,9 +331,11 @@ export function reportInitFailure(condition: string, error: unknown): void {
  * what state their runtime is in. One code (D9): the action is the same for all of them, and the
  * message names which invariant broke.
  */
-export function recoveryEvidenceMismatch(message: string): never {
+export function recoveryEvidenceMismatch(message: string, condition: string): never {
   throw new SystemError(message, {
     code: RECOVERY_EVIDENCE_MISMATCH.code,
     definition: RECOVERY_EVIDENCE_MISMATCH,
+    metadata: { condition },
+    diagnostic: condition,
   });
 }

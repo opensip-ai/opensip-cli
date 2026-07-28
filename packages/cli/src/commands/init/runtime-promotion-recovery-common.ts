@@ -12,6 +12,7 @@ import {
   RuntimePromotionDatastoreError,
   RuntimePromotionPreflightError,
 } from './runtime-promotion-preflight.js';
+import { recoveryEvidenceMismatch } from './runtime-promotion-root-authority.js';
 
 import type { VerifiedRuntimeManifest } from './runtime-manifest.js';
 import type {
@@ -128,7 +129,10 @@ export function assertRecoverySourceAuthority(
   operation: RuntimePromotionRecoveryOperation,
 ): string {
   if (operation.sourceRuntime === undefined) {
-    throw new Error('Source-backed recovery lacks its canonical cache location');
+    recoveryEvidenceMismatch(
+      'Source-backed recovery lacks its canonical cache location',
+      'source-recovery-cache-location-absent',
+    );
   }
   assertRecoveryProjectRoot(operation);
   operation.dependencies.assertSourceAuthority({
@@ -144,7 +148,10 @@ export function assertRecoverySourceAuthority(
 /** @throws {Error} When the recovery source is absent or no longer canonically located. */
 export function assertRecoverySourceLocation(operation: RuntimePromotionRecoveryOperation): string {
   if (operation.sourceRuntime === undefined) {
-    throw new Error('Source-backed recovery lacks its canonical cache location');
+    recoveryEvidenceMismatch(
+      'Source-backed recovery lacks its canonical cache location',
+      'source-recovery-cache-location-absent',
+    );
   }
   assertRecoveryProjectRoot(operation);
   operation.dependencies.assertSourceLocation({
@@ -173,7 +180,10 @@ export function asRecoveryOpen(
   operation: RuntimePromotionRecoveryOperation,
 ): DurableOpenPromotionJournal {
   if (operation.receipt.state !== 'open') {
-    throw new Error('Open recovery cannot use a closed journal receipt');
+    recoveryEvidenceMismatch(
+      'Open recovery cannot use a closed journal receipt',
+      'open-recovery-closed-receipt',
+    );
   }
   return operation.receipt;
 }
@@ -183,7 +193,10 @@ export function asRecoveryClosed(
   operation: RuntimePromotionRecoveryOperation,
 ): DurableClosedPromotionJournal {
   if (operation.receipt.state !== 'closed') {
-    throw new Error('Closed recovery cannot use an open journal receipt');
+    recoveryEvidenceMismatch(
+      'Closed recovery cannot use an open journal receipt',
+      'closed-recovery-open-receipt',
+    );
   }
   return operation.receipt;
 }
@@ -194,7 +207,10 @@ export function requireManifest(
   description: string,
 ): RuntimeManifestIdentity {
   if (manifest === null) {
-    throw new Error(`${description} lacks its recorded runtime manifest`);
+    recoveryEvidenceMismatch(
+      `${description} lacks its recorded runtime manifest`,
+      'recorded-runtime-manifest-absent',
+    );
   }
   return manifest;
 }
@@ -210,7 +226,10 @@ export function inspectExactRecoveryManifest(
   const observed = operation.dependencies.inspectManifest(runtimeDir, posture);
   assertRecoveryProjectRoot(operation);
   if (!runtimeManifestIdentityEqual(observed.identity, expected)) {
-    throw new Error('Recovered runtime authority does not match the durable journal');
+    recoveryEvidenceMismatch(
+      'Recovered runtime authority does not match the durable journal',
+      'recovered-runtime-authority-mismatch',
+    );
   }
   return observed;
 }
@@ -308,14 +327,20 @@ export function inspectOpenRecoveryRuntimeAuthority(
   });
   if (authority.location === 'none') {
     if (authority.manifest !== null) {
-      throw new Error('Runtime-free recovery unexpectedly retained a manifest');
+      recoveryEvidenceMismatch(
+        'Runtime-free recovery unexpectedly retained a manifest',
+        'runtime-free-recovery-retained-manifest',
+      );
     }
     return null;
   }
   const expected = requireManifest(authority.manifest, 'Recovered authority');
   if (authority.location === 'cache') {
     if (selectedSource === null) {
-      throw new Error('Recovered cache authority lacks selected-source verification');
+      recoveryEvidenceMismatch(
+        'Recovered cache authority lacks selected-source verification',
+        'cache-authority-source-unverified',
+      );
     }
     return selectedSource;
   }

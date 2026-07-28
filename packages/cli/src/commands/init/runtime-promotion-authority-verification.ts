@@ -67,23 +67,45 @@ async function bindAuthoredForVerification(
   return transaction;
 }
 
-/** @throws {Error} When the observed manifest no longer matches the expected identity. */
+/**
+ * The one failure funnel for this file's authority-verification refusals.
+ *
+ * Every refusal here means the same thing to the operator — the promotion source could not be
+ * verified against its recorded authority — so they share `CLI.INIT.PROMOTION_SOURCE_UNVERIFIED`
+ * and are told apart by `metadata.condition` (D9). Before registration these were bare `Error`s,
+ * which normalize to `SYSTEM_ERROR` (exposure `redacted`): a failure that decides whether the
+ * runtime lease may be released reported to the user as "The operation failed."
+ *
+ * @throws {SystemError} always — an authority check refused.
+ */
+function authorityUnverified(message: string, condition: string): never {
+  throw new SystemError(message, {
+    code: SOURCE_UNVERIFIED.code,
+    definition: SOURCE_UNVERIFIED,
+    metadata: { condition },
+    diagnostic: condition,
+  });
+}
+
+/** @throws {SystemError} When the observed manifest no longer matches the expected identity. */
 function assertExactManifest(
   expected: RuntimeManifestIdentity,
   observed: RuntimeManifestIdentity,
   message: string,
+  condition: string,
 ): void {
   if (!runtimeManifestIdentityEqual(expected, observed)) {
-    throw new Error(message);
+    authorityUnverified(message, condition);
   }
 }
 
-/** @throws {Error} When a required durable manifest identity is absent. */
+/** @throws {SystemError} When a required durable manifest identity is absent. */
 function requiredManifest(
   manifest: RuntimeManifestIdentity | null,
   message: string,
+  condition: string,
 ): RuntimeManifestIdentity {
-  if (manifest === null) throw new Error(message);
+  if (manifest === null) authorityUnverified(message, condition);
   return manifest;
 }
 
@@ -95,10 +117,12 @@ function committedRuntimeManifest(
     ? requiredManifest(
         journal.manifests.runtimeStage,
         'Committed promotion lacks its installed runtime manifest',
+        'committed-runtime-stage-manifest-absent',
       )
     : requiredManifest(
         journal.manifests.destination,
         'Committed promotion lacks its project runtime manifest',
+        'committed-destination-manifest-absent',
       );
 }
 
@@ -110,15 +134,17 @@ function rolledBackRuntimeManifest(
     return requiredManifest(
       journal.manifests.source,
       'Rolled-back promotion lacks its selected source manifest',
+      'rolled-back-source-manifest-absent',
     );
   }
   return requiredManifest(
     journal.manifests.destination,
     'Rolled-back promotion lacks its restored project runtime manifest',
+    'rolled-back-destination-manifest-absent',
   );
 }
 
-/** @throws {Error} When the open journal cannot prove the requested authored-state authority. */
+/** @throws {SystemError} When the open journal cannot prove the requested authored-state authority. */
 async function verifyOpenAuthoredAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableOpenPromotionJournal,
@@ -126,7 +152,10 @@ async function verifyOpenAuthoredAuthority(
 ): Promise<void> {
   if (operation.transaction === null) {
     if (expected === 'desired') {
-      throw new Error('Committed promotion lacks its authored-state transaction');
+      authorityUnverified(
+        'Committed promotion lacks its authored-state transaction',
+        'open-authored-transaction-absent',
+      );
     }
     return;
   }
@@ -136,12 +165,15 @@ async function verifyOpenAuthoredAuthority(
   const summary = await operation.dependencies.verifyAuthored(transaction, expected);
   assertFreshRuntimePromotionProjectRoot(operation);
   if (!summary.verified) {
-    throw new Error(`Authored ${expected} authority was not verified`);
+    authorityUnverified(
+      `Authored ${expected} authority was not verified`,
+      'open-authored-authority-unverified',
+    );
   }
   operation.authoredSummary = summary;
 }
 
-/** @throws {Error} When the closed journal cannot prove the requested authored-state authority. */
+/** @throws {SystemError} When the closed journal cannot prove the requested authored-state authority. */
 async function verifyClosedAuthoredAuthority(
   operation: RuntimePromotionOperation,
   receipt: DurableClosedPromotionJournal,
@@ -149,7 +181,10 @@ async function verifyClosedAuthoredAuthority(
 ): Promise<void> {
   if (operation.transaction === null) {
     if (expected === 'desired') {
-      throw new Error('Committed promotion lacks its authored-state transaction');
+      authorityUnverified(
+        'Committed promotion lacks its authored-state transaction',
+        'closed-authored-transaction-absent',
+      );
     }
     return;
   }
@@ -165,7 +200,10 @@ async function verifyClosedAuthoredAuthority(
   const summary = await operation.dependencies.verifyAuthored(transaction, expected);
   assertFreshRuntimePromotionProjectRoot(operation);
   if (!summary.verified) {
-    throw new Error(`Closed authored ${expected} authority was not verified`);
+    authorityUnverified(
+      `Closed authored ${expected} authority was not verified`,
+      'closed-authored-authority-unverified',
+    );
   }
   operation.authoredSummary = summary;
 }
@@ -192,6 +230,7 @@ function verifySelectedSource(
       expected,
       observed.identity,
       'Selected cache source changed before rolled-back authority was sealed',
+      'rolled-back-source-changed',
     );
     operation.sourcePreserved = true;
     return observed.identity;
@@ -210,6 +249,7 @@ function verifyProjectRuntime(
   outcome: 'committed' | 'rolled-back',
   expected: RuntimeManifestIdentity,
   message: string,
+  condition: string,
 ): RuntimeManifestIdentity {
   assertFreshRuntimePromotionProjectRoot(operation);
   const inspect = () =>
@@ -232,7 +272,7 @@ function verifyProjectRuntime(
     });
   }
   assertFreshRuntimePromotionProjectRoot(operation);
-  assertExactManifest(expected, observed.identity, message);
+  assertExactManifest(expected, observed.identity, message, condition);
   return observed.identity;
 }
 
@@ -249,6 +289,7 @@ function verifyCommittedRuntimeAuthority(
         'committed',
         expected,
         'Project runtime changed before committed authority completed',
+        'committed-project-runtime-changed',
       );
 }
 
@@ -269,6 +310,7 @@ function verifyRolledBackRuntimeAuthority(
           'rolled-back',
           expected,
           'Project runtime changed before rolled-back authority completed',
+          'rolled-back-project-runtime-changed',
         );
   if (expected !== null && observed === null) {
     throw new RuntimePromotionSelectedSourceError(
@@ -321,7 +363,12 @@ export async function verifyOpenTerminalOperationAuthority(
 ): Promise<void> {
   const journal = await operation.controller.verifyOpen(receipt);
   const terminal = journal.terminal;
-  if (terminal === null) throw new Error('Open promotion has no terminal authority to verify');
+  if (terminal === null) {
+    authorityUnverified(
+      'Open promotion has no terminal authority to verify',
+      'open-terminal-authority-absent',
+    );
+  }
   if (terminal.outcome === 'committed') {
     await verifyCommittedOperationAuthority(operation, receipt);
     return;
@@ -338,7 +385,12 @@ export async function verifyClosedTerminalOperationAuthority(
     state: 'closed',
   });
   const terminal = journal.terminal;
-  if (terminal === null) throw new Error('Closed promotion has no terminal authority to verify');
+  if (terminal === null) {
+    authorityUnverified(
+      'Closed promotion has no terminal authority to verify',
+      'closed-terminal-authority-absent',
+    );
+  }
   if (terminal.outcome === 'committed') {
     verifyCommittedRuntimeAuthority(operation, journal);
     await verifyClosedAuthoredAuthority(operation, receipt, 'desired');
