@@ -1,3 +1,4 @@
+import { authorityUnverified } from './runtime-promotion-authority-error.js';
 import { RuntimePromotionDatastoreError } from './runtime-promotion-preflight.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
 
@@ -12,7 +13,10 @@ export async function checkpointRuntimeDatastores(
   const candidates: RuntimePromotionDatastoreCandidate[] = [];
   if (operation.preflight.source.classification !== 'none') {
     if (operation.preflight.sourceRuntimeDir === undefined) {
-      throw new Error('Selected cache evidence has no source runtime path');
+      authorityUnverified(
+        'Selected cache evidence has no source runtime path',
+        'cache-evidence-source-path-absent',
+      );
     }
     candidates.push({
       kind: 'source',

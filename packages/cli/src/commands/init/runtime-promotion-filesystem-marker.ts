@@ -1,3 +1,4 @@
+import { journalError } from './runtime-promotion-journal-error.js';
 import {
   RUNTIME_PROMOTION_JOURNAL_CAPS,
   assertRuntimeManifestIdentity,
@@ -25,7 +26,11 @@ type MarkerSlot = (typeof MARKER_SLOTS)[number];
 
 /** @throws {SystemError} Always; constructs the canonical artifact-marker validation failure. */
 function markerFailure(message: string): never {
-  throw new Error(`Invalid runtime promotion artifact marker: ${message}`);
+  throw journalError(
+    `Invalid runtime promotion artifact marker: ${message}`,
+    undefined,
+    'journal-digest-mismatch',
+  );
 }
 
 function canonicalManifest(

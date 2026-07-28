@@ -1,5 +1,6 @@
 import { isDeepStrictEqual } from 'node:util';
 
+import { journalError } from './runtime-promotion-journal-error.js';
 import {
   canonicalRuntimePromotionJournal,
   type RuntimeManifestIdentity,
@@ -35,9 +36,13 @@ interface OpenPostconditionIdentity extends OpenIntentIdentity {
   readonly outcome: RuntimeMutationOutcome;
 }
 
-/** @throws {Error} Always; the requested runtime promotion transition is invalid. */
+/** @throws {SystemError} Always; the requested runtime promotion transition is invalid. */
 export function transitionFailure(message: string): never {
-  throw new Error(`Invalid runtime promotion transition request: ${message}`);
+  throw journalError(
+    `Invalid runtime promotion transition request: ${message}`,
+    undefined,
+    'journal-phase-invalid',
+  );
 }
 
 export function transitionTime(

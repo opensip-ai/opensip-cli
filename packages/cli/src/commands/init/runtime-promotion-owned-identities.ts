@@ -2,6 +2,7 @@
 
 import { createHash } from 'node:crypto';
 
+import { authorityUnverified } from './runtime-promotion-authority-error.js';
 import {
   RUNTIME_PROMOTION_OPERATION_ID_PATTERN,
   type RuntimePromotionOwnedSlotName,
@@ -39,7 +40,10 @@ export function runtimePromotionOwnedBasename(
   slot: RuntimePromotionOwnedSlotName,
 ): string {
   if (!RUNTIME_PROMOTION_OPERATION_ID_PATTERN.test(operationId)) {
-    throw new Error('Cannot derive a promotion basename from an invalid operation ID');
+    authorityUnverified(
+      'Cannot derive a promotion basename from an invalid operation ID',
+      'operation-id-invalid-basename',
+    );
   }
   const digest = ownedDigest(operationId, slot, 'opensip:init-promotion-basename:v1');
   return `.opensip-init-${SLOT_TOKENS[slot]}-${digest}`;
@@ -52,7 +56,10 @@ export function runtimePromotionOwnershipId(
   slot: RuntimePromotionOwnedSlotName,
 ): string {
   if (!RUNTIME_PROMOTION_OPERATION_ID_PATTERN.test(operationId)) {
-    throw new Error('Cannot derive a promotion ownership ID from an invalid operation ID');
+    authorityUnverified(
+      'Cannot derive a promotion ownership ID from an invalid operation ID',
+      'operation-id-invalid-ownership',
+    );
   }
   const digest = ownedDigest(operationId, slot, 'opensip:init-promotion-ownership:v1');
   return `opensip-init-ownership-${SLOT_TOKENS[slot]}-${digest}`;

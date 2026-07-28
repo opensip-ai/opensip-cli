@@ -110,7 +110,10 @@ async function beginRollback(operation: RuntimePromotionRecoveryOperation): Prom
 async function continueAuthoredCommit(operation: RuntimePromotionRecoveryOperation): Promise<void> {
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    recoveryEvidenceMismatch('Authored commit lacks its durable replay transaction');
+    recoveryEvidenceMismatch(
+      'Authored commit lacks its durable replay transaction',
+      'authored-commit-durable-replay-transaction',
+    );
   }
   const committed = await operation.dependencies.commitAuthored(operation.transaction);
   const committedReceipt = await operation.writer.bindAuthoredCommitted(committed.receipt);
@@ -206,7 +209,10 @@ async function continueRollback(operation: RuntimePromotionRecoveryOperation): P
   }
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    recoveryEvidenceMismatch('Authored rollback lacks its durable transaction');
+    recoveryEvidenceMismatch(
+      'Authored rollback lacks its durable transaction',
+      'authored-rollback-durable-transaction',
+    );
   }
   const rolledBack = await operation.dependencies.rollbackAuthored(operation.transaction);
   const rolledBackReceipt = await operation.writer.bindAuthoredRolledBack(rolledBack.receipt);
@@ -222,15 +228,24 @@ async function verifyRolledBackAuthored(
   if (!recoveryAuthoredWasMaterialized(operation.journal)) return;
   await loadRecoveryAuthored(operation);
   if (operation.transaction === null) {
-    recoveryEvidenceMismatch('Rolled-back authored verification lacks its transaction');
+    recoveryEvidenceMismatch(
+      'Rolled-back authored verification lacks its transaction',
+      'rolled-back-authored-verification-transaction',
+    );
   }
   const transaction = await bindRecoveryAuthoredReceipt(operation);
   if (transaction === null) {
-    recoveryEvidenceMismatch('Rolled-back authored verification lost its durable transaction');
+    recoveryEvidenceMismatch(
+      'Rolled-back authored verification lost its durable transaction',
+      'rolled-back-authored-verification-durable',
+    );
   }
   operation.authoredSummary = await operation.dependencies.verifyAuthored(transaction, 'preimage');
   if (!operation.authoredSummary.verified) {
-    recoveryEvidenceMismatch('Recovered authored preimage authority was not verified');
+    recoveryEvidenceMismatch(
+      'Recovered authored preimage authority was not verified',
+      'recovered-authored-preimage-authority-verified',
+    );
   }
 }
 
@@ -319,12 +334,18 @@ async function continueIdleOpen(operation: RuntimePromotionRecoveryOperation): P
         return;
       }
       default: {
-        recoveryEvidenceMismatch(`Unsupported forward recovery phase: ${phase}`);
+        recoveryEvidenceMismatch(
+          `Unsupported forward recovery phase: ${phase}`,
+          'unsupported-forward-recovery-phase',
+        );
       }
     }
   }
   if (direction !== 'rollback') {
-    recoveryEvidenceMismatch('Open recovery has an invalid direction');
+    recoveryEvidenceMismatch(
+      'Open recovery has an invalid direction',
+      'open-recovery-invalid-direction',
+    );
   }
   switch (phase) {
     case 'rollback-started':
@@ -341,7 +362,10 @@ async function continueIdleOpen(operation: RuntimePromotionRecoveryOperation): P
       return;
     }
     default: {
-      recoveryEvidenceMismatch(`Unsupported rollback recovery phase: ${phase}`);
+      recoveryEvidenceMismatch(
+        `Unsupported rollback recovery phase: ${phase}`,
+        'unsupported-rollback-recovery-phase',
+      );
     }
   }
 }
@@ -358,7 +382,10 @@ async function recoverOpenStep(
   step: number,
 ): Promise<DurableClosedPromotionJournal> {
   if (step >= MAX_RECOVERY_STEPS) {
-    recoveryEvidenceMismatch('Runtime promotion recovery exceeded its bounded transition count');
+    recoveryEvidenceMismatch(
+      'Runtime promotion recovery exceeded its bounded transition count',
+      'runtime-promotion-recovery-bounded-transition',
+    );
   }
   const journal = await refreshRecoveryJournal(operation);
   if (operation.receipt.state === 'closed') return operation.receipt;

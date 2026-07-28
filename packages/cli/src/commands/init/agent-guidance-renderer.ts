@@ -3,6 +3,8 @@
  * Pure, project-relative rendering for Init's managed agent guidance.
  */
 
+import { scaffoldAssetFailure } from './scaffold-asset-failure.js';
+
 import type { ToolScaffold } from '../shared.js';
 import type { AgentGuidanceTargetResult } from '@opensip-cli/contracts';
 
@@ -255,7 +257,11 @@ export function renderAgentGuidanceTargets(
   const targets = GUIDANCE_TARGETS.map((spec) => {
     const snapshot = snapshotsByPath.get(spec.relativePath);
     if (snapshot === undefined) {
-      throw new Error(`Missing agent-guidance snapshot: ${spec.relativePath}`);
+      scaffoldAssetFailure(
+        `Missing agent-guidance snapshot: ${spec.relativePath}`,
+        'snapshot-absent',
+        spec.relativePath,
+      );
     }
     return renderTarget(spec, snapshot, opts.toolScaffolds, block);
   });
@@ -273,10 +279,18 @@ function indexTargetSnapshots(
   const indexed = new Map<string, AgentGuidanceTargetSnapshot>();
   for (const snapshot of snapshots) {
     if (!knownPaths.has(snapshot.relativePath)) {
-      throw new Error(`Unknown agent-guidance target: ${snapshot.relativePath}`);
+      scaffoldAssetFailure(
+        `Unknown agent-guidance target: ${snapshot.relativePath}`,
+        'target-unknown',
+        snapshot.relativePath,
+      );
     }
     if (indexed.has(snapshot.relativePath)) {
-      throw new Error(`Duplicate agent-guidance snapshot: ${snapshot.relativePath}`);
+      scaffoldAssetFailure(
+        `Duplicate agent-guidance snapshot: ${snapshot.relativePath}`,
+        'snapshot-duplicate',
+        snapshot.relativePath,
+      );
     }
     indexed.set(snapshot.relativePath, snapshot);
   }

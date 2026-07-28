@@ -26,6 +26,7 @@ import {
 } from './init-authored-plan-snapshot-validation.js';
 import { readInitAuthoredSnapshot } from './init-authored-plan-snapshot.js';
 import { normalizeLanguages } from './init-authored-plan-types.js';
+import { scaffoldAssetFailure } from './scaffold-asset-failure.js';
 
 import type {
   CreateInitAuthoredPlanInput,
@@ -148,7 +149,9 @@ export function decodeInitAuthoredPlanBlob(
   name: string,
 ): Buffer {
   const encoded = plan.blobs[kind][name];
-  if (encoded === undefined) throw new Error(`Unknown Init authored ${kind} blob: ${name}`);
+  if (encoded === undefined) {
+    scaffoldAssetFailure(`Unknown Init authored ${kind} blob: ${name}`, 'blob-unknown', name);
+  }
   return Buffer.from(encoded, 'base64');
 }
 

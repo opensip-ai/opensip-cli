@@ -2,7 +2,7 @@ import {
   type DurablePromotionJournal,
   type RuntimePromotionJournalController,
 } from './runtime-promotion-journal-controller-internal.js';
-import { journalError } from './runtime-promotion-journal-controller-validation.js';
+import { journalError } from './runtime-promotion-journal-error.js';
 import { asClosed, asOpen } from './runtime-promotion-journal-transition-guards.js';
 
 export function handoffRuntimePromotionRecoveryOwner<Receipt extends DurablePromotionJournal>(

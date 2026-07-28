@@ -14,6 +14,7 @@ import {
   MAX_AGENT_GUIDANCE_FILE_BYTES,
   renderAgentGuidanceTargets,
 } from './agent-guidance-renderer.js';
+import { scaffoldAssetFailure } from './scaffold-asset-failure.js';
 
 import type {
   AgentGuidanceReadFailure,
@@ -96,7 +97,11 @@ function applyRenderedTarget(
   if (target.action === 'created' || target.action === 'updated') {
     if (spec.create === 'always') mkdirSync(dirname(path), { recursive: true });
     if (target.content === undefined) {
-      throw new Error(`Missing rendered guidance bytes: ${target.relativePath}`);
+      scaffoldAssetFailure(
+        `Missing rendered guidance bytes: ${target.relativePath}`,
+        'snapshot-absent',
+        target.relativePath,
+      );
     }
     writeFileSync(path, target.content, 'utf8');
   }
@@ -120,7 +125,11 @@ export function ensureOpenSipAgentGuidance(
   const targets = rendered.targets.map((target) => {
     const spec = specsByPath.get(target.relativePath);
     if (spec === undefined)
-      throw new Error(`Unknown rendered guidance target: ${target.relativePath}`);
+      scaffoldAssetFailure(
+        `Unknown rendered guidance target: ${target.relativePath}`,
+        'target-unknown',
+        target.relativePath,
+      );
     return applyRenderedTarget(cwd, spec, target);
   });
   return { changed: rendered.changed, targets };

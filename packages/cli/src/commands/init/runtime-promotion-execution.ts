@@ -1,4 +1,6 @@
+import { authoredTransactionFailure } from './authored-state-transaction-failure.js';
 import { compareRuntimeManifests } from './runtime-manifest.js';
+import { authorityUnverified } from './runtime-promotion-authority-error.js';
 import { checkpointRuntimeDatastores } from './runtime-promotion-execution-datastore.js';
 import {
   retireSelectedSource,
@@ -24,7 +26,10 @@ async function verifySelectedRuntimes(
     const sourceRuntimeDir = operation.preflight.sourceRuntimeDir;
     if (sourceRuntimeDir === undefined) {
       operation.sourcePreserved = false;
-      throw new Error('Selected cache authority has no source runtime');
+      authorityUnverified(
+        'Selected cache authority has no source runtime',
+        'selected-cache-source-runtime-absent',
+      );
     }
     try {
       operation.sourceManifest = operation.dependencies.inspectManifest(
@@ -80,7 +85,10 @@ async function verifySelectedRuntimes(
       operation.destinationManifest === null ||
       !compareRuntimeManifests(operation.sourceManifest, operation.destinationManifest).equal)
   ) {
-    throw new Error('Cache and project runtimes changed after equivalence selection');
+    authorityUnverified(
+      'Cache and project runtimes changed after equivalence selection',
+      'equivalence-selection-runtimes-changed',
+    );
   }
   return operation;
 }
@@ -142,7 +150,10 @@ async function materializeRuntimeStage(
   initialReceipt: DurableOpenPromotionJournal,
 ): Promise<VerifiedRuntimeManifest> {
   if (operation.sourceManifest === null || operation.preflight.sourceRuntimeDir === undefined) {
-    throw new Error('Runtime staging requires a verified cache source');
+    authorityUnverified(
+      'Runtime staging requires a verified cache source',
+      'staging-cache-source-unverified',
+    );
   }
   assertFreshRuntimePromotionProjectRoot(operation);
   const stageIntentReceipt = await operation.writer.recordRuntimeStageCreateIntent(initialReceipt);
@@ -197,7 +208,10 @@ async function backupDestinationIfNeeded(
 ): Promise<DurableOpenPromotionJournal> {
   if (!operation.preflight.destinationRuntimePreexisting) return operation.receipt;
   if (operation.destinationManifest === null) {
-    throw new Error('Destination backup requires a verified project runtime');
+    authorityUnverified(
+      'Destination backup requires a verified project runtime',
+      'backup-project-runtime-unverified',
+    );
   }
   assertFreshRuntimePromotionProjectRoot(operation);
   let journal = await operation.controller.verifyOpen(operation.receipt);
@@ -295,7 +309,11 @@ async function commitAuthored(
   operation: RuntimePromotionOperation,
 ): Promise<RuntimePromotionOperation> {
   if (operation.transaction === null) {
-    throw new Error('Authored transaction was not prepared');
+    authoredTransactionFailure(
+      'the authored transaction was not prepared',
+      undefined,
+      'authored-transaction-not-prepared',
+    );
   }
   assertFreshRuntimePromotionProjectRoot(operation);
   const transaction = await bindAuthoredForCommit(operation, operation.transaction);
