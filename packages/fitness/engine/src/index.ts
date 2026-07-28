@@ -76,6 +76,8 @@ export type {
 // ── Authoring helpers — snippet/line extraction, file access ────────
 export { getLineNumber, extractSnippet, isAPIFile } from './framework/result-builder.js';
 export { execAbortable } from './framework/abortable-exec.js';
+export { checkFileTooLargeError } from './errors/check-file-too-large-error.js';
+export type { CheckFileTooLargeErrorOptions } from './errors/check-file-too-large-error.js';
 export { matchConventionAlwaysUsed, matchConventionUsedExport } from './framework/conventions.js';
 export type { TargetConventionMatch } from './framework/conventions.js';
 // The FileCache TYPE — used by public FitnessSubscope.fileCache and test-support

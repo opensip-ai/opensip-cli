@@ -418,7 +418,7 @@ export const unboundedMemory = defineCheck({
           message: 'File read without size validation may cause OOM',
           severity: 'warning',
           suggestion:
-            'Check fs.stat().size before reading to prevent OOM on large files. Example: const stats = await fs.stat(path); if (stats.size > MAX_FILE_SIZE) throw new Error("File too large");',
+            'Check fs.stat().size before reading to prevent OOM on large files. Example: const stats = await fs.stat(path); if (stats.size > MAX_FILE_SIZE) throw new RangeError("File too large");',
           match: readCall.match,
           type: 'unbounded-file-read',
           filePath,
