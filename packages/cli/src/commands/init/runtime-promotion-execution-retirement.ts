@@ -1,4 +1,5 @@
 import { runtimeManifestIdentityEqual } from './runtime-manifest.js';
+import { authorityUnverified } from './runtime-promotion-authority-error.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
 import { runtimePromotionMutationOutcome } from './runtime-promotion-transitions-common.js';
 
@@ -22,7 +23,10 @@ export async function retireSelectedSource(
   }
   if (operation.sourceManifest === null || operation.preflight.sourceRuntimeDir === undefined) {
     operation.sourcePreserved = false;
-    throw new Error('Source retirement requires verified cache authority');
+    authorityUnverified(
+      'Source retirement requires verified cache authority',
+      'retirement-cache-authority-unverified',
+    );
   }
   assertFreshRuntimePromotionProjectRoot(operation);
   const destinationAuthority = operation.dependencies.inspectManifest(
@@ -38,7 +42,10 @@ export async function retireSelectedSource(
     expectedDestination === undefined ||
     !runtimeManifestIdentityEqual(destinationAuthority.identity, expectedDestination)
   ) {
-    throw new Error('Project runtime authority changed before cache retirement');
+    authorityUnverified(
+      'Project runtime authority changed before cache retirement',
+      'retirement-project-authority-changed',
+    );
   }
   let proof: RuntimePromotionSourceRetirementProof;
   try {
@@ -77,7 +84,10 @@ export async function retireSelectedSource(
     operation.sourceManifest.identity,
   );
   if (!runtimeManifestIdentityEqual(result.manifest.identity, operation.sourceManifest.identity)) {
-    throw new Error('Retired source tombstone authority does not match the selected source');
+    authorityUnverified(
+      'Retired source tombstone authority does not match the selected source',
+      'retirement-tombstone-mismatch',
+    );
   }
   operation.sourcePreserved = true;
   assertFreshRuntimePromotionProjectRoot(operation);

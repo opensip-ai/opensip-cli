@@ -65,6 +65,7 @@ import {
   assertRuntimePromotionProjectRootAuthority,
   captureRuntimePromotionRecoveryProjectRootAuthority,
   reportInitFailure,
+  recoveryEvidenceMismatch,
 } from './runtime-promotion-root-authority.js';
 import { createRuntimePromotionTransitionWriter } from './runtime-promotion-transitions.js';
 
@@ -143,7 +144,10 @@ async function claimValidatedJournal(input: {
     state: receipt.state,
   });
   if (journal.operationId !== input.operationId) {
-    throw new Error('Recovered journal operation identity changed after claim');
+    recoveryEvidenceMismatch(
+      'Recovered journal operation identity changed after claim',
+      'recovered-operation-identity-changed',
+    );
   }
   return { receipt, journal };
 }

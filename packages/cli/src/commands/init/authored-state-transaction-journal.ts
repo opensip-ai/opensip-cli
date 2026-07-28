@@ -1,3 +1,4 @@
+import { authoredTransactionFailure } from './authored-state-transaction-failure.js';
 import {
   canonicalRuntimePromotionJournal,
   type RuntimePromotionJournal,
@@ -67,7 +68,13 @@ export async function recordOpenPostcondition(
 ): Promise<DurableOpenPromotionJournal> {
   const current = await controller.verifyOpen(receipt);
   const pending = current.progress.pendingIntent;
-  if (pending === null) throw new Error('Authored postcondition requires a pending intent');
+  if (pending === null) {
+    authoredTransactionFailure(
+      'an authored postcondition requires a pending intent',
+      undefined,
+      'postcondition-pending-intent-absent',
+    );
+  }
   const recordedAt = transitionTime(current, now);
   const authoredDelta = input.authoredDelta ?? 0;
   const rollbackDelta = input.rollbackDelta ?? 0;
@@ -197,7 +204,11 @@ export async function recordCleanupPostcondition(
   const current = await controller.verifyReceipt(receipt, { state: 'closed' });
   const pending = current.progress.pendingIntent;
   if (pending?.kind !== 'owned-slot-cleanup' || pending.slot === null) {
-    throw new Error('Authored cleanup postcondition requires its exact pending intent');
+    authoredTransactionFailure(
+      'an authored cleanup postcondition requires its exact pending intent',
+      undefined,
+      'cleanup-postcondition-intent-mismatch',
+    );
   }
   const recordedAt = transitionTime(current, now);
   const desired = canonicalRuntimePromotionJournal({

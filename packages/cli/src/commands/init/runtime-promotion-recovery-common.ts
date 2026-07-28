@@ -6,7 +6,7 @@ import { AUTHORED_TRANSACTION_CODE } from './authored-state-transaction-fs.js';
 import { hasErrorCode } from './error-code.js';
 import { RuntimeManifestError, runtimeManifestIdentityEqual } from './runtime-manifest.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
-import { JOURNAL_ERROR_CODE } from './runtime-promotion-journal-controller-validation.js';
+import { JOURNAL_ERROR_CODE } from './runtime-promotion-journal-error.js';
 import { canonicalRuntimePromotionCacheChild } from './runtime-promotion-preflight-fs.js';
 import {
   RuntimePromotionDatastoreError,

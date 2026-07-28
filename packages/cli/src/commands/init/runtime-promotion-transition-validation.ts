@@ -6,6 +6,7 @@ import {
   runtimePromotionPendingIntentAllowed,
   runtimePromotionPostconditionPhaseAllowed,
 } from './runtime-promotion-intent-policy.js';
+import { journalError } from './runtime-promotion-journal-error.js';
 
 import type {
   RuntimePromotionJournal,
@@ -14,9 +15,13 @@ import type {
   RuntimePromotionPostcondition,
 } from './runtime-promotion-journal-schema.js';
 
-/** @throws {Error} Always; the proposed durable journal transition is invalid. */
+/** @throws {SystemError} Always; the proposed durable journal transition is invalid. */
 export function transitionFailure(message: string): never {
-  throw new Error(`Invalid runtime promotion transition: ${message}`);
+  throw journalError(
+    `Invalid runtime promotion transition: ${message}`,
+    undefined,
+    'journal-phase-invalid',
+  );
 }
 
 export function sameTransitionValue(left: unknown, right: unknown): boolean {

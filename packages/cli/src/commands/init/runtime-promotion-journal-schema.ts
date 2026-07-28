@@ -3,6 +3,7 @@
  * No journal payload contains absolute paths, entry lists, or authored bytes.
  */
 
+import { journalError } from './runtime-promotion-journal-error.js';
 import {
   RUNTIME_PROMOTION_JOURNAL_KIND,
   RUNTIME_PROMOTION_JOURNAL_MAX_BYTES,
@@ -204,8 +205,10 @@ export function canonicalRuntimePromotionJournal(
 export function encodeRuntimePromotionJournal(journal: RuntimePromotionJournal): string {
   const encoded = JSON.stringify(canonicalRuntimePromotionJournal(journal));
   if (Buffer.byteLength(encoded, 'utf8') > RUNTIME_PROMOTION_JOURNAL_MAX_BYTES) {
-    throw new Error(
+    throw journalError(
       `Runtime promotion journal exceeds ${RUNTIME_PROMOTION_JOURNAL_MAX_BYTES} bytes`,
+      undefined,
+      'journal-oversize',
     );
   }
   return encoded;
@@ -215,27 +218,33 @@ export function encodeRuntimePromotionJournal(journal: RuntimePromotionJournal):
  * Parse only exact canonical bytes. Re-encoding catches duplicate keys,
  * reordered fields, alternate escapes, whitespace, and unknown additions.
  *
- * @throws {Error} When the bytes are oversized, invalid, noncanonical, or bound elsewhere.
+ * @throws {SystemError} When the bytes are oversized, invalid, noncanonical, or bound elsewhere.
  */
 export function parseRuntimePromotionJournal(
   raw: string,
   expected: RuntimePromotionJournalBinding = {},
 ): RuntimePromotionJournal {
   if (Buffer.byteLength(raw, 'utf8') > RUNTIME_PROMOTION_JOURNAL_MAX_BYTES) {
-    throw new Error(
+    throw journalError(
       `Runtime promotion journal exceeds ${RUNTIME_PROMOTION_JOURNAL_MAX_BYTES} bytes`,
+      undefined,
+      'journal-oversize',
     );
   }
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
-  } catch {
-    throw new Error('Runtime promotion journal is not valid JSON');
+  } catch (error) {
+    throw journalError('Runtime promotion journal is not valid JSON', error, 'journal-malformed');
   }
   assertRuntimePromotionJournal(parsed);
   const canonical = canonicalRuntimePromotionJournal(parsed);
   if (raw !== encodeRuntimePromotionJournal(canonical)) {
-    throw new Error('Runtime promotion journal is not canonical v1 JSON');
+    throw journalError(
+      'Runtime promotion journal is not canonical v1 JSON',
+      undefined,
+      'journal-malformed',
+    );
   }
   if (
     (expected.coordinationKey !== undefined &&
@@ -243,7 +252,11 @@ export function parseRuntimePromotionJournal(
     (expected.operationId !== undefined && canonical.operationId !== expected.operationId) ||
     (expected.state !== undefined && canonical.state !== expected.state)
   ) {
-    throw new Error('Runtime promotion journal does not match the expected authority');
+    throw journalError(
+      'Runtime promotion journal does not match the expected authority',
+      undefined,
+      'journal-key-mismatch',
+    );
   }
   return canonical;
 }

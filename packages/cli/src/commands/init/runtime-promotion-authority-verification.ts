@@ -6,6 +6,7 @@ import {
   isRuntimeManifestReleaseUnsafe,
   runtimeManifestIdentityEqual,
 } from './runtime-manifest.js';
+import { authorityUnverified } from './runtime-promotion-authority-error.js';
 import { runtimePromotionOutcomeRequiresOriginalDestination } from './runtime-promotion-destination-authority.js';
 import { assertFreshRuntimePromotionProjectRoot } from './runtime-promotion-root-authority.js';
 
@@ -65,26 +66,6 @@ async function bindAuthoredForVerification(
 ): Promise<AuthoredTransaction> {
   await operation.dependencies.bindAuthoredReceipt(transaction, receipt);
   return transaction;
-}
-
-/**
- * The one failure funnel for this file's authority-verification refusals.
- *
- * Every refusal here means the same thing to the operator — the promotion source could not be
- * verified against its recorded authority — so they share `CLI.INIT.PROMOTION_SOURCE_UNVERIFIED`
- * and are told apart by `metadata.condition` (D9). Before registration these were bare `Error`s,
- * which normalize to `SYSTEM_ERROR` (exposure `redacted`): a failure that decides whether the
- * runtime lease may be released reported to the user as "The operation failed."
- *
- * @throws {SystemError} always — an authority check refused.
- */
-function authorityUnverified(message: string, condition: string): never {
-  throw new SystemError(message, {
-    code: SOURCE_UNVERIFIED.code,
-    definition: SOURCE_UNVERIFIED,
-    metadata: { condition },
-    diagnostic: condition,
-  });
 }
 
 /** @throws {SystemError} When the observed manifest no longer matches the expected identity. */
