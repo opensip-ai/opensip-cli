@@ -13,6 +13,7 @@ import {
   type ViewNode,
 } from '@opensip-cli/cli-ui';
 
+import { hostWiringInvalid } from '../../errors/host-wiring-failure.js';
 import { renderDiagnosticHuman } from '../render-diagnostic.js';
 
 import type {
@@ -142,7 +143,10 @@ type ToolsCommandResult = Extract<
 
 /** @throws {Error} When the closed tools result union and renderer drift. */
 function assertToolsNever(result: never): never {
-  throw new Error(`Unhandled tools command result '${JSON.stringify(result)}'`);
+  hostWiringInvalid(
+    `Unhandled tools command result '${JSON.stringify(result)}'`,
+    'tools-result-unrenderable',
+  );
 }
 
 export function viewToolsResult(result: ToolsCommandResult): ViewNode {

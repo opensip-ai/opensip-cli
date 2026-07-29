@@ -8,6 +8,8 @@ import {
   type ViewNode,
 } from '@opensip-cli/cli-ui';
 
+import { hostWiringInvalid } from '../../errors/host-wiring-failure.js';
+
 import type {
   CommandResult,
   PolicyAuditResult,
@@ -58,7 +60,10 @@ type PolicyCommandResult = Extract<
 
 /** @throws {Error} When the closed policy result union and renderer drift. */
 function assertPolicyNever(result: never): never {
-  throw new Error(`Unhandled policy command result '${JSON.stringify(result)}'`);
+  hostWiringInvalid(
+    `Unhandled policy command result '${JSON.stringify(result)}'`,
+    'policy-result-unrenderable',
+  );
 }
 
 export function viewPolicyResult(result: PolicyCommandResult): ViewNode {

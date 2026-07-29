@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T19:10:53.310Z",
+  "generatedAt": "2026-07-29T01:37:55.475Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 250,
+        "total": 251,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -37,7 +37,7 @@
           "one-outcome-shape": 1,
           "only-documented-toolcli-seams": 3,
           "context-leakage": 1,
-          "file-length-limit": 11,
+          "file-length-limit": 12,
           "no-hardcoded-timeouts": 8,
           "interface-implementation-consistency": 2,
           "env-secret-exposure": 3,
@@ -105,7 +105,7 @@
           "agent-eval": 9,
           "cli": 11,
           "contracts": 2,
-          "core": 10,
+          "core": 11,
           "dashboard": 1,
           "fitness/checks-dogfood": 12,
           "fitness/checks-typescript": 57,
@@ -129,7 +129,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 77,
+        "total": 78,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -141,7 +141,7 @@
           "one-outcome-shape": 1,
           "only-documented-toolcli-seams": 3,
           "context-leakage": 1,
-          "file-length-limit": 11,
+          "file-length-limit": 12,
           "no-hardcoded-timeouts": 1,
           "interface-implementation-consistency": 1,
           "env-secret-exposure": 2,
@@ -164,7 +164,7 @@
           "agent-eval": 9,
           "cli": 11,
           "contracts": 2,
-          "core": 10,
+          "core": 11,
           "dashboard": 1,
           "fitness/engine": 12,
           "graph/engine": 12,
@@ -387,7 +387,7 @@
     "cosmetic": {
       "file-length-limit": {
         "budget": 0,
-        "actual": 11
+        "actual": 12
       },
       "module-coupling-fan-out": {
         "budget": 4,
@@ -466,13 +466,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 250,
+    "budgetGateFitness": 251,
     "budgetGateFitnessSlugs": 73,
-    "productRuntimeFitness": 77,
+    "productRuntimeFitness": 78,
     "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 109,
+    "productRuntimeCombined": 110,
     "checkPackageFitness": 171,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -492,10 +492,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -228,
+      "productRuntimeFitness": -227,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -203,
-      "budgetGateFitness": -292,
+      "productRuntimeCombined": -202,
+      "budgetGateFitness": -291,
       "checkPackageFitness": -63,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232
@@ -509,7 +509,7 @@
       },
       {
         "slug": "file-length-limit",
-        "count": 11,
+        "count": 12,
         "disposition": "c",
         "kind": "fitness"
       }

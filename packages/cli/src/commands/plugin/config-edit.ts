@@ -20,6 +20,8 @@ import {
   type YAMLSeq,
 } from 'yaml';
 
+import { pluginEditRefused } from '../../errors/plugin-edit-failure.js';
+
 /**
  * Edit the project's `plugins.<domain>` list. Returns true when the
  * file was changed.
@@ -44,9 +46,12 @@ export function editPluginList(
   const doc = parseDocument(text);
   if (doc.errors.length > 0) {
     const first = doc.errors[0]?.message ?? 'unknown YAML error';
-    throw new Error(
+    pluginEditRefused(
       `Cannot edit plugins.${domain} in ${configPath}: ${first}. ` +
         `Fix the syntax error and re-run.`,
+      'yaml-syntax-invalid',
+      configPath,
+      domain,
     );
   }
 
@@ -62,9 +67,12 @@ export function editPluginList(
   // the root means the file isn't an opensip-cli config — refuse
   // to edit rather than reformat the whole thing.
   if (!isMap(root)) {
-    throw new Error(
+    pluginEditRefused(
       `Cannot edit plugins.${domain} in ${configPath}: top-level node is not a mapping. ` +
         `opensip-cli.config.yml must start with a YAML map.`,
+      'root-not-mapping',
+      configPath,
+      domain,
     );
   }
 
@@ -94,7 +102,12 @@ function appendToPluginList(
     plugins = doc.createNode({});
     root.set('plugins', plugins);
   } else if (!isMap(plugins)) {
-    throw new Error(`Cannot edit plugins.${domain} in ${configPath}: plugins must be a mapping.`);
+    pluginEditRefused(
+      `Cannot edit plugins.${domain} in ${configPath}: plugins must be a mapping.`,
+      'plugins-not-mapping',
+      configPath,
+      domain,
+    );
   }
   const pluginsMap = plugins as YAMLMap;
 
@@ -103,8 +116,11 @@ function appendToPluginList(
     list = doc.createNode([]);
     pluginsMap.set(domain, list);
   } else if (!isSeq(list)) {
-    throw new Error(
+    pluginEditRefused(
       `Cannot edit plugins.${domain} in ${configPath}: plugins.${domain} must be a sequence.`,
+      'domain-not-sequence',
+      configPath,
+      domain,
     );
   }
   const seq = list as YAMLSeq;

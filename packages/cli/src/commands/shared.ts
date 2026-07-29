@@ -10,6 +10,8 @@
  * the shared context type.
  */
 
+import { hostWiringInvalid } from '../errors/host-wiring-failure.js';
+
 import type { SpecLike } from './completion.js';
 import type { RunActionHooks } from '../bootstrap/run-plane.js';
 import type { SessionReplayRegistry } from '../session-replay-registry.js';
@@ -107,10 +109,16 @@ function assertUniqueToolScaffoldIdentities(toolScaffolds: readonly ToolScaffold
   const names = new Set<string>();
   for (const { identity } of toolScaffolds) {
     if (stableIds.has(identity.stableId)) {
-      throw new Error(`Duplicate Tool scaffold stable id: ${identity.stableId}`);
+      hostWiringInvalid(
+        `Duplicate Tool scaffold stable id: ${identity.stableId}`,
+        'scaffold-stable-id-duplicate',
+      );
     }
     if (names.has(identity.name)) {
-      throw new Error(`Duplicate Tool scaffold name: ${identity.name}`);
+      hostWiringInvalid(
+        `Duplicate Tool scaffold name: ${identity.name}`,
+        'scaffold-name-duplicate',
+      );
     }
     stableIds.add(identity.stableId);
     names.add(identity.name);

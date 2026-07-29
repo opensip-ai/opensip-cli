@@ -189,4 +189,25 @@ export const hostSurfacesDefinitions = {
       'External tool session replay requires provenance and a worker dispatcher. Reinstall the tool or re-run from a project that admitted it.',
     publicMetadataKeys: ['condition', 'tool'],
   },
+
+  /**
+   * The host refuses to edit `plugins.<domain>` because the config file is not the shape it must be.
+   *
+   * Sibling of `CLI.TOOLS.EDIT_REFUSED` and deliberately a separate code: that one governs
+   * `tools.trusted`, this one the plugin lists. They fail for the same reasons but name different
+   * regions of the file, and an operator fixing one should not be pointed at the other.
+   *
+   * `USER_INPUT` axes — `exposure: 'public'`, `configuration` exit — because these messages are
+   * the most actionable in the file. Each already names the file, the exact region, and the fix
+   * ("Fix the syntax error and re-run"); as bare `Error`s all of that was replaced by
+   * "The operation failed." for someone whose config file has a typo.
+   */
+  'CLI.PLUGIN.EDIT_REFUSED': {
+    ...USER_INPUT,
+    code: 'CLI.PLUGIN.EDIT_REFUSED',
+    kind: 'integrity',
+    operatorAction:
+      'The config file could not be edited: it is missing or malformed at the named region. Fix the file and re-run.',
+    publicMetadataKeys: ['condition', 'path', 'domain'],
+  },
 } as const;
