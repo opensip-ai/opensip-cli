@@ -33,6 +33,22 @@
  * repo runs a deliberate zero-warning gate. That leaves only two dishonest options —
  * disable the check, or weaken the gate — so it enforces the ground already taken.
  *
+ * KNOWN BOUNDARY — READ BEFORE TRUSTING A PASS
+ * This matches `new Error(` only. A `throw new TypeError(...)` or `new RangeError(...)` is NOT
+ * flagged, even though both normalize to `SYSTEM_ERROR` and reach the user as
+ * "The operation failed." exactly as a bare `Error` does — verified, not assumed.
+ *
+ * That is deliberate, not an oversight. Roughly 50 native non-`Error` throws already live in
+ * migrated packages as ordinary argument validation, and they survived Waves 1-3 review as such.
+ * Widening the pattern would fire on all of them at once and break the zero-warning gate — the
+ * same trap that made this check package-scoped in the first place.
+ *
+ * The consequence to be aware of: a bare `Error` CAN be laundered past this gate by changing it
+ * to a `TypeError`, with no change in what the user sees. This check makes the dominant pattern
+ * un-regressable; it does not make the property total. If that becomes a real evasion rather than
+ * a theoretical one, the fix is to classify the ~50 existing sites first, then widen — not to
+ * widen and suppress.
+ *
  * contentFilter is `strip-strings-and-comments`: the engine masks both, so prose in
  * this file's own doc comment and any `throw new Error(` inside a string literal are
  * inert. The check would otherwise flag its own documentation.
