@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **24**
-- Definitions: **251**
+- Definitions: **252**
 
 ## Catalogs
 
@@ -30,7 +30,7 @@ generated: true
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-surfaces.ts` | 11 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-surfaces.ts` | 12 |
 | `@opensip-cli/output` | `@opensip-cli/output` | `packages/output/src/errors/output-error-catalog.ts` | 2 |
 | `@opensip-cli/config` | `@opensip-cli/config` | `packages/config/src/errors/config-error-catalog.ts` | 4 |
 | `@opensip-cli/datastore` | `@opensip-cli/datastore` | `packages/datastore/src/errors/datastore-error-catalog.ts` | 5 |
@@ -67,6 +67,7 @@ generated: true
 | `CLI.INIT.PROMOTION_SOURCE_UNVERIFIED` | `opensip-cli` |  | environment | integrity |  |  |  |  | The runtime-promotion source could not be verified against its recorded authority. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
 | `CLI.INIT.RECOVERY_EVIDENCE_MISMATCH` | `opensip-cli` |  | environment | integrity |  |  |  |  | Recovery of an interrupted init stopped: the recovered runtime state does not match its durable record. The message names the mismatch. Re-run `opensip init`; if it repeats, the runtime directory needs inspection. |
 | `CLI.INIT.SCAFFOLD_ASSET_INVALID` | `opensip-cli` |  |  |  |  |  |  |  | A scaffold asset shipped with this build is missing, duplicated, or unknown. This is a defect in the release, not in your project. Report it with the named asset and the run id. |
+| `CLI.PLUGIN.EDIT_REFUSED` | `opensip-cli` |  |  | integrity |  |  |  |  | The config file could not be edited: it is missing or malformed at the named region. Fix the file and re-run. |
 | `CLI.POLICY.DENIED` | `opensip-cli` |  | operator | permission |  |  |  |  | Policy denied this operation. Change the policy deliberately, or run an operation the policy allows. |
 | `CLI.PROFILE.ARTIFACT_INVALID` | `opensip-cli` |  | tool-author | integrity |  |  | runtime |  | Profile artifact metadata failed its integrity check. Capture the run id and report a bug; do not construct profile metadata by hand. |
 | `CLI.PROFILE.CAPTURE_FAILED` | `opensip-cli` |  | environment | I/O | caller-policy |  |  |  | CPU profiling failed to capture a profile. Re-run with profiling enabled; if it persists, report a bug with the run id. |

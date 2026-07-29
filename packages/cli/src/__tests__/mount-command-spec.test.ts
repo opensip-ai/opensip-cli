@@ -652,8 +652,8 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
     expect(rendered).toHaveLength(0);
   });
 
-  it('signal-envelope under --json throws when the lean context lacks emitEnvelope', async () => {
-    const { ctx } = makeLeanCtx();
+  it('signal-envelope under --json reports a typed failure when the lean context lacks emitEnvelope', async () => {
+    const { ctx, rendered, exitCodes } = makeLeanCtx();
     const program = new Command();
     const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
       name: 'envhost',
@@ -664,16 +664,23 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       handler: () => ({ ok: true }),
     });
     // Lean CommandMountContext: cast to satisfy the mounter's public overloads; the
-    // runtime object lacks emitEnvelope so the --json dispatch throws (the point of this test).
+    // runtime object lacks emitEnvelope so the --json dispatch fails (the point of this test).
     mountCommandSpec(program, spec, ctx as ToolCliContext);
 
-    await expect(program.parseAsync(['envhost', '--json'], { from: 'user' })).rejects.toThrow(
-      /no emitEnvelope/,
-    );
+    // This used to assert an UNHANDLED REJECTION. The refusal now carries a registered
+    // definition (CLI.HOST.WIRING_INVALID), so the dispatch boundary catches it, presents it,
+    // and sets an exit code -- 'a typed error must never exit silently'. Escaping as a rejected
+    // promise was the old behaviour, not the contract worth keeping: assert the failure is
+    // SURFACED, which is the property that actually protects the operator.
+    await program.parseAsync(['envhost', '--json'], { from: 'user' });
+
+    expect(exitCodes).not.toHaveLength(0);
+    expect(exitCodes[0]).toBeGreaterThan(0);
+    expect(JSON.stringify(rendered)).toMatch(/no emitEnvelope/);
   });
 
-  it('live-view throws when the lean context lacks renderLive', async () => {
-    const { ctx } = makeLeanCtx();
+  it('live-view reports a typed failure when the lean context lacks renderLive', async () => {
+    const { ctx, rendered, exitCodes } = makeLeanCtx();
     const program = new Command();
     const spec: CommandSpec<unknown, CommandMountContext> = defineCommand({
       name: 'livehost',
@@ -684,12 +691,16 @@ describe('mountCommandSpec — leaner host CommandMountContext', () => {
       handler: () => undefined,
     });
     // Lean CommandMountContext: cast to satisfy the mounter's public overloads; the
-    // runtime object lacks renderLive so the live-view dispatch throws (the point of this test).
+    // runtime object lacks renderLive so the live-view dispatch fails (the point of this test).
     mountCommandSpec(program, spec, ctx as ToolCliContext);
 
-    await expect(program.parseAsync(['livehost'], { from: 'user' })).rejects.toThrow(
-      /no renderLive/,
-    );
+    // See the emitEnvelope case above: the refusal is now typed, so it is presented with an exit
+    // code instead of escaping as an unhandled rejection.
+    await program.parseAsync(['livehost'], { from: 'user' });
+
+    expect(exitCodes).not.toHaveLength(0);
+    expect(exitCodes[0]).toBeGreaterThan(0);
+    expect(JSON.stringify(rendered)).toMatch(/no renderLive/);
   });
 });
 
