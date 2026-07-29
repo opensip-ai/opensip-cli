@@ -18,6 +18,7 @@
  * runtime dependency is the value import of the frozen rows — no import cycle.
  */
 
+import { platformSupportError } from './platform-support-error.js';
 import { PLATFORM_SUPPORT_ROWS } from './platform-support-rows.js';
 import { assertPlatformSupportRowsValid } from './platform-support-validate.js';
 
@@ -328,7 +329,10 @@ function selectBestCandidate(
   }
   if (best === null) {
     // Unreachable: callers only pass a non-empty candidate list.
-    throw new Error('selectBestCandidate requires at least one candidate');
+    throw platformSupportError(
+      'select-best-empty',
+      'selectBestCandidate requires at least one candidate',
+    );
   }
   return { row: best.row, evaluation: best.evaluation };
 }

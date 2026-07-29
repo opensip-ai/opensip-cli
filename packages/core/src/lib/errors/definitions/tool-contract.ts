@@ -161,7 +161,7 @@ export const toolContractDefinitions = {
     code: 'CORE.COMMAND_INVENTORY.INVALID',
     operatorAction:
       'Correct the runtime command inventory shape; see the named field in the message.',
-    publicMetadataKeys: ['field'],
+    publicMetadataKeys: ['field', 'condition'],
   },
 
   /** Two inventory leaves claim the same command path. */
@@ -169,7 +169,7 @@ export const toolContractDefinitions = {
     ...TOOL_AUTHORING,
     code: 'CORE.COMMAND_INVENTORY.DUPLICATE_PATH',
     operatorAction: 'Give each command inventory leaf a distinct command path.',
-    publicMetadataKeys: ['field', 'value'],
+    publicMetadataKeys: ['field', 'value', 'condition'],
   },
 
   /** A leaf claims a static handler it is not entitled to claim. */
@@ -178,7 +178,7 @@ export const toolContractDefinitions = {
     code: 'CORE.COMMAND_INVENTORY.HANDLER_CLAIM_INVALID',
     operatorAction:
       'Only claim a static handler from the package that declares it; correct the leaf handler claim.',
-    publicMetadataKeys: ['field', 'value'],
+    publicMetadataKeys: ['field', 'value', 'condition'],
   },
 
   /**
@@ -193,7 +193,7 @@ export const toolContractDefinitions = {
     kind: 'resource',
     operatorAction:
       'Reduce the number of declared commands, or split them across tools; the inventory bound protects host bootstrap.',
-    publicMetadataKeys: ['bound'],
+    publicMetadataKeys: ['bound', 'condition'],
   },
 
   /**

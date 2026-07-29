@@ -36,6 +36,7 @@ import {
 } from '../lib/errors.js';
 import { logger as defaultLogger, type Logger } from '../lib/logger.js';
 import { currentScope } from '../lib/run-scope.js';
+import { scopeError } from '../lib/scope-error.js';
 import {
   isCapabilityValidator,
   isStructuralContributionSchema,
@@ -299,7 +300,8 @@ export function createCapabilityRegistry(logger?: Logger): CapabilityRegistry {
 export function currentCapabilityRegistry(): CapabilityRegistry {
   const scope = currentScope();
   if (!scope) {
-    throw new Error(
+    throw scopeError(
+      'not-entered',
       'core: currentCapabilityRegistry() called outside a RunScope. ' +
         'Wrap the call site in runWithScope (production: the pre-action-hook ' +
         'constructs the scope; tests: construct a RunScope, attach ' +
@@ -307,7 +309,8 @@ export function currentCapabilityRegistry(): CapabilityRegistry {
     );
   }
   if (!scope.capabilities) {
-    throw new Error(
+    throw scopeError(
+      'capabilities-missing',
       'core: scope.capabilities is missing. The CLI bootstrap must attach ' +
         'createCapabilityRegistry() to the scope before capability reads ' +
         '(production: the pre-action-hook seeds it; tests: assign ' +

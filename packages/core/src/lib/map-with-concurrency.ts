@@ -1,3 +1,5 @@
+import { executionInvariantError } from './execution-invariant-error.js';
+
 /**
  * Bounded-concurrency helpers for ordered maps and side-effect fan-out.
  */
@@ -31,7 +33,11 @@ export async function mapWithConcurrency<T, R>(
   const ordered: R[] = [];
   for (let index = 0; index < items.length; index++) {
     const entry = results[index];
-    if (entry === undefined) throw new Error('mapWithConcurrency worker did not fill result slot');
+    if (entry === undefined)
+      throw executionInvariantError(
+        'map-concurrency-empty-slot',
+        'mapWithConcurrency worker did not fill result slot',
+      );
     ordered.push(entry.value);
   }
   return ordered;

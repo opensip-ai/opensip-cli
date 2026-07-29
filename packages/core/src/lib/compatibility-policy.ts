@@ -1,5 +1,6 @@
 import { MIN_SUPPORTED_PLUGIN_API_VERSION, PLUGIN_API_VERSION } from '../tools/manifest.js';
 
+import { compatibilityPolicyError } from './compatibility-policy-error.js';
 import { CLI_SUPPORTED_SCHEMA_VERSION } from './config-version.js';
 import { PLATFORM_SUPPORT_CONTRACT_VERSION } from './platform-support.js';
 
@@ -164,21 +165,40 @@ export function assertCompatibilityPoliciesComplete(): void {
   const seen = new Set<CompatibilityContractClass>();
   for (const policy of COMPATIBILITY_POLICIES) {
     if (!classes.has(policy.class)) {
-      throw new Error(`Unknown compatibility contract class: ${policy.class}`);
+      throw compatibilityPolicyError(
+        'unknown-class',
+        `Unknown compatibility contract class: ${policy.class}`,
+        policy.class,
+      );
     }
     if (seen.has(policy.class)) {
-      throw new Error(`Duplicate compatibility policy for ${policy.class}`);
+      throw compatibilityPolicyError(
+        'duplicate-class',
+        `Duplicate compatibility policy for ${policy.class}`,
+        policy.class,
+      );
     }
     seen.add(policy.class);
     if (policy.breakingChangeRequires.length === 0) {
-      throw new Error(`Compatibility policy for ${policy.class} has no breaking-change gate.`);
+      throw compatibilityPolicyError(
+        'empty-breaking-change-gate',
+        `Compatibility policy for ${policy.class} has no breaking-change gate.`,
+        policy.class,
+      );
     }
     if (policy.docsPath.length === 0) {
-      throw new Error(`Compatibility policy for ${policy.class} has no docs path.`);
+      throw compatibilityPolicyError(
+        'empty-docs-path',
+        `Compatibility policy for ${policy.class} has no docs path.`,
+        policy.class,
+      );
     }
   }
   const missing = [...classes].filter((className) => !seen.has(className));
   if (missing.length > 0) {
-    throw new Error(`Missing compatibility policies: ${missing.join(', ')}`);
+    throw compatibilityPolicyError(
+      'missing-classes',
+      `Missing compatibility policies: ${missing.join(', ')}`,
+    );
   }
 }
