@@ -131,7 +131,7 @@ function checkUnboundedPush(ctx: CallExpressionContext): CheckViolation | null {
     column: 0,
     message: `Unbounded ${objectName}.push() - potential memory exhaustion`,
     severity: 'warning',
-    suggestion: `Add a size check before pushing: if (totalSize + chunk.length > MAX_SIZE) throw new Error('Size limit exceeded'); then track totalSize += chunk.length`,
+    suggestion: `Add a size check before pushing: if (totalSize + chunk.length > MAX_SIZE) throw new RangeError('Size limit exceeded'); then track totalSize += chunk.length`,
     match: callText.slice(0, 50),
   };
 }

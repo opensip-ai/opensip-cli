@@ -57,7 +57,11 @@ export function findNearDuplicates(
   const rows = NEAR_DUP_SIGNATURE_K / bands;
   // Integrality test, not `rows * bands === k` (128/7*7 round-trips in IEEE-754).
   if (!Number.isInteger(rows) || rows < 1) {
-    throw new Error(
+    // RangeError, not a registered code: this is caller argument validation of a numeric
+    // option, the JS type that means exactly that, and the same native-validation pattern
+    // already accepted across the migrated packages. Minting a catalog and an owner id for
+    // this substrate's single site would add a registration surface without adding meaning.
+    throw new RangeError(
       `findNearDuplicates: invalid lshBands (${String(bands)}) — it must evenly divide ` +
         `NEAR_DUP_SIGNATURE_K (${String(NEAR_DUP_SIGNATURE_K)}); ` +
         `${String(NEAR_DUP_SIGNATURE_K)} / ${String(bands)} = ${String(rows)} is not a positive integer.`,

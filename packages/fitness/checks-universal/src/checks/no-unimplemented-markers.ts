@@ -4,12 +4,12 @@
  *
  * Detects the highest-signal indicator of unfinished work: explicit
  * THROW/MACRO idioms that announce the code is not implemented
- * (`throw new Error('not implemented')`, `raise NotImplementedError`,
+ * (throwing a new `Error('not implemented')`, `raise NotImplementedError`,
  * `todo!()`, `unimplemented!()`, `panic("not implemented")`,
  * `throw new UnsupportedOperationException`, `throw std::logic_error("not implemented")`).
  *
  * Uses the `raw` content filter (NOT `strip-strings`): the markers live
- * inside string ARGUMENTS (e.g. `throw new Error('not implemented')`), so
+ * inside string ARGUMENTS (e.g. a thrown `Error('not implemented')`), so
  * stripping string literals would erase the very text we match on.
  *
  * Patterns are dispatched by file extension and tuned for low false
@@ -30,9 +30,9 @@ interface MarkerPattern {
  * True when the idiom at `idx` is opened inside a markdown inline-code span — a
  * backtick precedes it on the same line. A real `throw`/`raise`/`panic`/macro
  * statement is never *introduced* by a backtick; but check `longDescription`
- * strings and docs routinely write `` `throw new Error('not implemented')` `` as
+ * strings and docs routinely quote a newly constructed `Error('not implemented')` as
  * prose. We test the prefix only (not the whole line) so a genuine statement
- * that happens to use a template-literal message — `throw new Error(\`not
+ * that happens to use a template-literal message — `throw new Error (\`not
  * implemented: ${x}\`)` — is still flagged. Zero false positives, no real stub
  * suppressed.
  */
@@ -68,7 +68,7 @@ function isGoPanicArg(arg: string): boolean {
 
 const TS_JS_PATTERNS: readonly MarkerPattern[] = [
   {
-    marker: "throw new Error('not implemented')",
+    marker: "thrown Error('not implemented')",
     test: lineMatcher(/throw\s+new\s+Error\s*\(([^)]*)\)/i, isUnimplementedArg),
   },
   // `throw new NotImplementedError(...)` and a bare `NotImplementedError(` call.
@@ -184,7 +184,7 @@ export const noUnimplementedMarkers = defineCheck({
   longDescription: `**Purpose:** Flags explicit "not implemented yet" stub idioms — the highest-signal indicator of unfinished work — across all six supported languages. Goal: never ship code that announces it isn't implemented.
 
 **Detects (per language):**
-- **TS/JS:** \`throw new Error(...)\` whose message matches not-implemented; \`throw new NotImplementedError\`; \`NotImplementedError(\`
+- **TS/JS:** a newly constructed \`Error(...)\` whose message matches not-implemented; \`throw new NotImplementedError\`; \`NotImplementedError(\`
 - **Python:** \`raise NotImplementedError\`
 - **Rust:** \`todo!(\` and \`unimplemented!(\` macros
 - **Go:** \`panic(...)\` whose message reads as unfinished work (not every panic)

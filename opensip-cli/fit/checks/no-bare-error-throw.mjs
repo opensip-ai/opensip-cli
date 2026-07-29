@@ -65,16 +65,19 @@ const BARE_ERROR_THROW = /\bthrow\s+new\s+Error\s*\(/gu;
  * `packages/languages/` covers every language adapter without naming each one.
  */
 const MIGRATED_PACKAGES = [
+  'packages/clone-detection/',
   'packages/cli/',
   'packages/cli-live/',
   'packages/cli-ui/',
   'packages/codebase/',
   'packages/config/',
   'packages/contracts/',
+  'packages/core/',
   'packages/dashboard/',
   'packages/datastore/',
   'packages/external-tool-adapter/',
-  // Engine only — check packs and graph language adapters are Wave 4.
+  'packages/fitness/checks-typescript/',
+  'packages/fitness/checks-universal/',
   'packages/fitness/engine/',
   'packages/format/',
   'packages/graph/engine/',
@@ -86,6 +89,7 @@ const MIGRATED_PACKAGES = [
   'packages/simulation/engine/',
   'packages/targeting/',
   'packages/tool-test-kit/',
+  'packages/tree-sitter/',
   'packages/yagni/engine/',
 ];
 

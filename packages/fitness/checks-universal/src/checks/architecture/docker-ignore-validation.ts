@@ -10,7 +10,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import {
+  checkFileTooLargeError,
+  defineCheck,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-cli/fitness';
 
 // =============================================================================
 // REGEX PATTERNS
@@ -18,6 +23,8 @@ import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cl
 
 /** Matches FROM node:XX or FROM node:XX-alpine etc. */
 const FROM_NODE_PATTERN = /^FROM\s+node:/im;
+
+const MAX_CHECK_INPUT_BYTES = 10_000_000;
 
 // =============================================================================
 // HELPERS
@@ -50,7 +57,7 @@ function isNodeDockerfile(content: string): boolean {
  * 1. .git — always required
  * 2. node_modules — required for Node-based Dockerfiles
  *
- * @throws {Error} When a .dockerignore file exceeds 10MB
+ * @throws {ValidationError} When a .dockerignore file exceeds 10MB
  */
 export const dockerIgnoreValidation = defineCheck({
   id: '70123fbb-c538-4186-a82e-fdb5e53d52d7',
@@ -97,8 +104,15 @@ export const dockerIgnoreValidation = defineCheck({
 
       // Read .dockerignore and validate required patterns
       const dockerignoreStats = fs.statSync(dockerignorePath);
-      if (dockerignoreStats.size > 10_000_000)
-        throw new Error(`File too large: ${dockerignorePath}`);
+      if (dockerignoreStats.size > MAX_CHECK_INPUT_BYTES) {
+        throw checkFileTooLargeError({
+          check: 'docker-ignore-validation',
+          condition: 'dockerignore-input',
+          filePath: dockerignorePath,
+          actualBytes: dockerignoreStats.size,
+          maxBytes: MAX_CHECK_INPUT_BYTES,
+        });
+      }
       const dockerignoreContent = fs.readFileSync(dockerignorePath, 'utf8');
       const content = await files.read(filePath);
 

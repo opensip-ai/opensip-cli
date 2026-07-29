@@ -11,7 +11,12 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 
-import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import {
+  checkFileTooLargeError,
+  defineCheck,
+  type CheckViolation,
+  type FileAccessor,
+} from '@opensip-cli/fitness';
 
 // =============================================================================
 // TYPES
@@ -37,18 +42,28 @@ const PNPM_HARDCODED_PATTERN = /corepack\s+prepare\s+pnpm@([\d.]+)/;
 /** Matches the dynamic self-read pattern */
 const PNPM_DYNAMIC_PATTERN = /require\(['"]\.\/package\.json['"]\)\.packageManager/;
 
+const MAX_CHECK_INPUT_BYTES = 10_000_000;
+
 // =============================================================================
 // HELPERS
 // =============================================================================
 
 /**
  * Read and parse root package.json.
- * @throws {Error} When the file exceeds 10MB
+ * @throws {ValidationError} When the file exceeds 10MB
  */
 function readRootPackageJson(cwd: string): RootPackageJson {
   const pkgPath = path.join(cwd, 'package.json');
   const stats = fs.statSync(pkgPath);
-  if (stats.size > 10_000_000) throw new Error(`File too large: ${pkgPath}`);
+  if (stats.size > MAX_CHECK_INPUT_BYTES) {
+    throw checkFileTooLargeError({
+      check: 'docker-version-sync',
+      condition: 'root-package-json-input',
+      filePath: pkgPath,
+      actualBytes: stats.size,
+      maxBytes: MAX_CHECK_INPUT_BYTES,
+    });
+  }
   const raw = fs.readFileSync(pkgPath, 'utf8');
   return JSON.parse(raw) as RootPackageJson;
 }

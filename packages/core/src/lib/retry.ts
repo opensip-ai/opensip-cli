@@ -14,6 +14,7 @@ import {
   normalizeToolErrorDefinition,
   type ToolError,
 } from './errors.js';
+import { executionInvariantError } from './execution-invariant-error.js';
 import { normalizeFailure } from './failure-envelope.js';
 
 const ABSOLUTE_ATTEMPT_BACKSTOP = 100;
@@ -361,7 +362,11 @@ export async function withRetry<T>(fn: () => Promise<T>, options: RetryOptions =
     }
   }
 
-  if (!lastError) throw new Error('withRetry: unreachable — no attempts ran');
+  if (!lastError)
+    throw executionInvariantError(
+      'with-retry-no-attempts',
+      'withRetry: unreachable — no attempts ran',
+    );
   throw lastError;
 }
 

@@ -16,6 +16,7 @@
  * on stop).
  */
 
+import { executionInvalidModeError } from '../execution-invariant-error.js';
 import { currentScope } from '../scope-storage.js';
 
 /**
@@ -70,8 +71,9 @@ export async function scheduleUnits<Unit>(opts: ScheduleUnitsOptions<Unit>): Pro
   if (units.length === 0) return;
 
   if (mode !== 'sequential' && mode !== 'parallel') {
-    throw new Error(
+    throw executionInvalidModeError(
       `scheduleUnits: mode must be 'parallel' or 'sequential' (got '${String(mode)}')`,
+      mode,
     );
   }
 

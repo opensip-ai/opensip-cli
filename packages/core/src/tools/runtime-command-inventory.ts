@@ -11,6 +11,12 @@
 import { isPlainRecord } from '../lib/json-guards.js';
 
 import {
+  commandInventoryDuplicate,
+  commandInventoryHandlerClaim,
+  commandInventoryInvalid,
+  commandInventoryLimitExceeded,
+} from './command-inventory-error.js';
+import {
   freezeStaticHandlerDescriptor,
   isSafeProjectRelativePosixPath,
   staticHandlerValidationError,
@@ -147,13 +153,17 @@ export function createRuntimeCommandInventory(
   const complete = input.complete ?? true;
 
   if (leaves.length > limits.maxLeaves) {
-    throw new Error(
+    throw commandInventoryLimitExceeded(
+      'max-leaves',
       `runtime command inventory exceeds maxLeaves (${String(limits.maxLeaves)}); got ${String(leaves.length)}.`,
+      limits.maxLeaves,
     );
   }
   if (groups.length > limits.maxGroups) {
-    throw new Error(
+    throw commandInventoryLimitExceeded(
+      'max-groups',
       `runtime command inventory exceeds maxGroups (${String(limits.maxGroups)}); got ${String(groups.length)}.`,
+      limits.maxGroups,
     );
   }
 
@@ -179,7 +189,11 @@ export function createRuntimeCommandInventory(
 
   for (const reason of reasons) {
     if (typeof reason !== 'string' || !isSafeName(reason, limits.maxName)) {
-      throw new Error('runtime command inventory reason must be a bounded non-empty string.');
+      throw commandInventoryInvalid(
+        'reason-string',
+        'runtime command inventory reason must be a bounded non-empty string.',
+        'reasons',
+      );
     }
   }
 
@@ -205,29 +219,53 @@ function validateLeaf(
     throw new TypeError('runtime command leaf must be a plain object.');
   }
   if (!isSafePath(leaf.path, limits.maxPath)) {
-    throw new Error(`runtime command leaf path invalid or overlong: '${leaf.path}'.`);
+    throw commandInventoryInvalid(
+      'leaf-path',
+      `runtime command leaf path invalid or overlong: '${leaf.path}'.`,
+      'path',
+    );
   }
   if (paths.has(leaf.path)) {
-    throw new Error(`runtime command inventory duplicate path '${leaf.path}'.`);
+    throw commandInventoryDuplicate(
+      'leaf-path',
+      `runtime command inventory duplicate path '${leaf.path}'.`,
+      leaf.path,
+    );
   }
   paths.add(leaf.path);
   if (!isSafeName(leaf.name, limits.maxName)) {
-    throw new Error(`runtime command leaf name invalid: '${leaf.name}'.`);
+    throw commandInventoryInvalid(
+      'leaf-name',
+      `runtime command leaf name invalid: '${leaf.name}'.`,
+      'name',
+    );
   }
   if (leaf.owner !== 'host' && leaf.owner !== 'tool') {
-    throw new Error(`runtime command leaf owner must be host|tool; got '${String(leaf.owner)}'.`);
+    throw commandInventoryInvalid(
+      'leaf-owner',
+      `runtime command leaf owner must be host|tool; got '${String(leaf.owner)}'.`,
+      'owner',
+    );
   }
   if (!isSafeName(leaf.ownerLabel, limits.maxName)) {
-    throw new Error(`runtime command leaf ownerLabel invalid: '${leaf.ownerLabel}'.`);
+    throw commandInventoryInvalid(
+      'leaf-owner-label',
+      `runtime command leaf ownerLabel invalid: '${leaf.ownerLabel}'.`,
+      'ownerLabel',
+    );
   }
   if (leaf.visibility !== 'public' && leaf.visibility !== 'internal') {
-    throw new Error(`runtime command leaf visibility invalid.`);
+    throw commandInventoryInvalid(
+      'leaf-visibility',
+      'runtime command leaf visibility invalid.',
+      'visibility',
+    );
   }
   if (leaf.scope !== 'project' && leaf.scope !== 'none') {
-    throw new Error(`runtime command leaf scope invalid.`);
+    throw commandInventoryInvalid('leaf-scope', 'runtime command leaf scope invalid.', 'scope');
   }
   if (typeof leaf.output !== 'string' || !isSafeName(leaf.output, limits.maxName)) {
-    throw new Error(`runtime command leaf output invalid.`);
+    throw commandInventoryInvalid('leaf-output', 'runtime command leaf output invalid.', 'output');
   }
   validateLeafAliases(leaf, limits);
   validateLeafHandlerClaims(leaf);
@@ -243,13 +281,19 @@ function validateLeafAliases(
   limits: RuntimeCommandInventoryLimits,
 ): void {
   if (!Array.isArray(leaf.aliases) || leaf.aliases.length > limits.maxAliases) {
-    throw new Error(
+    throw commandInventoryLimitExceeded(
+      'max-aliases',
       `runtime command leaf aliases must be an array of at most ${String(limits.maxAliases)}.`,
+      limits.maxAliases,
     );
   }
   for (const alias of leaf.aliases) {
     if (typeof alias !== 'string' || !isSafeName(alias, limits.maxName)) {
-      throw new Error(`runtime command leaf alias invalid: '${String(alias)}'.`);
+      throw commandInventoryInvalid(
+        'leaf-alias',
+        `runtime command leaf alias invalid: '${String(alias)}'.`,
+        'aliases',
+      );
     }
   }
 }
@@ -266,16 +310,25 @@ function validateLeafHandlerClaims(leaf: RuntimeCommandLeaf): void {
     (typeof leaf.packageIdentity !== 'string' ||
       !isSafeName(leaf.packageIdentity, MAX_STATIC_HANDLER_PACKAGE))
   ) {
-    throw new Error('runtime command leaf packageIdentity invalid.');
+    throw commandInventoryHandlerClaim(
+      'package-identity',
+      'runtime command leaf packageIdentity invalid.',
+    );
   }
   if (leaf.staticHandler !== undefined) {
     const err = staticHandlerValidationError(leaf.staticHandler, leaf.name);
     if (err !== undefined) throw err;
     if (!isSafeProjectRelativePosixPath(leaf.staticHandler.path)) {
-      throw new Error('runtime command leaf staticHandler.path invalid.');
+      throw commandInventoryHandlerClaim(
+        'static-handler-path',
+        'runtime command leaf staticHandler.path invalid.',
+      );
     }
     if (leaf.staticHandler.declaration.length > MAX_STATIC_HANDLER_DECLARATION) {
-      throw new Error('runtime command leaf staticHandler.declaration overlong.');
+      throw commandInventoryHandlerClaim(
+        'static-handler-declaration',
+        'runtime command leaf staticHandler.declaration overlong.',
+      );
     }
   }
 }
@@ -289,23 +342,47 @@ function validateGroup(
   paths: Set<string>,
 ): void {
   if (!isSafePath(group.path, limits.maxPath)) {
-    throw new Error(`runtime command group path invalid: '${group.path}'.`);
+    throw commandInventoryInvalid(
+      'group-path',
+      `runtime command group path invalid: '${group.path}'.`,
+      'path',
+    );
   }
   if (paths.has(group.path)) {
-    throw new Error(`runtime command inventory duplicate path '${group.path}'.`);
+    throw commandInventoryDuplicate(
+      'group-path',
+      `runtime command inventory duplicate path '${group.path}'.`,
+      group.path,
+    );
   }
   paths.add(group.path);
   if (!isSafeName(group.name, limits.maxName)) {
-    throw new Error(`runtime command group name invalid: '${group.name}'.`);
+    throw commandInventoryInvalid(
+      'group-name',
+      `runtime command group name invalid: '${group.name}'.`,
+      'name',
+    );
   }
   if (group.owner !== 'host' && group.owner !== 'tool') {
-    throw new Error(`runtime command group owner must be host|tool.`);
+    throw commandInventoryInvalid(
+      'group-owner',
+      'runtime command group owner must be host|tool.',
+      'owner',
+    );
   }
   if (!isSafeName(group.ownerLabel, limits.maxName)) {
-    throw new Error(`runtime command group ownerLabel invalid.`);
+    throw commandInventoryInvalid(
+      'group-owner-label',
+      'runtime command group ownerLabel invalid.',
+      'ownerLabel',
+    );
   }
   if (group.visibility !== 'public' && group.visibility !== 'internal') {
-    throw new Error(`runtime command group visibility invalid.`);
+    throw commandInventoryInvalid(
+      'group-visibility',
+      'runtime command group visibility invalid.',
+      'visibility',
+    );
   }
 }
 

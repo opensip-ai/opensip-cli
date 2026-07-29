@@ -386,7 +386,7 @@ export const inputSanitization = defineCheck({
           functionNames: FS_FUNCTIONS,
           message: 'User input in file path - potential path traversal vulnerability',
           suggestion:
-            'Validate file paths with path.resolve and ensure they stay within allowed directories: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new Error("Invalid path");',
+            'Validate file paths with path.resolve and ensure they stay within allowed directories: const safePath = path.resolve(baseDir, userInput); if (!safePath.startsWith(baseDir)) throw new TypeError("Invalid path");',
         });
         if (pathTraversal) {
           violations.push(pathTraversal);
