@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-29T01:37:55.475Z",
+  "generatedAt": "2026-07-29T02:03:51.184Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
