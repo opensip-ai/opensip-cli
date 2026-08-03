@@ -104,10 +104,11 @@ export function defineSimulationRecipe(config: SimulationRecipeConfig): Simulati
   ) {
     // A `timeout` of 0 is rejected rather than reinterpreted as "unlimited" —
     // it would otherwise reach `runWithTimeout` as `setTimeout(fn, 0)`, which
-    // aborts the scenario before it ever gets to run. "Omit the field" is the
-    // documented way to request no timeout (see NO_TIMEOUT_MS in service.ts).
+    // aborts the scenario before it ever gets to run. Omitting the field applies
+    // the bounded DEFAULT_SCENARIO_TIMEOUT_MS default (service.ts) — it does NOT
+    // mean unlimited.
     throw new ValidationError(
-      `SimulationRecipe '${config.name}' execution.timeout must be a positive finite number (or omitted for no timeout)`,
+      `SimulationRecipe '${config.name}' execution.timeout must be a positive finite number (or omitted to use the default timeout)`,
       {
         code: RECIPE_INVALID.code,
         definition: RECIPE_INVALID,

@@ -155,19 +155,19 @@ function normalizeEvidenceOptions(
     stepLimit: requirePositiveLimit(
       options?.stepLimit ?? MAX_PARENT_RUN_READ_LIMIT,
       MAX_PARENT_RUN_READ_LIMIT,
-      'VALIDATION.RUN_READ.EVIDENCE_STEP_LIMIT_INVALID',
+      'evidence-step-limit',
       'parent Run evidence step limit',
     ),
     sessionLimit: requirePositiveLimit(
       options?.sessionLimit ?? MAX_PARENT_RUN_READ_LIMIT,
       MAX_PARENT_RUN_READ_LIMIT,
-      'VALIDATION.RUN_READ.EVIDENCE_SESSION_LIMIT_INVALID',
+      'evidence-session-limit',
       'parent Run evidence Session limit',
     ),
     byteBudget: requirePositiveLimit(
       options?.byteBudget ?? DEFAULT_PARENT_RUN_EVIDENCE_BYTE_BUDGET,
       MAX_PARENT_RUN_EVIDENCE_BYTE_BUDGET,
-      'VALIDATION.RUN_READ.EVIDENCE_BYTE_BUDGET_INVALID',
+      'evidence-byte-budget',
       'parent Run evidence byte budget',
     ),
   };

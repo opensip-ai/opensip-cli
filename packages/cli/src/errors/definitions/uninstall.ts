@@ -91,6 +91,10 @@ export const uninstallDefinitions = {
     code: 'CLI.UNINSTALL.TARGET_ESCAPES_ROOTS',
     kind: 'integrity',
     defaultResponsibility: 'tool-author',
+    // Overrides the exitClass REMOVAL_REFUSED inherits from USER_INPUT: this is a
+    // tool-author invariant breach, not a user mistake, so it exits like
+    // CLI.HOST.WIRING_INVALID (runtime → exit 1), not like an ordinary bad-path refusal.
+    exitClass: 'runtime',
     operatorAction:
       'Uninstall refused: a removal target resolved outside the project and cache roots. Nothing was deleted. Report this with the run id.',
     publicMetadataKeys: ['condition', 'bucket'],

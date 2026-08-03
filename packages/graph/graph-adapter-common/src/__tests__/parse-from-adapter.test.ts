@@ -15,6 +15,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { MAX_SOURCE_FILE_BYTES } from '@opensip-cli/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { createParseProjectFromAdapter } from '../parse-from-adapter.js';
@@ -108,6 +109,30 @@ describe('createParseProjectFromAdapter', () => {
     const out = parseProject({ projectDirAbs: dir, files: [], resolutionMode: 'exact' });
     expect(out.project.files.size).toBe(0);
     expect(out.parseErrors).toEqual([]);
+  });
+
+  it('degrades an oversized source file to a parseError instead of throwing (regression)', () => {
+    const huge = join(dir, 'huge.txt');
+    const ok = join(dir, 'ok.txt');
+    writeFileSync(huge, 'x'.repeat(MAX_SOURCE_FILE_BYTES + 1), 'utf8');
+    writeFileSync(ok, 'fine', 'utf8');
+
+    const { adapter, calls } = makeFakeAdapter();
+    const parseProject = createParseProjectFromAdapter(adapter);
+    const out = parseProject({
+      projectDirAbs: dir,
+      files: [huge, ok],
+      resolutionMode: 'exact',
+    });
+
+    expect(out.parseErrors).toHaveLength(1);
+    expect(out.parseErrors[0]?.filePath).toBe('huge.txt');
+    expect(out.parseErrors[0]?.message).toContain('read failed');
+    // The rest of the build must still complete — a single oversized file is
+    // never fatal to the whole graph build.
+    expect(out.project.files.has(ok)).toBe(true);
+    expect(out.project.files.size).toBe(1);
+    expect(calls).toEqual([{ source: 'fine', path: ok }]);
   });
 
   it('projects adapter failures without retaining the absolute project path', () => {

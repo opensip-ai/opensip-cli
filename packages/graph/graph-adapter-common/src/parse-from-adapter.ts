@@ -82,7 +82,9 @@ function parseOneFile(
   try {
     source = readSourceFileGuarded(path);
   } catch (error) {
-    if (isToolErrorLike(error)) throw error;
+    // Every readSourceFileGuarded failure (oversize or unreadable) is a per-file
+    // condition, never fatal to the build — see the guard's own contract. Cancellation
+    // is handled by the throwIfGraphAdapterAborted checkpoints above/below, not by this catch.
     return {
       ok: false,
       error: parseError(

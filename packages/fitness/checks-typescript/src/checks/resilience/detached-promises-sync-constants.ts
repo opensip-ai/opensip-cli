@@ -167,11 +167,6 @@ const KNOWN_SYNC_FUNCTION_NAMES = [
   // Registry / diagnostics helpers (void-returning in opensip-cli and similar CLIs)
   'register',
   'dispose',
-  // Same teardown family as `dispose`/`clear`: a synchronous handle release. Named here
-  // because the cross-file case is invisible to the same-file sync detection — the returned
-  // object's `release: () => void` is declared where the resource is acquired, not where it
-  // is released.
-  'release',
   'event',
   'send',
   'abort',

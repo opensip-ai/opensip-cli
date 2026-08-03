@@ -98,7 +98,7 @@ export function listParentRuns(
   const effectiveLimit = requirePositiveLimit(
     requestedLimit,
     MAX_PARENT_RUN_READ_LIMIT,
-    'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
+    'list-limit',
     'parent Run list limit',
   );
   const datastore = requireDrizzleHandle(store);
@@ -138,7 +138,7 @@ export function resolveParentRun(
   const limit = requirePositiveLimit(
     options?.limit ?? DEFAULT_PARENT_RUN_STEP_LIMIT,
     MAX_PARENT_RUN_READ_LIMIT,
-    'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
+    'step-limit',
     'parent Run step limit',
   );
   const datastore = requireDrizzleHandle(store);

@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { normalizeFailure } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { eq, sql } from 'drizzle-orm';
@@ -167,9 +168,27 @@ describe('listParentRuns', () => {
     for (const limit of [0, -1, 1.5, 501, Number.NaN]) {
       expectValidationCode(
         () => listParentRuns(datastore, { limit }),
-        'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
+        'SESSION.READ.BOUND_INVALID',
       );
     }
+  });
+
+  it('carries a registered definition so the real validation message survives normalization (regression)', () => {
+    // requirePositiveLimit's registered code must resolve to a real
+    // ErrorDefinition; without one, normalizeFailure falls back to the
+    // catch-all UNKNOWN_FAILURE definition and discards the actionable
+    // message in favor of "An unexpected internal failure occurred."
+    let caught: unknown;
+    try {
+      listParentRuns(datastore, { limit: 0 });
+    } catch (error) {
+      caught = error;
+    }
+    const failure = normalizeFailure(caught);
+    expect(failure.code).toBe('SESSION.READ.BOUND_INVALID');
+    expect(failure.definition.code).toBe('SESSION.READ.BOUND_INVALID');
+    expect(failure.message).toContain('parent Run list limit must be an integer between 1 and 500');
+    expect(failure.message).not.toContain('unexpected internal failure');
   });
 
   it('rejects unsafe new Run IDs at write time', () => {
@@ -411,7 +430,7 @@ describe('resolveParentRun', () => {
     });
     expectValidationCode(
       () => resolveParentRun(datastore, { runId: 'run-valid', limit: 501 }),
-      'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
   });
 });
@@ -756,7 +775,7 @@ describe('resolveParentRunEvidence', () => {
           runId: 'run-valid',
           stepLimit: 0,
         }),
-      'VALIDATION.RUN_READ.EVIDENCE_STEP_LIMIT_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
     expectValidationCode(
       () =>
@@ -764,7 +783,7 @@ describe('resolveParentRunEvidence', () => {
           runId: 'run-valid',
           sessionLimit: 501,
         }),
-      'VALIDATION.RUN_READ.EVIDENCE_SESSION_LIMIT_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
     expectValidationCode(
       () =>
@@ -772,7 +791,7 @@ describe('resolveParentRunEvidence', () => {
           runId: 'run-valid',
           byteBudget: MAX_PARENT_RUN_EVIDENCE_BYTE_BUDGET + 1,
         }),
-      'VALIDATION.RUN_READ.EVIDENCE_BYTE_BUDGET_INVALID',
+      'SESSION.READ.BOUND_INVALID',
     );
   });
 
