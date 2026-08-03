@@ -178,7 +178,7 @@ export async function buildProjectInventory(
       cancellation,
     );
   } finally {
-    cancellation.release();
+    void cancellation.release();
   }
 }
 

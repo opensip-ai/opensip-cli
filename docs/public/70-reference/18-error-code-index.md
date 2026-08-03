@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-28
+last_verified: 2026-08-03
 release: v0.8.5
 title: "Error code index"
 audience: [contributors, operators, agents]
@@ -91,7 +91,7 @@ generated: true
 | `CLI.UNINSTALL.REFUSED_PROJECT_ROOT` | `opensip-cli` |  |  | security |  |  |  |  | The project path is not a real directory. Pass a real project directory to uninstall. |
 | `CLI.UNINSTALL.REFUSED_SYMLINK_LEAF` | `opensip-cli` |  |  | security |  |  |  |  | A managed directory is a symbolic link. Replace it with a real directory, or remove the link yourself, then re-run uninstall. |
 | `CLI.UNINSTALL.REFUSED_SYMLINK_USER_ROOT` | `opensip-cli` |  |  | security |  |  |  |  | The OpenSIP user directory is a symbolic link. Replace it with a real directory, or remove the link yourself, then re-run. |
-| `CLI.UNINSTALL.TARGET_ESCAPES_ROOTS` | `opensip-cli` |  | tool-author | integrity |  |  |  |  | Uninstall refused: a removal target resolved outside the project and cache roots. Nothing was deleted. Report this with the run id. |
+| `CLI.UNINSTALL.TARGET_ESCAPES_ROOTS` | `opensip-cli` |  | tool-author | integrity |  |  | runtime |  | Uninstall refused: a removal target resolved outside the project and cache roots. Nothing was deleted. Report this with the run id. |
 | `CLI.UNINSTALL.USER_RECOVERY_UNSAFE` | `opensip-cli` |  | environment | integrity |  |  |  |  | User-level uninstall stopped in a state it will not modify further. Re-run to resume; if it repeats, the named path needs manual inspection. |
 | `CODEBASE.CONFIG.IDENTITY_UNENCODABLE` | `@opensip-cli/codebase` | application | user | validation | never | error | configuration | active | Remove the circular reference or non-JSON (bigint) value from the project configuration document, then re-run. |
 | `CODEBASE.INVENTORY.INPUT_INVALID` | `@opensip-cli/codebase` | application | tool-author | validation | never | error | runtime | active | Correct the named buildProjectInventory input: bounds must be positive finite numbers, and `signal` must be a real AbortSignal. Omit a bound to accept the built-in maximum. |

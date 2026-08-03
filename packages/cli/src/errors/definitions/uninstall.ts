@@ -91,8 +91,8 @@ export const uninstallDefinitions = {
     code: 'CLI.UNINSTALL.TARGET_ESCAPES_ROOTS',
     kind: 'integrity',
     defaultResponsibility: 'tool-author',
-    // Override REMOVAL_REFUSED's inherited `exitClass: 'configuration'` (from USER_INPUT):
-    // this is a tool-author invariant breach, not a user mistake, so it exits like
+    // Overrides the exitClass REMOVAL_REFUSED inherits from USER_INPUT: this is a
+    // tool-author invariant breach, not a user mistake, so it exits like
     // CLI.HOST.WIRING_INVALID (runtime → exit 1), not like an ordinary bad-path refusal.
     exitClass: 'runtime',
     operatorAction:
