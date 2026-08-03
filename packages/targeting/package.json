@@ -38,7 +38,7 @@
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/core": "workspace:*",
     "glob": "^13.0.0",
-    "minimatch": "^10.2.5"
+    "minimatch": "^10.2.6"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
