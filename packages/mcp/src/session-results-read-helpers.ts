@@ -5,10 +5,8 @@ import type { LatestFindingsOptions, McpResultReplay, RunSummary } from './resul
 import type { HistorySession } from '@opensip-cli/contracts';
 
 const EXECUTION_RUN_VALIDATION_CODES = new Set([
-  'VALIDATION.RUN_READ.LIST_LIMIT_INVALID',
   'SESSION.WRITE.RECORD_INVALID',
   'SESSION.READ.BOUND_INVALID',
-  'VALIDATION.RUN_READ.STEP_LIMIT_INVALID',
 ]);
 
 /** Map a `sessions list` row to the lean agent-facing Run summary. */

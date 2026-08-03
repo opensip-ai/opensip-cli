@@ -49,12 +49,14 @@ export function requireOffset(value: number): number {
 export function requirePositiveLimit(
   value: number,
   maximum: number,
-  code: string,
+  field: string,
   label: string,
 ): number {
   if (!Number.isSafeInteger(value) || value < 1 || value > maximum) {
     throw new ValidationError(`${label} must be an integer between 1 and ${String(maximum)}.`, {
-      code,
+      code: READ_BOUND.code,
+      definition: READ_BOUND,
+      metadata: { field },
     });
   }
   return value;

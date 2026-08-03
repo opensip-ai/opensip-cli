@@ -23,12 +23,7 @@
 
 import { extname, sep } from 'node:path';
 
-import {
-  isToolErrorLike,
-  normalizeFailure,
-  projectRelativePath,
-  scrubText,
-} from '@opensip-cli/core';
+import { normalizeFailure, projectRelativePath, scrubText } from '@opensip-cli/core';
 import { readSourceFileGuarded } from '@opensip-cli/graph';
 import ts from 'typescript';
 
@@ -73,7 +68,9 @@ export function parseProjectFast(input: ParseInput): ParseOutput<TypescriptFastP
     try {
       text = readSourceFileGuarded(fileName);
     } catch (error) {
-      if (isToolErrorLike(error)) throw error;
+      // Every readSourceFileGuarded failure (oversize or unreadable) is a per-file
+      // condition, never fatal to the build — see the guard's own contract. Cancellation
+      // is handled by the throwIfGraphAdapterAborted checkpoint above, not by this catch.
       parseErrors.push({
         filePath: safeProjectRelativePath(input, fileName),
         message: sourceReadFailureMessage(error),

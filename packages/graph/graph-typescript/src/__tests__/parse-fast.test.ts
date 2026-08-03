@@ -10,6 +10,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { MAX_SOURCE_FILE_BYTES } from '@opensip-cli/graph';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -90,6 +91,31 @@ describe('parseProjectFast', () => {
       },
     ]);
     expect(out.parseErrors[0]?.message).not.toContain(dir);
+  });
+
+  it('degrades an oversized source file to a parseError instead of throwing (regression)', () => {
+    const huge = join(dir, 'huge.ts');
+    const other = join(dir, 'ok.ts');
+    writeFileSync(huge, 'x'.repeat(MAX_SOURCE_FILE_BYTES + 1), 'utf8');
+    writeFileSync(other, 'export const ok = 1;\n', 'utf8');
+
+    const out = parseProjectFast({
+      projectDirAbs: dir,
+      files: [huge, other],
+      resolutionMode: 'fast',
+    });
+
+    expect(out.parseErrors).toEqual([
+      {
+        filePath: 'huge.ts',
+        message: 'Source file exceeds the graph source-size limit.',
+        code: 'GRAPH.TS.SOURCE_UNREADABLE',
+      },
+    ]);
+    // The rest of the build must still complete — a single oversized file is
+    // never fatal to the whole graph build.
+    expect(out.project.sourceFiles.size).toBe(1);
+    expect(out.project.sourceFiles.has(other)).toBe(true);
   });
 
   it('bounds retained TypeScript diagnostics per source file', () => {

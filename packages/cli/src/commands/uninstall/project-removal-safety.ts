@@ -6,6 +6,7 @@ import {
   isPathInside,
   resolveProjectPaths,
   resolveUserPaths,
+  SystemError,
   ValidationError,
 } from '@opensip-cli/core';
 
@@ -70,7 +71,7 @@ export function assertSafeProjectDir(projectDir: string): void {
   assertNotSymlinkLeaf(paths.configFile, 'opensip-cli.config.yml');
 }
 
-/** @throws {Error} When a target escapes its authorized deletion boundary. */
+/** @throws {SystemError} When a target escapes its authorized deletion boundary. */
 function assertTargetsContained(projectDir: string, targets: readonly Target[]): void {
   let projectReal: string;
   try {
@@ -95,7 +96,12 @@ function assertTargetsContained(projectDir: string, targets: readonly Target[]):
       continue;
     }
     if (!isPathInside(real, projectReal) && !isPathInside(real, cacheRootReal)) {
-      throw new ValidationError(
+      // TARGET_ESCAPES_ROOTS is authored `kind: 'integrity'` / `defaultResponsibility:
+      // 'tool-author'` (this means the deletion PLAN was computed wrong, not that the user
+      // passed a bad path) — SystemError, not ValidationError, so mapToolErrorToExitCode's
+      // subclass ladder maps it via the definition's exitClass (runtime → exit 1) instead of
+      // unconditionally forcing exit 2 (the ordinary "fix your input" bucket).
+      throw new SystemError(
         `Refusing project removal: target escapes allowed roots (${target.bucket}).`,
         {
           code: TARGET_ESCAPES_ROOTS.code,
