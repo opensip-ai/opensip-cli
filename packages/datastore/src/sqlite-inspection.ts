@@ -267,7 +267,19 @@ function sanitizeForeignKeyViolation(row: ForeignKeyRow): SqliteForeignKeyViolat
 
 function boundedIdentifier(value: unknown): string {
   if (typeof value !== 'string') return '';
-  return Buffer.from(value).subarray(0, MAX_IDENTIFIER_BYTES).toString('utf8');
+  // Truncate at a code point boundary, not a raw byte offset: SQLite quoted
+  // identifiers may contain multi-byte UTF-8 characters, and slicing the
+  // encoded bytes can land mid-codepoint, leaving `Buffer#toString('utf8')`
+  // to emit a U+FFFD replacement character for the split tail.
+  let bytes = 0;
+  let result = '';
+  for (const char of value) {
+    const charBytes = Buffer.byteLength(char, 'utf8');
+    if (bytes + charBytes > MAX_IDENTIFIER_BYTES) break;
+    bytes += charBytes;
+    result += char;
+  }
+  return result;
 }
 
 function safeRowId(value: unknown): SqliteForeignKeyRowId {

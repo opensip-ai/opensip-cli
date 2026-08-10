@@ -179,23 +179,28 @@ export function boundGraphCatalog(
   const ranked = [...entries].sort((a, b) => compareByImportance(a, b, metrics));
 
   const kept: FunctionMap = {};
-  let omittedFunctions = 0;
   for (const [key, occurrences] of ranked) {
     const projected = occurrences.map((occurrence) => projectOccurrence(occurrence));
     // `+ key.length + 8` approximates the map-entry overhead (quotes, colon,
     // comma) so the budget is not silently overrun by tens of thousands of keys.
     const cost = scriptContextJsonBytes(projected) + key.length + 8;
-    if (cost > budget) {
-      omittedFunctions += occurrences.length;
-      continue;
-    }
+    // `ranked` is importance-descending, so the first entry that doesn't fit
+    // is where the budget truly ends: stop here (not `continue`) so a later,
+    // smaller-but-less-important entry can't jump the queue and get kept
+    // ahead of an earlier, more important one that was merely too big.
+    if (cost > budget) break;
     budget -= cost;
     kept[key] = projected;
   }
 
+  const keptFunctions = Object.values(kept).reduce(
+    (total, occurrences) => total + occurrences.length,
+    0,
+  );
+
   return {
     catalog: { ...base, functions: kept },
     totalFunctions,
-    omittedFunctions,
+    omittedFunctions: totalFunctions - keptFunctions,
   };
 }

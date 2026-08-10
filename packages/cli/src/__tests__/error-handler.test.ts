@@ -11,6 +11,7 @@
 
 import { EXIT_CODES, type ErrorResult } from '@opensip-cli/contracts';
 import {
+  CapabilitySchemaMismatchError,
   ConfigurationError,
   NetworkError,
   NotFoundError,
@@ -76,6 +77,27 @@ describe('handleParseError', () => {
     // the typed mapper must win → CONFIGURATION_ERROR (2). This guards the
     // `typed ?? getErrorSuggestion` precedence against regression.
     await handleParseError(new ValidationError('could not fetch the manifest'), opts);
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
+  });
+
+  it('routes a ValidationError subclass whose registered code carries a different exitClass to the subclass exit code, not the definition exitClass', async () => {
+    // CapabilitySchemaMismatchError extends ValidationError but its default
+    // code (CORE.CONTRIBUTION.SCHEMA_MISMATCH) is registered with
+    // `exitClass: 'plugin-incompatible'`. The ADR-0066 subclass ladder must
+    // win — `instanceof ValidationError` — so this must exit
+    // CONFIGURATION_ERROR (2), not PLUGIN_INCOMPATIBLE (5). Both the
+    // human-mode setExitCode call and the --json outcome's exitCode field
+    // must agree with each other and with the subclass ladder.
+    const opts = makeOpts();
+    await handleParseError(
+      new CapabilitySchemaMismatchError('capability: contribution failed its schema', {
+        domainId: 'domain',
+        ownerToolId: 'owner',
+        diagnostic: 'bad shape',
+      }),
+      opts,
+    );
     expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
     expect(opts.rendered[0]?.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
   });
@@ -344,5 +366,30 @@ describe('handleParseError — 2.12.0 outcomes', () => {
     expect(outcome.kind).toBe('command.error');
     expect(outcome.errors[0]?.message).toContain('not found');
     expect(opts.rendered).toHaveLength(0); // JSON path never renders Ink
+  });
+
+  it('the --json outcome exitCode agrees with setExitCode for a ValidationError subclass with a mismatched-exitClass code', async () => {
+    // Regression: outcomeFromFailureEnvelope used to derive its own exitCode
+    // straight from envelope.definition.exitClass, independent of the
+    // subclass-ladder-aware exitCode already computed above it — so the
+    // --json body could disagree with the process exit code for exactly
+    // this error shape.
+    const opts = { ...makeOpts(), jsonRequested: true };
+    const s = spyStreams();
+    try {
+      await handleParseError(
+        new CapabilitySchemaMismatchError('capability: contribution failed its schema', {
+          domainId: 'domain',
+          ownerToolId: 'owner',
+          diagnostic: 'bad shape',
+        }),
+        opts,
+      );
+    } finally {
+      s.restore();
+    }
+    expect(opts.setExitCode).toHaveBeenCalledWith(EXIT_CODES.CONFIGURATION_ERROR);
+    const outcome = JSON.parse(s.stdout.join('')) as { exitCode: number };
+    expect(outcome.exitCode).toBe(EXIT_CODES.CONFIGURATION_ERROR);
   });
 });

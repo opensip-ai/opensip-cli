@@ -666,10 +666,14 @@ describe('SessionResultsReadPort — reviewChange', () => {
       expect(out.value.data.reviewBrief.suite).toBe('audit');
       expect(out.value.data.reviewBrief.topRisks.map((risk) => risk.ruleId)).toEqual(['fit-rule']);
       expect(out.value.data.reviewBrief.topRisks[0]?.signalRef.stepIndex).toBe(0);
+      // The fit step's `src/a.ts` finding is 'added'; the graph step's
+      // `unchanged` finding is on `src/b.ts`, outside the `files: ['src/a.ts']`
+      // scope — the baseline delta must not count it (it isn't in topRisks
+      // either).
       expect(out.value.data.reviewBrief.baselineDelta).toMatchObject({
         available: true,
         added: 1,
-        unchanged: 1,
+        unchanged: 0,
       });
       expect(out.value.data.reviewBrief.correlatedRisks).toBeUndefined();
       expect(out.value.data.source.sessionIds).toEqual(['graph-step', 'fit-step']);

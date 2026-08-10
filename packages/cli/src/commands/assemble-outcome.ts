@@ -19,6 +19,7 @@
 import {
   getErrorSuggestionFromMessage,
   mapExitClassToExitCode,
+  mapFailureToExitCode,
   type CliDiagnostic,
   type CommandOutcome,
   type ErrorDetail,
@@ -126,13 +127,23 @@ export function outcomeFromError(
   opts: { readonly kind?: string } = {},
 ): CommandOutcome {
   const envelope = normalizeFailure(error);
-  return outcomeFromFailureEnvelope(envelope, opts);
+  return outcomeFromFailureEnvelope(envelope, { ...opts, exitCode: mapFailureToExitCode(error) });
 }
 
-/** Build an error outcome from a failure already normalized by the host boundary. */
+/**
+ * Build an error outcome from a failure already normalized by the host
+ * boundary. `opts.exitCode` should be the caller's own
+ * {@link mapFailureToExitCode} result over the ORIGINAL thrown value — that
+ * total mapper applies the typed `ToolError` subclass ladder (ADR-0066)
+ * before falling back to `envelope.definition.exitClass`, so a subclass like
+ * `ValidationError` cannot be silently demoted by a subcode's registered
+ * `exitClass`. Callers that no longer have the original error (only an
+ * already-normalized envelope) may omit it; the definition-only fallback is
+ * then used, matching the class of error this function was built to route.
+ */
 export function outcomeFromFailureEnvelope(
   envelope: ReturnType<typeof normalizeFailure>,
-  opts: { readonly kind?: string } = {},
+  opts: { readonly kind?: string; readonly exitCode?: number } = {},
 ): CommandOutcome {
   const failure = toMachineFailureProjection(envelope);
   const message = typeof failure.message === 'string' ? failure.message : 'The operation failed.';
@@ -146,7 +157,7 @@ export function outcomeFromFailureEnvelope(
     code: envelope.code,
     failure,
   };
-  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
+  const exitCode = opts.exitCode ?? mapExitClassToExitCode(envelope.definition.exitClass);
   return withDiagnostics({
     kind: opts.kind ?? 'command.error',
     status: 'error',

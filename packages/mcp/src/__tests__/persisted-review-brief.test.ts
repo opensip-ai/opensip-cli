@@ -94,11 +94,46 @@ describe('buildPersistedReviewBrief', () => {
     expect(result.reviewBrief.topRisks.map((risk) => risk.file)).toEqual(['src/b.ts']);
     expect(result.reviewBrief.baselineDelta).toEqual({
       available: true,
-      added: 1,
+      added: 0,
       removed: 0,
       unchanged: 1,
     });
     expect(result.degraded).toBeUndefined();
+  });
+
+  it('keeps verdict, baselineDelta, and recommendedActions scoped to the files filter', () => {
+    const result = buildPersistedReviewBrief({
+      suiteRunId: 'suite-3',
+      files: ['src/target.ts'],
+      steps: [
+        {
+          session: session('only'),
+          replay: replay([
+            {
+              ...createSignal({
+                source: 'fit',
+                ruleId: 'fit:rule',
+                severity: 'high',
+                message: 'finding in src/other.ts',
+                code: { file: 'src/other.ts', line: 1, column: 1 },
+                metadata: { baselineState: 'added' },
+              }),
+              fingerprint: 'fp:src/other.ts',
+            },
+          ]),
+        },
+      ],
+    });
+
+    expect(result.reviewBrief.topRisks).toEqual([]);
+    expect(result.reviewBrief.verdict).toBe('pass');
+    expect(result.reviewBrief.baselineDelta).toEqual({
+      available: false,
+      added: 0,
+      removed: 0,
+      unchanged: 0,
+    });
+    expect(result.reviewBrief.recommendedActions).toEqual([]);
   });
 
   it('counts normalized focused files once', () => {

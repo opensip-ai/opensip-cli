@@ -175,6 +175,46 @@ describe('boundGraphCatalog', () => {
     expect(kept).not.toContain('h0000');
   });
 
+  it('does not admit a lower-importance function ahead of an earlier, more important one that did not fit', () => {
+    // A greedy bin-pack (skip an entry that's too big, keep scanning for a
+    // smaller one that fits) can admit a low-importance function while
+    // dropping the single most important one — the opposite of the
+    // strict, importance-ordered prefix cutoff this module's own doc
+    // comment promises ("drop the least important functions first").
+    // HIGH has by far the highest blast score but a large serialized body;
+    // LOW1/LOW2 have tiny bodies but the lowest blast scores.
+    const src = {
+      version: '2.0',
+      language: 'typescript',
+      cacheKey: 'ck',
+      builtAt: '2026-07-14T00:00:00.000Z',
+      resolutionMode: 'exact',
+      functions: {
+        HIGH: [occurrence('HIGH', { params: ['x'.repeat(300)] })],
+        LOW2: [occurrence('LOW2')],
+        LOW1: [occurrence('LOW1')],
+      },
+      features: {
+        function: {
+          HIGH: { bodyLines: 10, blast: { score: 1000 } },
+          LOW2: { bodyLines: 10, blast: { score: 2 } },
+          LOW1: { bodyLines: 10, blast: { score: 1 } },
+        },
+        edge: [],
+      },
+    } as unknown as GraphCatalog;
+
+    // Sized so HIGH alone does not fit, but LOW2 (and LOW1) would fit in the
+    // budget HIGH left behind — the exact condition a `continue`-based loop
+    // gets wrong.
+    const bounded = boundGraphCatalog(src, 700);
+    const kept = Object.keys(bounded.catalog?.functions ?? {});
+
+    expect(kept).not.toContain('LOW2');
+    expect(kept).not.toContain('LOW1');
+    expect(bounded.omittedFunctions).toBe(3);
+  });
+
   it('truncates deterministically — the same catalog bounds identically twice', () => {
     const first = boundGraphCatalog(catalog(80, { blast: (i) => i % 7 }), 3000);
     const second = boundGraphCatalog(catalog(80, { blast: (i) => i % 7 }), 3000);
