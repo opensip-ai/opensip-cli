@@ -164,6 +164,14 @@ function scan(src: string): ScanResult {
           foundClose = k;
           break;
         }
+        // A real Rust char literal never contains a newline or an
+        // (unescaped) `"`. Without this guard, a `"` that happens to fall
+        // within the lookahead window (e.g. two nearby lifetimes with a
+        // string opener between them) gets silently swallowed into the
+        // "char literal" span, hiding a real string open/close from the
+        // rest of the scan and corrupting string-region detection for the
+        // remainder of the input.
+        if (src[k] === '"' || src[k] === '\n') break;
       }
       if (foundClose >= 0) {
         // Char literal — preserve as code (don't strip)

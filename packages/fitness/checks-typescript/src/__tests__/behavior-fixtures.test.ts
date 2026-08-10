@@ -637,6 +637,24 @@ describe('logger-event-name-format — branch coverage', () => {
     const result = await runCheck('logger-event-name-format');
     expect(result.signals).toHaveLength(0);
   });
+
+  it('does not flag an evt-shaped string that is template-literal content on the line that closes the template', async () => {
+    // The closing backtick makes the unescaped-backtick count on line 2 odd,
+    // so a naive "even count ⇒ still in template" check treats the whole
+    // line as ordinary code and matches the `evt: "bad.name"` text that is
+    // actually inside the template literal, not a real logger call.
+    fx(
+      'src/log/evt-tpl-close.ts',
+      [
+        'declare const logger: { info(o: object): void }',
+        'const sample = `',
+        '  evt: "bad.name"`;',
+        'logger.info({ evt: sample })',
+      ].join('\n'),
+    );
+    const result = await runCheck('logger-event-name-format');
+    expect(result.signals).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -704,7 +722,23 @@ describe('no-hardcoded-correlation-id — branch coverage', () => {
     );
     const result = await runCheck('no-hardcoded-correlation-id');
     // The middle line is inside a multi-line template — should be skipped.
-    expect(result).toBeDefined();
+    expect(result.signals).toHaveLength(0);
+  });
+
+  it('does not flag a correlationId that is template-literal content on the line that closes the template', async () => {
+    // Line 3 both closes the template (leading text is template content) and
+    // contains a trailing `;` that is real code — the closing backtick makes
+    // the unescaped-backtick count on that line odd, so a naive "even count ⇒
+    // skip" check treats the whole line as ordinary code and matches the
+    // correlationId text that is actually inside the template literal.
+    fx(
+      'src/log/corr-tpl-close.ts',
+      ['const template = `', '  some header ${x}', '  correlationId: "in-template-value"`;'].join(
+        '\n',
+      ),
+    );
+    const result = await runCheck('no-hardcoded-correlation-id');
+    expect(result.signals).toHaveLength(0);
   });
 });
 

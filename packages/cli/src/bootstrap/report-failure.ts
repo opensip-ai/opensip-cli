@@ -3,7 +3,7 @@
  * (Plan 06). Combines core error types with contracts exit-code policy.
  */
 
-import { mapExitClassToExitCode } from '@opensip-cli/contracts';
+import { mapFailureToExitCode } from '@opensip-cli/contracts';
 import {
   SystemError,
   deepFreeze,
@@ -148,7 +148,9 @@ function deriveErrorDefaults(error: unknown): {
       typeof publicProjection.message === 'string'
         ? truncateDerivedMessage(publicProjection.message)
         : 'The operation failed.',
-    exitCode: mapExitClassToExitCode(envelope.definition.exitClass),
+    // The typed `ToolError` subclass ladder (ADR-0066) must run before the
+    // definition-only fallback — see `mapFailureToExitCode`'s doc comment.
+    exitCode: mapFailureToExitCode(error),
     code: envelope.code,
     suggestion: envelope.operatorAction,
     failure: toMachineFailureProjection(envelope),

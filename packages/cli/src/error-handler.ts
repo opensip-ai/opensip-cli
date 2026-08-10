@@ -17,7 +17,7 @@
 import {
   EXIT_CODES,
   getErrorSuggestionFromMessage,
-  mapExitClassToExitCode,
+  mapFailureToExitCode,
   type ErrorResult,
 } from '@opensip-cli/contracts';
 import {
@@ -137,10 +137,15 @@ export async function handleParseError(
   const message = typeof failure.message === 'string' ? failure.message : 'The operation failed.';
   const legacySuggestion = getErrorSuggestionFromMessage(envelope.message);
   const action = envelope.known === 'known' ? envelope.operatorAction : legacySuggestion?.action;
-  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
+  // The typed `ToolError` subclass ladder (ADR-0066) must run before the
+  // definition-only fallback — a subclass like `ValidationError` owns its
+  // exit code and must not be demoted by a subcode's registered `exitClass`
+  // (e.g. `CapabilitySchemaMismatchError`, whose `CORE.CONTRIBUTION.SCHEMA_MISMATCH`
+  // code is registered `exitClass: 'plugin-incompatible'`).
+  const exitCode = mapFailureToExitCode(error);
   opts.setExitCode(exitCode);
   if (opts.jsonRequested) {
-    await renderOutcome(outcomeFromFailureEnvelope(envelope, { kind: 'command.error' }), {
+    await renderOutcome(outcomeFromFailureEnvelope(envelope, { kind: 'command.error', exitCode }), {
       jsonRequested: true,
       render: NOOP_RENDER,
     });
@@ -183,7 +188,7 @@ export function handleFatalBootstrapError(
     typeof publicProjection.message === 'string'
       ? neutralizeTerminalText(publicProjection.message)
       : 'The operation failed.';
-  const exitCode = mapExitClassToExitCode(envelope.definition.exitClass);
+  const exitCode = mapFailureToExitCode(error);
   try {
     process.stderr.write(`opensip: fatal error [${envelope.code}]: ${message}\n`);
   } catch {

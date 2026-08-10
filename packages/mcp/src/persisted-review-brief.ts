@@ -63,6 +63,7 @@ export function buildPersistedReviewBrief(
   });
   const sortedRisks = [...collected.risks].sort(compareReviewBriefRisks);
   const focusedRisks = focusRisks(sortedRisks, focusedFiles);
+  const focusedBaselineStates = focusBaselineStates(collected.baselineStates, focusedFiles);
   const correlatedRisks = buildReviewBriefCorrelations(focusedRisks);
   const unavailableBaseline = collected.baselineStates.length === 0 && sortedRisks.length > 0;
   const degraded = [...collected.reviewDegraded];
@@ -78,7 +79,7 @@ export function buildPersistedReviewBrief(
     );
   }
   const verdict = deriveReviewBriefVerdict({
-    risks: sortedRisks,
+    risks: focusedRisks,
     degraded,
   });
   const reviewBrief: ReviewBrief = {
@@ -89,12 +90,12 @@ export function buildPersistedReviewBrief(
     changedFiles: focusedFiles?.length ?? null,
     topRisks: focusedRisks.slice(0, riskLimit),
     newFindings: focusedRisks.filter((risk) => risk.isNew).slice(0, riskLimit),
-    baselineDelta: buildReviewBriefBaselineDelta(sortedRisks, collected.baselineStates),
+    baselineDelta: buildReviewBriefBaselineDelta(focusedRisks, focusedBaselineStates),
     degraded,
     recommendedActions: buildReviewBriefRecommendedActions({
       verdict,
       degraded,
-      risks: sortedRisks,
+      risks: focusedRisks,
     }),
     ...(correlatedRisks.length === 0 ? {} : { correlatedRisks }),
   };
@@ -128,6 +129,20 @@ function focusRisks(
   return risks.filter((risk) => wanted.has(risk.file));
 }
 
+function focusBaselineStates(
+  entries: readonly BaselineStateEntry[],
+  files: readonly string[] | undefined,
+): readonly ReviewBriefBaselineState[] {
+  if (files === undefined || files.length === 0) return entries.map((entry) => entry.state);
+  const wanted = new Set(files);
+  return entries.filter((entry) => wanted.has(entry.file)).map((entry) => entry.state);
+}
+
+interface BaselineStateEntry {
+  readonly file: string;
+  readonly state: ReviewBriefBaselineState;
+}
+
 function collectRisks(input: {
   readonly suiteRunId: string;
   readonly steps: readonly PersistedReviewStep[];
@@ -136,13 +151,13 @@ function collectRisks(input: {
   readonly risks: readonly ReviewBriefRisk[];
   readonly reviewDegraded: readonly ReviewBriefDegradation[];
   readonly evidenceDegraded: readonly McpEvidenceDegradation[];
-  readonly baselineStates: readonly ReviewBriefBaselineState[];
+  readonly baselineStates: readonly BaselineStateEntry[];
   readonly degradedSteps: number;
 } {
   const risks: ReviewBriefRisk[] = [];
   const reviewDegraded: ReviewBriefDegradation[] = [];
   const evidenceDegraded: McpEvidenceDegradation[] = [];
-  const baselineStates: ReviewBriefBaselineState[] = [];
+  const baselineStates: BaselineStateEntry[] = [];
   let degradedSteps = 0;
 
   input.steps.forEach((step, stepIndex) => {
@@ -217,7 +232,7 @@ function collectRisks(input: {
 
     envelope.signals.forEach((signal, signalIndex) => {
       const state = reviewBriefBaselineState(signal);
-      if (state !== undefined) baselineStates.push(state);
+      if (state !== undefined) baselineStates.push({ file: signal.filePath, state });
       risks.push(
         signalToReviewBriefRisk({
           suiteRunId: input.suiteRunId,

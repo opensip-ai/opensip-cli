@@ -100,6 +100,21 @@ describe('rust stripStrings — char literals and lifetimes', () => {
     expect(out).toContain("'x'");
   });
 
+  it('does not let a lifetime lookahead swallow a real string opener between two nearby apostrophes', () => {
+    // Two apostrophes close together (a stray `'` followed a few chars later
+    // by an unrelated char literal's `'`) must not make the lifetime
+    // lookahead treat everything between them — including a real string's
+    // opening quote — as one opaque "char literal" span. The stray `'`
+    // here is not a valid lifetime/char-literal opener in real Rust, but
+    // the scanner must still recognize the `"..."` string that follows.
+    const src = 'x<\'"y\'z> real_secret_data "END"';
+    const out = stripStrings(src);
+    // The real string content between the two `"` must be stripped.
+    expect(out).not.toContain('real_secret_data');
+    // The string's own opening/closing quotes must remain.
+    expect(out).toContain('"');
+  });
+
   it('handles a lifetime followed by an escape-like sequence in scan window', () => {
     // 'static is a long lifetime — no closing quote within ~6 chars.
     const src = 'fn foo() -> &\'static str { "hi" }';

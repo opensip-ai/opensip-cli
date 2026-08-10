@@ -8,7 +8,8 @@ import {
   isTestFile,
   type CheckViolation,
 } from '@opensip-cli/fitness';
-import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
+
+import { scanLineOutsideTemplateLiteral } from '../../../shared/template-literal-line-scan.js';
 
 /**
  * Pattern for detecting hardcoded correlationId string literal assignments.
@@ -26,27 +27,28 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
     /* v8 ignore next -- defensive guard */
     if (!line) continue;
 
-    const backtickCount = countUnescapedBackticks(line);
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
-    if (inTemplateLiteral && backtickCount % 2 === 0) continue;
+    const scan = scanLineOutsideTemplateLiteral(line, inTemplateLiteral);
+    inTemplateLiteral = scan.inTemplateLiteral;
 
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
-    HARDCODED_CORR_ID_PATTERN.lastIndex = 0;
-    let match;
-    while ((match = HARDCODED_CORR_ID_PATTERN.exec(line)) !== null) {
-      violations.push({
-        line: i + 1,
-        column: match.index + 1,
-        message: `Hardcoded correlationId '${match[1]}' — use generateCorrelationId() instead`,
-        severity: 'warning',
-        suggestion:
-          'Use a correlation ID generator function (e.g., uuid or nanoid) to create unique IDs for each operation',
-        match: match[0],
-        type: 'hardcoded-correlation-id',
-        filePath,
-      });
+    for (const segment of scan.segments) {
+      HARDCODED_CORR_ID_PATTERN.lastIndex = 0;
+      let match;
+      while ((match = HARDCODED_CORR_ID_PATTERN.exec(segment.text)) !== null) {
+        violations.push({
+          line: i + 1,
+          column: segment.offset + match.index + 1,
+          message: `Hardcoded correlationId '${match[1]}' — use generateCorrelationId() instead`,
+          severity: 'warning',
+          suggestion:
+            'Use a correlation ID generator function (e.g., uuid or nanoid) to create unique IDs for each operation',
+          match: match[0],
+          type: 'hardcoded-correlation-id',
+          filePath,
+        });
+      }
     }
   }
 

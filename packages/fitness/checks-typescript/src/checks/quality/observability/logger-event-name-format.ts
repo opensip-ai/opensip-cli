@@ -8,7 +8,8 @@ import {
   isTestFile,
   type CheckViolation,
 } from '@opensip-cli/fitness';
-import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
+
+import { scanLineOutsideTemplateLiteral } from '../../../shared/template-literal-line-scan.js';
 
 /**
  * Validates evt format: domain.component.action (3+ segments in lowercase with underscores)
@@ -34,9 +35,7 @@ const EVENT_CONSTANT_PATTERNS = [
   /evt\s*:\s*[A-Z_]+_EVENTS\./,
 ];
 
-function shouldSkipLine(line: string, inTemplateLiteral: boolean, backtickCount: number): boolean {
-  /* v8 ignore next -- defensive AST/type guard */
-  if (inTemplateLiteral && backtickCount % 2 === 0) return true;
+function shouldSkipLine(line: string): boolean {
   const trimmed = line.trim();
   /* v8 ignore next -- defensive AST/type guard */
   if (trimmed.startsWith('//') || trimmed.startsWith('*')) return true;
@@ -55,11 +54,12 @@ function createEvtViolation(
   evtMatch: RegExpExecArray,
   lineNum: number,
   filePath: string,
+  columnOffset: number,
 ): CheckViolation {
   const segmentCount = evtValue.split('.').length;
   return {
     line: lineNum,
-    column: evtMatch.index,
+    column: columnOffset + evtMatch.index,
     message: `Logger evt '${evtValue}' has ${segmentCount} segment(s) — minimum 3 required (domain.component.action)`,
     severity: 'error',
     suggestion: `Change to a 3+ segment format, e.g., '${evtValue}.start' or restructure as 'domain.component.action'`,
@@ -67,6 +67,31 @@ function createEvtViolation(
     type: 'invalid-evt-segments',
     filePath,
   };
+}
+
+/**
+ * Find the first segment on a line that carries an `evt:` property (skipping
+ * segments that merely contain a matching-but-inapplicable pattern), and
+ * return its violation if the value fails the format check. Mirrors the
+ * original single-match-per-line semantics of a bare `EVT_FIELD_PATTERN.exec(line)`
+ * over the whole line, applied per non-template segment instead.
+ */
+function findEvtViolationInSegments(
+  segments: readonly { readonly text: string; readonly offset: number }[],
+  lineNum: number,
+  filePath: string,
+): CheckViolation | undefined {
+  for (const segment of segments) {
+    const evtMatch = EVT_FIELD_PATTERN.exec(segment.text);
+    if (!evtMatch?.[1]) continue;
+    if (isInsideStringLiteral(segment.text, evtMatch.index)) continue;
+    if (!isEvtPropertyContext(segment.text, evtMatch.index)) continue;
+
+    return EVT_FORMAT_PATTERN.test(evtMatch[1])
+      ? undefined
+      : createEvtViolation(evtMatch[1], evtMatch, lineNum, filePath, segment.offset);
+  }
+  return undefined;
 }
 
 function analyzeEvtNames(content: string, filePath: string): CheckViolation[] {
@@ -78,18 +103,12 @@ function analyzeEvtNames(content: string, filePath: string): CheckViolation[] {
     /* v8 ignore next -- defensive guard */
     if (!line) continue;
 
-    const backtickCount = countUnescapedBackticks(line);
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
-    if (shouldSkipLine(line, inTemplateLiteral, backtickCount)) continue;
+    const scan = scanLineOutsideTemplateLiteral(line, inTemplateLiteral);
+    inTemplateLiteral = scan.inTemplateLiteral;
+    if (shouldSkipLine(line)) continue;
 
-    const evtMatch = EVT_FIELD_PATTERN.exec(line);
-    if (!evtMatch?.[1]) continue;
-    if (isInsideStringLiteral(line, evtMatch.index)) continue;
-    if (!isEvtPropertyContext(line, evtMatch.index)) continue;
-
-    if (!EVT_FORMAT_PATTERN.test(evtMatch[1])) {
-      violations.push(createEvtViolation(evtMatch[1], evtMatch, i + 1, filePath));
-    }
+    const violation = findEvtViolationInSegments(scan.segments, i + 1, filePath);
+    if (violation !== undefined) violations.push(violation);
   }
 
   return violations;

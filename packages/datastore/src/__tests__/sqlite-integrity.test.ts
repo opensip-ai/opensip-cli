@@ -260,6 +260,32 @@ describe('inspectSqliteFile', () => {
     });
   });
 
+  it('truncates an over-long identifier at a code point boundary, not a raw byte offset', () => {
+    // A byte-offset slice can land mid-codepoint when the identifier's byte
+    // length crosses the 256-byte cap inside a multi-byte UTF-8 character —
+    // here, 255 ASCII bytes followed by a 3-byte '€' (U+20AC) puts the cap
+    // one byte into '€'. Buffer#toString('utf8') then emits a trailing
+    // U+FFFD replacement character for the split tail instead of a clean
+    // truncation.
+    const path = join(temporaryDirectory, 'long-identifier.sqlite');
+    createDatabase(path);
+    const table = `${'a'.repeat(255)}€`;
+
+    const result = inspectSqliteFileWithDependencies(path, {
+      openDatabase: () =>
+        inspectionDatabase({
+          foreignKeys: [{ table, parent: 'parent', rowid: 1, fkid: 0 }],
+        }),
+    });
+
+    if (result.status !== 'corrupt' || !('foreignKeys' in result)) {
+      throw new Error('expected a corrupt inspection with foreign-key samples');
+    }
+    const sampledTable = result.foreignKeys.samples[0]?.table ?? '';
+    expect(sampledTable).not.toContain('�');
+    expect(sampledTable).toBe('a'.repeat(255));
+  });
+
   it('runs the caller authority guard after hashing and before native open', () => {
     const path = join(temporaryDirectory, 'guarded-open.sqlite');
     createDatabase(path);
