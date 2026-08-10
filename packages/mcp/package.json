@@ -99,7 +99,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "@opensip-cli/codebase": "workspace:*",
     "@opensip-cli/config": "workspace:*",
     "@opensip-cli/contracts": "workspace:*",
