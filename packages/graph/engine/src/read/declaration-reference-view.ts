@@ -449,10 +449,7 @@ export function searchDeclarationFacts(
       coverage: rollupFacets({
         inventory,
         evidence: UNREQUESTED_FACET,
-        grouping:
-          groupBy === 'none'
-            ? UNREQUESTED_FACET
-            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
+        grouping: groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(true, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });
@@ -574,11 +571,8 @@ export function referencesToDeclaration(
       ...(grouping.groups === undefined ? {} : { groups: grouping.groups }),
       coverage: rollupFacets({
         inventory,
-        evidence: makeFacet(evidenceReasons.size === 0, evidenceReasons),
-        grouping:
-          groupBy === 'none'
-            ? UNREQUESTED_FACET
-            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
+        evidence: makeFacet(true, evidenceReasons),
+        grouping: groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(true, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });

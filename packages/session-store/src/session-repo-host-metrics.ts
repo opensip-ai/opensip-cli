@@ -5,7 +5,7 @@ import { sessionStoreErrorCatalog } from './errors/session-store-error-catalog.j
 import { sessionHostMetrics } from './schema/sessions.js';
 
 import type { StoredSessionHostMetrics } from '@opensip-cli/contracts';
-import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
+import type { DrizzleHandle } from '@opensip-cli/datastore/internal';
 
 // Plan 01: 22 literals become five registered definitions; the branch lives in metadata.
 const WRITE_INVALID = sessionStoreErrorCatalog.require('SESSION.WRITE.RECORD_INVALID');
@@ -87,12 +87,18 @@ export function projectHostMetrics(
   return Object.keys(metrics).length > 0 ? metrics : undefined;
 }
 
-/** Read host-metrics for one session, or `undefined` when no row exists. */
+/**
+ * Read host-metrics for one session, or `undefined` when no row exists.
+ * Takes a {@link DrizzleHandle} (not the owning {@link DrizzleDataStore}) so a
+ * caller can pass either the ambient `datastore.db` or a transaction's `tx` —
+ * the latter is required to read host-metrics in the same snapshot as the
+ * owning `sessions`/`session_tool_payload` rows (see `SessionReadRepo`).
+ */
 export function readHostMetrics(
-  datastore: DrizzleDataStore,
+  db: DrizzleHandle,
   sessionId: string,
 ): StoredSessionHostMetrics | undefined {
-  const row = datastore.db
+  const row = db
     .select()
     .from(sessionHostMetrics)
     .where(eq(sessionHostMetrics.sessionId, sessionId))
@@ -100,9 +106,12 @@ export function readHostMetrics(
   return row ? projectHostMetrics(row) : undefined;
 }
 
-/** Batch-load host-metrics for a page of session ids (avoids list()'s N+1). */
+/**
+ * Batch-load host-metrics for a page of session ids (avoids list()'s N+1).
+ * See {@link readHostMetrics} for why this takes a {@link DrizzleHandle}.
+ */
 export function hostMetricsBySessionId(
-  datastore: DrizzleDataStore,
+  db: DrizzleHandle,
   ids: readonly string[],
 ): Map<string, StoredSessionHostMetrics> {
   const byId = new Map<string, StoredSessionHostMetrics>();
@@ -114,7 +123,7 @@ export function hostMetricsBySessionId(
   for (let i = 0; i < ids.length; i += CHUNK) {
     const slice = ids.slice(i, i + CHUNK);
     if (slice.length === 0) continue;
-    const rows = datastore.db
+    const rows = db
       .select()
       .from(sessionHostMetrics)
       .where(inArray(sessionHostMetrics.sessionId, slice))

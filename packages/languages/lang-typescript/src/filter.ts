@@ -358,12 +358,16 @@ function filterContentImpl(
 
   const chars = content.split('');
 
-  // Depth counter, not a boolean — a `${ `inner` }` construct nests two templates
-  // and each `}` that closes a template-expression must be rescanned. A plain
-  // boolean flipped off by the inner TemplateTail would leave the outer unrescanned
-  // and desync the scanner for the rest of the file (which silently wipes real
-  // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
-  let templateDepth = 0;
+  // One entry per currently-open template substitution (`${ ... }`), holding the
+  // brace-nesting depth *within that substitution* — not the same thing as
+  // template nesting. A `}` only closes the substitution (and must be rescanned
+  // as TemplateMiddle/TemplateTail) when it matches the substitution's own `${`;
+  // any `}` that closes an object literal, block-bodied arrow, or nested block
+  // inside `${ ... }` must NOT be rescanned, or the scanner desyncs and silently
+  // wipes real code to whitespace (e.g. `${items.map(i => { return i.n; })}`).
+  // Pushed at TemplateHead, popped at TemplateTail; TemplateMiddle resets the
+  // top entry to 0 since it opens a fresh substitution in the same template.
+  const templateBraceDepths: number[] = [];
   // Previous non-trivia token — used to decide whether `/` starts a regex
   // (reScanSlashToken) vs division. Without this, `/.../` is never emitted as
   // RegularExpressionLiteral and quote/slash chars inside patterns desync the
@@ -375,10 +379,24 @@ function filterContentImpl(
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.EndOfFileToken) break;
 
-    // After a CloseBraceToken inside ANY template expression, rescan to get TemplateMiddle/TemplateTail
+    // A `}` only closes a template substitution (and must be rescanned to
+    // TemplateMiddle/TemplateTail) when it matches that substitution's own `${` —
+    // i.e. the innermost open template's brace-nesting is back to 0. Any `}`
+    // closing an object literal / block inside the substitution just decrements
+    // that nesting and stays an ordinary CloseBraceToken.
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
-    if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
-      token = scanner.reScanTemplateToken(false);
+    if (token === ts.SyntaxKind.CloseBraceToken) {
+      const top = templateBraceDepths.length - 1;
+      if (top >= 0) {
+        if (templateBraceDepths[top] === 0) {
+          token = scanner.reScanTemplateToken(false);
+        } else {
+          templateBraceDepths[top]--;
+        }
+      }
+      // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
+    } else if (token === ts.SyntaxKind.OpenBraceToken && templateBraceDepths.length > 0) {
+      templateBraceDepths[templateBraceDepths.length - 1]++;
     }
 
     // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
@@ -404,20 +422,25 @@ function filterContentImpl(
 
       case ts.SyntaxKind.TemplateHead: {
         // `text ${ — replace text between ` and ${
-        templateDepth++;
+        templateBraceDepths.push(0);
         replaceCharsInRange(chars, start + 1, end - 2, stringRegions);
         break;
       }
 
       case ts.SyntaxKind.TemplateMiddle: {
-        // }text ${ — replace text between } and ${
+        // }text ${ — replace text between } and ${; a new substitution starts
+        // at depth 0 (the closing `}` above only rescans once its own nesting
+        // already unwound to 0, so this is a defensive reset, not a load-bearing one).
+        if (templateBraceDepths.length > 0) {
+          templateBraceDepths[templateBraceDepths.length - 1] = 0;
+        }
         replaceCharsInRange(chars, start + 1, end - 2, stringRegions);
         break;
       }
 
       case ts.SyntaxKind.TemplateTail: {
         // }text` — replace text between } and `
-        templateDepth = Math.max(0, templateDepth - 1);
+        templateBraceDepths.pop();
         replaceCharsInRange(chars, start + 1, end - 1, stringRegions);
         break;
       }

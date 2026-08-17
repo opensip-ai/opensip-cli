@@ -179,7 +179,17 @@ function matchStringPrefix(src: string, i: number): number {
  * never an identifier character.
  */
 function matchCharLiteralPrefix(src: string, i: number): number {
-  if (src[i] === "'") return 0;
+  if (src[i] === "'") {
+    // A bare `'` flanked by identifier characters on both sides (letters,
+    // digits, `_`) is never a char-literal opener in real C++ — it's a
+    // C++14 digit separator (`1'000`, `0x1234'5678`). Misreading it as an
+    // opener makes scanCharLiteral consume the rest of the line hunting for
+    // a closing `'`, which can swallow a real string literal later on the
+    // same line (e.g. `int n = 1'000; log("it's a TODO", n);`) and blank
+    // real code past it.
+    if (isIdentChar(src[i - 1]) && isIdentChar(src[i + 1])) return -1;
+    return 0;
+  }
   if (i > 0 && isIdentChar(src[i - 1])) return -1;
   if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === "'") return 2;
   if ((src[i] === 'L' || src[i] === 'u' || src[i] === 'U') && src[i + 1] === "'") return 1;

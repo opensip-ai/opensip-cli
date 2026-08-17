@@ -128,9 +128,15 @@ export async function runHostGateDispatch(
   }
 
   const result = await cli.compareBaseline(tool, envelope);
+  // A faulted run's diff is untrustworthy — a unit that crashed produces no
+  // signals, so its previously-recorded findings would otherwise diff as
+  // "resolved" even though they were never fixed. `graph` already guards
+  // this via its own `compareRunFailed` override; this is the shared default
+  // every other caller (fitness, yagni, every external scanner adapter) gets
+  // when it passes none, so they were all silently exposed until now.
   const runFailed =
     input.compareRunFailed?.({ envelope, result }) ??
-    (result.degraded && resolveFailOnDegraded(tool));
+    (envelope.verdict.faulted === true || (result.degraded && resolveFailOnDegraded(tool)));
   await cli.render({
     type: 'gate-done',
     lines: input.renderCompareLines({ envelope, result, runFailed }),

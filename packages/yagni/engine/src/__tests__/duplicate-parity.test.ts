@@ -198,6 +198,31 @@ export class LiteralNames {
 }
 `,
   );
+
+  // Regression: a member nested inside a method of an ANONYMOUS class
+  // expression. yagni's threaded `enclosingClass` used to leak the
+  // '<anon-class>' sentinel into every nested member's qualifiedName instead
+  // of clearing on body descent + walking to the nearest real class ancestor
+  // (mirroring graph-typescript's walk.ts + findEnclosingClassName), so
+  // yagni and graph disagreed on where the duplicate-body group anchor sits.
+  writeFileSync(
+    join(a, 'src', 'anon-class-nested.ts'),
+    `export const AnonHolder = class {
+  outer(): unknown {
+    return {
+      dup(value: number): number { return value + 401; },
+    };
+  }
+};
+export class NamedHolder {
+  outer(): unknown {
+    return {
+      dupNamed(value: number): number { return value + 402; },
+    };
+  }
+}
+`,
+  );
 });
 
 afterAll(() => {

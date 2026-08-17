@@ -6,6 +6,7 @@ import {
   buildGraphReadIndexes,
   buildImpactView,
   catalogGenerationKey,
+  deriveGraphReadFeatures,
   MAX_IMPACT_VIEW_ROWS,
   projectEntityDetail,
   selectStaticTests,
@@ -263,6 +264,28 @@ describe('task-context graph read views', () => {
         decorators: ['trace'],
         testReachability: { testReachable: true },
       },
+    });
+  });
+
+  // Regression: MCP's entity_detail path requests a derived feature set that
+  // never asks for the `reachableOnlyFromTests` column (only
+  // ['blast','packageCoupling','reachableFromEntry']). That still produces a
+  // *defined* row for this bodyHash — just missing testReachable/
+  // reachableOnlyFromTests — so a row-level `??` never fell through to the
+  // persisted catalog features that a normal `opensip graph` run wrote,
+  // and testReachability always came back empty on that path.
+  it('falls back per-column to persisted catalog features when the derived row omits them', () => {
+    const value = catalog();
+    const indexes = buildGraphReadIndexes(value);
+    const features = deriveGraphReadFeatures(value, indexes, {}, [
+      'blast',
+      'packageCoupling',
+      'reachableFromEntry',
+    ]);
+    const result = projectEntityDetail(value, indexes, 'src/work.ts:1:0', features);
+    expect(result).toMatchObject({
+      ok: true,
+      value: { testReachability: { testReachable: true } },
     });
   });
 

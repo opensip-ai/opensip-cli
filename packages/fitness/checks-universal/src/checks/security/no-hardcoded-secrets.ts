@@ -67,9 +67,14 @@ const SECRET_PATTERNS = [
     suggestion:
       'Move API key to environment variable: process.env.API_KEY. For local development, use .env files (and add to .gitignore).',
   },
-  // Passwords - uses [^'"`]* which is bounded by quote characters
+  // Passwords - uses [^'"`]* which is bounded by quote characters.
+  // Anchored on \b so this only matches a WHOLE word "password"/"passwd"/
+  // "pwd" — without it, the pattern also matched inside identifiers merely
+  // CONTAINING one of those words (resetPassword, confirmPassword), firing
+  // on ordinary route constants / i18n strings (severity: error, so this
+  // hard-failed the CI gate on correct code).
   {
-    regex: createPattern('(?:password|passwd|pwd)\\s*[:=]\\s*[\'"`][^\'"`]{8,}[\'"`]', 'gi'),
+    regex: createPattern('\\b(?:password|passwd|pwd)\\s*[:=]\\s*[\'"`][^\'"`]{8,}[\'"`]', 'gi'),
     message: 'Hardcoded password detected',
     suggestion:
       'Move password to environment variable or secrets manager. Never store passwords in source code. Consider using a password manager or vault service.',
@@ -81,9 +86,13 @@ const SECRET_PATTERNS = [
     suggestion:
       'Move JWT secret to environment variable: process.env.JWT_SECRET. Generate a strong random secret (256+ bits) and rotate periodically.',
   },
-  // Database connection strings with credentials - uses [^:]+ and [^@]+ which are bounded
+  // Database connection strings with credentials - uses [^:]+ and [^@]+ which are
+  // bounded, and additionally exclude `$`/quote/whitespace chars so an
+  // interpolated `${process.env.PGUSER}:${process.env.PGPASSWORD}@...` (nothing
+  // hardcoded — the credentials ARE already environment-sourced) can't be
+  // swallowed as if the placeholder text were a literal credential.
   {
-    regex: createPattern('(?:postgres|mysql|mongodb)://[^:]+:[^@]+@', 'gi'),
+    regex: createPattern('(?:postgres|mysql|mongodb)://[^:$\'"`\\s]+:[^@$\'"`\\s]+@', 'gi'),
     message: 'Hardcoded database connection string with credentials detected',
     suggestion:
       'Use environment variables for database credentials: process.env.DATABASE_URL. Consider using IAM authentication or secrets manager for production.',
@@ -203,7 +212,9 @@ function analyzeLine(
     if (lineHasRedactionPlaceholder(line)) continue;
     violations.push({
       line: lineNumber,
-      column: matched.index,
+      // +1: Signal.column is 1-based; matched.index is the raw 0-based
+      // String.prototype.exec offset.
+      column: matched.index + 1,
       message: pattern.message,
       severity: 'error',
       suggestion: pattern.suggestion,
@@ -213,28 +224,58 @@ function analyzeLine(
   }
 }
 
+/** Result of {@link scanSlashesOutsideStrings}: the slash count and the quote state at `end`. */
+interface SlashScanResult {
+  readonly count: number;
+  readonly quote: string | undefined;
+}
+
 /**
- * Heuristic: is `pos` inside a regex literal on `line`? Walks the line
- * tracking unescaped `/` chars as regex-literal delimiters. A position
- * with an odd number of unescaped `/` chars to its left, and another
- * unescaped `/` after, is inside a literal.
+ * Count unescaped `/` chars in `line[start, end)`, SKIPPING any that fall
+ * inside a quoted string (single/double/backtick) — a URL like
+ * `'https://a.co/b'` contributes 3 "/" that are string content, not
+ * regex-literal delimiters. Returns the open-quote state at `end` so a
+ * caller can resume scanning a later range in the same string context.
+ */
+function scanSlashesOutsideStrings(
+  line: string,
+  start: number,
+  end: number,
+  initialQuote: string | undefined,
+): SlashScanResult {
+  let count = 0;
+  let quote = initialQuote;
+  for (let i = start; i < end; i++) {
+    const ch = line[i];
+    if (quote !== undefined) {
+      if (ch === quote && line[i - 1] !== '\\') quote = undefined;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === '`') {
+      quote = ch;
+      continue;
+    }
+    if (ch === '/' && line[i - 1] !== '\\') count++;
+  }
+  return { count, quote };
+}
+
+/**
+ * Heuristic: is `pos` inside a regex literal on `line`? A position with an
+ * odd number of (non-string) unescaped `/` chars to its left, and another
+ * such `/` after, is inside a literal — throwing off the odd/even parity
+ * would otherwise suppress detection on the entire rest of the line (e.g. a
+ * hardcoded secret next to a `fetch()` URL).
  *
  * Heuristic — division operators and JSX can confuse it, but lines
  * with those tokens AND a secret-pattern match in the same line are
  * rare; the trade-off favors silencing the redaction-pattern FPs.
  */
 function isInsideRegexLiteral(line: string, pos: number): boolean {
-  // Count unescaped slashes before pos.
-  let slashesBefore = 0;
-  for (let i = 0; i < pos; i++) {
-    if (line[i] === '/' && line[i - 1] !== '\\') slashesBefore++;
-  }
-  if (slashesBefore % 2 !== 1) return false;
-  // Check at least one unescaped slash follows.
-  for (let i = pos; i < line.length; i++) {
-    if (line[i] === '/' && line[i - 1] !== '\\') return true;
-  }
-  return false;
+  const before = scanSlashesOutsideStrings(line, 0, pos, undefined);
+  if (before.count % 2 !== 1) return false;
+  const after = scanSlashesOutsideStrings(line, pos, line.length, before.quote);
+  return after.count > 0;
 }
 
 /**

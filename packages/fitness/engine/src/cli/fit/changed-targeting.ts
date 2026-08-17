@@ -200,3 +200,31 @@ export function restrictFileMapToChanged(
   }
   return narrowed;
 }
+
+/**
+ * Seed a narrowed scope map with an entry for every registered per-file check
+ * that never got a key from `resolveFilesForCheck` (scope-resolver.ts) at
+ * all — a check whose declared `scope` is present but EMPTY
+ * (`{ languages: [], concerns: [] }`) hits that resolver's case 3
+ * ("no scope, no override") and is left out of `buildScopeBasedFileMap`'s
+ * map entirely, same as a check with no scope declared at all.
+ *
+ * Without a key, `checkTargetFiles.get(checkId)` is `undefined`, and the
+ * check's `matchFiles()` falls back to the whole-repo fileCache — so a
+ * `--changed` run silently scanned the ENTIRE repo for those checks, the
+ * exact failure mode {@link restrictFileMapToChanged}'s invariant 1 already
+ * guards against for checks that DO have a scope-resolved key.
+ */
+export function seedEmptyScopeKeys(
+  scopeMap: Map<string, readonly string[]>,
+  allCheckKeys: readonly string[],
+  fullScopeKeys: ReadonlySet<string>,
+  changedFiles: readonly string[],
+): Map<string, readonly string[]> {
+  const seeded = new Map(scopeMap);
+  for (const key of allCheckKeys) {
+    if (seeded.has(key) || fullScopeKeys.has(key)) continue;
+    seeded.set(key, changedFiles);
+  }
+  return seeded;
+}

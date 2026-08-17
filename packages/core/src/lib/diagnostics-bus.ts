@@ -126,7 +126,20 @@ export class DiagnosticsBus {
     for (const [key, value] of Object.entries(correlation)) {
       if (value !== undefined) mergedData[key] = value;
     }
-    if (data !== undefined) Object.assign(mergedData, data);
+    // Not Object.assign: it uses [[Set]] on the target, so a `__proto__` key
+    // in `data` would invoke Object.prototype's setter and repoint
+    // mergedData's own prototype instead of copying the field — silently
+    // dropping it. defineProperty always creates a normal own data property.
+    if (data !== undefined) {
+      for (const [key, value] of Object.entries(data)) {
+        Object.defineProperty(mergedData, key, {
+          value,
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      }
+    }
     this.event(phase, level, message, mergedData);
   }
 

@@ -30,10 +30,18 @@ function extractTsDirectiveAndReason(line: string): { directive: string; reason:
     return null;
   }
 
-  // Extract reason after directive (after : or - or em-dash).
+  // Extract reason after directive (after : or - or -- or em-dash).
   // Bounded quantifiers prevent ReDoS.
+  // `[:-—]` was an unintended RANGE (U+003A ':' through U+2014 '—'), not a
+  // set — hyphen (U+002D) sits below the range start, so the `-`/`--`
+  // separator convention (shared by the fitness/graph/semgrep directive
+  // grammars) never matched here, while other characters in that wide range
+  // (letters, digits, punctuation) DID match and ate the first character of
+  // the reason (e.g. "TS2345 ..." -> "S2345 ..."). `-{1,2}` (tried before the
+  // single-char alternatives so it greedily consumes both hyphens) restores
+  // both the single- and double-hyphen forms.
   const afterDirective = line.slice(directiveStart + directive.length);
-  const separatorMatch = /^\s{0,5}[:-—]\s{0,5}(.{0,500})/.exec(afterDirective);
+  const separatorMatch = /^\s{0,5}(?:-{1,2}|:|—)\s{0,5}(.{0,500})/.exec(afterDirective);
   const reason = separatorMatch?.[1]?.trim() ?? '';
 
   return { directive, reason };

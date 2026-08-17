@@ -22,12 +22,17 @@
  */
 
 import { createToolLogger } from '@opensip-cli/core';
+import { applyGlobalExcludes } from '@opensip-cli/targeting';
 
 import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
 import { FitnessRecipeService } from '../recipes/service.js';
 
-import { resolveChangedSet, restrictFileMapToChanged } from './fit/changed-targeting.js';
+import {
+  resolveChangedSet,
+  restrictFileMapToChanged,
+  seedEmptyScopeKeys,
+} from './fit/changed-targeting.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import {
@@ -97,6 +102,8 @@ function resolveFitScopeMap(
   args: FitOptions,
   initialScopeMap: CheckScopeMap,
   fullScopeKeys: ReadonlySet<string>,
+  allCheckKeys: readonly string[],
+  globalExcludes: readonly string[],
 ): {
   readonly scopeMap: CheckScopeMap;
   readonly warnings: readonly string[];
@@ -117,6 +124,14 @@ function resolveFitScopeMap(
       verification: changed.trust,
     };
   }
+  // Same treatment for a check that resolveFilesForCheck (scope-resolver.ts)
+  // never gave a map entry at all — a declared-but-EMPTY scope
+  // (`{ languages: [], concerns: [] }`) — as for a check that DID get an
+  // entry: narrow it to the changed subset (possibly empty), never leave it
+  // keyless, or `checkTargetFiles.get(checkId)` reads `undefined` and the
+  // check's `matchFiles()` falls back to scanning the WHOLE repo under
+  // `--changed` (see seedEmptyScopeKeys).
+  const changedFilesForSeed = applyGlobalExcludes([...changed.files], args.cwd, globalExcludes);
   if (changed.files.size === 0) {
     // "Target nothing" must be expressed as every scoped check → EMPTY target
     // list, NOT an empty map. An empty map leaves `checkTargetFiles.get(checkId)`
@@ -127,13 +142,23 @@ function resolveFitScopeMap(
     // check to `[]`, so it scans nothing. (Same defect, sibling branch to the
     // key-preservation fix in restrictFileMapToChanged.)
     return {
-      scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
+      scopeMap: seedEmptyScopeKeys(
+        restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
+        allCheckKeys,
+        fullScopeKeys,
+        changedFilesForSeed,
+      ),
       warnings: ['No changed files detected — fit run will target nothing.'],
       verification: changed.trust,
     };
   }
   return {
-    scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
+    scopeMap: seedEmptyScopeKeys(
+      restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
+      allCheckKeys,
+      fullScopeKeys,
+      changedFilesForSeed,
+    ),
     warnings: [],
     verification: changed.trust,
   };
@@ -239,6 +264,8 @@ export async function executeFit(
     args,
     buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd),
     fullScopeKeys,
+    allChecks.map((check) => check.id ?? check.slug),
+    targetsConfig.globalExcludes,
   );
   const scopeMap = changedResolution.scopeMap;
   const checkTargetFiles =

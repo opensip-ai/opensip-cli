@@ -54,4 +54,15 @@ describe('projectJsonScalarMetadata', () => {
       }),
     ).toEqual({ ok: 1, label: 'x' });
   });
+
+  // Regression: `out[key] = value` on a plain `{}` invokes Object.prototype's
+  // `__proto__` setter for that key instead of creating an own property,
+  // silently dropping a literal `__proto__` metadata field.
+  it('preserves a literal `__proto__` scalar key as an own property', () => {
+    const input = JSON.parse('{"__proto__":"x","label":"y"}') as Record<string, unknown>;
+    const out = projectJsonScalarMetadata(input);
+    expect(out).toBeDefined();
+    expect(Object.hasOwn(out ?? {}, '__proto__')).toBe(true);
+    expect((out as Record<string, unknown>).__proto__).toBe('x');
+  });
 });

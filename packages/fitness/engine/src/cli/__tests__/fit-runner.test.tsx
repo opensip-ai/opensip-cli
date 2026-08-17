@@ -188,4 +188,58 @@ describe('renderFitLive produce mapping', () => {
       ignored: 0,
     });
   });
+
+  // Regression: the TTY live runner used to hand-roll its own session
+  // literal that never set `runOutcome`, so the host fell back to
+  // `deriveRunOutcome({ passed })` — a degraded/faulted interactive run
+  // persisted in session history as plain 'passed'/'failed', unlike the
+  // non-TTY/`--json`/gate paths (`fitSessionContribution`), which already
+  // derive it correctly. `renderFitLive` now shares that same helper.
+  it('carries an explicit degraded runOutcome from executeFit into the session contribution', async () => {
+    const envelope = fitEnvelope();
+    executeFitMock.mockResolvedValue({
+      result: { type: 'run-presentation', tool: 'fitness', envelope },
+      warnings: [],
+      runOutcome: 'degraded',
+    });
+    await renderFitLive(fitArgs({ cwd: '/proj' }));
+    const outcome = await invokeProduce();
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind !== 'done') return;
+    expect(outcome.session).toMatchObject({ runOutcome: 'degraded' });
+  });
+
+  it('derives an error runOutcome from a faulted envelope when executeFit gives no explicit runOutcome', async () => {
+    const envelope = buildSignalEnvelope({
+      tool: 'fit',
+      runId: 'run-fit-fault',
+      createdAt: '2026-06-04T00:00:00.000Z',
+      recipe: 'default',
+      units: [
+        {
+          slug: 'dead-code',
+          passed: false,
+          violationCount: 0,
+          durationMs: 50,
+          filesValidated: 0,
+          itemType: 'files',
+          ignoredCount: 0,
+          error: 'Command exited unexpectedly',
+        },
+      ],
+      signals: [],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: true,
+    });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'run-presentation', tool: 'fitness', envelope },
+      warnings: [],
+    });
+    await renderFitLive(fitArgs({ cwd: '/proj' }));
+    const outcome = await invokeProduce();
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind !== 'done') return;
+    expect(envelope.verdict.faulted).toBe(true);
+    expect(outcome.session).toMatchObject({ runOutcome: 'error' });
+  });
 });

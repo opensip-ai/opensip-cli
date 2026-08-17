@@ -6,7 +6,11 @@ import path, { join } from 'node:path';
 import { LanguageRegistry, RunScope, ToolRegistry, runWithScopeSync } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
-import { resolveChangedSet, restrictFileMapToChanged } from '../changed-targeting.js';
+import {
+  resolveChangedSet,
+  restrictFileMapToChanged,
+  seedEmptyScopeKeys,
+} from '../changed-targeting.js';
 
 import type { GraphCatalog } from '@opensip-cli/contracts';
 
@@ -119,6 +123,38 @@ describe('restrictFileMapToChanged', () => {
     // targets as "missing").
     expect(narrowed.get('whole-repo')).toEqual(full);
     expect(narrowed.get('per-file')).toEqual([path.resolve(cwd, 'src/a.ts')]);
+  });
+});
+
+// Regression: a check whose declared `scope` is present but EMPTY
+// (`{ languages: [], concerns: [] }`) — e.g. no-todo-comments,
+// file-length-limit — never got a key from `resolveFilesForCheck` at all
+// (scope-resolver.ts case 3), so `restrictFileMapToChanged` alone can't
+// narrow it: it only iterates keys ALREADY in the map. With no key,
+// `checkTargetFiles.get(checkId)` reads `undefined` downstream and the
+// check's `matchFiles()` falls back to scanning the WHOLE repo under
+// `--changed` — silently defeating the flag for exactly those checks.
+describe('seedEmptyScopeKeys', () => {
+  it('adds a changed-set entry for a registered check missing from the scope map', () => {
+    const scopeMap = new Map<string, readonly string[]>([['scoped-check', ['/proj/src/a.ts']]]);
+    const seeded = seedEmptyScopeKeys(scopeMap, ['scoped-check', 'empty-scope-check'], new Set(), [
+      '/proj/src/b.ts',
+    ]);
+    // The already-narrowed scoped check is untouched...
+    expect(seeded.get('scoped-check')).toEqual(['/proj/src/a.ts']);
+    // ...and the empty-scope check gets a key pinning it to the changed set,
+    // not left absent (which would fall back to scanning the whole repo).
+    expect(seeded.get('empty-scope-check')).toEqual(['/proj/src/b.ts']);
+  });
+
+  it('does not seed a key for an analyzeAll (full-scope) check', () => {
+    const seeded = seedEmptyScopeKeys(
+      new Map(),
+      ['whole-repo-check'],
+      new Set(['whole-repo-check']),
+      ['/proj/src/a.ts'],
+    );
+    expect(seeded.has('whole-repo-check')).toBe(false);
   });
 });
 

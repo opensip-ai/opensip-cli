@@ -7,7 +7,7 @@ import { buildSession, type StoredPayloadRow } from './session-hydrator.js';
 import { hostMetricsBySessionId, readHostMetrics } from './session-repo-host-metrics.js';
 
 import type { StoredSession } from '@opensip-cli/contracts';
-import type { DrizzleDataStore } from '@opensip-cli/datastore/internal';
+import type { DrizzleDataStore, DrizzleHandle } from '@opensip-cli/datastore/internal';
 
 const MODULE_NAME = 'session-store:session-repo';
 
@@ -24,25 +24,34 @@ export class SessionReadRepo {
 
   list(opts: SessionListOptions = {}): readonly StoredSession[] {
     try {
-      const baseQuery = opts.tool
-        ? this.datastore.db.select().from(sessions).where(eq(sessions.tool, opts.tool))
-        : this.datastore.db.select().from(sessions);
-      const ordered = baseQuery.orderBy(desc(sessions.timestamp));
-      let sessionRows: (typeof sessions.$inferSelect)[];
-      if (opts.cwdWithin === undefined) {
-        sessionRows = opts.limit === undefined ? ordered.all() : ordered.limit(opts.limit).all();
-      } else {
-        const root = opts.cwdWithin;
-        const filteredRows = ordered.all().filter((row) => isSessionCwdWithin(row.cwd, root));
-        sessionRows = opts.limit === undefined ? filteredRows : filteredRows.slice(0, opts.limit);
-      }
+      // A single transaction snapshot for the sessions page + its payload and
+      // host-metrics batch reads: two concurrent `opensip` processes can share
+      // this project DB (backends/shared.ts sets `busy_timeout` for exactly
+      // that case), and a session-retention purge is one atomic commit. Three
+      // independent bare statements would let a purge land between snapshots
+      // and hydrate a since-deleted session with an undefined payload/metrics
+      // — reported as "evidence unreadable" instead of "concurrently pruned".
+      const results = this.datastore.transaction((tx) => {
+        const baseQuery = opts.tool
+          ? tx.select().from(sessions).where(eq(sessions.tool, opts.tool))
+          : tx.select().from(sessions);
+        const ordered = baseQuery.orderBy(desc(sessions.timestamp));
+        let sessionRows: (typeof sessions.$inferSelect)[];
+        if (opts.cwdWithin === undefined) {
+          sessionRows = opts.limit === undefined ? ordered.all() : ordered.limit(opts.limit).all();
+        } else {
+          const root = opts.cwdWithin;
+          const filteredRows = ordered.all().filter((row) => isSessionCwdWithin(row.cwd, root));
+          sessionRows = opts.limit === undefined ? filteredRows : filteredRows.slice(0, opts.limit);
+        }
 
-      const ids = sessionRows.map((row) => row.id);
-      const payloadsById = this.payloadsBySessionId(ids);
-      const metricsById = hostMetricsBySessionId(this.datastore, ids);
-      const results = sessionRows.map((row) =>
-        buildSession(row, payloadsById.get(row.id), metricsById.get(row.id)),
-      );
+        const ids = sessionRows.map((row) => row.id);
+        const payloadsById = this.payloadsBySessionId(tx, ids);
+        const metricsById = hostMetricsBySessionId(tx, ids);
+        return sessionRows.map((row) =>
+          buildSession(row, payloadsById.get(row.id), metricsById.get(row.id)),
+        );
+      });
       logger.info({
         evt: 'session.list.complete',
         module: MODULE_NAME,
@@ -62,8 +71,10 @@ export class SessionReadRepo {
   }
 
   get(id: string): StoredSession | null {
-    const row = this.datastore.db.select().from(sessions).where(eq(sessions.id, id)).get();
-    return row ? this.hydrateSession(row) : null;
+    return this.datastore.transaction((tx) => {
+      const row = tx.select().from(sessions).where(eq(sessions.id, id)).get();
+      return row ? this.hydrateSession(tx, row) : null;
+    });
   }
 
   /**
@@ -83,10 +94,10 @@ export class SessionReadRepo {
   }
 
   /** Hydrate one session via point queries — the single-row get() path. */
-  private hydrateSession(row: typeof sessions.$inferSelect): StoredSession {
+  private hydrateSession(tx: DrizzleHandle, row: typeof sessions.$inferSelect): StoredSession {
     // Tool-owned opaque detail — drizzle returns the JSON pre-parsed; the owning
     // tool (not persistence) validates its shape.
-    const payloadRow = this.datastore.db
+    const payloadRow = tx
       .select({
         payload: sessionToolPayload.payload,
         payload_version: sessionToolPayload.payload_version,
@@ -94,11 +105,14 @@ export class SessionReadRepo {
       .from(sessionToolPayload)
       .where(eq(sessionToolPayload.sessionId, row.id))
       .get();
-    return buildSession(row, payloadRow, readHostMetrics(this.datastore, row.id));
+    return buildSession(row, payloadRow, readHostMetrics(tx, row.id));
   }
 
   /** Batch-load tool payloads for a page of session ids (avoids list()'s N+1). */
-  private payloadsBySessionId(ids: readonly string[]): Map<string, StoredPayloadRow> {
+  private payloadsBySessionId(
+    tx: DrizzleHandle,
+    ids: readonly string[],
+  ): Map<string, StoredPayloadRow> {
     const byId = new Map<string, StoredPayloadRow>();
     // Chunk to stay under SQLite's bound-parameter ceiling
     // (SQLITE_MAX_VARIABLE_NUMBER, ~32k): `list()` with no limit is unbounded, so
@@ -108,7 +122,7 @@ export class SessionReadRepo {
     for (let i = 0; i < ids.length; i += CHUNK) {
       const slice = ids.slice(i, i + CHUNK);
       if (slice.length === 0) continue;
-      const rows = this.datastore.db
+      const rows = tx
         .select({
           sessionId: sessionToolPayload.sessionId,
           payload: sessionToolPayload.payload,

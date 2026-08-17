@@ -622,6 +622,23 @@ describe('SessionResultsReadPort — showRun', () => {
     const out = await port().showRun({ ref: 'does-not-exist' });
     expect(out.ok).toBe(false);
   });
+
+  // Regression: `resolveAndReplaySession`'s `applyAgentFilters` call sat
+  // outside its own try/catch, contradicting its docstring's "never throws
+  // across the domain boundary" promise. An invalid agent filter token threw
+  // `AgentFilterParseError` straight out of `showRun`, escaping to the MCP
+  // SDK as a non-JSON `isError` response instead of the documented
+  // `{ ok: false, error: { code, message } }` contract every other MCP
+  // failure follows.
+  it('returns a structured invalid-input err for an invalid filter token instead of throwing', async () => {
+    new SessionRepo(store).save(makeSession({ id: 'fit-1' }));
+    const out = await port().showRun({ ref: 'fit-1', filters: ['bogus'] });
+    expect(out.ok).toBe(false);
+    if (!out.ok) {
+      expect(out.error.code).toBe('invalid-input');
+      expect(out.error.message).toContain('bogus');
+    }
+  });
 });
 
 describe('SessionResultsReadPort — reviewChange', () => {

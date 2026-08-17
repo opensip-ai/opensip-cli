@@ -59,7 +59,8 @@ function createEvtViolation(
   const segmentCount = evtValue.split('.').length;
   return {
     line: lineNum,
-    column: evtMatch.index,
+    // +1: Signal.column is 1-based; evtMatch.index is 0-based.
+    column: evtMatch.index + 1,
     message: `Logger evt '${evtValue}' has ${segmentCount} segment(s) — minimum 3 required (domain.component.action)`,
     severity: 'error',
     suggestion: `Change to a 3+ segment format, e.g., '${evtValue}.start' or restructure as 'domain.component.action'`,

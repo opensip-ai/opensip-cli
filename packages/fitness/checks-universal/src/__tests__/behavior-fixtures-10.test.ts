@@ -248,6 +248,19 @@ describe('sentry-pii-scrubbing detectors', () => {
     expect(types).toContain('sentry-pii-in-context');
   });
 
+  // Regression: `column: fieldIdx` reported the raw 0-based
+  // String.prototype.indexOf offset instead of the 1-based column ADR-0179
+  // requires, pointing SARIF/report/MCP consumers one character left of the
+  // real PII field name.
+  it('reports a 1-based column for the flagged PII field', async () => {
+    const line = '  Sentry.setUser({ email: email })';
+    const result = await findCheck('sentry-pii-scrubbing').run(cwd, {
+      targetFiles: [join(cwd, 'src/context-pii.ts')],
+    });
+    const piiSignal = result.signals.find((s) => s.metadata.type === 'sentry-pii-in-context');
+    expect(piiSignal?.column).toBe(line.indexOf('email') + 1);
+  });
+
   it('flags a shorthand PII key followed by a closing brace', async () => {
     const result = await findCheck('sentry-pii-scrubbing').run(cwd, {
       targetFiles: [join(cwd, 'src/context-shorthand.ts')],

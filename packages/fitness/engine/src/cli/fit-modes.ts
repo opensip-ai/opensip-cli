@@ -30,6 +30,7 @@ import {
 } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
+import { FITNESS_LAYOUT_KEY } from '../identity.js';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
@@ -51,8 +52,14 @@ type FitRunCompletion = Pick<ToolRunCompletion, 'session'>;
  * Build fit's generic-session contribution from a completed run envelope
  * (host-owned-run-timing Phase 3). The static modes RETURN this; the host run
  * plane persists it after the handler resolves — no tool-side session write.
+ *
+ * Exported so the TTY live runner (`fit-runner.tsx`) shares this exact
+ * `runOutcome` derivation instead of hand-rolling a second session-literal
+ * that omits it — see the `explicit` comment above for the defect that
+ * created (a faulted/degraded interactive run persisting as
+ * passed/failed instead of error/degraded).
  */
-function fitSessionContribution(
+export function fitSessionContribution(
   args: FitOptions,
   envelope: SignalEnvelope,
   runOutcome?: ToolRunOutcome,
@@ -68,7 +75,7 @@ function fitSessionContribution(
   // outlives the terminal.
   const explicit = runOutcome ?? (envelope.verdict.faulted ? 'error' : undefined);
   return {
-    tool: 'fit',
+    tool: FITNESS_LAYOUT_KEY,
     cwd: args.cwd,
     recipe: envelope.recipe,
     score: envelope.verdict.score,

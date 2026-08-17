@@ -274,7 +274,19 @@ function normalizeObject(
     // undefined object values — except we already map free-standing undefined
     // to a sentinel when it appears as a root or array element.
     if (child === undefined) continue;
-    out[key] = normalize(child, depth + 1, seen, limits);
+    // `out[key] = ...` on a plain `{}` invokes Object.prototype's `__proto__`
+    // SETTER when key === '__proto__' — it repoints out's own prototype
+    // instead of creating an own property, silently dropping the field and
+    // making `out` inherit from whatever the input's `__proto__` value was
+    // (e.g. a worker-reported diagnostic field routed through V8's "advanced"
+    // structured-clone serialization, which preserves an own `__proto__` key).
+    // defineProperty always creates a normal own data property.
+    Object.defineProperty(out, key, {
+      value: normalize(child, depth + 1, seen, limits),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
   seen.delete(value);
   return out;

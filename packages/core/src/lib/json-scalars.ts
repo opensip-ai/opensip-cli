@@ -22,7 +22,16 @@ export function projectJsonScalarMetadata(
   let any = false;
   for (const [key, value] of Object.entries(metadata)) {
     if (typeof value === 'string' || typeof value === 'boolean' || isFiniteNumber(value)) {
-      out[key] = value;
+      // `out[key] = value` on a plain `{}` invokes Object.prototype's
+      // `__proto__` setter when key === '__proto__', silently dropping the
+      // metadata field instead of storing it. defineProperty always creates
+      // a normal own data property.
+      Object.defineProperty(out, key, {
+        value,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
       any = true;
     }
   }

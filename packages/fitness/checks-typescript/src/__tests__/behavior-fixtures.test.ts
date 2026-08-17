@@ -583,6 +583,28 @@ describe('logger-event-name-format — branch coverage', () => {
     expect(result.signals.length).toBeGreaterThanOrEqual(2);
   });
 
+  // Regression: `column: evtMatch.index` reported the raw 0-based regex
+  // match offset instead of the 1-based column ADR-0179 requires, pointing
+  // SARIF/report/MCP consumers one character left of the real `evt:` field.
+  it('reports a 1-based column for the flagged evt field', async () => {
+    const line = '    evt: "single",';
+    fx(
+      'src/log/evt-column.ts',
+      [
+        'declare const logger: { info(o: object): void }',
+        'export function f() {',
+        '  logger.info({',
+        line,
+        '    msg: "x",',
+        '  })',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('logger-event-name-format');
+    expect(result.signals).toHaveLength(1);
+    expect(result.signals[0]?.column).toBe(line.indexOf('evt') + 1);
+  });
+
   it('skips template-literal evt values (runtime interpolation)', async () => {
     fx(
       'src/log/evt-template.ts',
