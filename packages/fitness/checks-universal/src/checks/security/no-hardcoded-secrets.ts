@@ -212,8 +212,8 @@ function analyzeLine(
     if (lineHasRedactionPlaceholder(line)) continue;
     violations.push({
       line: lineNumber,
-      // +1: Signal.column is 1-based (ADR-0179); matched.index is the raw
-      // 0-based String.prototype.exec offset.
+      // +1: Signal.column is 1-based; matched.index is the raw 0-based
+      // String.prototype.exec offset.
       column: matched.index + 1,
       message: pattern.message,
       severity: 'error',

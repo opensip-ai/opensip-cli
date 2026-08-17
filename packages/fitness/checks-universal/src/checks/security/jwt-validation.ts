@@ -353,8 +353,8 @@ function structuralViolation(
   return [
     {
       line: (location?.line ?? content.slice(0, start).split('\n').length - 1) + 1,
-      // +1: Signal.column is 1-based (ADR-0179); both `location.character`
-      // (TS's LineAndCharacter API) and `start - lineStart` are 0-based.
+      // +1: Signal.column is 1-based; both `location.character` (TS's
+      // LineAndCharacter API) and `start - lineStart` are 0-based.
       column: (location?.character ?? start - lineStart) + 1,
       message: pattern.message,
       severity: pattern.severity,
@@ -546,7 +546,7 @@ function structuralWeakSecretViolations(
     return [
       {
         line: content.slice(0, literal.start).split('\n').length,
-        // +1: Signal.column is 1-based (ADR-0179); literal.start - lineStart is 0-based.
+        // +1: Signal.column is 1-based; literal.start - lineStart is 0-based.
         column: literal.start - lineStart + 1,
         message: 'JWT secret appears weak (too short) - use a strong random secret',
         severity: 'warning' as const,
@@ -597,7 +597,7 @@ function jwtLineViolations(
       if (!startsInCode(codeLine, result.matchIndex)) continue;
       violations.push({
         line: lineNum + 1,
-        // +1: Signal.column is 1-based (ADR-0179); matchIndex is 0-based.
+        // +1: Signal.column is 1-based; matchIndex is 0-based.
         column: result.matchIndex + 1,
         message: pattern.message,
         severity: pattern.severity,
