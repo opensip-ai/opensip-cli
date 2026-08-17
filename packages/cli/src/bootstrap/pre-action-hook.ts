@@ -272,6 +272,36 @@ export async function prepareLeasedBootstrapPlan(
   );
 }
 
+/**
+ * Propagate config-derived option defaults (`mergeConfigDefaults` — json,
+ * verbose, reportTo, apiKey, exclude) from the matched command onto every
+ * ancestor that ALSO declares the same option (a nested `<tool> <verb>`
+ * child shares its common flags with its tool primary via
+ * `applyCommonFlags`), but only where the ancestor's own flag was never
+ * explicitly supplied (`getOptionValueSource(key) === 'default'`).
+ *
+ * Without this, the merged value lives only on the matched (usually child)
+ * command's option store, while `optsWithGlobals()` — which
+ * `splitActionArgs` reads at dispatch time — applies "global overwrites
+ * local" (Commander's documented semantics): an ancestor's UNTOUCHED
+ * default silently wins over the child's fresh config-merged value, so e.g.
+ * a project's `cli: { json: true }` config default took effect on `fit`
+ * but was silently dropped on `fit recipes`.
+ */
+function propagateConfigDefaultsToAncestors(
+  command: Command,
+  merged: Readonly<Record<string, unknown>>,
+): void {
+  for (let ancestor = command.parent; ancestor; ancestor = ancestor.parent) {
+    const ancestorOpts = ancestor.opts();
+    for (const key of Object.keys(merged)) {
+      if (!(key in ancestorOpts)) continue;
+      if (ancestor.getOptionValueSource(key) !== 'default') continue;
+      ancestorOpts[key] = merged[key];
+    }
+  }
+}
+
 export function installPreActionHook(
   program: Command,
   version: string,
@@ -295,8 +325,22 @@ export function installPreActionHook(
     const inherited = hostEnv.get<string>('OPENSIP_RUN_ID');
     const runId = inherited && inherited.length > 0 ? inherited : generatePrefixedId('run');
     const opts = actionCommand.opts();
-    const cwd = (opts.cwd as string) ?? process.cwd();
-    const cwdExplicit = actionCommand.getOptionValueSource('cwd') === 'cli';
+    // Read the host-owned selection options (`--cwd`/`--config`) from the
+    // globals-merged view, matching `splitActionArgs`'s read of the same
+    // options later in the handler — NOT `actionCommand.opts()`. Both the
+    // tool primary (`fit`) and its nested verb (`fit recipes`) declare
+    // `--cwd`/`--config` (`applyCommonFlags`/`decorateToolPrimary`), and
+    // Commander lets whichever command actually PARSED the flag hold it in
+    // its own `.opts()` — so on a nested command, `actionCommand.opts()` can
+    // read back the child's untouched default (`process.cwd()`, no config)
+    // even though the flag was explicitly passed and consumed by the parent.
+    // `resolveStartupProjectSelection` (below, via `prepareLeasedBootstrapPlan`)
+    // scans raw argv and gets it right regardless, so the two disagreed and
+    // `assertStartupProjectKey` threw "the canonical OpenSIP project root
+    // changed during startup" on every `--cwd`/`--config` nested-verb call.
+    const globalOpts = actionCommand.optsWithGlobals();
+    const cwd = (globalOpts.cwd as string) ?? process.cwd();
+    const cwdExplicit = actionCommand.getOptionValueSourceWithGlobals('cwd') === 'cli';
 
     const prepared = await prepareLeasedBootstrapPlan({
       opts: opts,
@@ -306,7 +350,7 @@ export function installPreActionHook(
       commandName: actionCommand.name(),
       commandPath: commandPath(actionCommand),
       commandScopes,
-      explicitConfigPath: opts.config as string | undefined,
+      explicitConfigPath: globalOpts.config as string | undefined,
       ...(startupRuntimeLease === undefined ? {} : { startupRuntimeLease }),
       ...(startupLeaseEvents === undefined ? {} : { startupLeaseEvents }),
     });
@@ -317,6 +361,7 @@ export function installPreActionHook(
       // authoritative values after stabilization, never tentative defaults.
       // Publication belongs inside the lease-owned failure boundary.
       Object.assign(opts, prepared.plan.opts);
+      propagateConfigDefaultsToAncestors(actionCommand, prepared.plan.opts);
       const { scope } = await executePostBailoutBootstrap({
         plan: prepared.plan,
         runtime,

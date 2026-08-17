@@ -322,6 +322,18 @@ describe('jwt-validation matchers', () => {
     expect(result.signals.length).toBeGreaterThan(0);
   });
 
+  // Regression: `column: result.matchIndex` reported the raw 0-based
+  // String.prototype.indexOf offset instead of the 1-based column ADR-0179
+  // requires, pointing SARIF/report/MCP consumers one character left of the
+  // real `jwt.decode` call.
+  it('reports a 1-based column for the flagged jwt.decode call', async () => {
+    const line = '  const user = jwt.decode(token)';
+    const result = await findCheck('jwt-validation').run(cwd, {
+      targetFiles: [join(cwd, 'src/decode.ts')],
+    });
+    expect(result.signals[0]?.column).toBe(line.indexOf('jwt.decode') + 1);
+  });
+
   it('does not flag verify-in-comment or verify-with-algorithms', async () => {
     const result = await findCheck('jwt-validation').run(cwd, {
       targetFiles: [join(cwd, 'src/safe.ts')],

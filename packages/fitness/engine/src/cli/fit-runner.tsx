@@ -16,10 +16,8 @@ import {
   type ToolRunCompletion,
 } from '@opensip-cli/core';
 
-import { FITNESS_LAYOUT_KEY } from '../identity.js';
-
 import { buildFitVerboseDetail, envelopeToFitRows, type FitTableRow } from './fit/envelope-view.js';
-import { buildFitnessSessionPayload } from './fit/result-builders.js';
+import { fitSessionContribution } from './fit-modes.js';
 import { checkCountLabel, withCheckCountFromProgress } from './fit-runner-progress.js';
 import { ensureChecksLoaded, executeFit, getEnabledCheckCount } from './fit.js';
 
@@ -143,7 +141,10 @@ export async function renderFitLive(
           };
         }
 
-        const { result } = fitResult as { result: RunPresentation };
+        const { result, runOutcome } = fitResult as {
+          result: RunPresentation;
+          runOutcome?: 'degraded';
+        };
         const envelope = result.envelope;
         const verboseDetail = buildFitVerboseDetail(envelope, {
           verbose: args.verbose === true,
@@ -168,14 +169,15 @@ export async function renderFitLive(
             warnings: fitResult.warnings ?? [],
           },
           envelope,
-          session: {
-            tool: FITNESS_LAYOUT_KEY,
-            cwd: args.cwd,
-            recipe: envelope.recipe,
-            score: envelope.verdict.score,
-            passed: envelope.verdict.passed,
-            payload: buildFitnessSessionPayload(envelope),
-          },
+          // Regression: this used to hand-roll a second session-literal that
+          // omitted `runOutcome` entirely, so the host fell back to
+          // `deriveRunOutcome({ passed })` — a degraded/faulted TTY run
+          // persisted as plain 'passed'/'failed', unlike the non-TTY/`--json`/
+          // gate paths (`fitSessionContribution` above), which already derive
+          // it from `fitResult.runOutcome ?? (envelope.verdict.faulted ?
+          // 'error' : undefined)`. Reusing the same helper keeps both paths
+          // from drifting again.
+          session: fitSessionContribution(args, envelope, runOutcome),
         };
       },
     },

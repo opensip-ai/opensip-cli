@@ -1,7 +1,11 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { requireDrizzleHandle } from '@opensip-cli/datastore/internal';
 import { eq, sql } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sessionHostMetrics, sessions, sessionToolPayload } from '../schema/sessions.js';
 import { SessionRepo } from '../session-repo.js';
@@ -115,6 +119,71 @@ describe('SessionRepo — save / get', () => {
     const session = makeSession({ id: 'opaque', tool: 'graph', payload });
     repo.save(session);
     expect(repo.get('opaque')?.payload).toEqual(payload);
+  });
+});
+
+// Regression: SessionReadRepo.list()/get() used to issue three independent
+// bare SQLite statements (sessions page, then a payload batch query, then a
+// host-metrics batch query) with no enclosing transaction. Two concurrent
+// `opensip` processes can share one project DB (backends/shared.ts sets
+// `busy_timeout` for exactly that case), and session-retention pruning is one
+// atomic commit — so a purge landing between two of those bare statements
+// left a session row hydrated with an undefined payload, reported as
+// SESSION.EVIDENCE.UNREADABLE ("corrupt") instead of "concurrently pruned".
+// Wrapping the whole read in one `datastore.transaction()` gives it a single
+// consistent snapshot, mirroring the pattern already used by
+// run-reads.ts/run-evidence-read.ts (and this file's own
+// "holds one read snapshot across a concurrent Session purge" sibling in
+// run-reads.test.ts) for the parent-Run read paths.
+describe('SessionRepo — read-skew across a concurrent purge', () => {
+  it('list() holds one snapshot: a session is either fully hydrated or absent, never payload-less', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'opensip-session-read-snapshot-'));
+    const path = join(directory, 'datastore.sqlite');
+    const reader = DataStoreFactory.open({ backend: 'sqlite', path });
+    const writer = DataStoreFactory.open({ backend: 'sqlite', path });
+    try {
+      const writerRepo = new SessionRepo(writer);
+      writerRepo.save(makeSession({ id: 'ses-a' }));
+      writerRepo.save(makeSession({ id: 'ses-b' }));
+
+      const readerHandle = requireDrizzleHandle(reader);
+      const readerRepo = new SessionRepo(reader);
+      const originalTransaction = readerHandle.transaction.bind(readerHandle);
+      let purged = false;
+      vi.spyOn(readerHandle, 'transaction').mockImplementation((work) =>
+        originalTransaction((tx) => {
+          // Pin the transaction's read snapshot with a throwaway first read
+          // (SQLite's deferred-transaction snapshot is established at the
+          // FIRST read, not at BEGIN) before the concurrent purge commits —
+          // mirrors run-reads.test.ts's "holds one read snapshot" sibling.
+          tx.select({ id: sessions.id }).from(sessions).limit(1).all();
+          if (!purged) {
+            // A second, independent connection to the same file commits a
+            // purge WHILE the reader's transaction is still open.
+            expect(writerRepo.purge(new Date('2099-01-01T00:00:00.000Z'))).toBe(2);
+            purged = true;
+          }
+          return work(tx);
+        }),
+      );
+
+      const results = readerRepo.list();
+      expect(purged).toBe(true);
+      // The reader's snapshot was taken before the purge committed, so both
+      // rows are still fully present — payload included — not silently
+      // hydrated with an undefined payload for the now-deleted rows.
+      expect(results.map((r) => r.id).sort()).toEqual(['ses-a', 'ses-b']);
+      for (const result of results) {
+        expect(result.payload).toEqual(fitnessLikePayload());
+      }
+
+      // A fresh call (fresh transaction) correctly sees the post-purge state.
+      expect(readerRepo.list()).toEqual([]);
+    } finally {
+      writer.close();
+      reader.close();
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
 

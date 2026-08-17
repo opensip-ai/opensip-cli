@@ -70,6 +70,26 @@ describe('filterContent', () => {
       // The identifier `c` inside the innermost expression is code and must survive
       expect(code).toContain('${c}');
     });
+
+    // Regression: a `}` that closes an object literal, block, or arrow body
+    // INSIDE a `${...}` substitution used to be mistaken for the substitution's
+    // own closing brace (the old `templateDepth` counter tracked template
+    // nesting, not brace nesting within the current substitution). That
+    // rescanned the code `}` as a template continuation and desynced the
+    // scanner, silently wiping the rest of the template's real code to
+    // whitespace. Fix tracks brace-nesting depth per open template.
+    it('handles object/block literals inside ${} substitutions — code after the brace is preserved', () => {
+      const src = 'const html = `<ul>${items.map(i => { return i.n; }).join("")}</ul>`;';
+      const { code } = filterContent(src, 'a.ts');
+      expect(code).toContain('.join(');
+      expect(code).not.toContain('</ul>');
+    });
+
+    it('handles an object literal argument inside a ${} substitution', () => {
+      const src = 'const s = `${JSON.stringify({ a: 1 })}`;';
+      const { code } = filterContent(src, 'a.ts');
+      expect(code).toContain('JSON.stringify({ a: 1 })');
+    });
   });
 
   describe('codeNoComments — strings AND comments masked', () => {

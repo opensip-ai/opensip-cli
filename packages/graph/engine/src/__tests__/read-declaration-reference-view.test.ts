@@ -183,6 +183,38 @@ describe('searchDeclarationFacts', () => {
     expect(paged.ok && paged.value.hasMore).toBe(true);
   });
 
+  // Regression: `makeFacet(requested, reasons)` takes `requested` FIRST, but
+  // the grouping facet passed `grouping.reasons.size === 0` — i.e. it claimed
+  // "not requested" exactly when there WAS a truncation reason. Since
+  // `rollupFacets` only aggregates requested facets into the top-level
+  // `complete`/`reasons`, a group-key-cap truncation dropped out of the
+  // top-level summary entirely, so a caller who only checks `coverage.complete`
+  // saw a clean, exhaustive read even though 1 of 501 group keys was dropped.
+  it('surfaces a group-key-cap truncation in the top-level coverage, not just the grouping facet', () => {
+    const manyPackages: SemanticFactBundle = {
+      ...sampleBundle,
+      declarations: Array.from({ length: 501 }, (_, index) => ({
+        ...sampleBundle.declarations[0],
+        declarationId: `d1|pkg${index}|src/types.ts|interface|Foo|000000000000${String(index).padStart(4, '0')}|0000000000000000`,
+        package: `pkg${index}`,
+      })),
+    };
+    const result = searchDeclarationFacts(
+      catalog(manyPackages),
+      { query: 'Foo', match: 'exact', filter, limit: 20, groupBy: 'package' },
+      noMatcher.value,
+    );
+    if (!result.ok) throw new Error('expected ok result');
+    expect(result.value.coverage.grouping).toMatchObject({
+      requested: true,
+      complete: false,
+      truncated: true,
+      reasons: ['group-key-cap'],
+    });
+    expect(result.value.coverage.complete).toBe(false);
+    expect(result.value.coverage.reasons).toContain('group-key-cap');
+  });
+
   it('propagates partial producer coverage reasons', () => {
     const partial: SemanticFactBundle = {
       ...sampleBundle,

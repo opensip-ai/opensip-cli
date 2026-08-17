@@ -304,6 +304,70 @@ describe('CLI e2e', () => {
         rmSync(tempDir, { recursive: true, force: true });
       }
     });
+
+    // Regression: both a tool primary (`fit`) and its nested verb
+    // (`fit recipes`) declare `--cwd`/`--config` (applyCommonFlags /
+    // decorateToolPrimary), and Commander can leave the explicitly-passed
+    // value on either command in the chain depending on parse order. The
+    // pre-action hook used to read `actionCommand.opts()` (the matched
+    // command's OWN local store only), which on a nested verb could still
+    // hold the untouched `process.cwd()` default even though `--cwd` was
+    // explicitly passed and consumed by an ancestor — while
+    // `resolveStartupProjectSelection` (which scans raw argv) correctly
+    // found the real path, so the two disagreed and the pre-action guard
+    // threw "the canonical OpenSIP project root changed during startup".
+    it('--cwd resolves correctly on a nested `<tool> <verb>` command, not just the tool primary', () => {
+      const { stdout, stderr, exitCode } = cli.run(['fit', 'recipes', '--cwd', FIXTURE], {
+        // Spawned from a directory that is NOT the target project, so a
+        // regression here cannot be masked by process.cwd() happening to
+        // already be the right answer.
+        cwd: tmpdir(),
+      });
+      expect(exitCode, JSON.stringify({ stdout, stderr })).toBe(0);
+      expect(stderr).not.toContain('canonical OpenSIP project root changed');
+      expect(stdout).toContain('Available Recipes');
+    });
+
+    it('--config resolves correctly on a nested `<tool> <verb>` command, not just the tool primary', () => {
+      const { stdout, stderr, exitCode } = cli.run(
+        ['fit', 'recipes', '--config', join(FIXTURE, 'opensip-cli.config.yml')],
+        { cwd: FIXTURE },
+      );
+      expect(exitCode, JSON.stringify({ stdout, stderr })).toBe(0);
+      expect(stderr).not.toContain('canonical OpenSIP project root changed');
+      expect(stdout).toContain('Available Recipes');
+    });
+
+    // Regression: `mergeConfigDefaults` publishes the project's `cli:` block
+    // (e.g. `json: true`) onto the matched command's own option store, but a
+    // nested verb shares that flag with its tool primary ancestor. Reading
+    // the effective value via `optsWithGlobals()` (as the dispatch/handler
+    // path does) applies Commander's "global overwrites local" semantics, so
+    // the ancestor's untouched default silently overwrote the freshly
+    // config-merged value — a project's `cli: { json: true }` took effect on
+    // `fit` but was silently dropped on `fit recipes`.
+    it('a `cli: { json: true }` config default takes effect on a nested `<tool> <verb>` command too', () => {
+      const tempDir = join(
+        tmpdir(),
+        `opensip-e2e-nested-json-default-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      );
+      mkdirSync(tempDir, { recursive: true });
+      try {
+        const configSrc = readFileSync(join(FIXTURE, 'opensip-cli.config.yml'), 'utf8');
+        writeFileSync(
+          join(tempDir, 'opensip-cli.config.yml'),
+          `${configSrc}\ncli:\n  json: true\n`,
+        );
+
+        const { stdout, stderr, exitCode } = cli.run(['fit', 'recipes'], { cwd: tempDir });
+        expect(exitCode, JSON.stringify({ stdout, stderr })).toBe(0);
+        const output = JSON.parse(stdout).data;
+        expect(output.type).toBe('list-recipes');
+        expect(Array.isArray(output.recipes)).toBe(true);
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true });
+      }
+    });
   });
 
   describe('sim', () => {

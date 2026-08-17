@@ -163,6 +163,25 @@ describe('DiagnosticsBus', () => {
         workerKind: 'external-tool',
       });
     });
+
+    // Regression: `Object.assign(mergedData, data)` uses [[Set]] on the
+    // target, so a `__proto__` key in `data` invoked Object.prototype's
+    // setter and repointed `mergedData`'s own prototype instead of copying
+    // the field — silently dropping a `__proto__`-keyed data extra.
+    it('preserves a literal `__proto__` key in a data extra instead of dropping it', () => {
+      const bus = new DiagnosticsBus('run_10');
+      const extra = JSON.parse('{"__proto__":"hostile","shardId":"s-1"}') as Record<
+        string,
+        unknown
+      >;
+      bus.emitSubprocessEvent('load', 'debug', 'subprocess.spawn', { runId: 'run_10' }, extra);
+      const [event] = bus.snapshot().events;
+      const data = event.data;
+      expect(data).toBeDefined();
+      expect(Object.getPrototypeOf(data)).toBe(Object.prototype);
+      expect(Object.hasOwn(data ?? {}, '__proto__')).toBe(true);
+      expect((data as Record<string, unknown>).shardId).toBe('s-1');
+    });
   });
 
   describe('ingest', () => {

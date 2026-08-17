@@ -153,4 +153,18 @@ describe('toJsonRecord', () => {
     });
     expect(() => JSON.stringify(out)).not.toThrow();
   });
+
+  // Regression: `out[key] = ...` on a plain `{}` invokes Object.prototype's
+  // `__proto__` SETTER when key === '__proto__' — it repoints `out`'s own
+  // prototype instead of creating an own property, so the field is silently
+  // dropped from the JSON-safe tree (contradicting this module's own
+  // "normalize-and-keep, never drop" contract) and the returned value is no
+  // longer a plain object.
+  it('preserves a literal `__proto__` key as an own property instead of dropping it', () => {
+    const input = JSON.parse('{"__proto__":{"leaked":1},"b":2}') as Record<string, unknown>;
+    const out = toJsonRecord(input);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(Object.hasOwn(out, '__proto__')).toBe(true);
+    expect((out as Record<string, unknown>).leaked).toBeUndefined();
+  });
 });

@@ -132,6 +132,49 @@ describe('runHostGateDispatch', () => {
     expect(result).toEqual({ mode: 'compare', result: gateResult, runFailed: true });
   });
 
+  // Regression: a faulted run (a unit crashed, so `envelope.verdict.faulted`
+  // is true) produces no signals for the crashed check, so the diff against
+  // the baseline looks like every previously-recorded finding for that check
+  // was "resolved" — even though nothing was actually fixed. The default
+  // verdict only consulted `result.degraded`, never `envelope.verdict.faulted`,
+  // so `--gate-compare` silently reported success (`runFailed: false`) on a
+  // faulted run with resolved findings and a non-degraded compare result.
+  it('fails the default gate-compare verdict when the envelope is faulted, even if the compare result is not degraded', async () => {
+    const gateResult: GateCompareResult = {
+      added: [],
+      resolved: [
+        { ruleId: 'fit:no-console-log', filePath: 'a.ts', line: 1 } as never,
+        { ruleId: 'fit:no-console-log', filePath: 'b.ts', line: 2 } as never,
+      ],
+      unchanged: [],
+      degraded: false,
+    };
+    const { cli, render, deliverSignals } = makeCli(gateResult);
+    const envelope: SignalEnvelope = {
+      ...envelopeOf(false),
+      verdict: {
+        score: 0,
+        passed: false,
+        faulted: true,
+        summary: { total: 0, passed: 0, failed: 0, errors: 1, warnings: 0 },
+      },
+    };
+
+    const result = await runHostGateDispatch({
+      cli,
+      tool: 'fitness',
+      envelope,
+      mode: 'compare',
+      deliver: { cwd: '/repo' },
+      renderSaveLines: () => [],
+      renderCompareLines: ({ runFailed }) => [`runFailed=${String(runFailed)}`],
+    });
+
+    expect(render).toHaveBeenCalledWith({ type: 'gate-done', lines: ['runFailed=true'] });
+    expect(deliverSignals).toHaveBeenCalledWith(envelope, { cwd: '/repo', runFailed: true });
+    expect(result).toEqual({ mode: 'compare', result: gateResult, runFailed: true });
+  });
+
   it('allows a custom gate-compare verdict override', async () => {
     const gateResult = compareResult(true);
     const { cli, deliverSignals } = makeCli(gateResult);

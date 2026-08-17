@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-24T19:10:53.310Z",
+  "generatedAt": "2026-08-17T18:29:19.603Z",
   "repoRef": "main",
   "layerRules": {
     "budgetGate": "packages/**/src minus __tests__/, *.test.ts, __fixtures__/; excludes dist/; includes checks-* and test-support",
@@ -25,7 +25,7 @@
   "layers": {
     "budget-gate": {
       "fitness": {
-        "total": 250,
+        "total": 251,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -54,7 +54,7 @@
           "no-generic-error": 4,
           "numeric-validation": 12,
           "fitness-check-architecture": 4,
-          "unsafe-secret-comparison": 8,
+          "unsafe-secret-comparison": 9,
           "canonical-result-usage": 3,
           "logging-standards": 3,
           "error-handling-quality": 2,
@@ -113,7 +113,7 @@
           "fitness/engine": 12,
           "graph/engine": 12,
           "graph/graph-typescript": 1,
-          "languages/lang-typescript": 3,
+          "languages/lang-typescript": 4,
           "mcp": 10,
           "shared-analysis": 2,
           "simulation": 3,
@@ -129,7 +129,7 @@
     },
     "product-runtime": {
       "fitness": {
-        "total": 77,
+        "total": 78,
         "bySlug": {
           "missing-type-exports": 4,
           "async-waterfall-detection": 15,
@@ -155,7 +155,7 @@
           "eslint-backend": 1,
           "clean-code-naming-quality": 1,
           "env-via-registry": 2,
-          "unsafe-secret-comparison": 3,
+          "unsafe-secret-comparison": 4,
           "hot-paths-require-spans": 1,
           "no-raw-fetch": 1,
           "array-validation": 1
@@ -169,7 +169,7 @@
           "fitness/engine": 12,
           "graph/engine": 12,
           "graph/graph-typescript": 1,
-          "languages/lang-typescript": 3,
+          "languages/lang-typescript": 4,
           "mcp": 10,
           "shared-analysis": 2,
           "simulation": 3,
@@ -466,13 +466,13 @@
     }
   },
   "summary": {
-    "budgetGateFitness": 250,
+    "budgetGateFitness": 251,
     "budgetGateFitnessSlugs": 73,
-    "productRuntimeFitness": 77,
+    "productRuntimeFitness": 78,
     "productRuntimeFitnessSlugs": 28,
     "productRuntimeGraph": 32,
     "productRuntimeGraphRuleIds": 3,
-    "productRuntimeCombined": 109,
+    "productRuntimeCombined": 110,
     "checkPackageFitness": 171,
     "testSupportFitness": 2,
     "testsFitness": 62,
@@ -492,10 +492,10 @@
       "budgetGateSafetyTotal": 234
     },
     "delta": {
-      "productRuntimeFitness": -228,
+      "productRuntimeFitness": -227,
       "productRuntimeGraph": 25,
-      "productRuntimeCombined": -203,
-      "budgetGateFitness": -292,
+      "productRuntimeCombined": -202,
+      "budgetGateFitness": -291,
       "checkPackageFitness": -63,
       "productRuntimeSafetyTotal": -183,
       "budgetGateSafetyTotal": -232

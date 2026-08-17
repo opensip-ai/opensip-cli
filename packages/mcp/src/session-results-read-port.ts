@@ -14,6 +14,7 @@
  * `mcp-results-no-rerun` invariant). Every method returns `Result<T, E>`.
  */
 
+import { AgentFilterParseError } from '@opensip-cli/contracts';
 import { err, logger, mapWithConcurrency, ok } from '@opensip-cli/core';
 import { BaselineRepo } from '@opensip-cli/datastore';
 import {
@@ -141,13 +142,31 @@ export class SessionResultsReadPort implements ResultsReadPort {
   async showRun(opts: ShowRunOptions): Promise<Result<McpResultReplay<ShowRunData>, McpReadError>> {
     const scoped = this.resolveScopedSession(opts.ref, opts.tool);
     if (!scoped.ok) return err(scoped.error);
-    const outcome = await resolveAndReplaySession(this.store, {
-      ref: opts.ref,
-      ...(opts.tool ? { tool: opts.tool } : {}),
-      replayFor: this.replayFor,
-      ...(opts.filters?.length ? { filters: opts.filters } : {}),
-      ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
-    });
+    let outcome;
+    try {
+      outcome = await resolveAndReplaySession(this.store, {
+        ref: opts.ref,
+        ...(opts.tool ? { tool: opts.tool } : {}),
+        replayFor: this.replayFor,
+        ...(opts.filters?.length ? { filters: opts.filters } : {}),
+        ...(this.projectRoot === undefined ? {} : { cwdWithin: this.projectRoot }),
+      });
+    } catch (error) {
+      // `resolveAndReplaySession`'s own docstring promises "never throws
+      // across the domain boundary" — but its `applyAgentFilters` call sits
+      // outside its try/catch, so an invalid agent filter token (e.g. a typo
+      // in `filters`) throws `AgentFilterParseError` straight out of this
+      // await. The CLI (`sessions show`) deliberately lets that reach its own
+      // host error boundary for a clean exit 2 — so the fix belongs at this
+      // MCP-specific boundary, not inside `resolveAndReplaySession` (which
+      // would also swallow it there). Without this, the thrown error escaped
+      // to the MCP SDK as a non-JSON `isError` text response, breaking every
+      // other MCP failure's `{"error":{"code":...}}` machine-readable contract.
+      if (error instanceof AgentFilterParseError) {
+        return err(readError('invalid-input', error.message));
+      }
+      throw error;
+    }
     if (!outcome.ok) return err(fromSessionReason(outcome.reason, outcome.detail));
     const { session, replay, originalSignalCount } = outcome;
     if (!this.isSessionInScope(session)) return this.foreignSessionNotFound(opts.ref);

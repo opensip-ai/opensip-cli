@@ -179,11 +179,17 @@ export function projectEntityDetail(
       return name === undefined ? [] : [name];
     });
     if (rawDecorators.length > MAX_DECORATORS) reasons.add('entity-decorator-cap');
-    const feature =
-      features?.function.get(occurrence.bodyHash) ??
-      catalog.features?.function?.[occurrence.bodyHash];
-    const testReachable = feature?.testReachable;
-    const reachableOnlyFromTests = feature?.reachableOnlyFromTests;
+    // Per-column fallback, not per-row: a caller-requested feature set (e.g.
+    // MCP's `generationFeatures`) can derive a row for this bodyHash that
+    // simply never asked for `testReachable`/`reachableOnlyFromTests` — that
+    // row is still *defined*, so a row-level `??` never falls through to the
+    // persisted catalog features that a full `opensip graph` run wrote for
+    // those two specific columns.
+    const derivedFeature = features?.function.get(occurrence.bodyHash);
+    const persistedFeature = catalog.features?.function?.[occurrence.bodyHash];
+    const testReachable = derivedFeature?.testReachable ?? persistedFeature?.testReachable;
+    const reachableOnlyFromTests =
+      derivedFeature?.reachableOnlyFromTests ?? persistedFeature?.reachableOnlyFromTests;
     if (
       (testReachable !== undefined && typeof testReachable !== 'boolean') ||
       (reachableOnlyFromTests !== undefined && typeof reachableOnlyFromTests !== 'boolean')

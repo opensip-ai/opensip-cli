@@ -64,6 +64,19 @@ describe('stripStrings (C/C++)', () => {
     expect(stripStrings(String.raw`char c = '\n';`)).toContain(String.raw`'\n'`);
   });
 
+  // Regression: a C++14 digit separator (`1'000`) was mistaken for a
+  // char-literal opener, so the scanner hunted the rest of the line for a
+  // closing `'` — pairing with the apostrophe inside a later string literal
+  // (`it's`) and consuming everything up to its closing quote, leaving the
+  // real string body unstripped and blanking the real code after it.
+  it('does not treat a digit separator as a char-literal opener', () => {
+    const src = 'int n = 1\'000; log("it\'s a TODO %d", n);';
+    const out = stripStrings(src);
+    expect(out).toContain("1'000");
+    expect(out).toContain(', n);');
+    expect(out).not.toContain('TODO');
+  });
+
   it('handles u8R, uR, UR, LR raw-string prefixes', () => {
     const variants = [
       'auto s = u8R"foo(payload)foo";',

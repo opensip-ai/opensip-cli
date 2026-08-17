@@ -96,11 +96,48 @@ function collectFunctions(
 ): void {
   const candidate = candidateFor(node, ctx, enclosingClass);
   if (candidate) out.push(candidate);
-  const nextClass =
-    ts.isClassDeclaration(node) || ts.isClassExpression(node)
-      ? (node.name?.text ?? '<anon-class>')
-      : enclosingClass;
+  const nextClass = nextEnclosingClass(node, candidate !== undefined, enclosingClass);
   ts.forEachChild(node, (child) => collectFunctions(child, ctx, nextClass, out));
+}
+
+/**
+ * Mirrors graph-typescript's walk.ts: descending into a function/method BODY
+ * leaves the class scope (a function nested inside a method is a local, not
+ * a member) — the threaded class resets to undefined so `classify` falls back
+ * to `findEnclosingClassName`'s raw-AST-parent walk (below), which recovers a
+ * NAMED enclosing class across the function boundary but correctly yields
+ * `undefined` — not the `<anon-class>` sentinel — for an anonymous class
+ * ancestor. A class node itself is never occurrence-producing, so the class
+ * branch always takes precedence over this reset for its own children.
+ */
+function nextEnclosingClass(
+  node: ts.Node,
+  producedCandidate: boolean,
+  enclosingClass: string | undefined,
+): string | undefined {
+  if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
+    return node.name?.text ?? '<anon-class>';
+  }
+  return producedCandidate ? undefined : enclosingClass;
+}
+
+/**
+ * Walk raw AST parent pointers (ignoring function boundaries) to the nearest
+ * enclosing class, exactly mirroring
+ * `graph-typescript/inventory-helpers/enclosing-class.ts`. Returns `undefined`
+ * — not a `'<anon-class>'` sentinel — for an anonymous class ancestor, so a
+ * caller's `?? '<anon-class>'` fallback (if any) only fires when there is
+ * truly no enclosing class at all.
+ */
+function findEnclosingClassName(node: ts.Node): string | undefined {
+  let parent: ts.Node | undefined = node.parent;
+  while (parent) {
+    if (ts.isClassDeclaration(parent) || ts.isClassExpression(parent)) {
+      return parent.name?.text;
+    }
+    parent = parent.parent;
+  }
+  return undefined;
 }
 
 function candidateFor(
@@ -153,8 +190,8 @@ function classify(
   projectRel: string,
 ): Shape | undefined {
   const base = projectRel.replace(/\.(?:[cm]?ts|tsx|[cm]?js|jsx)$/, '');
-  const inClass = (name: string): string =>
-    enclosingClass ? `${base}.${enclosingClass}.${name}` : `${base}.${name}`;
+  const inClass = (name: string, cls: string | undefined): string =>
+    cls ? `${base}.${cls}.${name}` : `${base}.${name}`;
 
   if (ts.isFunctionDeclaration(node)) {
     const name = functionDeclName(node);
@@ -163,7 +200,11 @@ function classify(
       : { kind: 'function-declaration', simpleName: name, qualifiedName: `${base}.${name}` };
   }
   if (ts.isConstructorDeclaration(node)) {
-    const className = enclosingClass ?? '<anon-class>';
+    // A constructor is always a direct class-body child (never nested inside
+    // another function first), so `enclosingClass` is already set by the
+    // class branch above; the walk fallback mirrors graph's
+    // constructor-declaration.ts for parity but is not reachable in practice.
+    const className = enclosingClass ?? findEnclosingClassName(node) ?? '<anon-class>';
     return {
       kind: 'constructor',
       simpleName: className,
@@ -173,15 +214,19 @@ function classify(
   if (ts.isMethodDeclaration(node) && node.body) {
     const name = methodName(node, ctxSourceFile(node));
     if (name === undefined) return undefined;
-    return { kind: 'method', simpleName: name, qualifiedName: inClass(name) };
+    const resolvedClass = enclosingClass ?? findEnclosingClassName(node);
+    return { kind: 'method', simpleName: name, qualifiedName: inClass(name, resolvedClass) };
   }
-  if (ts.isGetAccessor(node)) return accessorShape(node, 'getter', inClass);
-  if (ts.isSetAccessor(node)) return accessorShape(node, 'setter', inClass);
+  if (ts.isGetAccessor(node)) return accessorShape(node, 'getter', enclosingClass, inClass);
+  if (ts.isSetAccessor(node)) return accessorShape(node, 'setter', enclosingClass, inClass);
   if (ts.isClassStaticBlockDeclaration(node)) {
+    // A static block is also always a direct class-body child, so
+    // `enclosingClass` is already correctly threaded here (mirrors graph's
+    // class-static-init.ts, which uses `ctx.enclosingClass` with no fallback).
     return {
       kind: 'function-declaration',
       simpleName: '<static-init>',
-      qualifiedName: inClass('<static-init>'),
+      qualifiedName: inClass('<static-init>', enclosingClass),
     };
   }
   return undefined;
@@ -243,11 +288,13 @@ function accessorName(node: ts.AccessorDeclaration): string | undefined {
 function accessorShape(
   node: ts.AccessorDeclaration,
   kind: FunctionKind,
-  inClass: (name: string) => string,
+  enclosingClass: string | undefined,
+  inClass: (name: string, cls: string | undefined) => string,
 ): Shape | undefined {
   const name = accessorName(node);
   if (name === undefined) return undefined;
-  return { kind, simpleName: name, qualifiedName: inClass(name) };
+  const resolvedClass = enclosingClass ?? findEnclosingClassName(node);
+  return { kind, simpleName: name, qualifiedName: inClass(name, resolvedClass) };
 }
 
 function ctxSourceFile(node: ts.Node): ts.SourceFile {

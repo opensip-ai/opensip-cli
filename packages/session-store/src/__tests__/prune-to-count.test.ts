@@ -159,7 +159,11 @@ describe('SessionRepo bounded maintenance batches', () => {
       repo.save(makeSession('b', 2));
       const handle = requireDrizzleHandle(datastore);
       const originalTransaction = handle.transaction.bind(handle);
-      vi.spyOn(handle, 'transaction').mockImplementation((fn) =>
+      // `mockImplementationOnce`, not `mockImplementation`: SessionReadRepo.get()
+      // also runs inside its own `datastore.transaction()` call (session
+      // read-skew fix), so a blanket mock here would make the post-failure
+      // read assertions below throw too, not just the batch under test.
+      vi.spyOn(handle, 'transaction').mockImplementationOnce((fn) =>
         originalTransaction((tx) => {
           fn(tx);
           throw new Error('session retention transaction failed');

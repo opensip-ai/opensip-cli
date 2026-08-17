@@ -90,7 +90,8 @@ function analyze(content: string, filePath: string): CheckViolation[] {
       if (afterField.startsWith(':') || afterField.startsWith(',') || afterField.startsWith('}')) {
         violations.push({
           line: i + 1,
-          column: fieldIdx,
+          // +1: Signal.column is 1-based (ADR-0179); fieldIdx is 0-based.
+          column: fieldIdx + 1,
           message: `PII field '${field}' passed to Sentry context — may violate GDPR/CCPA`,
           severity: 'warning',
           suggestion: `Scrub or hash the '${field}' field before sending to Sentry. Consider using Sentry's data scrubbing settings or a beforeSend callback.`,
