@@ -97,6 +97,34 @@ describe('FitnessRecipeRegistry', () => {
     expect(reg.getOverriddenBuiltIns()).toEqual([]);
   });
 
+  it('isOverridden / getOverriddenBuiltIns / listForDisplay flip once a built-in is overwritten', () => {
+    const reg = new FitnessRecipeRegistry();
+    const builtIn = reg.getByName('default');
+    expect(builtIn).toBeDefined();
+    reg.register(
+      { ...stub(builtIn!.id, 'default'), description: 'replaced' },
+      { allowOverwrite: true },
+    );
+
+    expect(reg.isOverridden('default')).toBe(true);
+    expect(reg.getOverriddenBuiltIns()).toEqual(['default']);
+    expect(reg.listForDisplay().find((d) => d.name === 'default')?.overridesBuiltIn).toBe(true);
+  });
+
+  it('reset clears override tracking along with the overriding recipe', () => {
+    const reg = new FitnessRecipeRegistry();
+    const builtIn = reg.getByName('default');
+    reg.register(
+      { ...stub(builtIn!.id, 'default'), description: 'replaced' },
+      { allowOverwrite: true },
+    );
+    expect(reg.isOverridden('default')).toBe(true);
+
+    reg.reset();
+    expect(reg.isOverridden('default')).toBe(false);
+    expect(reg.getOverriddenBuiltIns()).toEqual([]);
+  });
+
   it('clear removes everything', () => {
     const reg = new FitnessRecipeRegistry();
     reg.clear();

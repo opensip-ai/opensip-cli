@@ -298,6 +298,17 @@ describe('auth-middleware-coverage', () => {
         '}',
       ].join('\n'),
     );
+    // An unprotected route immediately followed by a protected one — the
+    // second route's auth keyword must not leak backward into the first
+    // route's context window and suppress its violation.
+    writeFixture(
+      cwd,
+      'src/routes/adjacent.ts',
+      [
+        "router.get('/admin/users', listUsers);",
+        "router.post('/admin/login', authMiddleware, login);",
+      ].join('\n'),
+    );
   });
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
@@ -328,6 +339,16 @@ describe('auth-middleware-coverage', () => {
       targetFiles: [join(cwd, 'src/health/health.ts')],
     });
     expect(result.signals.length).toBe(0);
+  });
+
+  it('still flags an unprotected route immediately followed by a protected one', async () => {
+    const result = await findCheck('auth-middleware-coverage').run(cwd, {
+      targetFiles: [join(cwd, 'src/routes/adjacent.ts')],
+    });
+    // Only the first (unprotected) route should be flagged — the second
+    // route's `authMiddleware` must not leak backward and suppress it.
+    expect(result.signals.length).toBe(1);
+    expect(result.signals[0]?.line).toBe(1);
   });
 });
 

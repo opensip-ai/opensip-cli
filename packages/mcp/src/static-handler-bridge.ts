@@ -147,12 +147,26 @@ export function dedupeStaticHandlerRefs(
 export function preflightStaticHandlerRef(
   ref: StaticHandlerRef,
 ): StaticHandlerBridgeOutcome | undefined {
-  if (
-    ref.owner === 'tool' &&
-    ref.admittedPackageIdentity !== undefined &&
-    ref.package !== ref.admittedPackageIdentity &&
-    !isReviewedCrossPackage(ref)
-  ) {
+  if (ref.owner !== 'tool' || isReviewedCrossPackage(ref)) return undefined;
+
+  if (ref.admittedPackageIdentity === undefined) {
+    // No admitted npm package identity to compare against (e.g. an authored
+    // project-local/user-global tool, which is never admitted with a
+    // `packageName`). The claim is unverifiable, not automatically
+    // legitimate — treat it the same as a mismatch instead of silently
+    // skipping the check (fail-open would let such a tool claim a
+    // staticHandler in any package it likes).
+    return {
+      ref,
+      status: 'provenance-mismatch',
+      claimProvenance: CLAIM_PROVENANCE_AUTHOR_DECLARED,
+      matchBasis: MATCH_BASIS_AUTHOR_DECLARED,
+      confidence: 'low',
+      reason: 'admitted-package-identity-unknown',
+    };
+  }
+
+  if (ref.package !== ref.admittedPackageIdentity) {
     return {
       ref,
       status: 'provenance-mismatch',
@@ -162,6 +176,7 @@ export function preflightStaticHandlerRef(
       reason: 'claimed-package-differs-from-admitted-plugin-identity',
     };
   }
+
   return undefined;
 }
 

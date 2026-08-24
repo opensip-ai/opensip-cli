@@ -233,6 +233,17 @@ describe('scanLineComment', () => {
     expect(result.end).toBe(src.length);
   });
 
+  it('splices on a double trailing backslash too — only the last backslash before the newline matters (phase-2 has no escape concept)', () => {
+    const src = '// a\\\\\nb\nint x = 1;';
+    //              0 1 2 3 4 5 6 7 8 9
+    const result = scanLineComment(src, 0, { allowLineContinuation: true });
+    // The newline right after the two backslashes still splices (deleting
+    // just the adjacent backslash + newline); the comment continues to the
+    // second \n.
+    expect(src[result.end]).toBe('\n');
+    expect(result.end).toBe(src.indexOf('\n', src.indexOf('b')));
+  });
+
   it('scans a line comment that starts mid-source', () => {
     const src = 'x = 1; // tail comment\nnext';
     const start = src.indexOf('//');

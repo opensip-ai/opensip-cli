@@ -17,7 +17,12 @@
  * module just gives the concern its own home and a narrow, testable surface.
  */
 
-import { EXIT_CODES, type CommandResult, type SignalEnvelope } from '@opensip-cli/contracts';
+import {
+  EXIT_CODES,
+  type AgentFilteredResult,
+  type CommandResult,
+  type SignalEnvelope,
+} from '@opensip-cli/contracts';
 import { logger as defaultLogger, type Logger, type ToolCliContext } from '@opensip-cli/core';
 
 import {
@@ -32,6 +37,29 @@ import { deriveFindingsExitCode } from './deliver-envelope.js';
 
 /** Structured-log `module` tag for the output plane. */
 const MODULE_TAG = 'cli:output-plane';
+
+/**
+ * `emitJson`/`emitRaw` are generic seams that carry arbitrary tool payloads,
+ * but the agent-filtered `--filter`/`--top`/`--raw` path (ADR-0085) wraps a
+ * `SignalEnvelope` inside an `{ type: 'agent-filtered', envelope, ... }`
+ * shape and hands it to one of these two seams instead of `emitEnvelope` —
+ * the only other seam that stamps `declaredInputs`. Detect that shape so the
+ * nested envelope is stamped here too, keeping `declaredInputs` present
+ * regardless of which flags produced the JSON.
+ */
+function isAgentFilteredResult(value: unknown): value is AgentFilteredResult {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { type?: unknown }).type === 'agent-filtered' &&
+    'envelope' in value
+  );
+}
+
+function stampAgentFilteredEnvelope(value: unknown): unknown {
+  if (!isAgentFilteredResult(value)) return value;
+  return { ...value, envelope: stampDeclaredInputs(value.envelope) };
+}
 
 /** Stable dependencies the output plane captures. */
 export interface OutputPlaneDeps {
@@ -72,7 +100,8 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
     // completely swallowed by the `void` (they surface in logs and as
     // unhandled-rejection diagnostics instead of silent loss).
     emitJson: (value) => {
-      renderOutcome(outcomeFromResult(value, exitCode ?? EXIT_CODES.SUCCESS), {
+      const stamped = stampAgentFilteredEnvelope(value);
+      renderOutcome(outcomeFromResult(stamped, exitCode ?? EXIT_CODES.SUCCESS), {
         jsonRequested: true,
         render: deps.render,
       }).catch((error) => {
@@ -147,7 +176,7 @@ export function createOutputPlane(deps: OutputPlaneDeps): OutputPlane {
     // declares `output:'raw-stream'` (e.g. `sessions show --raw`). The single
     // sanctioned write lives in `renderRaw` (the one stdout-JSON seam), so the
     // command body never hand-rolls `process.stdout.write(JSON.stringify(...))`.
-    emitRaw: (value) => renderRaw(value),
+    emitRaw: (value) => renderRaw(stampAgentFilteredEnvelope(value)),
   };
 
   return {

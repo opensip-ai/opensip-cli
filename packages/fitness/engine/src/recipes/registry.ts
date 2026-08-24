@@ -58,6 +58,9 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
       allowOverwrite: options?.allowOverwrite ?? false,
       throwOnDuplicate: !(options?.allowOverwrite ?? false),
     });
+    if ((options?.allowOverwrite ?? false) && isBuiltInRecipe(recipe.name)) {
+      this._overriddenBuiltIns.add(recipe.name);
+    }
   }
 
   /** Check whether a built-in recipe has been overridden by a user recipe */
@@ -73,6 +76,7 @@ export class FitnessRecipeRegistry extends RecipeRegistry<FitnessRecipe> {
   /** Clear all recipes and re-register built-in recipes */
   reset(): void {
     this.clear();
+    this._overriddenBuiltIns.clear();
     this.registerBuiltInRecipes();
   }
 

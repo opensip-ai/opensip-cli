@@ -143,6 +143,46 @@ describe('createOutputPlane — emit seams', () => {
     expect(parsed.status).toBeUndefined();
   });
 
+  it("emitJson stamps declaredInputs on an agent-filtered result's nested envelope", () => {
+    const plane = createOutputPlane({ render: () => Promise.resolve() });
+    const { out, restore } = captureStdout();
+    try {
+      plane.emits.emitJson({
+        type: 'agent-filtered',
+        envelope: envelope(true),
+        filtersApplied: ['errors-only'],
+        originalSignalCount: 0,
+        returnedSignalCount: 0,
+      });
+    } finally {
+      restore();
+    }
+    const parsed = JSON.parse(out[0]) as {
+      data?: { envelope?: { declaredInputs?: { cliVersion?: string } } };
+    };
+    expect(parsed.data?.envelope?.declaredInputs?.cliVersion).toBeDefined();
+  });
+
+  it("emitRaw stamps declaredInputs on an agent-filtered result's nested envelope", () => {
+    const plane = createOutputPlane({ render: () => Promise.resolve() });
+    const { out, restore } = captureStdout();
+    try {
+      plane.emits.emitRaw({
+        type: 'agent-filtered',
+        envelope: envelope(true),
+        filtersApplied: [],
+        originalSignalCount: 0,
+        returnedSignalCount: 0,
+      });
+    } finally {
+      restore();
+    }
+    const parsed = JSON.parse(out[0]) as {
+      envelope?: { declaredInputs?: { cliVersion?: string } };
+    };
+    expect(parsed.envelope?.declaredInputs?.cliVersion).toBeDefined();
+  });
+
   it('emitEnvelope nests the envelope under .envelope in human-render-inert json mode', () => {
     const rendered: CommandResult[] = [];
     const plane = createOutputPlane({
