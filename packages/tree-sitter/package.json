@@ -39,10 +39,10 @@
   },
   "dependencies": {
     "@opensip-cli/core": "workspace:*",
-    "web-tree-sitter": "0.26.11"
+    "web-tree-sitter": "0.26.12"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

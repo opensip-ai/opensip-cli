@@ -30,6 +30,6 @@
   "devDependencies": {
     "@opensip-cli/test-support": "workspace:*",
     "@types/node": "^24.13.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }

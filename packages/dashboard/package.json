@@ -48,9 +48,9 @@
     "@types/node": "^24.13.3",
     "cytoscape": "3.34.0",
     "cytoscape-dagre": "4.0.0",
-    "esbuild": "^0.28.1",
+    "esbuild": "^0.28.2",
     "jsdom": "^29.1.1",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
