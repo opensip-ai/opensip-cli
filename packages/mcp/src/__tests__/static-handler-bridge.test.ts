@@ -107,6 +107,31 @@ describe('preflightStaticHandlerRef', () => {
     expect(mismatch?.status).toBe('provenance-mismatch');
   });
 
+  it('rejects a tool-owned claim with no admitted package identity (authored/project-local tool)', () => {
+    // Authored tools (project-local, user-global) are admitted with no
+    // `packageName` — `admittedPackageIdentity` is absent, not merely equal
+    // to the claim. This must fail closed rather than skip the check, or
+    // any authored tool could claim a staticHandler binding to code in an
+    // unrelated package and have it reported as `resolved`.
+    const unverifiable = preflightStaticHandlerRef(
+      ref({
+        package: '@opensip-cli/contracts',
+        admittedPackageIdentity: undefined,
+        owner: 'tool',
+      }),
+    );
+    expect(unverifiable?.status).toBe('provenance-mismatch');
+    expect(unverifiable?.reason).toBe('admitted-package-identity-unknown');
+  });
+
+  it('matchStaticHandlerCandidates never resolves an authored tool claim with no admitted identity', () => {
+    const outcome = matchStaticHandlerCandidates(
+      ref({ package: '@opensip-cli/contracts', admittedPackageIdentity: undefined, owner: 'tool' }),
+      [candidate({ package: '@opensip-cli/contracts' })],
+    );
+    expect(outcome.status).toBe('provenance-mismatch');
+  });
+
   it('allows reviewed first-party shared mappings across packages', () => {
     const shared = REVIEWED_CROSS_PACKAGE_HANDLERS[0];
     const allowed = preflightStaticHandlerRef(

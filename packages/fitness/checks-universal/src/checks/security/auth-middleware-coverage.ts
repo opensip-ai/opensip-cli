@@ -113,6 +113,29 @@ function isPublicRoute(line: string): boolean {
 // Paths to exclude from checking
 const PUBLIC_ROUTE_PATTERNS = ['/health/', '/status/'];
 
+/** How many lines ahead of a route line the auth-middleware context window may span. */
+const ROUTE_CONTEXT_WINDOW = 5;
+
+/**
+ * Build the auth-detection context for a route line: the route line itself
+ * plus up to `ROUTE_CONTEXT_WINDOW - 1` following lines, so a multi-line
+ * call like `router.get('/x',\n  authMiddleware,\n  handler)` is still
+ * detected as authenticated. Stops before any line that itself starts a new
+ * route definition — otherwise a protected route immediately following an
+ * unprotected one leaks its auth keyword backward into the unprotected
+ * route's context, silently suppressing a real violation.
+ */
+function buildRouteContext(lines: readonly string[], lineNum: number): string {
+  const windowLines = [lines[lineNum] ?? ''];
+  const end = Math.min(lineNum + ROUTE_CONTEXT_WINDOW, lines.length);
+  for (let i = lineNum + 1; i < end; i++) {
+    const candidate = lines[i] ?? '';
+    if (matchFastifyRoute(candidate) ?? matchExpressRoute(candidate)) break;
+    windowLines.push(candidate);
+  }
+  return windowLines.join(' ');
+}
+
 /**
  * Check if content contains route-defining framework references
  */
@@ -204,8 +227,8 @@ export const authMiddlewareCoverage = defineCheck({
     for (let lineNum = 0; lineNum < lines.length; lineNum++) {
       const line = lines[lineNum] ?? '';
 
-      // Get context (current line + next few lines)
-      const context = lines.slice(lineNum, lineNum + 5).join(' ');
+      // Get context (current line + next few lines, stopping before the next route)
+      const context = buildRouteContext(lines, lineNum);
 
       // Skip comments
       const trimmed = line.trim();

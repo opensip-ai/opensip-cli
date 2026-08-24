@@ -149,29 +149,22 @@ export function scanLineComment(
 }
 
 /**
- * Returns true when the position immediately before `newlinePos` is an
- * unescaped backslash — i.e. the count of consecutive backslashes ending
- * at `newlinePos - 1` is odd. The C/C++ phase-2 translation rule treats
- * a single trailing backslash as a line splice, but `\\<newline>` is an
- * escaped backslash with no splice. A single-character lookback at
- * `src[i - 1] === '\\'` cannot tell the two apart and would consume the
- * next physical line as part of the comment incorrectly.
- *
- * `bodyStart` bounds the back-walk so we do not count backslashes from
- * before the `//` opener.
+ * Returns true when the position immediately before `newlinePos` is a
+ * backslash. Per the C/C++ phase-2 translation rule, a splice is a
+ * mechanical deletion of "a backslash immediately followed by a
+ * newline" — there is no escape concept at this phase, so only the
+ * single backslash adjacent to the newline matters. Any additional
+ * backslashes further back are unrelated literal characters and do not
+ * change whether this newline splices (`bodyStart` just bounds the
+ * lookback so we never read before the `//` opener).
  */
 function hasUnescapedTrailingBackslash(
   src: string,
   bodyStart: number,
   newlinePos: number,
 ): boolean {
-  let count = 0;
-  let k = newlinePos - 1;
-  while (k >= bodyStart && src[k] === '\\') {
-    count++;
-    k--;
-  }
-  return count % 2 === 1;
+  const k = newlinePos - 1;
+  return k >= bodyStart && src[k] === '\\';
 }
 
 /**
