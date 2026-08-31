@@ -143,8 +143,17 @@ function extractTimeoutAssignment(line: string): { timeout: number; matchText: s
   const idx = lowerLine.indexOf('timeout');
   if (idx === -1) return null;
 
-  // Skip if this is setTimeout (handled separately)
-  if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') return null;
+  // Skip if this is setTimeout (handled separately). Require "set" to begin
+  // a word — otherwise an identifier that merely ENDS in "set" right before
+  // "Timeout" (resetTimeout, offsetTimeout, ...) is misclassified as the
+  // setTimeout call and its hardcoded value goes unflagged.
+  if (
+    idx >= 3 &&
+    lowerLine.slice(idx - 3, idx) === 'set' &&
+    !isAlphanumericChar(lowerLine[idx - 4])
+  ) {
+    return null;
+  }
 
   const afterTimeout = line.slice(Math.max(0, idx + 7));
   let i = 0;

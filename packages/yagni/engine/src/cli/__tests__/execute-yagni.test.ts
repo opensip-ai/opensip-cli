@@ -116,6 +116,23 @@ describe('executeYagni', () => {
     });
     expect(result.envelope.units[0]?.error).not.toContain('/private/repo');
     expect(result.envelope.units[1]?.slug).toBe('yagni:clean-detector');
+    // A faulted run (a detector crashed) must persist as a FAULT, not a plain
+    // failure — otherwise session history/dashboard/MCP replay renders it
+    // identically to a run that completed cleanly and merely found problems.
+    expect(result.session.runOutcome).toBe('error');
+  });
+
+  it('persists an ordinary failing run without an explicit runOutcome (no fault occurred)', async () => {
+    const result = await executeYagni(
+      {
+        cwd: fixtureDir(),
+        config: { failOnErrors: 0, failOnWarnings: 1 },
+      },
+      [warningDetector()],
+    );
+
+    expect(result.envelope.verdict.faulted).toBe(false);
+    expect(result.session.runOutcome).toBeUndefined();
   });
 
   it('propagates host cancellation instead of recording a detector fault', async () => {

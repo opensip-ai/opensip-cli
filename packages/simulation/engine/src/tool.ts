@@ -20,7 +20,12 @@ import {
   type StoredSession,
   type ToolOptions,
 } from '@opensip-cli/contracts';
-import { createToolScope, defineTool, readPackageVersion } from '@opensip-cli/core';
+import {
+  createToolScope,
+  defineTool,
+  deriveRunOutcome,
+  readPackageVersion,
+} from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
 import { isolatedSimPackBridge } from './capability/isolated-sim-pack.js';
@@ -171,6 +176,16 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
   // host run plane persists it after this handler resolves (no tool-side write).
   // The session row is built from the envelope, not from *DoneResult fields.
   const { buildSimulationSessionPayload } = await import('./persistence/session-payload.js');
+  // A faulted run (a scenario threw or exceeded its timeout — see
+  // assembleEnvelopeInputs in cli/sim.ts, which sets UnitResult.error for
+  // exactly that case) is recorded as a FAULT, not merely a failure —
+  // matching the fitness fix for this exact defect class (envelope.verdict.
+  // faulted always implies passed: false, so leaving this to plain
+  // passed/failed inference silently collapsed a fault into an ordinary
+  // policy failure in session history/dashboard/MCP replay).
+  const runOutcome = result.envelope.verdict.faulted
+    ? deriveRunOutcome({ passed: result.envelope.verdict.passed, explicit: 'error' })
+    : undefined;
   return {
     session: {
       tool: 'sim',
@@ -178,6 +193,7 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
       recipe: result.envelope.recipe,
       score: result.envelope.verdict.score,
       passed: result.envelope.verdict.passed,
+      ...(runOutcome === undefined ? {} : { runOutcome }),
       payload: buildSimulationSessionPayload(result.envelope),
     },
   };

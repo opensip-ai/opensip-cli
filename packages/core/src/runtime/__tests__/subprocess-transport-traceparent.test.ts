@@ -44,4 +44,22 @@ describe('TRACEPARENT propagation (createSubprocessProgressRun)', () => {
     mockCurrentTraceparent.mockReturnValue(undefined);
     expect(await forkTraceparentEcho()).toBeUndefined();
   });
+
+  it('strips an ambient TRACEPARENT already present in this process env when no span is active', async () => {
+    // Reproduces deterministically regardless of the host's own ambient env
+    // (e.g. an external OTel-instrumented launcher/CI runner that sets
+    // TRACEPARENT on this very process): buildChildEnv used to only ever
+    // ADD a TRACEPARENT key when a span was active, never strip one already
+    // inherited from `parentEnv` — so a stale ambient value passed straight
+    // through to the child instead of being omitted.
+    const previous = process.env.TRACEPARENT;
+    process.env.TRACEPARENT = '00-stale-ambient-trace-01';
+    try {
+      mockCurrentTraceparent.mockReturnValue(undefined);
+      expect(await forkTraceparentEcho()).toBeUndefined();
+    } finally {
+      if (previous === undefined) delete process.env.TRACEPARENT;
+      else process.env.TRACEPARENT = previous;
+    }
+  });
 });

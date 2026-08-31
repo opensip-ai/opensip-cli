@@ -370,6 +370,16 @@ describe('no-hardcoded-timeouts edges', () => {
         '}',
       ].join('\n'),
     );
+    writeFixture(
+      cwd,
+      'src/compound-set-suffix.ts',
+      [
+        'export function backoff() {',
+        '  const resetTimeout = 15000;',
+        '  return resetTimeout;',
+        '}',
+      ].join('\n'),
+    );
   });
 
   afterAll(() => rmSync(cwd, { recursive: true, force: true }));
@@ -396,6 +406,19 @@ describe('no-hardcoded-timeouts edges', () => {
     });
     expect(result.signals.length).toBe(1);
     expect(result.signals[0]?.message).toContain('90000ms');
+  });
+
+  it('flags a plain assignment whose identifier merely ends in "set" (not the setTimeout call)', async () => {
+    // The setTimeout-vs-plain-assignment guard used to check only whether the
+    // 3 characters immediately before "timeout" spelled "set", with no word-
+    // boundary check — so any identifier ending in "...set" right before
+    // "Timeout" (resetTimeout, offsetTimeout, ...) was misclassified as the
+    // setTimeout call and silently skipped.
+    const result = await findCheck('no-hardcoded-timeouts').run(cwd, {
+      targetFiles: [join(cwd, 'src/compound-set-suffix.ts')],
+    });
+    expect(result.signals.length).toBe(1);
+    expect(result.signals[0]?.message).toContain('15000ms');
   });
 });
 
