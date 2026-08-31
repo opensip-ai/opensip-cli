@@ -52,6 +52,6 @@
     "@types/node": "^24.13.3",
     "commander": "^15.0.0",
     "typescript": "~6.0.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   }
 }
