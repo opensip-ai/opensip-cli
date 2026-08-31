@@ -112,25 +112,31 @@ export function projectEvidenceSnapshotEvidence(
   };
 }
 
+function sanitizeArrayValue(value: readonly unknown[], depth: number): unknown {
+  if (depth >= MAX_DEPTH) return '<array>';
+  return value.slice(0, MAX_ARRAY_LENGTH).map((item) => sanitizeLedgerValue(item, depth + 1));
+}
+
+function sanitizeObjectValue(value: Record<string, unknown>, depth: number): unknown {
+  if (depth >= MAX_DEPTH) return '<object>';
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, MAX_OBJECT_KEYS)) {
+    out[key] = SECRET_PATTERN.test(key) ? '<redacted>' : sanitizeLedgerValue(child, depth + 1);
+  }
+  return out;
+}
+
 function sanitizeLedgerValue(value: unknown, depth: number): unknown {
   if (value === null) return null;
   if (typeof value === 'string') {
     return value.length > MAX_STRING_LENGTH ? `${value.slice(0, MAX_STRING_LENGTH)}...` : value;
   }
   if (typeof value === 'number' || typeof value === 'boolean') return value;
-  if (Array.isArray(value)) {
-    return value.slice(0, MAX_ARRAY_LENGTH).map((item) => sanitizeLedgerValue(item, depth + 1));
-  }
-  if (typeof value === 'object') {
-    if (depth >= MAX_DEPTH) return '<object>';
-    const out: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .slice(0, MAX_OBJECT_KEYS)) {
-      out[key] = SECRET_PATTERN.test(key) ? '<redacted>' : sanitizeLedgerValue(child, depth + 1);
-    }
-    return out;
-  }
+  if (Array.isArray(value)) return sanitizeArrayValue(value, depth);
+  if (typeof value === 'object')
+    return sanitizeObjectValue(value as Record<string, unknown>, depth);
   if (typeof value === 'bigint' || typeof value === 'symbol') return value.toString();
   return Object.prototype.toString.call(value);
 }

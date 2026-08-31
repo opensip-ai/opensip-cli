@@ -67,6 +67,7 @@ describe('run ledger projection', () => {
             },
           },
         },
+        deepArray: [[[['too deep']]]],
         many: Object.fromEntries(
           Array.from({ length: 55 }, (_, index) => [
             `key-${String(index).padStart(2, '0')}`,
@@ -83,6 +84,7 @@ describe('run ledger projection', () => {
         'big',
         'callable',
         'count',
+        'deepArray',
         'empty',
         'enabled',
         'list',
@@ -113,6 +115,10 @@ describe('run ledger projection', () => {
         beta: 'b',
         token: '<redacted>',
       });
+      // Arrays must be depth-capped exactly like plain objects — the bound
+      // exists to keep ledger-persisted output finite regardless of which
+      // container type carries the nesting.
+      expect(projected?.deepArray).toEqual([[['<array>']]]);
     });
   });
 

@@ -26,7 +26,8 @@ import { simulationTool } from '../tool.js';
 
 import { noopTarget } from './test-utils/targets.js';
 
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { RunnableScenario } from '../framework/runnable-scenario.js';
+import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')) as {
@@ -270,6 +271,26 @@ describe('simulationTool command surface (Phase 3 — CommandSpec migration)', (
   });
 });
 
+/**
+ * Register a scenario whose `run()` throws — the recipe service maps that to
+ * `SimulationScenarioResult.failure`/`.error` (recipes/service.ts
+ * `runScenarioUnit`), which `assembleEnvelopeInputs` carries onto the unit as
+ * `UnitResult.error` — a unit fault, per the `runFaulted: false` comment in
+ * cli/sim.ts (buildSignalEnvelope derives `verdict.faulted` from the unit
+ * regardless).
+ */
+function registerThrowingScenario(): void {
+  const scenario: RunnableScenario = {
+    kind: 'load',
+    id: 'boom',
+    name: 'boom',
+    description: 'fixture scenario that throws',
+    tags: [],
+    run: () => Promise.reject(new Error('scenario exploded')),
+  };
+  currentScenarioRegistry().register(scenario);
+}
+
 describe('sim command handler', () => {
   it('runs against the default recipe and renders the result', async () => {
     const { ctx, rendered } = makeFakeContext();
@@ -352,5 +373,30 @@ describe('sim command handler', () => {
     expect(errResult.type).toBe('error');
     expect(errResult.type).not.toBe('run-presentation');
     expect(errResult.message).toContain('still-nope');
+  });
+
+  it('persists a faulted run (a scenario threw) as runOutcome "error", not a plain failure', async () => {
+    const { ctx } = makeFakeContext();
+    registerThrowingScenario();
+
+    const completion = (await simSpec().handler({ cwd: process.cwd() }, ctx)) as ToolRunCompletion;
+
+    expect(completion.session?.passed).toBe(false);
+    // The bug: the session contribution never consulted envelope.verdict.faulted,
+    // so a run whose scenario COULD NOT COMPLETE (a fault) persisted identically
+    // to one that ran cleanly and merely found a policy failure.
+    expect(completion.session?.runOutcome).toBe('error');
+  });
+
+  it('persists an ordinary failing run without an explicit runOutcome (no fault occurred)', async () => {
+    const { ctx } = makeFakeContext();
+    registerProbeScenario();
+
+    const completion = (await simSpec().handler({ cwd: process.cwd() }, ctx)) as ToolRunCompletion;
+
+    // The probe scenario (see registerProbeScenario) runs to completion, so
+    // there is no fault — runOutcome must be left unset and inferred from
+    // `passed` downstream (deriveRunOutcome({ passed })).
+    expect(completion.session?.runOutcome).toBeUndefined();
   });
 });

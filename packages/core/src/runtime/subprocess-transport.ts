@@ -173,17 +173,26 @@ export function createSubprocessProgressRun<TEvent, TResult>(
       enableHeartbeat: true,
       cancellationSignal: currentScope()?.abortSignal,
       buildChildEnv: (parentEnv) => {
+        // Strip any ambient TRACEPARENT inherited from this process's own
+        // environment before deciding what the child gets — otherwise a
+        // TRACEPARENT already present in `parentEnv` (e.g. propagated by an
+        // external OTel-instrumented launcher) survives untouched whenever
+        // there's no active in-process span (`traceId === undefined`), even
+        // though `currentTraceparent()`'s contract promises no TRACEPARENT
+        // reaches the child in that case.
+        // eslint-disable-next-line sonarjs/no-unused-vars -- destructure-omit pattern: drop `TRACEPARENT` from spread copy
+        const { TRACEPARENT: _ambientTraceparent, ...parentEnvWithoutTraceparent } = parentEnv;
         const traceparentEnv = traceId === undefined ? {} : { TRACEPARENT: traceId };
         if (descriptor.env || descriptor.correlation || traceId !== undefined) {
           // @fitness-ignore-next-line env-secret-exposure -- fork() REPLACES the child env wholesale when `env` is set, so the parent env must be spread in to preserve it; correlation env carries NO secret (Task 0.1) and this object is passed to fork, never logged.
           return {
-            ...parentEnv,
+            ...parentEnvWithoutTraceparent,
             ...descriptor.env,
             ...correlationEnv,
             ...traceparentEnv,
           };
         }
-        return parentEnv;
+        return parentEnvWithoutTraceparent;
       },
       onMessage: (msg: unknown) => {
         const typed = msg as WorkerMessage<TEvent, TResult>;

@@ -8,6 +8,7 @@ import {
   createDeadlineError,
   createToolError,
   currentScope,
+  deriveRunOutcome,
   filterSignalsBySuppressions,
   isErrorSignal,
   normalizeFailure,
@@ -35,7 +36,7 @@ import type { SkippedDetector, YagniDetector } from '../detectors/types.js';
 import type { YagniConfig } from '../types/yagni-config.js';
 import type { YagniConfidence } from '../types/yagni-metadata.js';
 import type { SignalEnvelope, UnitResult } from '@opensip-cli/contracts';
-import type { Signal } from '@opensip-cli/core';
+import type { Signal, ToolRunOutcome } from '@opensip-cli/core';
 
 /** Runtime options for one YAGNI detector pass. */
 export interface ExecuteYagniOptions {
@@ -63,6 +64,7 @@ export interface ExecuteYagniResult {
     readonly cwd: string;
     readonly score: number;
     readonly passed: boolean;
+    readonly runOutcome?: ToolRunOutcome;
     readonly payload: ReturnType<typeof buildYagniSessionPayload>;
   };
 }
@@ -339,6 +341,15 @@ export async function executeYagni(
   const yagniSummary = buildYagniRunSummary(envelope.signals, skipped);
   const sessionPayload = buildYagniSessionPayload(envelope, skipped, yagniSummary);
 
+  // A faulted run (a detector threw or timed out) is recorded as a FAULT, not
+  // merely a failure — matching the fitness fix for this exact defect class
+  // (envelope.verdict.faulted always implies passed: false, so leaving this
+  // to plain passed/failed inference silently collapsed a fault into an
+  // ordinary policy failure in session history/dashboard/MCP replay).
+  const runOutcome = envelope.verdict.faulted
+    ? deriveRunOutcome({ passed: envelope.verdict.passed, explicit: 'error' })
+    : undefined;
+
   return {
     envelope,
     session: {
@@ -346,6 +357,7 @@ export async function executeYagni(
       cwd: opts.cwd,
       score: envelope.verdict.score,
       passed: envelope.verdict.passed,
+      ...(runOutcome === undefined ? {} : { runOutcome }),
       payload: sessionPayload,
     },
   };
