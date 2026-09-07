@@ -37,7 +37,7 @@ vi.mock('@opensip-cli/core', async (importOriginal) => {
 
 const executeSimMock = executeSim as unknown as ReturnType<typeof vi.fn>;
 
-function simEnvelope() {
+function simEnvelope(opts: { runFaulted?: boolean } = {}) {
   return buildSignalEnvelope({
     tool: 'sim',
     runId: 'run-sim',
@@ -46,7 +46,7 @@ function simEnvelope() {
     units: [{ slug: 'scenario-a', passed: true, durationMs: 8 }],
     signals: [],
     policy: HOST_VERDICT_POLICY_FALLBACK,
-    runFaulted: false,
+    runFaulted: opts.runFaulted ?? false,
   });
 }
 
@@ -127,5 +127,28 @@ describe('renderSimLive', () => {
     expect(outcome.done.summary).toMatchObject({ passed: true, errors: 0, warnings: 0 });
     expect(outcome.session).toMatchObject({ tool: 'sim', cwd: '/proj', passed: true });
     expect(outcome.envelope?.recipe).toBe('example');
+  });
+
+  it('records session.runOutcome "error" (not "failed") when the run faulted', async () => {
+    // Regression: this session literal used to omit `runOutcome` entirely, so a
+    // faulted run — which always has verdict.passed === false — persisted
+    // identically to a run that completed cleanly and merely found real
+    // assertion failures.
+    executeSimMock.mockResolvedValue({
+      result: {
+        type: 'run-presentation',
+        tool: 'simulation',
+        envelope: simEnvelope({ runFaulted: true }),
+      },
+    });
+    await renderSimLive({ cwd: '/proj', recipe: 'example', json: false, debug: false });
+    const outcome = await capturedSpec!.produce(vi.fn(), {
+      setRunning: vi.fn(),
+      setHeaderMetadata: vi.fn(),
+      setShowRunHeader: vi.fn(),
+    });
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind !== 'done') return;
+    expect(outcome.session).toMatchObject({ passed: false, runOutcome: 'error' });
   });
 });

@@ -66,4 +66,30 @@ describe('context-mutation — FP regression suite (1.0.7)', () => {
     `;
     expect(analyze(src)).toHaveLength(0);
   });
+
+  it('STILL flags an unsafe mutation sharing a line with an earlier safe one', () => {
+    // Regression: `isSafeMutation` judged the WHOLE line, and
+    // `createAssignmentDetector` only inspected the FIRST `ctx.` occurrence.
+    // `userId` (a safe keyword) appearing first on the line used to hide the
+    // genuinely unsafe `ctx.role` assignment sharing that line.
+    const src = `
+      function handler(ctx: RequestContext) {
+        ctx.userId = 'x'; ctx.role = 'admin';
+      }
+    `;
+    const violations = analyze(src);
+    expect(violations.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does NOT flag a trailing comment mentioning a safe keyword as licensing an unsafe mutation', () => {
+    // Regression: a trailing comment containing any SAFE_KEYWORDS substring
+    // (e.g. "userId") used to suppress a genuinely unsafe mutation on that
+    // same line, because safety was judged over the whole line's text.
+    const src = `
+      function handler(ctx: RequestContext) {
+        ctx.role = 'admin'; // looked up from userId
+      }
+    `;
+    expect(analyze(src).length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -174,6 +174,20 @@ describe('runHeapPreflight', () => {
     }
     const os = await import('node:os');
     const spy = vi.spyOn(os.default, 'totalmem').mockReturnValue(512 * 1024 * 1024); // 512 MB
+    // Regression: this test relied on the HOST's real (unmocked) default V8
+    // heap limit staying below the 8192MB target, so the "already elevated"
+    // branch wouldn't short-circuit it first. V8 scales its default
+    // heap_size_limit with available system RAM, so on a machine with
+    // enough physical memory the real default already exceeds 8192MB —
+    // the preflight then returns via the earlier already-elevated check
+    // with an EMPTY stderr, and this test's assertion silently never
+    // exercised the insufficient-memory branch it exists to cover. Mock
+    // the heap limit down explicitly, like the sibling "already elevated"
+    // test above does, so this test is deterministic on any host.
+    const v8 = await import('node:v8');
+    const heapSpy = vi.spyOn(v8.default, 'getHeapStatistics').mockReturnValue({
+      heap_size_limit: 2048 * 1024 * 1024, // 2048 MB → below the 8192MB target
+    } as ReturnType<typeof v8.default.getHeapStatistics>);
     let stderr = '';
     const errSpy = vi.spyOn(process.stderr, 'write').mockImplementation((chunk: unknown) => {
       stderr += typeof chunk === 'string' ? chunk : String(chunk);
@@ -185,6 +199,7 @@ describe('runHeapPreflight', () => {
       expect(stderr).toContain('Continuing with current heap');
     } finally {
       spy.mockRestore();
+      heapSpy.mockRestore();
       errSpy.mockRestore();
     }
   });

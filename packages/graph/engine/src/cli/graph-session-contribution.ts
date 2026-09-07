@@ -17,6 +17,7 @@ import type { Signal, ToolSessionContribution } from '@opensip-cli/core';
 export interface SessionVerdict {
   readonly score: number;
   readonly passed: boolean;
+  readonly faulted?: boolean;
 }
 
 /**
@@ -124,7 +125,14 @@ export function contributionFromGraphPayload(
     ...(opts.recipe === undefined ? {} : { recipe: opts.recipe }),
     score: verdict.score,
     passed: verdict.passed,
-    runOutcome: deriveRunOutcome({ passed: verdict.passed }),
+    // A faulted run always has `passed: false`; without the explicit override
+    // here, deriveRunOutcome's passed/failed fallback persisted a run the
+    // engine could not complete identically to one that completed and found
+    // real policy violations (same fix as fitness's fitSessionContribution).
+    runOutcome: deriveRunOutcome({
+      passed: verdict.passed,
+      ...(verdict.faulted === true ? { explicit: 'error' } : {}),
+    }),
     payload,
   };
 }

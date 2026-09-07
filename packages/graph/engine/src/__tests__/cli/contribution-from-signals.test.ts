@@ -23,6 +23,7 @@ import { passRate } from '@opensip-cli/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { buildGraphEnvelope } from '../../cli/build-envelope.js';
+import { contributionFromGraphPayload } from '../../cli/graph-session-contribution.js';
 import { contributionFromSignals, evaluatedRuleSlugs } from '../../cli/graph.js';
 import { withGraphScopeSync } from '../test-utils/with-graph-scope.js';
 
@@ -157,6 +158,25 @@ describe('contributionFromSignals', () => {
     expect(contribution.score).toBe(0);
     expect(contribution.passed).toBe(false);
     expect(contribution.runOutcome).toBe('failed');
+  });
+
+  it('records runOutcome "error" (not "failed") when the verdict faulted', () => {
+    // Regression: `contributionFromGraphPayload` derived runOutcome from
+    // `verdict.passed` alone and never consulted `verdict.faulted`. A faulted
+    // run always has `passed: false`, so every fault persisted identically to
+    // a run that completed cleanly and merely found real rule violations
+    // (same fix as fitness's fitSessionContribution).
+    const contribution = contributionFromGraphPayload(
+      { cwd: '/repo' },
+      {
+        __version: 1,
+        checks: [],
+        summary: { total: 0, passed: 0, failed: 0, errors: 0, warnings: 0 },
+      },
+      { score: 0, passed: false, faulted: true },
+    );
+    expect(contribution.passed).toBe(false);
+    expect(contribution.runOutcome).toBe('error');
   });
 });
 

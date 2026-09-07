@@ -70,7 +70,7 @@ const ensureChecksLoadedMock = ensureChecksLoaded as unknown as ReturnType<typeo
 const executeFitMock = executeFit as unknown as ReturnType<typeof vi.fn>;
 const getEnabledCheckCountMock = getEnabledCheckCount as unknown as ReturnType<typeof vi.fn>;
 
-function fitEnvelope() {
+function fitEnvelope(opts: { runFaulted?: boolean } = {}) {
   return buildSignalEnvelope({
     tool: 'fit',
     runId: 'run-fit',
@@ -89,7 +89,7 @@ function fitEnvelope() {
     ],
     signals: [],
     policy: HOST_VERDICT_POLICY_FALLBACK,
-    runFaulted: false,
+    runFaulted: opts.runFaulted ?? false,
   });
 }
 
@@ -186,6 +186,27 @@ describe('renderFitLive produce mapping', () => {
       status: 'FAIL',
       validated: 4,
       ignored: 0,
+    });
+  });
+
+  it('records session.runOutcome "error" (not "failed") when the run faulted', async () => {
+    // Regression: this literal used to omit `runOutcome` entirely, so a faulted
+    // run — which always has verdict.passed === false — persisted identically
+    // to a run that completed cleanly and merely found real policy violations,
+    // unlike the non-TTY/--json/gate paths which already go through
+    // fitSessionContribution's verdict.faulted check.
+    const envelope = fitEnvelope({ runFaulted: true });
+    executeFitMock.mockResolvedValue({
+      result: { type: 'run-presentation', tool: 'fitness', envelope },
+      warnings: [],
+    });
+    await renderFitLive(fitArgs({ cwd: '/proj' }));
+    const outcome = await invokeProduce();
+    expect(outcome.kind).toBe('done');
+    if (outcome.kind !== 'done') return;
+    expect(outcome.session).toMatchObject({
+      passed: false,
+      runOutcome: 'error',
     });
   });
 });

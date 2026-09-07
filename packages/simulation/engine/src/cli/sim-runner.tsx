@@ -141,6 +141,10 @@ export async function renderSimLive(
             recipe: done.envelope.recipe,
             score: done.envelope.verdict.score,
             passed: done.envelope.verdict.passed,
+            // A faulted run always has `passed: false`; without this, the
+            // host's deriveRunOutcome fallback persisted it identically to a
+            // run that completed and found real policy violations.
+            ...(done.envelope.verdict.faulted === true ? { runOutcome: 'error' as const } : {}),
             payload: buildSimulationSessionPayload(done.envelope),
           },
         };
