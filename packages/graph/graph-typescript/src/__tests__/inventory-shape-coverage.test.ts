@@ -651,6 +651,13 @@ describe('Tier 1 — object-literal accessors and method shorthand', () => {
       'obj-setter.ts': `export const o = { set x(v: number) { /* noop */ void v; } };\n`,
       'obj-async.ts': `export const o = { async foo() { return 1; } };\n`,
       'obj-gen.ts': `export const o = { *foo() { yield 1; } };\n`,
+      'obj-method-in-class-method.ts':
+        `export class Outer {\n` +
+        `  method() {\n` +
+        `    const obj = { helper() { return 1; }, get x() { return 1; } };\n` +
+        `    return obj;\n` +
+        `  }\n` +
+        `}\n`,
     });
   });
   afterAll(() => f.cleanup());
@@ -685,6 +692,36 @@ describe('Tier 1 — object-literal accessors and method shorthand', () => {
       (_n, o) => o.filePath === 'obj-gen.ts' && o.kind === 'method' && o.simpleName === 'foo',
     );
     expect(occ).toBeDefined();
+  });
+
+  it('56. object-literal method nested inside a class method has no enclosingClass', () => {
+    // Regression: `findEnclosingClassName`'s AST-parent walk used to have no
+    // function-boundary stop, so it kept climbing past the object literal,
+    // past `method()`'s body, and found `Outer` — even though the walker's
+    // own `ctx.enclosingClass` was correctly reset to null on body descent.
+    // `helper` is a local value, not a member of `Outer`.
+    const occ = findByName(
+      f.catalog,
+      (_n, o) =>
+        o.filePath === 'obj-method-in-class-method.ts' &&
+        o.kind === 'method' &&
+        o.simpleName === 'helper',
+    );
+    expect(occ).toBeDefined();
+    expect(occ!.enclosingClass).toBeNull();
+    expect(occ!.qualifiedName).not.toMatch(/Outer/);
+  });
+
+  it('57. object-literal getter nested inside a class method has no enclosingClass', () => {
+    const occ = findByName(
+      f.catalog,
+      (_n, o) =>
+        o.filePath === 'obj-method-in-class-method.ts' &&
+        o.kind === 'getter' &&
+        o.simpleName === 'x',
+    );
+    expect(occ).toBeDefined();
+    expect(occ!.enclosingClass).toBeNull();
   });
 });
 

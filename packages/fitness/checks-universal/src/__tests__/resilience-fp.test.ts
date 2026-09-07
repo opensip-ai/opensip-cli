@@ -127,6 +127,39 @@ describe('unbounded-memory — bounded-read FP regression', () => {
     rmSync(cwd, { recursive: true, force: true });
   });
 
+  it('STILL flags a genuinely unbounded collection even when a sibling field in the same file is evicted', async () => {
+    // Regression: hasEvictionKeyword/hasGrowthMethod scanned the WHOLE file,
+    // so any .delete()/.clear() anywhere silenced the warning for every
+    // private collection in that file — including one, like leakyMap below,
+    // that is never evicted at all.
+    const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-mem3-'));
+    const file = writeFixture(
+      cwd,
+      'src/store.ts',
+      [
+        'export class Store {',
+        '  private boundedMap: Map<string, number> = new Map()',
+        '  private leakyMap: Map<string, number> = new Map()',
+        '',
+        '  put(key: string, value: number): void {',
+        '    this.leakyMap.set(key, value)',
+        '  }',
+        '',
+        '  cleanupBounded(key: string): void {',
+        '    this.boundedMap.delete(key)',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await findCheck('unbounded-memory').run(cwd, {
+      targetFiles: [file],
+    });
+    // Line 2 declares boundedMap (evicted via .delete()); line 3 declares
+    // leakyMap (grown via .set(), never evicted). Only line 3 should fire.
+    expect(result.signals.map((s) => s.code?.line)).toEqual([3]);
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
   it('does NOT flag synchronous for-of scans without await', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'cu-fp-batch1-'));
     const file = writeFixture(

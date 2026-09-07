@@ -178,6 +178,11 @@ async function runSim(rawOpts: unknown, cli: ToolCliContext): Promise<ToolRunCom
       recipe: result.envelope.recipe,
       score: result.envelope.verdict.score,
       passed: result.envelope.verdict.passed,
+      // A faulted run (the scenario runner couldn't complete) always has
+      // `passed: false`; without this, deriveRunOutcome's fallback persisted
+      // it identically to a run that completed and found real policy
+      // violations (see fit's fitSessionContribution for the same fix).
+      ...(result.envelope.verdict.faulted === true ? { runOutcome: 'error' as const } : {}),
       payload: buildSimulationSessionPayload(result.envelope),
     },
   };

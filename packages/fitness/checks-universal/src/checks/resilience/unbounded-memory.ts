@@ -100,6 +100,23 @@ function hasEvictionKeyword(content: string): boolean {
   return EVICTION_KEYWORDS.some((keyword) => lowerContent.includes(keyword.toLowerCase()));
 }
 
+/** Extracts the field name from a `private <name>...` declaration match. */
+function declaredFieldName(declarationMatch: string): string | undefined {
+  return /private\s+(#?[A-Za-z_$][\w$]*)/.exec(declarationMatch)?.[1];
+}
+
+/**
+ * Lines that reference a given field name, so eviction/growth detection is
+ * scoped to the declaration's own usages rather than the whole file — two
+ * unrelated collections in the same file/class must be judged independently.
+ */
+function linesReferencingField(content: string, fieldName: string): string {
+  return content
+    .split('\n')
+    .filter((line) => line.includes(fieldName))
+    .join('\n');
+}
+
 const BOUNDED_COLLECTION_MARKER = '@bounded-collection';
 
 function isCommentDelimiter(content: string, codeMask: string, index: number): boolean {
@@ -326,6 +343,40 @@ function hasGrowthMethod(content: string): boolean {
   return methods.some((method) => content.includes(method));
 }
 
+/** One violation per private collection declaration that grows but is never
+ *  evicted, judged from usages of that field specifically (not the whole
+ *  file — two unrelated collections in the same file must be judged
+ *  independently). */
+function collectUnboundedCollectionViolations(
+  content: string,
+  codeOnly: string,
+  literalCodeMask: string,
+  filePath: string,
+): CheckViolation[] {
+  const violations: CheckViolation[] = [];
+  for (const declaration of findCollectionDeclarations(codeOnly)) {
+    const fieldName = declaredFieldName(declaration.match);
+    const scopedContent = fieldName ? linesReferencingField(codeOnly, fieldName) : codeOnly;
+    const hasEviction =
+      hasEvictionKeyword(scopedContent) || hasBoundedCollectionComment(content, literalCodeMask);
+    const hasGrowth = hasGrowthMethod(scopedContent);
+    if (!hasGrowth || hasEviction) continue;
+
+    violations.push({
+      line: getLineNumber(content, declaration.index),
+      column: 0,
+      message: 'Unbounded collection that grows without eviction',
+      severity: 'warning',
+      suggestion:
+        'Add maxSize limit and eviction logic (e.g., LRU). Use a shared cache utility for caching or implement periodic cleanup with .delete() or .clear().',
+      match: declaration.match,
+      type: 'unbounded-collection',
+      filePath,
+    });
+  }
+  return violations;
+}
+
 /**
  * Check: resilience/unbounded-memory
  *
@@ -365,27 +416,9 @@ export const unboundedMemory = defineCheck({
     const codeOnly = stripStringsAndCommentsPreservingPositions(content);
     const literalCodeMask = createCodeMask(filePath, content);
 
-    const collectionDeclarations = findCollectionDeclarations(codeOnly);
-    for (const declaration of collectionDeclarations) {
-      const hasEviction =
-        hasEvictionKeyword(codeOnly) || hasBoundedCollectionComment(content, literalCodeMask);
-      const hasGrowth = hasGrowthMethod(codeOnly);
-
-      if (hasGrowth && !hasEviction) {
-        const lineNumber = getLineNumber(content, declaration.index);
-        violations.push({
-          line: lineNumber,
-          column: 0,
-          message: 'Unbounded collection that grows without eviction',
-          severity: 'warning',
-          suggestion:
-            'Add maxSize limit and eviction logic (e.g., LRU). Use a shared cache utility for caching or implement periodic cleanup with .delete() or .clear().',
-          match: declaration.match,
-          type: 'unbounded-collection',
-          filePath,
-        });
-      }
-    }
+    violations.push(
+      ...collectUnboundedCollectionViolations(content, codeOnly, literalCodeMask, filePath),
+    );
 
     if (hasGuardedReadWrapper(codeOnly)) {
       return violations;

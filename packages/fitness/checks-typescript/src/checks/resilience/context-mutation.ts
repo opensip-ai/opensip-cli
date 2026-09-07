@@ -96,6 +96,11 @@ function mutationContextRoot(line: string): string | null {
 interface MutationDetector {
   readonly test: (line: string) => boolean;
   readonly patternName: string;
+  /** True when `test` already judged safety per-occurrence internally, so
+   *  `findMutationMatch` must not re-run the whole-line `isSafeMutation`
+   *  check (which would re-introduce the "safe keyword anywhere on the
+   *  line" false-negative this detector exists to avoid). */
+  readonly selfScopedSafety?: boolean;
 }
 
 /**
@@ -127,6 +132,12 @@ function findWordEndIndex(str: string): number {
  * @param prefix - The prefix to match (e.g., 'ctx.')
  * @returns A detector that checks for assignment after prefix and word
  */
+/** Chars of surrounding context to include on each side of a matched
+ *  assignment when checking `isSafeMutation` for that SPECIFIC occurrence —
+ *  wide enough to cover the longest `SAFE_CONTEXT_PREFIXES` entry
+ *  (`request.context`) plus the assigned property name. */
+const SAFETY_WINDOW_RADIUS = 24;
+
 function createAssignmentDetector(prefix: string): MutationDetector {
   return {
     test: (line: string): boolean => {
@@ -134,22 +145,42 @@ function createAssignmentDetector(prefix: string): MutationDetector {
         evt: 'fitness.checks.context_mutation.assignment_detector_test',
         msg: 'Testing line for context assignment mutation',
       });
-      const idx = line.indexOf(prefix);
-      if (idx === -1) return false;
-      // Find next non-word character after prefix
-      const afterPrefix = line.slice(Math.max(0, idx + prefix.length));
-      // Must have at least one word character
-      const wordEnd = findWordEndIndex(afterPrefix);
-      if (wordEnd === 0) return false;
-      const afterWord = afterPrefix.slice(Math.max(0, wordEnd)).trimStart();
-      // Check for assignment (but NOT comparison operators)
-      if (!afterWord.startsWith('=')) return false;
-      // Exclude === and == (comparison) and !=, !==
-      const secondChar = afterWord.charAt(1);
-      if (secondChar === '=' || secondChar === '!') return false;
-      return true;
+      // Scan EVERY occurrence of the prefix on the line — a line can carry
+      // more than one mutation (`ctx.userId = 'x'; ctx.role = 'admin';`) and
+      // the first (possibly safe) one must not hide a later unsafe one.
+      let searchFrom = 0;
+      // Never let a window look back past the previous occurrence's own
+      // window — otherwise a safe keyword from an EARLIER mutation on the
+      // same line (e.g. `userId` in `ctx.userId = 'x';`) leaks into this
+      // occurrence's safety check.
+      let leftBoundary = 0;
+      for (;;) {
+        const idx = line.indexOf(prefix, searchFrom);
+        if (idx === -1) return false;
+        searchFrom = idx + prefix.length;
+        // Find next non-word character after prefix
+        const afterPrefix = line.slice(searchFrom);
+        // Must have at least one word character
+        const wordEnd = findWordEndIndex(afterPrefix);
+        if (wordEnd === 0) continue;
+        const afterWord = afterPrefix.slice(wordEnd).trimStart();
+        // Check for assignment (but NOT comparison operators)
+        if (!afterWord.startsWith('=')) continue;
+        // Exclude === and == (comparison) and !=, !==
+        const secondChar = afterWord.charAt(1);
+        if (secondChar === '=' || secondChar === '!') continue;
+        // Judge safety from a window around THIS occurrence, not the whole
+        // line — otherwise a safe keyword anywhere else on the line (an
+        // earlier safe mutation, a trailing comment) suppresses a genuinely
+        // unsafe assignment sharing that line.
+        const windowStart = Math.max(leftBoundary, idx - SAFETY_WINDOW_RADIUS);
+        const windowEnd = searchFrom + wordEnd;
+        leftBoundary = windowEnd;
+        if (!isSafeMutation(line.slice(windowStart, windowEnd))) return true;
+      }
     },
     patternName: `${prefix}*=`,
+    selfScopedSafety: true,
   };
 }
 
@@ -314,7 +345,10 @@ function isSafeMutation(line: string): boolean {
 function findMutationMatch(line: string): { detector: MutationDetector; isSafe: boolean } | null {
   for (const detector of MUTATION_DETECTORS) {
     if (detector.test(line)) {
-      return { detector, isSafe: isSafeMutation(line) };
+      return {
+        detector,
+        isSafe: detector.selfScopedSafety === true ? false : isSafeMutation(line),
+      };
     }
   }
   return null;

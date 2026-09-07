@@ -143,7 +143,10 @@ export async function renderFitLive(
           };
         }
 
-        const { result } = fitResult as { result: RunPresentation };
+        const { result, runOutcome } = fitResult as {
+          result: RunPresentation;
+          runOutcome?: 'degraded';
+        };
         const envelope = result.envelope;
         const verboseDetail = buildFitVerboseDetail(envelope, {
           verbose: args.verbose === true,
@@ -152,6 +155,14 @@ export async function renderFitLive(
           verboseDetail?.kind === 'findings' && verboseDetail.groups.length > 0
             ? verboseDetail.groups
             : undefined;
+        // Mirrors fitSessionContribution's fix in fit-modes.ts: a faulted run
+        // always has `passed: false`, so without consulting
+        // `envelope.verdict.faulted` here too, the interactive/TTY path
+        // persisted a run the engine could not complete identically to one
+        // that completed and found real policy violations — unlike the
+        // non-TTY/--json/gate paths, which already go through
+        // fitSessionContribution.
+        const sessionRunOutcome = runOutcome ?? (envelope.verdict.faulted ? 'error' : undefined);
 
         return {
           kind: 'done',
@@ -174,6 +185,7 @@ export async function renderFitLive(
             recipe: envelope.recipe,
             score: envelope.verdict.score,
             passed: envelope.verdict.passed,
+            ...(sessionRunOutcome === undefined ? {} : { runOutcome: sessionRunOutcome }),
             payload: buildFitnessSessionPayload(envelope),
           },
         };

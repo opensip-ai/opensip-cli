@@ -26,7 +26,7 @@ import { simulationTool } from '../tool.js';
 
 import { noopTarget } from './test-utils/targets.js';
 
-import type { CommandSpec, ToolCliContext } from '@opensip-cli/core';
+import type { CommandSpec, ToolCliContext, ToolRunCompletion } from '@opensip-cli/core';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')) as {
@@ -352,5 +352,27 @@ describe('sim command handler', () => {
     expect(errResult.type).toBe('error');
     expect(errResult.type).not.toBe('run-presentation');
     expect(errResult.message).toContain('still-nope');
+  });
+
+  it('records session.runOutcome "error" (not "failed") when a scenario faults', async () => {
+    // Regression: this session literal used to omit `runOutcome` entirely, so a
+    // faulted run (a scenario throws — verdict.faulted becomes true, and
+    // verdict.passed is always false alongside it) persisted identically to a
+    // run that completed cleanly and merely found real assertion failures.
+    currentScenarioRegistry().register({
+      id: 'throws',
+      name: 'throws',
+      description: 'throws',
+      kind: 'load',
+      tags: [],
+      run: () => Promise.reject(new Error('boom')),
+    });
+    const { ctx } = makeFakeContext();
+
+    const completion = (await simSpec().handler({ cwd: process.cwd() }, ctx)) as
+      ToolRunCompletion | undefined;
+
+    expect(completion?.session?.passed).toBe(false);
+    expect(completion?.session?.runOutcome).toBe('error');
   });
 });
