@@ -79,7 +79,9 @@ vi.mock('../check-loader.js', async (importOriginal) => {
               // Deliberately never resolves: the ONLY thing that ends this unit
               // is the per-check timeout budget. That makes the assertion a fact
               // about the budget in force, not a race against wall-clock.
-              analyze: async () => {
+              // analyzeAll (not analyze) because it's the async analysis mode —
+              // analyze() is typed synchronous, so it cannot itself hang.
+              analyzeAll: async () => {
                 await new Promise(() => {
                   /* never settles */
                 });

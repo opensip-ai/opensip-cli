@@ -34,6 +34,7 @@ import { seedScopelessChangedTargets } from '../changed-targeting.js';
 
 import type * as CheckLoaderModule from '../check-loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';
+import type { FileAccessor } from '../../../framework/check-config.js';
 
 /** slug → every filePath the check's `analyze` was handed this run. */
 const analyzed = vi.hoisted(() => new Map<string, string[]>());
@@ -91,9 +92,9 @@ vi.mock('../check-loader.js', async (importOriginal) => {
             slug: 'scopeless-analyze-all',
             description: 'a scope-less WHOLE-REPO invariant (mirrors stale-build-artifacts)',
             tags: ['test'],
-            analyzeAll: (files: { readonly paths: readonly string[] }) => {
+            analyzeAll: (files: FileAccessor) => {
               analyzed.set('scopeless-analyze-all', [...files.paths]);
-              return [];
+              return Promise.resolve([]);
             },
           }),
           '@opensip-cli/test',
