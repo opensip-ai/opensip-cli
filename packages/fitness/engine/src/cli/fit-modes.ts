@@ -22,6 +22,7 @@ import {
 import {
   ConfigurationError,
   deriveRunOutcome,
+  resolveFailOnDegraded,
   SystemError,
   type ToolCliContext,
   type ToolRunCompletion,
@@ -30,6 +31,7 @@ import {
 } from '@opensip-cli/core';
 import { resolveSession } from '@opensip-cli/session-store';
 
+import { FITNESS_IDENTITY, FITNESS_LAYOUT_KEY } from '../identity.js';
 import { fitReplayFromSession } from '../persistence/session-replay.js';
 
 import { renderGateCompareOutput } from './fit/gate-compare-render.js';
@@ -352,7 +354,13 @@ export async function runGateMode(
   try {
     await runHostGateDispatch({
       cli,
-      tool: 'fitness',
+      // The baseline namespace MUST be fitness's SHORT id (`fit`) — the same
+      // key every reader resolves a tool by (`identity.layoutKey ?? name`,
+      // e.g. MCP's `validToolIds`, which never sees `fitness`). Saving under
+      // the canonical long name left the baseline unreachable: no value of
+      // MCP's `tool` parameter could ever find it. Keyed off the identity
+      // constant so the two can't drift again.
+      tool: FITNESS_LAYOUT_KEY,
       envelope,
       mode: args.gateSave === true ? 'save' : 'compare',
       deliver: {
@@ -360,6 +368,15 @@ export async function runGateMode(
         reportTo: args.reportTo,
         apiKey: args.apiKey,
       },
+      // `runHostGateDispatch` would otherwise resolve `failOnDegraded` under the
+      // same key it uses for the baseline namespace. Those are two different
+      // namespaces for fitness: the baseline is keyed on the SHORT id (`fit`)
+      // while the config block is `fitness:` (FITNESS_IDENTITY.name — see
+      // `fitnessConfigDeclaration`). Resolve the policy explicitly so switching
+      // the baseline key does not silently ignore a user's
+      // `fitness.failOnDegraded: false`.
+      compareRunFailed: ({ result }) =>
+        result.degraded && resolveFailOnDegraded(FITNESS_IDENTITY.name),
       renderSaveLines: ({ envelope, runFailed }) => formatFitGateSaveLines(envelope, runFailed),
       renderCompareLines: ({ result }) => renderGateCompareOutput(result).split('\n'),
     });

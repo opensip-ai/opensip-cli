@@ -114,6 +114,12 @@ function computePackagePublicSurface(packageRoot: string): PackagePublicSurface 
   if (entryPaths.length === 0) return null;
 
   const publicFiles = seedPublicFiles(entryPaths, packageRoot);
+  // Entries existed but none mapped to a real source file (unrecognized build
+  // layout, bundled-only output, ...). That is "unknown surface", not "empty
+  // surface" — fail open like the no-entries case rather than silently
+  // reporting the whole package as internal.
+  if (publicFiles.size === 0) return null;
+
   walkReExportGraph(publicFiles);
   return { packageRoot, publicFiles };
 }
@@ -257,6 +263,26 @@ function resolveExportTarget(target: string, packageRoot: string): string {
 }
 
 /**
+ * Candidate package-relative source paths for a package-relative entry
+ * path, most-specific first. A `dist/` or `build/` prefix is rewritten
+ * to `src/`; a non-built path is used as-is.
+ */
+function sourceCandidatesFor(rel: string): string[] {
+  // dist/foo.js → src/foo.ts (and .tsx)
+  const distMatch = /^(dist|build)([\\/].*)?$/.exec(rel);
+  if (!distMatch) return [rel];
+
+  const remainder = rel.slice(distMatch[1].length);
+  const candidates = ['src' + remainder];
+  // Dual-build layouts (tsup/rollup `dist/esm/index.js` +
+  // `dist/cjs/index.cjs`) interpose a build-flavor segment that has no
+  // counterpart in `src/`. Collapse it: dist/esm/index.js → src/index.js.
+  const flavorMatch = /^[\\/](?:esm|cjs|mjs|module)([\\/].+)$/.exec(remainder);
+  if (flavorMatch) candidates.push('src' + flavorMatch[1]);
+  return candidates;
+}
+
+/**
  * Map a built artifact path (typically `./dist/foo.js`) back to its
  * TypeScript source path (typically `./src/foo.ts`). Returns
  * `undefined` if no source file can be located.
@@ -268,19 +294,8 @@ function mapDistToSource(absPath: string, packageRoot: string): string | undefin
   const rel = absPath.startsWith(packageRoot + sep)
     ? absPath.slice(packageRoot.length + 1)
     : absPath;
-  const candidates: string[] = [];
 
-  // dist/foo.js → src/foo.ts (and .tsx)
-  const distMatch = /^(dist|build)([\\/].*)?$/.exec(rel);
-  if (distMatch) {
-    const remainder = rel.slice(distMatch[1].length);
-    const inSrc = 'src' + remainder;
-    candidates.push(inSrc);
-  } else {
-    candidates.push(rel);
-  }
-
-  for (const cand of candidates) {
+  for (const cand of sourceCandidatesFor(rel)) {
     const abs = isAbsolute(cand) ? cand : join(packageRoot, cand);
     for (const ext of ['.ts', '.tsx', '.mts', '.cts']) {
       const swapped = abs.replace(/\.(js|mjs|cjs)$/, ext);

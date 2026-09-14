@@ -643,10 +643,14 @@ function dispatchVisitor(node: ts.Node, ctx: VisitorContext): FunctionOccurrence
 
 /**
  * An inline callable (arrow / function-expression / method / accessor /
- * constructor) gets a creation edge from its enclosing scope so
- * reachability flows through inline callbacks even when the runtime
- * dispatch site is unresolvable. Function declarations are
- * deliberately excluded — they need a real call edge to be reachable.
+ * constructor / class static block) gets a creation edge from its
+ * enclosing scope so reachability flows through inline callbacks even
+ * when the runtime dispatch site is unresolvable. Function declarations
+ * are deliberately excluded — they need a real call edge to be reachable.
+ *
+ * A class `static {}` block has no dispatch site at all: it runs at class
+ * evaluation time. Without its creation edge it has zero incoming edges and
+ * its whole subtree reads as unreachable to `graph:orphan-subtree`.
  */
 function isInlineCallable(node: ts.Node): boolean {
   return (
@@ -655,7 +659,8 @@ function isInlineCallable(node: ts.Node): boolean {
     ts.isMethodDeclaration(node) ||
     ts.isConstructorDeclaration(node) ||
     ts.isGetAccessor(node) ||
-    ts.isSetAccessor(node)
+    ts.isSetAccessor(node) ||
+    ts.isClassStaticBlockDeclaration(node)
   );
 }
 

@@ -231,7 +231,15 @@ export function generateDashboardHtml(input: DashboardInput): string {
     'literal',
   );
   const normalizedSelection = normalizeReportViewSelection(selection);
-  const projectedImpactRuns = projectChangeImpactRuns(runs, sessions, graph.catalog);
+  // Identity from the full stored catalog; navigability from the bounded one
+  // the page actually carries — an "Open" button must only be offered for a
+  // function the embedded blob can resolve (see projectChangeImpactRuns).
+  const projectedImpactRuns = projectChangeImpactRuns(
+    runs,
+    sessions,
+    graph.catalog,
+    boundedCatalog.catalog,
+  );
   const boundedImpact = boundChangeImpactRuns(projectedImpactRuns, normalizedSelection?.runId);
   const safeChangeImpactJson = serializeJsonForScriptContext(boundedImpact.runs);
 

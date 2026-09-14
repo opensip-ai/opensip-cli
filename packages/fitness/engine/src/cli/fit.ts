@@ -22,12 +22,17 @@
  */
 
 import { createToolLogger } from '@opensip-cli/core';
+import { applyGlobalExcludes } from '@opensip-cli/targeting';
 
 import { currentCheckRegistry } from '../framework/scope-registry.js';
 import { buildScopeBasedFileMap } from '../framework/scope-resolver.js';
 import { FitnessRecipeService } from '../recipes/service.js';
 
-import { resolveChangedSet, restrictFileMapToChanged } from './fit/changed-targeting.js';
+import {
+  resolveChangedSet,
+  restrictFileMapToChanged,
+  seedScopelessChangedTargets,
+} from './fit/changed-targeting.js';
 import { ensureChecksLoaded, getLoadWarnings } from './fit/check-loader.js';
 import { loadFitConfig, validateLanguagesAgainstAdapters } from './fit/config-loader.js';
 import {
@@ -93,10 +98,26 @@ export interface ExecuteFitOptions {
   onProgress?: (completed: number, total: number) => void;
 }
 
+/** Per-run identity + exclusion facts `resolveFitScopeMap` needs to narrow the map. */
+interface FitScopeMapContext {
+  /** `analyzeAll` checks — they keep their FULL file list under `--changed`. */
+  readonly fullScopeKeys: ReadonlySet<string>;
+  /** Scope-map keys (`check.config.id`) of EVERY resolved check in this run. */
+  readonly allCheckKeys: readonly string[];
+  /** The project `globalExcludes`, applied to the seeded changed set. */
+  readonly globalExcludes: readonly string[];
+}
+
+/**
+ * Narrow the scope map to the changed set, keying BOTH halves of the map:
+ * the keys scope resolution produced (`restrictFileMapToChanged`) and the keys
+ * it did not (`seedScopelessChangedTargets` — scope-less checks, which would
+ * otherwise fall back to the whole repo and defeat `--changed` entirely).
+ */
 function resolveFitScopeMap(
   args: FitOptions,
   initialScopeMap: CheckScopeMap,
-  fullScopeKeys: ReadonlySet<string>,
+  ctx: FitScopeMapContext,
 ): {
   readonly scopeMap: CheckScopeMap;
   readonly warnings: readonly string[];
@@ -111,32 +132,42 @@ function resolveFitScopeMap(
     return { scopeMap: initialScopeMap, warnings: [changed.warning] };
   }
   if (!changed.trust.fullyVerified && changed.trust.fallback === 'full-run') {
+    // A full run: the untouched map is correct — scope-less checks legitimately
+    // keep their whole-repo fileCache fallback here.
     return {
       scopeMap: initialScopeMap,
       warnings: changed.warning ? [changed.warning] : [],
       verification: changed.trust,
     };
   }
+
+  // "Target nothing" (and "target only these") must be expressed as every check →
+  // an EXPLICIT target list, NOT an absent key. An absent key leaves
+  // `checkTargetFiles.get(checkId)` undefined, which routes the check to the
+  // whole-repo fileCache fallback (globalExcludes-only, no per-target
+  // `*.test.ts` / `__tests__` excludes) — the exact opposite of a narrowed run.
+  // `seedScopelessChangedTargets` supplies the entry for checks scope resolution
+  // skipped; `restrictFileMapToChanged` narrows the ones it produced.
+  const changedTargets = applyGlobalExcludes(
+    [...changed.files].sort(),
+    args.cwd,
+    ctx.globalExcludes,
+  );
+  const seeded = seedScopelessChangedTargets(initialScopeMap, {
+    allCheckKeys: ctx.allCheckKeys,
+    fullScopeKeys: ctx.fullScopeKeys,
+    changedTargets,
+  });
+  const scopeMap = restrictFileMapToChanged(seeded, changed.files, ctx.fullScopeKeys);
+
   if (changed.files.size === 0) {
-    // "Target nothing" must be expressed as every scoped check → EMPTY target
-    // list, NOT an empty map. An empty map leaves `checkTargetFiles.get(checkId)`
-    // undefined for every check, which routes each one to the whole-repo
-    // fileCache fallback (globalExcludes-only, no per-target `*.test.ts` /
-    // `__tests__` excludes) — the exact opposite of "target nothing". Running
-    // the (empty) changed set through restrictFileMapToChanged pins each scoped
-    // check to `[]`, so it scans nothing. (Same defect, sibling branch to the
-    // key-preservation fix in restrictFileMapToChanged.)
     return {
-      scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
+      scopeMap,
       warnings: ['No changed files detected — fit run will target nothing.'],
       verification: changed.trust,
     };
   }
-  return {
-    scopeMap: restrictFileMapToChanged(initialScopeMap, changed.files, fullScopeKeys),
-    warnings: [],
-    verification: changed.trust,
-  };
+  return { scopeMap, warnings: [], verification: changed.trust };
 }
 
 /**
@@ -223,6 +254,24 @@ export async function executeFit(
       scope: check?.config.checkScope,
     };
   });
+  // `fitness.defaultTarget` is the documented tier-3 target for a check that
+  // declares no scope. Honour it only when it names a REGISTERED target — an
+  // unknown name would resolve to zero files and silently mute every scope-less
+  // check, so it surfaces as a warning and the file-cache fallback stands.
+  const configuredDefaultTarget =
+    fitnessResolved?.defaultTarget ?? signalersConfig.fitness.defaultTarget;
+  const defaultTargetWarnings: string[] = [];
+  let defaultTarget: string | undefined;
+  if (configuredDefaultTarget !== undefined) {
+    if (targetRegistry.getByName(configuredDefaultTarget) === undefined) {
+      defaultTargetWarnings.push(
+        `Configured fitness.defaultTarget '${configuredDefaultTarget}' is not a defined target; ` +
+          'scope-less checks fall back to the whole project file set.',
+      );
+    } else {
+      defaultTarget = configuredDefaultTarget;
+    }
+  }
   // `analyzeAll` checks verify CROSS-FILE / whole-repo invariants (e.g. "these two
   // composition roots must share one helper"), so they cannot be narrowed to a
   // `--changed` subset — a target that simply didn't change would read as absent.
@@ -237,8 +286,14 @@ export async function executeFit(
   );
   const changedResolution = resolveFitScopeMap(
     args,
-    buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd),
-    fullScopeKeys,
+    buildScopeBasedFileMap(allChecks, targetRegistry, targetsConfig, args.cwd, {
+      ...(defaultTarget === undefined ? {} : { defaultTarget }),
+    }),
+    {
+      fullScopeKeys,
+      allCheckKeys: allChecks.map((c) => c.id ?? c.slug),
+      globalExcludes: targetsConfig.globalExcludes,
+    },
   );
   const scopeMap = changedResolution.scopeMap;
   const checkTargetFiles =
@@ -260,7 +315,19 @@ export async function executeFit(
     globalExcludes: targetsConfig.globalExcludes,
   });
 
-  const fitResultOrError = await runRecipeOrAdHoc(service, args, recipeName);
+  // ADR-0023: `fitness.timeout` / `fitness.maxParallel` are project-level
+  // scheduling knobs. They are resolved here (scope block > file-sourced block)
+  // and folded over the selected recipe's execution options by
+  // `runRecipeOrAdHoc` — without this the recipe's hard-coded values won and
+  // both knobs were validated, documented, and inert.
+  const configTimeout = fitnessResolved?.timeout ?? signalersConfig.fitness.timeout;
+  const configMaxParallel = fitnessResolved?.maxParallel ?? signalersConfig.fitness.maxParallel;
+  const executionOverrides = {
+    ...(configTimeout === undefined ? {} : { timeout: configTimeout }),
+    ...(configMaxParallel === undefined ? {} : { maxParallel: configMaxParallel }),
+  };
+
+  const fitResultOrError = await runRecipeOrAdHoc(service, args, recipeName, executionOverrides);
   if ('error' in fitResultOrError) return { result: fitResultOrError.error };
   const fitnessResult = fitResultOrError;
 
@@ -277,7 +344,12 @@ export async function executeFit(
   // and from config validation (validateLanguagesAgainstAdapters). Both flow
   // through the result rather than direct stderr writes so the live renderer
   // can surface them without breaking Ink's frame tracking.
-  const warnings = [...getLoadWarnings(), ...validationWarnings, ...changedResolution.warnings];
+  const warnings = [
+    ...getLoadWarnings(),
+    ...validationWarnings,
+    ...defaultTargetWarnings,
+    ...changedResolution.warnings,
+  ];
 
   const result = buildFitPresentation({
     args,

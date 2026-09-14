@@ -101,6 +101,55 @@ describe('decodeSessionPayload — fit-style options (all relaxed)', () => {
   });
 });
 
+/**
+ * Regression: the decoder dropped `fingerprint`, so a replayed session's signals
+ * were unstamped and matched no baseline row — a baseline comparison then
+ * reported every stored row as RESOLVED even when the run was identical.
+ */
+describe('decodeSessionPayload — fingerprint round-trip (ADR-0036 baseline identity)', () => {
+  it('decodes the persisted fingerprint regardless of tool options', () => {
+    const decoded = decodeSessionPayload(
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({
+            findings: [{ ruleId: 'r', message: 'm', severity: 'error', fingerprint: 'fp-abc123' }],
+          }),
+        ],
+      },
+      { tool: 'fit' },
+    );
+    expect(decoded.checks[0].findings[0].fingerprint).toBe('fp-abc123');
+  });
+
+  it('omits fingerprint on a legacy row that never stored one', () => {
+    const decoded = decodeSessionPayload(
+      { summary: SUMMARY, checks: [fitCheck()] },
+      { tool: 'fit' },
+    );
+    expect(decoded.checks[0].findings[0]).not.toHaveProperty('fingerprint');
+  });
+
+  it('treats an empty or non-string fingerprint as absent (the plane keys on non-empty only)', () => {
+    const decoded = decodeSessionPayload(
+      {
+        summary: SUMMARY,
+        checks: [
+          fitCheck({
+            findings: [
+              { ruleId: 'r', message: 'm', severity: 'error', fingerprint: '' },
+              { ruleId: 'r2', message: 'm', severity: 'error', fingerprint: 42 },
+            ],
+          }),
+        ],
+      },
+      { tool: 'fit' },
+    );
+    expect(decoded.checks[0].findings[0]).not.toHaveProperty('fingerprint');
+    expect(decoded.checks[0].findings[1]).not.toHaveProperty('fingerprint');
+  });
+});
+
 describe('decodeSessionPayload — repair round-trip (ADR-0086)', () => {
   it('decodes a full repair contract regardless of tool options', () => {
     const repair = {

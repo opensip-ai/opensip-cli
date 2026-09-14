@@ -295,10 +295,34 @@ export function installPreActionHook(
     const inherited = hostEnv.get<string>('OPENSIP_RUN_ID');
     const runId = inherited && inherited.length > 0 ? inherited : generatePrefixedId('run');
     const opts = actionCommand.opts();
-    const cwd = (opts.cwd as string) ?? process.cwd();
-    const cwdExplicit = actionCommand.getOptionValueSource('cwd') === 'cli';
+    // Project selection must be read through the GLOBALS-RESOLVED view, never the
+    // action command's local option bag. This program never calls Commander's
+    // `enablePositionalOptions`, so options are non-positional: a flag typed
+    // anywhere on the command line is consumed by the OUTERMOST command in the
+    // chain that declares it. For `--cwd` / `--config` that is the tool PRIMARY
+    // (`fit`, `graph`, …), not the nested `<tool> <verb>` child that Commander
+    // hands this hook as `actionCommand` — so `opensip graph index --cwd /elsewhere`
+    // leaves the child's local `cwd` at its own seeded `process.cwd()` default
+    // while the primary holds the typed value. Reading locals there selected the
+    // wrong project (and, against the argv-scanned startup lease, surfaced as a
+    // misleading "canonical project root changed during startup" refusal), and
+    // dropped `--config` entirely for nested verbs.
+    //
+    // `optsWithGlobals()` merges ancestors over locals and
+    // `getOptionValueSourceWithGlobals()` mirrors that precedence — outermost
+    // declarer wins, which is exactly the command that consumed the user's token.
+    // This is the same view the ACTION HANDLER already reads (`splitActionArgs` in
+    // commands/mount-command-action.ts), so hook and handler cannot disagree. For a
+    // flat command the actionCommand IS the declaring command and both readers are
+    // identical to `opts()` / `getOptionValueSource()`.
+    const resolvedOpts = actionCommand.optsWithGlobals();
+    const cwd = (resolvedOpts.cwd as string) ?? process.cwd();
+    const cwdExplicit = actionCommand.getOptionValueSourceWithGlobals('cwd') === 'cli';
 
     const prepared = await prepareLeasedBootstrapPlan({
+      // The plan's option bag stays the LIVE local object: the write-back below
+      // publishes `projectContext` / `cwdExplicit` onto it, and Commander hands
+      // that same object to the action continuation.
       opts: opts,
       cwd,
       cwdExplicit,
@@ -306,7 +330,7 @@ export function installPreActionHook(
       commandName: actionCommand.name(),
       commandPath: commandPath(actionCommand),
       commandScopes,
-      explicitConfigPath: opts.config as string | undefined,
+      explicitConfigPath: resolvedOpts.config as string | undefined,
       ...(startupRuntimeLease === undefined ? {} : { startupRuntimeLease }),
       ...(startupLeaseEvents === undefined ? {} : { startupLeaseEvents }),
     });

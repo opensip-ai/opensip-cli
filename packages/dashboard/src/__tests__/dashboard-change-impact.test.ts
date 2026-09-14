@@ -73,6 +73,44 @@ const graphCatalog: GraphCatalog = {
   },
 };
 
+/**
+ * The same catalog, padded with higher-blast filler so that a small
+ * `maxGraphCatalogBytes` provably drops `src.changed` from the projection the
+ * report embeds. `changed`/`twin` carry the heaviest payload and the lowest
+ * blast score, so the importance ranking in `code-paths/bound-catalog.ts` puts
+ * them last and no leftover budget can readmit them.
+ */
+function catalogWithHigherBlastFiller(fillerCount: number): GraphCatalog {
+  const template = graphCatalog.functions.changed[0];
+  const heavy = (occurrence: typeof template): typeof template => ({
+    ...occurrence,
+    returnType: 'padding'.repeat(600),
+  });
+  const functions: Record<string, (typeof template)[]> = {
+    changed: [heavy(template)],
+    twin: [heavy(graphCatalog.functions.twin[0])],
+  };
+  const metrics: Record<string, unknown> = {
+    changed: { bodyLines: 1, blast: { direct: 0, transitive: 0, score: 0 } },
+    twin: { bodyLines: 1, blast: { direct: 0, transitive: 0, score: 0 } },
+  };
+  for (let index = 0; index < fillerCount; index++) {
+    const name = `filler_${String(index).padStart(3, '0')}`;
+    functions[name] = [
+      {
+        ...template,
+        bodyHash: `body-${name}`,
+        simpleName: name,
+        qualifiedName: `src.${name}`,
+        filePath: `src/${name}.ts`,
+        returnType: 'padding'.repeat(60),
+      },
+    ];
+    metrics[name] = { bodyLines: 40, blast: { direct: 5, transitive: 20, score: 99 } };
+  }
+  return { ...graphCatalog, functions, features: { function: metrics } } as GraphCatalog;
+}
+
 function reviewBrief(message = 'Review the changed function.'): ReviewBrief {
   const risk = {
     source: 'fit',
@@ -455,6 +493,51 @@ describe('Change Impact generated report', () => {
     );
     expect(panel?.textContent).toContain('src/caller.ts');
     expect(panel?.textContent).toContain('src: 1 function(s)');
+  });
+
+  it('offers no Open button for a function the report budget dropped from the embedded catalog', () => {
+    // The "Open" click resolves against the BOUNDED catalog the page carries,
+    // not the stored one. Computing availability from the full catalog offers a
+    // button that dead-ends on "This function is not present as one exact
+    // occurrence in the current graph catalog" — for most rows on any repo big
+    // enough to truncate.
+    const run = auditRun('RUN_bounded', '2026-07-12T00:00:01.000Z', 'session-bounded');
+    bootReport({
+      sessions: [impactSession('session-bounded')],
+      runs: [run],
+      graphCatalog: catalogWithHigherBlastFiller(40),
+      selection: { view: 'change-impact', runId: run.id },
+      // Far below what the padded catalog needs: truncation is guaranteed.
+      maxGraphCatalogBytes: 6000,
+    });
+
+    // The premise, asserted rather than assumed: the embedded blob kept filler
+    // and dropped the changed function.
+    const embedded = document.querySelector('#graph-catalog')?.textContent ?? '';
+    expect(embedded).toContain('src.filler_');
+    expect(embedded).not.toContain('src.changed');
+
+    const panel = document.querySelector<HTMLElement>('#panel-change-impact');
+    expect(panel?.querySelector('tbody th[scope="row"]')?.textContent).toBe('src.changed');
+    expect(panel?.querySelector('button.fc-action')).toBeNull();
+    expect(panel?.textContent).toContain('Code Paths unavailable');
+  });
+
+  it('keeps the Open button when the budget retains the changed function', () => {
+    const run = auditRun('RUN_unbounded', '2026-07-12T00:00:01.000Z', 'session-unbounded');
+    bootReport({
+      sessions: [impactSession('session-unbounded')],
+      runs: [run],
+      graphCatalog: catalogWithHigherBlastFiller(40),
+      selection: { view: 'change-impact', runId: run.id },
+      maxGraphCatalogBytes: 64 * 1024 * 1024,
+    });
+
+    const embedded = document.querySelector('#graph-catalog')?.textContent ?? '';
+    expect(embedded).toContain('src.changed');
+
+    const panel = document.querySelector<HTMLElement>('#panel-change-impact');
+    expect(panel?.querySelector('button.fc-action')?.textContent).toBe('Open');
   });
 
   it.each([

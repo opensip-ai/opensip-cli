@@ -51,11 +51,25 @@ interface CompiledGlobPattern {
   readonly staticTerminalGlobstarAlternatives: readonly boolean[];
 }
 
-export interface CompiledTarget {
-  readonly includes: readonly CompiledGlobPattern[];
+/**
+ * The two matcher layers a target's `exclude` list is evaluated through.
+ *
+ * `resolveTargets` feeds `exclude` into `globSync`'s `ignore` option AND then
+ * re-applies it through the shared post-glob filter, so an exclude is honoured
+ * when EITHER layer matches. Both layers are modelled here so every resolver
+ * (`resolveTargets`, `preResolveAllTargets`, `resolveTargetsBounded`) evaluates
+ * target excludes through one implementation.
+ */
+export interface CompiledTargetExcludes {
+  /** glob 13 `Ignore`-equivalent matchers (leading `./` stripped, absolute-aware, slash-tolerant). */
   readonly ignoreExcludes: readonly CompiledGlobPattern[];
-  readonly name: string;
+  /** Raw post-glob matchers, preserving the historical relative-path-only filter. */
   readonly postFilterExcludes: readonly Minimatch[];
+}
+
+export interface CompiledTarget extends CompiledTargetExcludes {
+  readonly includes: readonly CompiledGlobPattern[];
+  readonly name: string;
 }
 
 function stripLeadingDotSegments(pattern: string): string {
@@ -98,19 +112,47 @@ function compileGlobPattern(
   };
 }
 
+/**
+ * Compile one target's `exclude` list into the glob-`Ignore`-equivalent matchers
+ * plus the historical raw post-glob matchers.
+ *
+ * Shared by `compileTargets` (bounded resolution) and the synchronous
+ * `filterOneTargetFiles` in `resolve.ts`, so a `./`-prefixed, absolute, or
+ * trailing-slash-sensitive exclude cannot be honoured by one resolver and
+ * silently dropped by another.
+ */
+export function compileTargetExcludes(patterns: readonly string[]): CompiledTargetExcludes {
+  return {
+    ignoreExcludes: patterns.map((pattern) =>
+      compileGlobPattern(pattern, IGNORE_MATCH_OPTIONS, 'always'),
+    ),
+    postFilterExcludes: patterns.map(
+      (pattern) => new Minimatch(pattern, POST_FILTER_MATCH_OPTIONS),
+    ),
+  };
+}
+
+/** True when either exclude layer claims the file — mirrors glob's `ignore` + post-filter union. */
+export function excludesFile(
+  excludes: CompiledTargetExcludes,
+  relativePath: string,
+  absolutePath: string,
+): boolean {
+  return (
+    excludes.ignoreExcludes.some((pattern) =>
+      matchesGlobPattern(pattern, relativePath, absolutePath),
+    ) || excludes.postFilterExcludes.some((pattern) => pattern.match(relativePath))
+  );
+}
+
 export function compileTargets(targets: readonly TargetView[]): readonly CompiledTarget[] {
   return targets
     .map((target) => ({
       includes: target.config.include.map((pattern) =>
         compileGlobPattern(pattern, INCLUDE_MATCH_OPTIONS, 'globstar-tail'),
       ),
-      ignoreExcludes: target.config.exclude.map((pattern) =>
-        compileGlobPattern(pattern, IGNORE_MATCH_OPTIONS, 'always'),
-      ),
       name: target.config.name,
-      postFilterExcludes: target.config.exclude.map(
-        (pattern) => new Minimatch(pattern, POST_FILTER_MATCH_OPTIONS),
-      ),
+      ...compileTargetExcludes(target.config.exclude),
     }))
     .sort((left, right) => compareCodePointStrings(left.name, right.name));
 }
@@ -161,10 +203,7 @@ export function targetRetainsFile(
 ): boolean {
   return (
     target.includes.some((pattern) => matchesGlobPattern(pattern, relativePath, absolutePath)) &&
-    !target.ignoreExcludes.some((pattern) =>
-      matchesGlobPattern(pattern, relativePath, absolutePath),
-    ) &&
-    !target.postFilterExcludes.some((pattern) => pattern.match(relativePath))
+    !excludesFile(target, relativePath, absolutePath)
   );
 }
 

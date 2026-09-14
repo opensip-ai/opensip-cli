@@ -68,6 +68,13 @@ export interface DecodedSessionFinding {
   readonly metadata?: Readonly<Record<string, SessionPayloadScalar>>;
   /** Structured repair guidance (ADR-0086), preserved across the round-trip. */
   readonly repair?: SignalRepair;
+  /**
+   * The baseline fingerprint the tool stamped on the signal at construction
+   * time (ADR-0036), preserved across the round-trip. Absent on legacy rows
+   * persisted before the payloads carried it — consumers that compare against a
+   * baseline must treat that absence as "cannot compare", never as "resolved".
+   */
+  readonly fingerprint?: string;
 }
 
 /** A decoded per-check row. */
@@ -218,6 +225,10 @@ function decodeFinding(value: unknown, opts: DecodeSessionPayloadOptions): Decod
   // `repair` is a core cross-tool field (not tool vocabulary); decode it for any
   // tool whose payload carries it (absent on legacy/sim rows ⇒ undefined).
   const repair = decodeRepair(finding.repair);
+  // `fingerprint` is likewise a core cross-tool field (ADR-0036 baseline
+  // identity). An empty string is treated as absent — the baseline plane keys
+  // on non-empty fingerprints only.
+  const fingerprint = optionalNonEmptyString(finding.fingerprint);
   return {
     ruleId: stringField(finding, 'ruleId', label),
     message: stringField(finding, 'message', label),
@@ -228,6 +239,7 @@ function decodeFinding(value: unknown, opts: DecodeSessionPayloadOptions): Decod
     ...(suggestion === undefined ? {} : { suggestion }),
     ...(metadata === undefined ? {} : { metadata }),
     ...(repair === undefined ? {} : { repair }),
+    ...(fingerprint === undefined ? {} : { fingerprint }),
   };
 }
 
@@ -394,6 +406,10 @@ export function booleanField(
 
 function optionalString(value: unknown): string | undefined {
   return typeof value === 'string' ? value : undefined;
+}
+
+function optionalNonEmptyString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }
 
 function optionalNumber(value: unknown): number | undefined {

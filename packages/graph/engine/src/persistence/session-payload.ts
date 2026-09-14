@@ -44,6 +44,14 @@ export interface GraphSessionFinding {
   readonly metadata?: Readonly<Record<string, JsonScalar>>;
   /** Structured repair guidance (ADR-0086) — round-trips through replay. */
   readonly repair?: SignalRepair;
+  /**
+   * The baseline fingerprint stamped on the source signal at construction time
+   * (ADR-0036). Persisted verbatim so a replayed session carries the SAME
+   * fingerprint identity the gate captured — the baseline plane never
+   * re-fingerprints, so a payload that drops this makes every replayed signal
+   * unmatchable and a baseline comparison report every row as resolved.
+   */
+  readonly fingerprint?: string;
 }
 
 /** A persisted per-rule detail row — the structural subset the dashboard renders. */
@@ -122,6 +130,7 @@ export function buildGraphSessionPayload(
       suggestion: s.suggestion,
       ...(metadata ? { metadata } : {}),
       ...(s.repair === undefined ? {} : { repair: s.repair }),
+      ...(s.fingerprint === undefined ? {} : { fingerprint: s.fingerprint }),
     };
     let arr = byRule.get(s.ruleId);
     if (!arr) {

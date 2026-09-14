@@ -46,6 +46,11 @@ export function buildReplaySignal(input: BuildReplaySignalInput): Signal {
     ...codeLocation(input.finding, filePath, input.alwaysIncludeCode === true),
     metadata: input.metadata ?? {},
     ...(input.finding.repair === undefined ? {} : { repair: input.finding.repair }),
+    // ADR-0036: the fingerprint is stamped ONCE at construction time and the
+    // baseline seams only READ it, so replay must carry the persisted value
+    // through verbatim rather than leave it undefined (an unstamped replayed
+    // signal matches no baseline row, which reads as "everything was fixed").
+    ...(input.finding.fingerprint === undefined ? {} : { fingerprint: input.finding.fingerprint }),
     createdAt: input.stored.startedAt,
   };
 }

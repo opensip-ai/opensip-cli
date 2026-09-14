@@ -110,6 +110,10 @@ describe('buildFitEnvelope', () => {
               line: 3,
               column: 11,
               suggestion: 'keep the rich fields',
+              // The construction-time baseline stamp is persisted verbatim so a
+              // replayed session stays comparable to the stored baseline
+              // (ADR-0036: the plane never re-fingerprints).
+              fingerprint: '2ba1046533d9ab506c1dd6ef5f9047ec54cc4e452257850de70042710ec1d074',
             },
           ],
           durationMs: 7,

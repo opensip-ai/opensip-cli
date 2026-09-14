@@ -428,6 +428,54 @@ class Inline {
     expect(walk.occurrences.f).toBeDefined();
   });
 
+  it('gives an anonymous-class method its own enclosingClass, not the outer type', () => {
+    // Regression: `class_body` under `object_creation_expression` is not in
+    // TYPE_DECL_NODES, so the anonymous class's methods used to inherit the
+    // OUTER class's `enclosingClass`. `Outer.run` and the anonymous
+    // `Runnable.run` then produced a byte-identical qualifiedName (and hence
+    // an identical derived symbol id) for two genuinely different functions.
+    writeFileSync(
+      join(dir, 'Outer.java'),
+      `package x;
+class Outer {
+  Runnable r = new Runnable() {
+    public void run() { helper(); }
+  };
+  void run() { }
+  void helper() { }
+}
+`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const runs = walk.occurrences.run ?? [];
+    expect(runs).toHaveLength(2);
+    const qualified = runs.map((o) => o.qualifiedName);
+    expect(new Set(qualified).size).toBe(2);
+    expect(qualified).toContain('x.Outer.run');
+    const anon = runs.find((o) => o.qualifiedName !== 'x.Outer.run');
+    expect(anon?.enclosingClass).toMatch(/^Outer\.<anon:Runnable:/);
+  });
+
+  it('gives an enum-constant body its own enclosingClass, not the enum name', () => {
+    // Same class of bug via the other anonymous-body parent: `enum_constant`.
+    writeFileSync(
+      join(dir, 'E.java'),
+      `package x;
+enum E {
+  A { void go() { } };
+  void go() { }
+}
+`,
+      'utf8',
+    );
+    const walk = run(dir);
+    const gos = walk.occurrences.go ?? [];
+    expect(gos).toHaveLength(2);
+    const qualified = gos.map((o) => o.qualifiedName).sort();
+    expect(qualified).toEqual(['x.E.A.go', 'x.E.go']);
+  });
+
   it('emits a synthetic <module-init> per file', () => {
     writeFileSync(
       join(dir, 'A.java'),

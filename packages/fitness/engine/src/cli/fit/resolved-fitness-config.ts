@@ -27,6 +27,8 @@
 
 import { currentScope, isPlainRecord } from '@opensip-cli/core';
 
+import type { FitnessRecipe } from '../../recipes/types.js';
+
 /** The fitness namespace's resolved knobs (mirror of `FitnessNamespaceSchema`). */
 export interface ResolvedFitnessConfig {
   readonly defaultTarget?: string;
@@ -54,4 +56,48 @@ export interface ResolvedFitnessConfig {
 export function resolvedFitnessConfig(): ResolvedFitnessConfig | undefined {
   const block = currentScope()?.toolConfig?.fitness;
   return isPlainRecord(block) ? block : undefined;
+}
+
+/**
+ * The project-level scheduling knobs a `fitness:` config block may impose on
+ * the recipe that is about to run.
+ */
+export interface FitnessExecutionOverrides {
+  /** Per-check timeout in ms (`fitness.timeout`). */
+  readonly timeout?: number;
+  /** Cap on parallel checks (`fitness.maxParallel`). */
+  readonly maxParallel?: number;
+}
+
+/**
+ * Apply the project's `fitness.timeout` / `fitness.maxParallel` over the
+ * selected recipe's own execution options.
+ *
+ * Both knobs are validated by {@link FitnessNamespaceSchema} and documented in
+ * `docs/public/70-reference/03-configuration.md`, but nothing read them: a
+ * recipe's hard-coded `timeout` (30s on the built-in `default`) won every run,
+ * so a user who granted a slow check 120s still saw it recorded as a
+ * `timeout`-status unit fault. Config WINS when present — it is the narrower,
+ * project-specific statement of intent; when absent the recipe's own value (and
+ * below that the engine defaults) stands, so recipes that deliberately pick a
+ * long/short budget are unaffected.
+ *
+ * Returns the recipe unchanged when neither knob is set, so the common path
+ * keeps the exact frozen recipe object the registry handed out.
+ */
+export function applyFitnessExecutionOverrides(
+  recipe: FitnessRecipe,
+  overrides: FitnessExecutionOverrides | undefined,
+): FitnessRecipe {
+  const timeout = overrides?.timeout;
+  const maxParallel = overrides?.maxParallel;
+  if (timeout === undefined && maxParallel === undefined) return recipe;
+  return {
+    ...recipe,
+    execution: {
+      ...recipe.execution,
+      ...(timeout === undefined ? {} : { timeout }),
+      ...(maxParallel === undefined ? {} : { maxParallel }),
+    },
+  };
 }

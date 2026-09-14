@@ -82,14 +82,22 @@ export class ToolStateRepo {
         },
       );
     }
+    // Normalize `undefined` to a literal null ONCE, for both arms of the
+    // upsert. Drizzle DROPS undefined-valued keys from an
+    // `.onConflictDoUpdate({ set })` clause entirely (`.values()` coerces them
+    // to null instead), so passing the raw payload would omit the column from
+    // the UPDATE and silently preserve the previous value. `get()` deliberately
+    // distinguishes a stored null from a never-put key, so insert and update
+    // must agree on how `undefined` is stored.
+    const stored = payload ?? null;
     this.datastore.withWriteLock('tool_state.put', () => {
       const updatedAt = Date.now();
       this.datastore.db
         .insert(toolState)
-        .values({ tool, key, payload, updatedAt })
+        .values({ tool, key, payload: stored, updatedAt })
         .onConflictDoUpdate({
           target: [toolState.tool, toolState.key],
-          set: { payload, updatedAt },
+          set: { payload: stored, updatedAt },
         })
         .run();
     });

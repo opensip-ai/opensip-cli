@@ -8,6 +8,7 @@ import {
   record,
 } from './evidence.js';
 
+import type { CatalogFunctionSource } from './evidence.js';
 import type { ChangeImpactOmittedCounts, ChangeImpactViewModel } from './types.js';
 import type {
   GraphCatalog,
@@ -94,11 +95,26 @@ function parseReviewBrief(value: unknown): {
   return { state: 'available', value: parsed.data };
 }
 
-/** Join built-in audit runs to graph impact sessions only through RunStep.sessionId. */
+/**
+ * Join built-in audit runs to graph impact sessions only through RunStep.sessionId.
+ *
+ * Two catalogs, two different questions:
+ *
+ * - `currentCatalog` is the full STORED catalog and answers identity: is the
+ *   catalog this impact evidence was computed against still the catalog on
+ *   disk (`catalogMatch`)? Bounding is irrelevant to that comparison.
+ * - `embeddedCatalog` is the bounded projection the report actually inlines
+ *   (`code-paths/bound-catalog.ts`) and answers availability: can the browser
+ *   resolve this function when the reader clicks "Open"? Answering it from the
+ *   full catalog enables a button that dead-ends, because the click resolves
+ *   against the embedded blob — on a repository large enough to truncate, that
+ *   is most of the rows.
+ */
 export function projectChangeImpactRuns(
   runs: readonly ImpactDashboardRun[],
   sessions: readonly StoredSession[],
   currentCatalog: GraphCatalog | null,
+  embeddedCatalog: CatalogFunctionSource | null,
 ): readonly ChangeImpactViewModel[] {
   const eligible = runs.filter((run) => run.name === 'audit' && run.source === 'built-in-suite');
   const ordered = [...eligible].sort((left, right) => {
@@ -108,7 +124,7 @@ export function projectChangeImpactRuns(
     if (left.id > right.id) return 1;
     return 0;
   });
-  const functionIndex = buildCatalogFunctionIndex(currentCatalog);
+  const functionIndex = buildCatalogFunctionIndex(embeddedCatalog);
   return ordered.map((run): ChangeImpactViewModel => {
     const base = baseModel(run);
     const step = graphImpactStep(run.steps);

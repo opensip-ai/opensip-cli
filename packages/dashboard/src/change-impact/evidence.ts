@@ -131,6 +131,18 @@ export function catalogMatch(
 
 export type CatalogFunctionIndex = ReadonlyMap<string, readonly string[]>;
 
+/**
+ * Any catalog-shaped value carrying a function map.
+ *
+ * Structural rather than `GraphCatalog` because the navigation index must be
+ * built from the catalog the REPORT EMBEDS (the bounded projection in
+ * `code-paths/bound-catalog.ts`), which is a narrower shape. Every field read
+ * below is validated at runtime anyway.
+ */
+export interface CatalogFunctionSource {
+  readonly functions: Readonly<Record<string, readonly unknown[]>>;
+}
+
 function functionIdentity(value: {
   readonly qualifiedName: string;
   readonly filePath: string;
@@ -139,12 +151,26 @@ function functionIdentity(value: {
   return `${value.qualifiedName}\0${value.filePath}\0${String(value.line)}`;
 }
 
-export function buildCatalogFunctionIndex(catalog: GraphCatalog | null): CatalogFunctionIndex {
+/**
+ * Index `qualifiedName|filePath|line` → the body hashes present for it.
+ *
+ * This decides whether a changed/impacted function gets a working "Open"
+ * button, so it MUST be built from the catalog the report actually ships to the
+ * browser. Building it from the full stored catalog offers navigation into
+ * occurrences the page does not contain — the click then dead-ends on "This
+ * function is not present as one exact occurrence in the current graph
+ * catalog."
+ */
+export function buildCatalogFunctionIndex(
+  catalog: CatalogFunctionSource | null | undefined,
+): CatalogFunctionIndex {
   const mutable = new Map<string, string[]>();
   if (!catalog) return new Map();
   for (const occurrences of Object.values(catalog.functions)) {
-    for (const occurrence of occurrences) {
+    for (const entry of occurrences) {
+      const occurrence = record(entry);
       if (
+        !occurrence ||
         !safeDisplay(occurrence.qualifiedName) ||
         !safePath(occurrence.filePath) ||
         finiteCount(occurrence.line) === undefined ||
@@ -152,7 +178,11 @@ export function buildCatalogFunctionIndex(catalog: GraphCatalog | null): Catalog
       ) {
         continue;
       }
-      const key = functionIdentity(occurrence);
+      const key = functionIdentity({
+        qualifiedName: occurrence.qualifiedName,
+        filePath: occurrence.filePath,
+        line: occurrence.line as number,
+      });
       const hashes = mutable.get(key) ?? [];
       hashes.push(occurrence.bodyHash);
       mutable.set(key, hashes);

@@ -200,3 +200,55 @@ export function restrictFileMapToChanged(
   }
   return narrowed;
 }
+
+/** Inputs for {@link seedScopelessChangedTargets}. */
+export interface ScopelessSeedInput {
+  /**
+   * Scope-map keys (`check.config.id`) of EVERY check resolved for this run —
+   * including the ones scope resolution produced no entry for.
+   */
+  readonly allCheckKeys: readonly string[];
+  /** The `analyzeAll` checks, which keep their whole-repo view under `--changed`. */
+  readonly fullScopeKeys: ReadonlySet<string>;
+  /**
+   * The changed set as an absolute-path list, ALREADY filtered by
+   * `globalExcludes` (and by the inside-root guard `applyGlobalExcludes` adds).
+   */
+  readonly changedTargets: readonly string[];
+}
+
+/**
+ * Seed a changed-set entry for every per-file check that scope resolution left
+ * with NO key in the map at all — a check declaring no `scope` (or an empty
+ * `languages`/`concerns` pair) and carrying no `checkOverrides` entry.
+ *
+ * {@link restrictFileMapToChanged} can only narrow keys that ALREADY exist, so
+ * without this pass a scope-less check keeps `checkTargetFiles.get(checkId) ===
+ * undefined` under `--changed`/`--since`. Its `matchFiles()` then falls back to
+ * the whole prewarm universe (globalExcludes only) and the check silently scans
+ * the ENTIRE repo — every unchanged file included — while the run still reports
+ * a fully-verified changed-file narrowing. That is the same defect the two
+ * invariants on `restrictFileMapToChanged` close for keys that DO exist; this
+ * closes it for the absent-key case.
+ *
+ * The changed set is the tightest honest bound available for such a check: it
+ * has no target, so there are no target-level excludes to inherit, and
+ * `globalExcludes` has already been applied to `changedTargets` by the caller.
+ *
+ * `analyzeAll` (cross-file / whole-repo invariant) checks are deliberately NOT
+ * seeded: narrowing them to the changed subset would make an unchanged target
+ * read as absent, so an absent key — whole-repo fallback — is the correct
+ * behaviour for them, exactly as `fullScopeKeys` keeps full lists for the keys
+ * that exist.
+ */
+export function seedScopelessChangedTargets(
+  scopeMap: Map<string, readonly string[]>,
+  input: ScopelessSeedInput,
+): Map<string, readonly string[]> {
+  const seeded = new Map(scopeMap);
+  for (const key of input.allCheckKeys) {
+    if (seeded.has(key) || input.fullScopeKeys.has(key)) continue;
+    seeded.set(key, input.changedTargets);
+  }
+  return seeded;
+}

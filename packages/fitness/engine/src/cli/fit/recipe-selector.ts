@@ -19,7 +19,10 @@ import { fitnessScopeError } from '../../errors/fitness-scope-error.js';
 import { currentRecipeRegistry } from '../../framework/scope-registry.js';
 import { FitnessRecipeService } from '../../recipes/service.js';
 
-import type { FitnessRecipeResult } from '../../recipes/types.js';
+import { applyFitnessExecutionOverrides } from './resolved-fitness-config.js';
+
+import type { FitnessExecutionOverrides } from './resolved-fitness-config.js';
+import type { FitnessRecipe, FitnessRecipeResult } from '../../recipes/types.js';
 import type { ErrorResult, FitOptions } from '@opensip-cli/contracts';
 
 const log = createToolLogger('fitness:cli');
@@ -95,8 +98,18 @@ export function selectRecipe(
   return { recipeName: resolved.name };
 }
 
+/** Whether the project config imposes any execution knob on this run. */
+function hasExecutionOverrides(overrides: FitnessExecutionOverrides | undefined): boolean {
+  return overrides?.timeout !== undefined || overrides?.maxParallel !== undefined;
+}
+
 /**
  * Run the recipe (or ad-hoc selector built from `--check` / `--tags`).
+ *
+ * `executionOverrides` carries the project's `fitness.timeout` /
+ * `fitness.maxParallel`. This is the point where the run's execution options are
+ * finalized, so the override is applied to WHICHEVER recipe shape runs — named,
+ * `--check`, or `--tags` — rather than only to the named-recipe branch.
  *
  * @throws {Error} When neither `args.check` nor `args.tags` is set but
  *   `recipeName` is `undefined` — an invariant violation in the caller
@@ -106,14 +119,21 @@ export async function runRecipeOrAdHoc(
   service: FitnessRecipeService,
   args: FitOptions,
   recipeName: string | undefined,
+  executionOverrides?: FitnessExecutionOverrides,
 ): Promise<FitnessRecipeResult | { error: ErrorResult }> {
+  const withOverrides = (recipe: FitnessRecipe): FitnessRecipe =>
+    applyFitnessExecutionOverrides(recipe, executionOverrides);
   try {
     if (args.check) {
-      return await service.start(FitnessRecipeService.createAdHocRecipe({ check: args.check }));
+      return await service.start(
+        withOverrides(FitnessRecipeService.createAdHocRecipe({ check: args.check })),
+      );
     }
     const tagFilters = tagFiltersFrom(args.tags);
     if (tagFilters.length > 0) {
-      return await service.start(FitnessRecipeService.createAdHocRecipe({ tagFilters }));
+      return await service.start(
+        withOverrides(FitnessRecipeService.createAdHocRecipe({ tagFilters })),
+      );
     }
     // selectRecipe sets recipeName to undefined only when args.check or
     // args.tags are present — both of which return earlier in this function.
@@ -124,7 +144,17 @@ export async function runRecipeOrAdHoc(
         'runRecipeOrAdHoc: recipeName must be defined when args.check/args.tags are absent',
       );
     }
-    return await service.start(recipeName);
+    // Without config overrides the name goes straight to `start`, exactly as
+    // before — no pre-resolution, so the registry lookup + NotFoundError stay
+    // wholly owned by the service. Only when the project actually imposes a
+    // knob do we resolve the recipe here to fold it in; a name the registry does
+    // not know is still forwarded AS THE NAME so `start` raises its own
+    // NotFoundError and the established failure path is unchanged.
+    if (!hasExecutionOverrides(executionOverrides)) {
+      return await service.start(recipeName);
+    }
+    const named = service.getRecipe(recipeName);
+    return await service.start(named === undefined ? recipeName : withOverrides(named));
   } catch (error) {
     const projectedMessage = toPublicFailureProjection(normalizeFailure(error)).message;
     const message =

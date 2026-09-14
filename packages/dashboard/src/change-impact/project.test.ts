@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { CATALOG_IDENTITY_DIGEST_VECTORS } from './__tests__/catalog-identity-digest-vectors.fixture.js';
-import { boundChangeImpactRuns, projectChangeImpactRuns } from './project.js';
+import { boundChangeImpactRuns, projectChangeImpactRuns as projectRuns } from './project.js';
 
 import type { DashboardRun } from '../generator.js';
 import type {
@@ -15,6 +15,22 @@ import type {
 
 function digest(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+type ProjectArgs = Parameters<typeof projectRuns>;
+
+/**
+ * Project with the embedded (bounded) catalog defaulting to the full stored
+ * one — the untruncated case, which is what every test here except the
+ * bounding regression is about. Truncation passes the two explicitly.
+ */
+function projectChangeImpactRuns(
+  runs: ProjectArgs[0],
+  sessions: ProjectArgs[1],
+  currentCatalog: ProjectArgs[2],
+  embeddedCatalog: ProjectArgs[3] = currentCatalog,
+): ReturnType<typeof projectRuns> {
+  return projectRuns(runs, sessions, currentCatalog, embeddedCatalog);
 }
 
 describe('catalog identity digest vectors', () => {
@@ -335,6 +351,44 @@ describe('projectChangeImpactRuns', () => {
       navigation: 'ambiguous',
     });
     expect(model?.evidence?.changedFunctions[0]?.bodyHash).toBeUndefined();
+  });
+
+  it('withholds navigation for a function the embedded catalog dropped to fit its budget', () => {
+    // The stored catalog still has `src.changed`; the bounded projection the
+    // report inlines does not. Navigation must follow the EMBEDDED population —
+    // an "Open" button computed from the full catalog resolves against a blob
+    // that no longer carries the occurrence and dead-ends on "This function is
+    // not present as one exact occurrence in the current graph catalog."
+    const [model] = projectRuns([run()], [session()], catalog, { functions: {} });
+
+    // Identity is a separate question and is unaffected by bounding.
+    expect(model?.catalogMatch).toBe('matching');
+    expect(model?.evidence?.changedFunctions[0]).toMatchObject({
+      qualifiedName: 'src.changed',
+      navigation: 'not-found',
+    });
+    expect(model?.evidence?.changedFunctions[0]?.bodyHash).toBeUndefined();
+  });
+
+  it('keeps navigation for a function the embedded catalog retained', () => {
+    const embedded = {
+      functions: {
+        changed: [
+          {
+            bodyHash: 'body-changed',
+            qualifiedName: 'src.changed',
+            filePath: 'src/a.ts',
+            line: 1,
+          },
+        ],
+      },
+    };
+    const [model] = projectRuns([run()], [session()], catalog, embedded);
+
+    expect(model?.evidence?.changedFunctions[0]).toMatchObject({
+      navigation: 'available',
+      bodyHash: 'body-changed',
+    });
   });
 
   it('isolates malformed runs, orders deterministically, and bounds history while retaining selection', () => {

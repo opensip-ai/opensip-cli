@@ -77,6 +77,90 @@ describe('unbounded-memory bounded-collection directive', () => {
   });
 });
 
+describe('readline-cleanup prose in comments', () => {
+  // The cleanup-exemption patterns used to be the bare words /finally/ and
+  // /using\s/, tested against the whole file with comments still present — so
+  // one sentence containing "using" (or "finally") suppressed every
+  // readline.createInterface() finding in that file.
+  it('still flags an uncleaned readline when a comment merely contains the word "using"', async () => {
+    fixture(
+      'src/prompt.ts',
+      [
+        "import * as readline from 'node:readline';",
+        '',
+        'export function prompt(): void {',
+        '  // Read a line using the stdin stream.',
+        '  const rl = readline.createInterface({ input: process.stdin });',
+        "  rl.question('name? ', () => undefined);",
+        '}',
+      ].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('readline-no-cleanup');
+  });
+
+  it('still flags an uncleaned readline when a comment merely contains the word "finally"', async () => {
+    fixture(
+      'src/prompt.ts',
+      [
+        "import * as readline from 'node:readline';",
+        '',
+        'export function prompt(): void {',
+        '  // Prompt the user and finally hand the answer back to the caller.',
+        '  const rl = readline.createInterface({ input: process.stdin });',
+        "  rl.question('name? ', () => undefined);",
+        '}',
+      ].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('readline-no-cleanup');
+  });
+
+  it('still recognises a real finally block as cleanup', async () => {
+    fixture(
+      'src/prompt.ts',
+      [
+        "import * as readline from 'node:readline';",
+        '',
+        'export function prompt(): void {',
+        '  const rl = readline.createInterface({ input: process.stdin });',
+        '  try {',
+        "    rl.question('name? ', () => undefined);",
+        '  } finally {',
+        '    rl.close();',
+        '  }',
+        '}',
+      ].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).not.toContain(
+      'readline-no-cleanup',
+    );
+  });
+
+  it('still recognises an explicit `using` resource declaration as cleanup', async () => {
+    fixture(
+      'src/prompt.ts',
+      [
+        "import * as readline from 'node:readline';",
+        '',
+        'export function prompt(): void {',
+        '  using rl = readline.createInterface({ input: process.stdin });',
+        "  rl.question('name? ', () => undefined);",
+        '}',
+      ].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).not.toContain(
+      'readline-no-cleanup',
+    );
+  });
+});
+
 describe('transaction callback comments', () => {
   it('recognizes a callback-managed transaction after an inline comment', async () => {
     fixture('src/transaction.ts', 'db.transaction(/* managed */ async(tx) => tx.insert(record));');

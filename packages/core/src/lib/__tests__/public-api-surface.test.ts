@@ -65,6 +65,56 @@ describe('public API surface discovery', () => {
     }
   });
 
+  it('maps dual esm/cjs build layouts back to a single source tree', () => {
+    const root = tempPackage();
+    try {
+      writeJson(join(root, 'package.json'), {
+        name: 'fixture-dual-build',
+        exports: {
+          '.': {
+            types: './dist/esm/index.d.ts',
+            import: './dist/esm/index.js',
+            require: './dist/cjs/index.cjs',
+          },
+        },
+      });
+      writeFileSync(
+        join(root, 'src', 'index.ts'),
+        "export { Thing } from './thing.js';\nimport './private.js';\n",
+      );
+      writeFileSync(join(root, 'src', 'thing.ts'), 'export const Thing = 1;\n');
+      writeFileSync(join(root, 'src', 'private.ts'), 'export const Private = 1;\n');
+
+      _resetPublicApiGraphCache();
+      expect(isInPublicApiSurface(join(root, 'src', 'index.ts'))).toBe(true);
+      expect(isInPublicApiSurface(join(root, 'src', 'thing.ts'))).toBe(true);
+      // The surface is determined (not open-failed), so internals stay private.
+      expect(isInPublicApiSurface(join(root, 'src', 'private.ts'))).toBe(false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      _resetPublicApiGraphCache();
+    }
+  });
+
+  it('fails open when entries exist but none resolve to a source file', () => {
+    const root = tempPackage();
+    try {
+      writeJson(join(root, 'package.json'), {
+        name: 'fixture-unresolvable-entries',
+        exports: { '.': './dist/bundle-only/entry.js' },
+      });
+      writeFileSync(join(root, 'src', 'file.ts'), 'export const x = 1;\n');
+
+      _resetPublicApiGraphCache();
+      // Entries existed but mapped to nothing — treat the surface as unknown
+      // rather than silently reporting an empty public API for the package.
+      expect(isInPublicApiSurface(join(root, 'src', 'file.ts'))).toBe(true);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      _resetPublicApiGraphCache();
+    }
+  });
+
   it('uses main/module fallback entries when exports is absent', () => {
     const root = tempPackage();
     try {

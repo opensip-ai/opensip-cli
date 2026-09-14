@@ -190,6 +190,100 @@ describe('boundGraphCatalog', () => {
   });
 });
 
+describe('boundGraphCatalog — coupling edges', () => {
+  // Two package pairs: one whose call site survives bounding, one whose
+  // occurrences are heavy and blast-zero and therefore do not.
+  function couplingCatalog(): GraphCatalog {
+    const call = (target: string): Record<string, unknown> => ({
+      to: [target],
+      line: 1,
+      column: 0,
+      resolution: 'static',
+      confidence: 'high',
+      text: 'callee()',
+    });
+    const functions = {
+      keptCaller: [
+        occurrence('body-kept-caller', {
+          package: 'kept-caller',
+          filePath: 'packages/kept-caller/src/a.ts',
+          calls: [call('body-kept-callee')],
+        }),
+      ],
+      keptCallee: [
+        occurrence('body-kept-callee', {
+          package: 'kept-callee',
+          filePath: 'packages/kept-callee/src/b.ts',
+        }),
+      ],
+      droppedCaller: [
+        occurrence('body-dropped-caller', {
+          package: 'dropped-caller',
+          filePath: 'packages/dropped-caller/src/c.ts',
+          returnType: 'x'.repeat(4000),
+          calls: [call('body-dropped-callee')],
+        }),
+      ],
+      droppedCallee: [
+        occurrence('body-dropped-callee', {
+          package: 'dropped-callee',
+          filePath: 'packages/dropped-callee/src/d.ts',
+          returnType: 'x'.repeat(4000),
+        }),
+      ],
+    };
+    return {
+      version: '2.0',
+      language: 'typescript',
+      cacheKey: 'ck',
+      builtAt: '2026-07-14T00:00:00.000Z',
+      resolutionMode: 'exact',
+      functions,
+      features: {
+        function: {
+          keptCaller: { bodyLines: 1, blast: { score: 100 } },
+          keptCallee: { bodyLines: 1, blast: { score: 100 } },
+          droppedCaller: { bodyLines: 1, blast: { score: 0 } },
+          droppedCallee: { bodyLines: 1, blast: { score: 0 } },
+        },
+        edge: [
+          { callerPackage: 'kept-caller', calleePackage: 'kept-callee', count: 1 },
+          { callerPackage: 'dropped-caller', calleePackage: 'dropped-callee', count: 42 },
+        ],
+      },
+    } as unknown as GraphCatalog;
+  }
+
+  function edgesOf(bounded: ReturnType<typeof boundGraphCatalog>): readonly { count: number }[] {
+    return (bounded.catalog?.features as { edge: readonly { count: number }[] }).edge;
+  }
+
+  it('drops the cells whose call sites did not survive bounding', () => {
+    // A coupling cell counts `features.edge`, but the drilldown behind it walks
+    // the (bounded) `functions` map. Keeping a "42" whose occurrences were
+    // dropped renders a count that opens onto "No call sites found."
+    const bounded = boundGraphCatalog(couplingCatalog(), 2000);
+
+    expect(bounded.omittedFunctions).toBeGreaterThan(0);
+    expect(edgesOf(bounded)).toEqual([
+      { callerPackage: 'kept-caller', calleePackage: 'kept-callee', count: 1 },
+    ]);
+  });
+
+  it('keeps the engine rows verbatim — counts included — when nothing was dropped', () => {
+    // The matrix is the WHOLE-GRAPH count by design: bounding is the only thing
+    // that may narrow it, and an untruncated report must be byte-identical to
+    // what the engine emitted.
+    const bounded = boundGraphCatalog(couplingCatalog(), 64 * 1024 * 1024);
+
+    expect(bounded.omittedFunctions).toBe(0);
+    expect(edgesOf(bounded)).toEqual([
+      { callerPackage: 'kept-caller', calleePackage: 'kept-callee', count: 1 },
+      { callerPackage: 'dropped-caller', calleePackage: 'dropped-callee', count: 42 },
+    ]);
+  });
+});
+
 describe('boundGraphCatalog — caller-supplied budget', () => {
   it('honours a raised budget so a local explorer can see the whole catalog', () => {
     // The default would truncate this catalog; a bigger budget must not.
