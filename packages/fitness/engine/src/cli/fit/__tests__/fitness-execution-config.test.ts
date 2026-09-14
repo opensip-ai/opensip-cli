@@ -183,21 +183,38 @@ describe('buildScopeBasedFileMap — fitness.defaultTarget', () => {
   const config: TargetsConfig = { globalExcludes: [], checkOverrides: {} };
 
   it('resolves a scope-less check to the configured default target', () => {
-    const out = buildScopeBasedFileMap([{ slug: 'unscoped' }], registryWithSource(), config, testDir, {
-      defaultTarget: 'source',
-    });
+    const out = buildScopeBasedFileMap(
+      [{ slug: 'unscoped' }],
+      registryWithSource(),
+      config,
+      testDir,
+      {
+        defaultTarget: 'source',
+      },
+    );
     expect(out.get('unscoped')).toEqual([join(testDir, 'src', 'a.ts')]);
   });
 
   it('still returns no entry for a scope-less check when no default target is configured', () => {
-    const out = buildScopeBasedFileMap([{ slug: 'unscoped' }], registryWithSource(), config, testDir);
+    const out = buildScopeBasedFileMap(
+      [{ slug: 'unscoped' }],
+      registryWithSource(),
+      config,
+      testDir,
+    );
     expect(out.has('unscoped')).toBe(false);
   });
 
   it('ignores an unknown default-target name rather than resolving it to zero files', () => {
-    const out = buildScopeBasedFileMap([{ slug: 'unscoped' }], registryWithSource(), config, testDir, {
-      defaultTarget: 'typo',
-    });
+    const out = buildScopeBasedFileMap(
+      [{ slug: 'unscoped' }],
+      registryWithSource(),
+      config,
+      testDir,
+      {
+        defaultTarget: 'typo',
+      },
+    );
     // Resolving a typo to `[]` would silently mute every scope-less check; the
     // file-cache fallback stands instead (and `executeFit` warns).
     expect(out.has('unscoped')).toBe(false);
@@ -248,7 +265,10 @@ function writeProject(fitnessBlock: Record<string, unknown>): Record<string, unk
   return { targets, fitness: fitnessBlock };
 }
 
-function withFitScope<T>(configDocument: Record<string, unknown>, fn: () => Promise<T>): Promise<T> {
+function withFitScope<T>(
+  configDocument: Record<string, unknown>,
+  fn: () => Promise<T>,
+): Promise<T> {
   const scope = new RunScope({ languages: new LanguageRegistry() });
   applyToolContributeScope(scope, fitnessTool);
   Object.assign(scope, { configDocument });
@@ -270,24 +290,20 @@ describe('executeFit — fitness config knobs reach the run', () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it(
-    'enforces fitness.timeout instead of the recipe default',
-    { timeout: 15_000 },
-    async () => {
-      // The built-in `default` recipe declares 30s. With the config knob inert
-      // the never-settling check burns that full budget (and this test exceeds
-      // its own 15s allowance); with it honoured the unit is a 1s timeout.
-      probe.registerNeverSettles = true;
-      const doc = writeProject({ timeout: 1000 });
-      const fit = await withFitScope(doc, () => executeFit(makeArgs()));
+  it('enforces fitness.timeout instead of the recipe default', { timeout: 15_000 }, async () => {
+    // The built-in `default` recipe declares 30s. With the config knob inert
+    // the never-settling check burns that full budget (and this test exceeds
+    // its own 15s allowance); with it honoured the unit is a 1s timeout.
+    probe.registerNeverSettles = true;
+    const doc = writeProject({ timeout: 1000 });
+    const fit = await withFitScope(doc, () => executeFit(makeArgs()));
 
-      expect(fit.result.type).not.toBe('error');
-      const unit = fit.envelope?.units.find((u) => u.slug === 'never-settles');
-      expect(unit).toBeDefined();
-      expect(unit?.passed).toBe(false);
-      expect(String(unit?.error)).toMatch(/tim(ed|e)[- ]?out/i);
-    },
-  );
+    expect(fit.result.type).not.toBe('error');
+    const unit = fit.envelope?.units.find((u) => u.slug === 'never-settles');
+    expect(unit).toBeDefined();
+    expect(unit?.passed).toBe(false);
+    expect(String(unit?.error)).toMatch(/tim(ed|e)[- ]?out/i);
+  });
 
   it('scopes a scope-less check to fitness.defaultTarget instead of the whole project', async () => {
     const doc = writeProject({ defaultTarget: 'source' });

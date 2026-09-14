@@ -32,9 +32,9 @@ import { fitnessTool } from '../../../tool.js';
 import { executeFit } from '../../fit.js';
 import { seedScopelessChangedTargets } from '../changed-targeting.js';
 
+import type { FileAccessor } from '../../../framework/check-config.js';
 import type * as CheckLoaderModule from '../check-loader.js';
 import type { FitOptions } from '@opensip-cli/contracts';
-import type { FileAccessor } from '../../../framework/check-config.js';
 
 /** slug → every filePath the check's `analyze` was handed this run. */
 const analyzed = vi.hoisted(() => new Map<string, string[]>());
