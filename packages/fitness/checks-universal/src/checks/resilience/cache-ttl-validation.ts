@@ -276,6 +276,10 @@ export const cacheTtlValidation = defineCheck({
   id: 'a4d3b82d-d599-4ff1-be42-1313b1c11a70',
   slug: 'cache-ttl-validation',
   scope: { languages: ['typescript'], concerns: ['backend', 'server'] },
+  // Strings and comments are stripped before parsing: parseTtlsFromLine reads
+  // real assignment syntax only, so an example `ttl: N` snippet inside a
+  // doc comment (or a string literal) must never read as a live TTL.
+  contentFilter: 'strip-strings-and-comments',
 
   confidence: 'medium',
   description: 'Validate cache TTL values for appropriate caching behavior',
