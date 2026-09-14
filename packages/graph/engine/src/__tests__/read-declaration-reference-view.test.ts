@@ -78,6 +78,40 @@ const sampleBundle: SemanticFactBundle = {
 
 const filter = { sourceScope: 'all' as const, generated: 'include' as const };
 
+/**
+ * `boundedIterableGroups` retains at most 500 keys, so 501 distinct group keys
+ * is the smallest input that trips `group-key-cap`.
+ */
+const OVER_GROUP_CAP = 501;
+
+function padded(index: number): string {
+  return String(index).padStart(4, '0');
+}
+
+/** A bundle whose declarations span more distinct files than the group cap. */
+function overGroupCapDeclarationBundle(): SemanticFactBundle {
+  const declarations = Array.from({ length: OVER_GROUP_CAP }, (_unused, index) => ({
+    ...sampleBundle.declarations[0],
+    declarationId: `d${padded(index)}|pkg|src/f${padded(index)}.ts|interface|Foo${padded(index)}|0000000000000001|0000000000000000`,
+    name: `Foo${padded(index)}`,
+    qualifiedName: `src/f${padded(index)}.Foo${padded(index)}`,
+    filePath: `src/f${padded(index)}.ts`,
+  }));
+  return { ...sampleBundle, declarations, references: [] };
+}
+
+/** A bundle whose references to `d1` span more distinct files than the group cap. */
+function overGroupCapReferenceBundle(): SemanticFactBundle {
+  const targetId = sampleBundle.declarations[0].declarationId;
+  const references = Array.from({ length: OVER_GROUP_CAP }, (_unused, index) => ({
+    ...sampleBundle.references[0],
+    referenceId: `r${padded(index)}|src/u${padded(index)}.ts|type|0000000000000002|0000000000000000|d1`,
+    filePath: `src/u${padded(index)}.ts`,
+    targetDeclarationId: targetId,
+  }));
+  return { ...sampleBundle, references };
+}
+
 describe('searchDeclarationFacts', () => {
   it('reports unsupported inventory when the plane is absent', () => {
     const result = searchDeclarationFacts(
@@ -227,6 +261,39 @@ describe('searchDeclarationFacts', () => {
     );
     expect(miss.ok && miss.value.totalMatches).toBe(0);
   });
+
+  it('rolls a truncated grouping read into the top-level coverage summary', () => {
+    const result = searchDeclarationFacts(
+      catalog(overGroupCapDeclarationBundle(), 'exact'),
+      { query: 'Foo', match: 'substring', filter, limit: 20, groupBy: 'file' },
+      noMatcher.value,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // Grouping was genuinely computed — it must be marked requested so that
+    // rollupFacets (which aggregates requested facets only) sees its reasons.
+    expect(result.value.coverage.grouping.requested).toBe(true);
+    expect(result.value.coverage.grouping.truncated).toBe(true);
+    expect(result.value.coverage.grouping.reasons).toContain('group-key-cap');
+
+    expect(result.value.coverage.truncated).toBe(true);
+    expect(result.value.coverage.complete).toBe(false);
+    expect(result.value.coverage.reasons).toContain('group-key-cap');
+  });
+
+  it('keeps an untruncated grouping read requested and complete', () => {
+    const result = searchDeclarationFacts(
+      catalog(sampleBundle, 'exact'),
+      { query: 'Foo', match: 'substring', filter, limit: 20, groupBy: 'package' },
+      noMatcher.value,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.coverage.grouping.requested).toBe(true);
+    expect(result.value.coverage.grouping.complete).toBe(true);
+    expect(result.value.coverage.truncated).toBe(false);
+  });
 });
 
 describe('referencesToDeclaration', () => {
@@ -280,5 +347,64 @@ describe('referencesToDeclaration', () => {
       noMatcher.value,
     );
     expect(grouped.ok && grouped.value.groups?.some((g) => g.key === 'src/use.ts')).toBe(true);
+  });
+
+  it('rolls a truncated grouping read into the top-level coverage summary', () => {
+    const bundle = overGroupCapReferenceBundle();
+    const result = referencesToDeclaration(
+      catalog(bundle, 'exact'),
+      { declarationId: bundle.declarations[0].declarationId, filter, limit: 20, groupBy: 'file' },
+      noMatcher.value,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.coverage.grouping.requested).toBe(true);
+    expect(result.value.coverage.grouping.truncated).toBe(true);
+    expect(result.value.coverage.grouping.reasons).toContain('group-key-cap');
+
+    expect(result.value.coverage.truncated).toBe(true);
+    expect(result.value.coverage.complete).toBe(false);
+    expect(result.value.coverage.reasons).toContain('group-key-cap');
+  });
+
+  it('marks the evidence facet requested even when producer coverage is partial', () => {
+    const partial: SemanticFactBundle = {
+      ...sampleBundle,
+      coverage: {
+        ...sampleBundle.coverage,
+        status: 'partial',
+        omittedReferences: 1,
+        reasons: ['reference-cap'],
+      },
+    };
+    const result = referencesToDeclaration(
+      catalog(partial, 'exact'),
+      { declarationId: partial.declarations[0].declarationId, filter, limit: 20 },
+      noMatcher.value,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The evidence facet was computed from the reference sites; a partial
+    // producer must not flip it to unrequested (which would drop its reasons
+    // from the rollup and from every MCP consumer that forwards it verbatim).
+    expect(result.value.coverage.evidence.requested).toBe(true);
+    expect(result.value.coverage.evidence.complete).toBe(false);
+    expect(result.value.coverage.evidence.reasons).toContain('reference-cap');
+    expect(result.value.coverage.truncated).toBe(true);
+  });
+
+  it('marks the evidence facet requested and complete for complete producer coverage', () => {
+    const result = referencesToDeclaration(
+      catalog(sampleBundle, 'exact'),
+      { declarationId: sampleBundle.declarations[0].declarationId, filter, limit: 20 },
+      noMatcher.value,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.coverage.evidence.requested).toBe(true);
+    expect(result.value.coverage.evidence.complete).toBe(true);
+    expect(result.value.coverage.complete).toBe(true);
   });
 });

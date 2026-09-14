@@ -16,12 +16,19 @@ const READLINE_CREATE_PATTERN = /readline\.createInterface\s*\(/g;
 const READLINE_HELPER_PATTERN = /\breadLine\s*\(/g;
 
 /**
- * Patterns indicating proper cleanup
+ * Patterns indicating proper cleanup.
+ *
+ * Each entry must be anchored to real SYNTAX, never to a bare English word:
+ * the bare `/finally/` and `/using\s/` forms these replaced matched ordinary
+ * prose ("Read a line using the stdin stream"), so a single comment or
+ * identifier containing the word silently suppressed every finding in the file.
+ * `using` is therefore recognised only as an explicit resource declaration
+ * (`using rl = …` / `await using rl = …`) and `finally` only as a block header.
  */
 const CLEANUP_PATTERNS = [
   /\.close\s*\(/,
-  /finally/,
-  /using\s/,
+  /\bfinally\s*\{/,
+  /\b(?:await\s+)?using\s+[A-Za-z_$][\w$]*\s*=/,
   /\[Symbol\.dispose\]/,
   /\[Symbol\.asyncDispose\]/,
 ];
@@ -39,7 +46,11 @@ export const readlineCleanup = defineCheck({
     languages: ['typescript'],
     concerns: ['backend', 'frontend', 'cli'],
   },
-  contentFilter: 'strip-strings',
+  // Strings AND comments are stripped: the cleanup-exemption patterns are
+  // matched against the whole file, so prose in a comment ("…using the stdin
+  // stream", "…finally close it") must never read as a cleanup construct. The
+  // check reads no comment-based directive, so nothing needs the raw comments.
+  contentFilter: 'strip-strings-and-comments',
 
   confidence: 'medium',
   description: 'Detect readline usage without proper cleanup (close/finally)',

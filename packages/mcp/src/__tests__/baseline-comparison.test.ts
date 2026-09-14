@@ -57,6 +57,61 @@ describe('compareSignalsToBaseline', () => {
     ]);
   });
 
+  /**
+   * Regression: when NO current signal carries a fingerprint (exactly what a
+   * replayed session used to produce, because the persisted payload dropped the
+   * stamp), `currentFingerprints` is empty and every baseline row trivially
+   * looks resolved. `compare_to_baseline` then answered "all 12 findings were
+   * fixed" for a run whose findings were unchanged, with the
+   * `missing-fingerprint` note doing nothing to stop the wrong number being
+   * emitted as if confident.
+   */
+  it('refuses to report a confident resolved count when NO current signal is fingerprinted', () => {
+    const baselineRows: BaselineRow[] = [
+      { fingerprint: 'fp-1', payload: signal('one', 'fp-1') },
+      { fingerprint: 'fp-2', payload: signal('two', 'fp-2') },
+    ];
+
+    const result = compareSignalsToBaseline({
+      current: [signal('a'), signal('b')],
+      baselineRows,
+      includeResolved: true,
+    });
+
+    expect(result.delta).toEqual({
+      added: 0,
+      resolved: 0,
+      unchanged: 0,
+      missingFingerprint: 2,
+    });
+    expect(result.resolvedFindings).toEqual([]);
+    expect(result.degraded?.map((d) => d.code)).toEqual(['comparison-unavailable']);
+    expect(result.degraded?.[0]?.count).toBe(2);
+  });
+
+  it('still reports resolved rows when only SOME current signals lack a fingerprint', () => {
+    const result = compareSignalsToBaseline({
+      current: [signal('same', 'fp-same'), signal('missing')],
+      baselineRows: [
+        { fingerprint: 'fp-same', payload: signal('same', 'fp-same') },
+        { fingerprint: 'fp-gone', payload: signal('gone', 'fp-gone') },
+      ],
+    });
+
+    expect(result.delta).toMatchObject({ resolved: 1, unchanged: 1, missingFingerprint: 1 });
+    expect(result.degraded?.map((d) => d.code)).toEqual(['missing-fingerprint']);
+  });
+
+  it('a genuinely clean run (no current signals) still reports its baseline rows as resolved', () => {
+    const result = compareSignalsToBaseline({
+      current: [],
+      baselineRows: [{ fingerprint: 'fp-1', payload: signal('one', 'fp-1') }],
+    });
+
+    expect(result.delta).toMatchObject({ resolved: 1, missingFingerprint: 0 });
+    expect(result.degraded).toBeUndefined();
+  });
+
   it('omits optional resolved and degraded sections when not requested or unnecessary', () => {
     const result = compareSignalsToBaseline({
       current: [signal('same', 'fp-same')],

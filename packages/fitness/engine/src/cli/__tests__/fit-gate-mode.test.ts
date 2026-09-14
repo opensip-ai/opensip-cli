@@ -25,6 +25,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../fit.js', () => ({ executeFit: vi.fn() }));
 
+import { fitnessConfigDeclaration } from '../../config/fitness-config-schema.js';
+import { FITNESS_IDENTITY, FITNESS_LAYOUT_KEY } from '../../identity.js';
 import { runGateMode } from '../fit-modes.js';
 import { executeFit } from '../fit.js';
 
@@ -53,9 +55,20 @@ function mockCli(opts: { readonly degraded?: boolean } = {}): {
   cli: ToolCliContext;
   setExitCode: ReturnType<typeof vi.fn>;
   deliverSignals: ReturnType<typeof vi.fn>;
+  saveBaseline: ReturnType<typeof vi.fn>;
+  compareBaseline: ReturnType<typeof vi.fn>;
 } {
   const setExitCode = vi.fn();
   const deliverSignals = vi.fn(() => Promise.resolve());
+  const saveBaseline = vi.fn(() => Promise.resolve());
+  const compareBaseline = vi.fn(() =>
+    Promise.resolve({
+      added: [],
+      resolved: [],
+      unchanged: [],
+      degraded: opts.degraded ?? false,
+    }),
+  );
   const cli = {
     setExitCode,
     deliverSignals,
@@ -68,15 +81,8 @@ function mockCli(opts: { readonly degraded?: boolean } = {}): {
     // ADR-0036 host baseline seams — gate-save/compare route persistence + diff
     // through these (the host owns them); no-op stubs suffice for the exit/deliver
     // contract these tests assert.
-    saveBaseline: vi.fn(() => Promise.resolve()),
-    compareBaseline: vi.fn(() =>
-      Promise.resolve({
-        added: [],
-        resolved: [],
-        unchanged: [],
-        degraded: opts.degraded ?? false,
-      }),
-    ),
+    saveBaseline,
+    compareBaseline,
     exportBaselineSarif: vi.fn(() => Promise.resolve()),
     exportBaselineFingerprints: vi.fn(() => Promise.resolve()),
     scope: { datastore: () => datastore },
@@ -86,7 +92,7 @@ function mockCli(opts: { readonly degraded?: boolean } = {}): {
     },
     reportFailure: vi.fn(() => Promise.resolve()),
   } as unknown as ToolCliContext;
-  return { cli, setExitCode, deliverSignals };
+  return { cli, setExitCode, deliverSignals, saveBaseline, compareBaseline };
 }
 
 function gateSaveArgs(): FitOptions {
@@ -170,5 +176,59 @@ describe('runGateMode --gate-compare (ADR-0036 failOnDegraded)', () => {
     expect(deliverSignals).toHaveBeenCalledTimes(1);
     const [, opts] = deliverSignals.mock.calls[0] ?? [];
     expect(opts).toMatchObject({ cwd: '/x', runFailed: false });
+  });
+});
+
+/**
+ * Regression: the gate wrote the baseline under the CANONICAL tool name
+ * ('fitness'), but every reader resolves a tool by its SHORT id
+ * (`identity.layoutKey ?? identity.name` → 'fit'). MCP's `compare_to_baseline`
+ * therefore rejected `tool: 'fitness'` as unknown AND found nothing for
+ * `tool: 'fit'` — no argument could ever reach the fitness baseline, so a user
+ * who had just run `fit --gate-save` was told "No stored baseline exists for
+ * fit. Run opensip fit --gate-save to capture one."
+ */
+describe('runGateMode baseline namespace (short-id regression)', () => {
+  it('saves the baseline under fitness SHORT id, which is what tool resolvers expose', async () => {
+    vi.mocked(executeFit).mockResolvedValue(fitResult(true));
+    const { cli, saveBaseline } = mockCli();
+
+    await runGateMode(gateSaveArgs(), cli);
+
+    const [namespace] = saveBaseline.mock.calls[0] ?? [];
+    expect(namespace).toBe('fit');
+    // The short id is exactly what a tool resolver (e.g. MCP's validToolIds)
+    // derives from the tool identity — pinned so the two cannot drift apart.
+    expect(FITNESS_IDENTITY.layoutKey ?? FITNESS_IDENTITY.name).toBe(namespace);
+    expect(FITNESS_LAYOUT_KEY).toBe('fit');
+  });
+
+  it('compares against the same short-id namespace it saved under', async () => {
+    vi.mocked(executeFit).mockResolvedValue(fitResult(true));
+    const { cli, compareBaseline } = mockCli();
+
+    await runGateMode(gateCompareArgs(), cli);
+
+    expect(compareBaseline.mock.calls[0]?.[0]).toBe(FITNESS_LAYOUT_KEY);
+  });
+
+  it('still honours the `fitness:` config block for failOnDegraded after the namespace split', async () => {
+    // The baseline namespace ('fit') and the CONFIG namespace ('fitness') are
+    // deliberately different keys; the compare policy must keep reading the
+    // config one, otherwise `fitness.failOnDegraded: false` silently stops working.
+    vi.mocked(executeFit).mockResolvedValue(fitResult(true));
+    const { cli, deliverSignals } = mockCli({ degraded: true });
+    const scope = new RunScope({
+      languages: new LanguageRegistry(),
+      tools: new ToolRegistry(),
+    });
+    Object.assign(scope, { toolConfig: { fitness: { failOnDegraded: false } } });
+
+    await runWithScope(scope, () => runGateMode(gateCompareArgs(), cli));
+
+    expect(fitnessConfigDeclaration.namespace).toBe(FITNESS_IDENTITY.name);
+    expect(fitnessConfigDeclaration.namespace).not.toBe(FITNESS_LAYOUT_KEY);
+    const [, opts] = deliverSignals.mock.calls[0] ?? [];
+    expect(opts).toMatchObject({ runFailed: false });
   });
 });

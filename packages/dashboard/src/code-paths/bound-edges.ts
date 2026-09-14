@@ -1,0 +1,149 @@
+/**
+ * bound-edges — keep the coupling matrix's cells drillable after the catalog
+ * has been bounded.
+ *
+ * `boundGraphCatalog` drops the least important FUNCTIONS to fit the byte
+ * budget, but the engine-emitted `features.edge` rows (package→package call
+ * counts) are a separate, tiny payload that survives whole. The coupling view
+ * (`client/view-coupling.ts`) renders its cell counts from those rows, while
+ * the drilldown behind a cell enumerates the occurrences in `functions`. Its
+ * module comment states the resulting invariant outright:
+ *
+ *   "the drilldown below enumerates that same unfiltered population, so a
+ *    non-empty cell can never resolve to 'No call sites found'."
+ *
+ * That only holds while `functions` and `features.edge` describe the SAME
+ * population. Bounding breaks it: on a repository large enough to truncate, a
+ * cell reading "42" could open onto "No call sites found." — a count with no
+ * evidence behind it, which is exactly the "looks like an answer, isn't one"
+ * failure this product exists to prevent.
+ *
+ * So after bounding, an edge row is kept only when the RETAINED occurrences
+ * still contain at least one call site for that package pair. The count itself
+ * stays the engine's whole-graph number (the engine resolves call targets with
+ * more evidence than the report carries, and the drilldown is documented as a
+ * sample capped at 200 sites either way) — what is removed is only the cells
+ * that can no longer show anything at all.
+ *
+ * The pair walk deliberately mirrors the client's own resolution
+ * (`client/path-utils.ts#pkgOf` + `client/indexes.ts#resolveCalleeOcc`) rather
+ * than the engine's: the question being answered is "can the DRILLDOWN find a
+ * call site here", and the drilldown is the client code.
+ */
+
+import type { GraphPackageEdgeFeature } from '@opensip-cli/contracts';
+
+type Occurrence = Readonly<Record<string, unknown>>;
+type FunctionMap = Readonly<Record<string, readonly Occurrence[]>>;
+
+const UNKNOWN_PACKAGE = '<unknown>';
+const PAIR_SEPARATOR = ' ';
+
+/**
+ * The package identity the client attributes an occurrence to. Mirrors
+ * `client/path-utils.ts#pkgOf`: the build-time-stamped `package`, else the
+ * `packages/<name>/` path heuristic for older catalogs.
+ */
+function packageIdentityOf(occurrence: Occurrence): string {
+  const declared = occurrence.package;
+  if (typeof declared === 'string' && declared.length > 0) return declared;
+  const filePath = occurrence.filePath;
+  if (typeof filePath !== 'string' || filePath.length === 0) return UNKNOWN_PACKAGE;
+  const match = /^packages\/([^/]+)\//.exec(filePath);
+  return match ? match[1] : UNKNOWN_PACKAGE;
+}
+
+function qualifiedNameOf(occurrence: Occurrence): string {
+  return typeof occurrence.qualifiedName === 'string' ? occurrence.qualifiedName : '';
+}
+
+/** Group the retained occurrences by body hash, as the client's `buildIndexes` does. */
+function indexByBodyHash(functions: FunctionMap): Map<string, Occurrence[]> {
+  const byHash = new Map<string, Occurrence[]>();
+  for (const occurrences of Object.values(functions)) {
+    for (const occurrence of occurrences) {
+      const hash = occurrence.bodyHash;
+      if (typeof hash !== 'string') continue;
+      const bucket = byHash.get(hash);
+      if (bucket) bucket.push(occurrence);
+      else byHash.set(hash, [occurrence]);
+    }
+  }
+  return byHash;
+}
+
+/**
+ * Resolve one call target to the callee occurrence the caller can reach.
+ * Mirrors `client/indexes.ts#resolveCalleeOcc`: prefer a body-hash twin in the
+ * caller's own package, else the lowest qualified name, deterministically.
+ */
+function resolveCallee(
+  target: string,
+  callerPackage: string,
+  byHash: ReadonlyMap<string, readonly Occurrence[]>,
+): Occurrence | undefined {
+  const candidates = byHash.get(target);
+  if (!candidates || candidates.length === 0) return undefined;
+  if (candidates.length === 1) return candidates[0];
+  let samePackage: Occurrence | undefined;
+  let lowest = candidates[0];
+  for (const candidate of candidates) {
+    if (!samePackage && packageIdentityOf(candidate) === callerPackage) samePackage = candidate;
+    if (qualifiedNameOf(candidate) < qualifiedNameOf(lowest)) lowest = candidate;
+  }
+  return samePackage ?? lowest;
+}
+
+/** Every call target string on one occurrence's `calls` edges. */
+function callTargetsOf(occurrence: Occurrence): readonly string[] {
+  if (!Array.isArray(occurrence.calls)) return [];
+  const targets: string[] = [];
+  for (const edge of occurrence.calls as readonly unknown[]) {
+    if (typeof edge !== 'object' || edge === null) continue;
+    const to = (edge as { readonly to?: unknown }).to;
+    if (!Array.isArray(to)) continue;
+    for (const target of to as readonly unknown[]) {
+      if (typeof target === 'string') targets.push(target);
+    }
+  }
+  return targets;
+}
+
+/**
+ * The `callerPackage → calleePackage` pairs the drilldown can still enumerate
+ * at least one call site for, given only the retained occurrences.
+ */
+export function resolvableCouplingPairs(functions: FunctionMap): ReadonlySet<string> {
+  const byHash = indexByBodyHash(functions);
+  const pairs = new Set<string>();
+  for (const occurrences of byHash.values()) {
+    for (const occurrence of occurrences) {
+      const callerPackage = packageIdentityOf(occurrence);
+      for (const target of callTargetsOf(occurrence)) {
+        const callee = resolveCallee(target, callerPackage, byHash);
+        if (!callee) continue;
+        pairs.add(callerPackage + PAIR_SEPARATOR + packageIdentityOf(callee));
+      }
+    }
+  }
+  return pairs;
+}
+
+/**
+ * Drop the coupling cells whose call sites did not survive bounding.
+ *
+ * A row whose shape is not the engine's `{ callerPackage, calleePackage,
+ * count }` is dropped too: the coupling view keys its matrix off those two
+ * fields, so such a row could only ever render an `undefined → undefined` cell
+ * that no drilldown could answer.
+ */
+export function boundEdgeFeature(edge: unknown, functions: FunctionMap): unknown {
+  if (!Array.isArray(edge) || edge.length === 0) return edge;
+  const pairs = resolvableCouplingPairs(functions);
+  return (edge as readonly unknown[]).filter((row) => {
+    if (typeof row !== 'object' || row === null) return false;
+    const { callerPackage, calleePackage } = row as Partial<GraphPackageEdgeFeature>;
+    if (typeof callerPackage !== 'string' || typeof calleePackage !== 'string') return false;
+    return pairs.has(callerPackage + PAIR_SEPARATOR + calleePackage);
+  });
+}

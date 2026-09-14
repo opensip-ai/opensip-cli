@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { resolveTargetsBounded } from '../bounded-resolve.js';
 import { preResolveAllTargets, resolveTargets } from '../resolve.js';
 import { TargetRegistry } from '../target-registry.js';
 
@@ -119,5 +120,53 @@ describe('resolveTargets/preResolveAllTargets equivalence', () => {
     // preResolveAllTargets's case-sensitive-only post-filter kept `DROP.ts`
     // while resolveTargets's nocase glob `ignore` had already dropped it.
     expect(viaPreResolve).toEqual(viaResolveTargets);
+  });
+
+  // Regression: `resolveTargets` hands a target's `exclude` to globSync's
+  // `ignore`, which is glob 13's `Ignore` class. That class strips a leading
+  // `./`, collapses interior `.` segments (optimizationLevel 2), routes an
+  // absolute pattern against the entry's absolute path, and tests both
+  // `<relative>` and `<relative>/`. The shared post-glob filter used a bare
+  // `new Minimatch(ex, { dot, nocase })` tested only against the relative path,
+  // so `preResolveAllTargets` — which relies on that filter ALONE for target
+  // excludes — silently kept files the user had excluded. `opensip fit` resolves
+  // scope through `preResolveAllTargets`, so checks ran against files other
+  // tools correctly skipped from the same `opensip-cli.config.yml`.
+  describe.each([
+    { label: 'a leading ./ segment', exclude: (): string[] => ['./src/drop.ts'] },
+    { label: 'an interior . segment', exclude: (): string[] => ['src/./drop.ts'] },
+    { label: 'a leading ./ on a directory globstar', exclude: (): string[] => ['./src/sub/**'] },
+    { label: 'an absolute path', exclude: (): string[] => [join(testDir, 'src/drop.ts')] },
+    { label: 'a trailing-slash directory form', exclude: (): string[] => ['src/*/'] },
+  ])('a target exclude written with $label', ({ label, exclude }) => {
+    it(`is honoured identically by every resolver (${label})`, async () => {
+      fixture('src/keep.ts');
+      fixture('src/drop.ts');
+      fixture('src/sub/nested.ts');
+
+      const target = makeTarget('src', {
+        include: ['src/**/*.ts'],
+        exclude: exclude(),
+      });
+      const registry = new TargetRegistry();
+      registry.register(target);
+
+      const viaResolveTargets = resolveTargets([target], testDir, []);
+      const viaPreResolve = preResolveAllTargets(registry, [], testDir).get('src');
+      const viaBounded = await resolveTargetsBounded([target], testDir, [], { maxResults: 1000 });
+
+      // Anchor on the true outcome, not just parity: every form above must drop
+      // something, so a regression cannot pass by all resolvers agreeing that
+      // nothing is excluded.
+      const everything = [
+        join(testDir, 'src/drop.ts'),
+        join(testDir, 'src/keep.ts'),
+        join(testDir, 'src/sub/nested.ts'),
+      ];
+      expect(viaResolveTargets).not.toEqual(everything);
+
+      expect(viaPreResolve).toEqual(viaResolveTargets);
+      expect([...viaBounded.files]).toEqual([...viaResolveTargets]);
+    });
   });
 });

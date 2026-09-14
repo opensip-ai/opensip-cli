@@ -100,6 +100,7 @@ export interface McpEvidenceDegradation {
   readonly code:
     | 'missing-baseline'
     | 'missing-fingerprint'
+    | 'comparison-unavailable'
     | 'legacy-baseline-payload'
     | 'replay-unavailable'
     | 'decode-error'

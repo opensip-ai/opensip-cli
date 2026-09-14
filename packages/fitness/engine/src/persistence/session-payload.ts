@@ -34,6 +34,14 @@ interface FitnessSessionFinding {
   readonly suggestion?: string;
   /** Structured repair guidance (ADR-0086) — round-trips through replay. */
   readonly repair?: SignalRepair;
+  /**
+   * The baseline fingerprint stamped on the source signal at construction time
+   * (ADR-0036). Persisted verbatim so a replayed session carries the SAME
+   * fingerprint identity the gate captured — the baseline plane never
+   * re-fingerprints, so a payload that drops this makes every replayed signal
+   * unmatchable and a baseline comparison report every row as resolved.
+   */
+  readonly fingerprint?: string;
 }
 
 /** Per-check result inside a {@link FitnessSessionPayload}. */
@@ -75,6 +83,7 @@ function findingsFor(signals: readonly Signal[]): FitnessSessionFinding[] {
     column: s.column,
     suggestion: s.suggestion,
     ...(s.repair === undefined ? {} : { repair: s.repair }),
+    ...(s.fingerprint === undefined ? {} : { fingerprint: s.fingerprint }),
   }));
 }
 

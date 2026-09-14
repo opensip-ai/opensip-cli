@@ -75,6 +75,20 @@ describe('ToolStateRepo', () => {
     expect(repo.get('acme-audit', 'unset')).toBeNull();
   });
 
+  it('stores undefined payloads as JSON null on the UPSERT path too', () => {
+    // Regression: `.values()` coerces an `undefined` payload to a literal null,
+    // but Drizzle DROPS undefined-valued keys from `.onConflictDoUpdate({ set })`
+    // entirely — so re-putting an existing key with `undefined` omitted the
+    // payload column from the UPDATE and the PREVIOUS value silently survived
+    // while updated_at was bumped. Insert and update paths must agree.
+    repo.put('acme-audit', 'k', { v: 1 });
+    expect(repo.get('acme-audit', 'k')).toEqual({ v: 1 });
+    repo.put('acme-audit', 'k', undefined);
+    expect(repo.get('acme-audit', 'k')).toBeNull();
+    // The row itself stays present (a stored null is not a delete).
+    expect(repo.list('acme-audit')).toEqual(['k']);
+  });
+
   it('an oversized payload throws ValidationError (error, never evict)', () => {
     const big = 'x'.repeat(TOOL_STATE_MAX_PAYLOAD_BYTES + 1);
     expect(() => repo.put('acme-audit', 'big', big)).toThrow(ValidationError);

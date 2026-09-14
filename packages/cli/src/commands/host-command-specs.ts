@@ -65,7 +65,7 @@ const HOST_COMMAND_SPECS_PATH = 'packages/cli/src/commands/host-command-specs.ts
 
 interface InitOpts extends InitOptions {
   projectContext?: ProjectContext;
-  /** Stashed by the pre-action hook from `getOptionValueSource('cwd') === 'cli'`. */
+  /** Stashed by the pre-action hook from `getOptionValueSourceWithGlobals('cwd') === 'cli'`. */
   cwdExplicit?: boolean;
 }
 

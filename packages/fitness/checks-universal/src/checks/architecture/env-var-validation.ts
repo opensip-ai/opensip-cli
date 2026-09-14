@@ -114,8 +114,18 @@ function isCapturedAndGuarded(window: string): boolean {
   return guard.test(window);
 }
 
-function isSafeContext(context: string): boolean {
-  return SAFE_PATTERNS.some((p) => p.test(context)) || isCapturedAndGuarded(context);
+/**
+ * Value-shape safety, judged from the text immediately AROUND the matched
+ * access.
+ *
+ * Every `SAFE_PATTERNS` entry is env-var-NAME-agnostic (`process\.env\.\w+`),
+ * so evaluating them against a multi-line window let a DIFFERENT, properly
+ * defaulted read a line or two away exempt the unguarded access being judged —
+ * a pure source-order dependency (swapping two unrelated statements flipped the
+ * finding). Only the match-local context may answer "is THIS access guarded?".
+ */
+function isSafeAccess(context: string): boolean {
+  return SAFE_PATTERNS.some((p) => p.test(context));
 }
 
 function hasNullCheck(context: string): boolean {
@@ -243,9 +253,12 @@ function analyzeMatchForIssues(
 ): EnvVarIssue | null {
   const { envVarName, context, window } = analysis;
 
-  // Skip if in safe context (idiomatic guards may sit on a following line, so
-  // the safe-context test uses the multi-line window, not just the access line).
-  if (isSafeContext(window)) {
+  // Value-shape guards (`??`, `||`, `Boolean(...)`, comparisons, `if (...)`)
+  // belong to ONE access, so they are judged from the match-local context.
+  // Only the capture-then-guard idiom (`const x = process.env.X` followed by
+  // `if (!x) return`) is genuinely positional and name-aware, so it alone keeps
+  // the multi-line window.
+  if (isSafeAccess(context) || isCapturedAndGuarded(window)) {
     return null;
   }
 

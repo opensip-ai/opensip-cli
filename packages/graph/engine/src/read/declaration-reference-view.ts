@@ -449,10 +449,11 @@ export function searchDeclarationFacts(
       coverage: rollupFacets({
         inventory,
         evidence: UNREQUESTED_FACET,
-        grouping:
-          groupBy === 'none'
-            ? UNREQUESTED_FACET
-            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
+        // Grouping was genuinely computed whenever groupBy !== 'none'; it is
+        // requested regardless of whether it hit the group cap. Deriving
+        // `requested` from the reason count would hide a truncated grouping
+        // read from rollupFacets (which aggregates requested facets only).
+        grouping: groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(true, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });
@@ -574,11 +575,11 @@ export function referencesToDeclaration(
       ...(grouping.groups === undefined ? {} : { groups: grouping.groups }),
       coverage: rollupFacets({
         inventory,
-        evidence: makeFacet(evidenceReasons.size === 0, evidenceReasons),
-        grouping:
-          groupBy === 'none'
-            ? UNREQUESTED_FACET
-            : makeFacet(grouping.reasons.size === 0, grouping.reasons),
+        // Evidence (the reference sites) was always computed here, and grouping
+        // whenever groupBy !== 'none'. Both are requested regardless of the
+        // reason count — see the note in searchDeclarationFacts.
+        evidence: makeFacet(true, evidenceReasons),
+        grouping: groupBy === 'none' ? UNREQUESTED_FACET : makeFacet(true, grouping.reasons),
         projection: makeFacet(true, new Set()),
       }),
     });

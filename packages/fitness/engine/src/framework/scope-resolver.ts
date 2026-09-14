@@ -56,7 +56,9 @@ function unionTargetFiles(
  * Resolution order:
  * 1. If checkOverrides has an entry for this slug, use those target(s) directly
  * 2. If scope is declared, match against all targets by languages + concerns
- * 3. If no scope and no override, return undefined (check uses file cache fallback)
+ * 3. If no scope and no override, use the configured `fitness.defaultTarget`
+ *    when it names a registered target
+ * 4. Otherwise return undefined (check uses file cache fallback)
  *
  * When pre-resolved targets are provided (from buildScopeBasedFileMap), globalExcludes
  * have already been applied during pre-resolution and are skipped here.
@@ -74,6 +76,13 @@ interface CheckFileResolutionContext {
   config: TargetsConfig;
   rootDir: string;
   resolvedTargets?: Map<string, readonly string[]>;
+  /**
+   * `fitness.defaultTarget` — the tier-3 fallback target for a check that
+   * declares no scope and has no `checkOverrides` entry. Ignored when it does
+   * not name a registered target (the caller warns; resolution falls through to
+   * the file-cache fallback rather than silently resolving to zero files).
+   */
+  defaultTarget?: string;
 }
 
 interface ScopeResolvableCheck {
@@ -88,7 +97,7 @@ function resolveFilesForCheck(
   scope: CheckScope | undefined,
   ctx: CheckFileResolutionContext,
 ): readonly string[] | undefined {
-  const { registry, config, rootDir, resolvedTargets } = ctx;
+  const { registry, config, rootDir, resolvedTargets, defaultTarget } = ctx;
   const { globalExcludes, checkOverrides } = config;
 
   // When resolvedTargets is provided, globalExcludes are pre-applied — skip re-filtering
@@ -135,12 +144,23 @@ function resolveFilesForCheck(
     return maybeApplyExcludes(lookupFiles(names));
   }
 
-  // 3. No scope, no override — undefined signals "use file cache fallback"
+  // 3. No scope, no override — the project's `fitness.defaultTarget`, when it
+  //    names a REGISTERED target, is the documented fallback target for
+  //    scope-less checks. An unknown name is deliberately NOT honoured here:
+  //    `unionTargetFiles` would resolve it to `[]` (scan nothing) and silently
+  //    disable every scope-less check. The caller surfaces the typo as a warning
+  //    and resolution falls through to tier 4.
+  if (defaultTarget !== undefined && registry.getByName(defaultTarget) !== undefined) {
+    return maybeApplyExcludes(lookupFiles(defaultTarget));
+  }
+
+  // 4. Nothing declared — undefined signals "use file cache fallback"
   return undefined;
 }
 
 /**
- * Build the complete check-to-files map for all checks with scopes or overrides.
+ * Build the complete check-to-files map for all checks with scopes, overrides,
+ * or (via `opts.defaultTarget`) the project-configured fallback target.
  *
  * All targets are globbed once upfront. Per-check resolution is a pure
  * in-memory lookup against the pre-resolved file lists.
@@ -150,6 +170,7 @@ export function buildScopeBasedFileMap(
   registry: TargetRegistry,
   config: TargetsConfig,
   rootDir: string,
+  opts: { readonly defaultTarget?: string } = {},
 ): Map<string, readonly string[]> {
   // Pre-resolve all targets once — deduplicated glob pass across all targets.
   // GlobalExcludes are applied during pre-resolution so per-check lookups are pure in-memory.
@@ -159,6 +180,7 @@ export function buildScopeBasedFileMap(
     config,
     rootDir,
     resolvedTargets,
+    ...(opts.defaultTarget === undefined ? {} : { defaultTarget: opts.defaultTarget }),
   };
 
   const result = new Map<string, readonly string[]>();

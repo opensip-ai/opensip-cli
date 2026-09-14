@@ -216,7 +216,50 @@ function visit(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {
       kind: 'call',
     });
   }
+  // An anonymous-class body (`new Runnable() { … }`) and an enum-constant
+  // body (`enum E { A { … } }`) are type bodies that the grammar does NOT
+  // spell as a `*_declaration` node, so they are not in TYPE_DECL_NODES.
+  // Without their own enclosing-class context their methods would inherit
+  // the OUTER type's name and collide with it in `qualifiedName` (and hence
+  // in the derived symbol id). Give the body its own label; everything else
+  // under the holder node (constructor arguments, the type reference) stays
+  // in the outer frame.
+  const anonClass = anonymousBodyClassName(node, frame);
+  if (anonClass !== null) {
+    const anonFrame: Frame = { ...frame, enclosingClass: anonClass };
+    for (const child of childrenOf(node)) {
+      visit(child, child.type === ANON_BODY_NODE ? anonFrame : frame, ctx, depth + 1);
+    }
+    return;
+  }
   for (const child of childrenOf(node)) visit(child, frame, ctx, depth + 1);
+}
+
+// Grammar node that carries the members of an anonymous class / enum-constant
+// body. It is the same `class_body` node a named class uses — only the parent
+// tells them apart.
+const ANON_BODY_NODE = 'class_body';
+
+/**
+ * The synthetic `enclosingClass` for an anonymous-class or enum-constant body
+ * hanging off `node`, or `null` when `node` carries no such body.
+ *
+ * Anonymous classes are positionally labelled (`<anon:Type:line:col>`) because
+ * Java gives them no source-level name and two `new Runnable() { … }` bodies in
+ * one type would otherwise collide — the same convention this walker already
+ * uses for lambdas. Enum constants have a real name, so they use it directly.
+ * Both are nested under the outer type name when there is one.
+ */
+function anonymousBodyClassName(node: Node, frame: Frame): string | null {
+  if (node.type !== 'object_creation_expression' && node.type !== 'enum_constant') return null;
+  if (!childrenOf(node).some((child) => child.type === ANON_BODY_NODE)) return null;
+  const label =
+    node.type === 'enum_constant'
+      ? (nameOf(node) ?? '<anon-constant>')
+      : `<anon:${node.childForFieldName('type')?.text ?? 'Object'}:${String(
+          node.startPosition.row + 1,
+        )}:${String(node.startPosition.column)}>`;
+  return frame.enclosingClass === null ? label : `${frame.enclosingClass}.${label}`;
 }
 
 function visitTypeDeclaration(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void {

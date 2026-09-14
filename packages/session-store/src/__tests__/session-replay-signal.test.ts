@@ -129,6 +129,41 @@ describe('buildReplaySignal', () => {
     });
   });
 
+  /**
+   * Regression: a replayed signal that carries no `fingerprint` matches no
+   * baseline row, so a baseline comparison silently reports every stored row as
+   * RESOLVED. ADR-0036 stamps the fingerprint once at construction time and the
+   * baseline seams only READ it, so replay must carry the persisted value
+   * through verbatim.
+   */
+  it('carries the persisted fingerprint onto the replayed signal (ADR-0036 baseline identity)', () => {
+    const signal = buildReplaySignal({
+      stored: makeSession(),
+      source: 'check-fp',
+      finding: finding({ severity: 'error', fingerprint: 'fp-abc123' }),
+      checkIndex: 0,
+      findingIndex: 0,
+      toolPrefix: 'fit',
+      category: 'quality',
+    });
+
+    expect(signal.fingerprint).toBe('fp-abc123');
+  });
+
+  it('omits fingerprint for a legacy finding that carries none', () => {
+    const signal = buildReplaySignal({
+      stored: makeSession(),
+      source: 'check-x',
+      finding: finding(),
+      checkIndex: 0,
+      findingIndex: 0,
+      toolPrefix: 'fit',
+      category: 'quality',
+    });
+
+    expect(signal).not.toHaveProperty('fingerprint');
+  });
+
   it('omits repair when the finding carries none', () => {
     const signal = buildReplaySignal({
       stored: makeSession(),

@@ -132,20 +132,14 @@ function findSetTimeoutOccurrences(
 }
 
 /**
- * Extract timeout assignment value using string parsing.
+ * Extract a timeout assignment value anchored at the `timeout` substring at
+ * `idx`, or null when that occurrence is not a `timeout = N` / `timeout: N`
+ * assignment of a 4+-digit literal.
  */
-function extractTimeoutAssignment(line: string): { timeout: number; matchText: string } | null {
-  logger.debug({
-    evt: 'fitness.checks.no_hardcoded_timeouts.extract_timeout_assignment',
-    msg: 'Extracting timeout assignment value from line',
-  });
-  const lowerLine = line.toLowerCase();
-  const idx = lowerLine.indexOf('timeout');
-  if (idx === -1) return null;
-
-  // Skip if this is setTimeout (handled separately)
-  if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') return null;
-
+function extractTimeoutAssignmentAt(
+  line: string,
+  idx: number,
+): { timeout: number; matchText: string } | null {
   const afterTimeout = line.slice(Math.max(0, idx + 7));
   let i = 0;
 
@@ -188,16 +182,39 @@ function extractTimeoutAssignment(line: string): { timeout: number; matchText: s
 }
 
 /**
- * Extract .timeout(N) value using string parsing.
+ * Extract timeout assignment value using string parsing.
+ *
+ * Scans EVERY `timeout` substring on the line: stopping at the first one let a
+ * leading non-numeric key (`connectTimeout: opts.connect`) abandon the line and
+ * hide a real `readTimeout: 30000` sharing it.
  */
-function extractDotTimeout(line: string): { timeout: number; matchText: string } | null {
+function extractTimeoutAssignment(line: string): { timeout: number; matchText: string } | null {
   logger.debug({
-    evt: 'fitness.checks.no_hardcoded_timeouts.extract_dot_timeout',
-    msg: 'Extracting .timeout() value from line',
+    evt: 'fitness.checks.no_hardcoded_timeouts.extract_timeout_assignment',
+    msg: 'Extracting timeout assignment value from line',
   });
-  const idx = line.indexOf('.timeout');
-  if (idx === -1) return null;
+  const lowerLine = line.toLowerCase();
+  let from = 0;
+  for (;;) {
+    const idx = lowerLine.indexOf('timeout', from);
+    if (idx === -1) return null;
+    from = idx + 7;
 
+    // Skip if this is setTimeout (handled separately)
+    if (idx >= 3 && lowerLine.slice(idx - 3, idx) === 'set') continue;
+
+    const found = extractTimeoutAssignmentAt(line, idx);
+    if (found) return found;
+  }
+}
+
+/**
+ * Extract a `.timeout(N)` value anchored at the `.timeout` occurrence at `idx`.
+ */
+function extractDotTimeoutAt(
+  line: string,
+  idx: number,
+): { timeout: number; matchText: string } | null {
   const afterDotTimeout = line.slice(Math.max(0, idx + 8));
   let i = 0;
 
@@ -247,6 +264,26 @@ function extractDotTimeout(line: string): { timeout: number; matchText: string }
     timeout,
     matchText: `.timeout${afterDotTimeout.slice(0, Math.max(0, i))}`,
   };
+}
+
+/**
+ * Extract .timeout(N) value using string parsing — scanning every `.timeout`
+ * occurrence on the line, not just the first (same first-occurrence-only
+ * suppression as {@link extractTimeoutAssignment}).
+ */
+function extractDotTimeout(line: string): { timeout: number; matchText: string } | null {
+  logger.debug({
+    evt: 'fitness.checks.no_hardcoded_timeouts.extract_dot_timeout',
+    msg: 'Extracting .timeout() value from line',
+  });
+  let from = 0;
+  for (;;) {
+    const idx = line.indexOf('.timeout', from);
+    if (idx === -1) return null;
+    from = idx + 8;
+    const found = extractDotTimeoutAt(line, idx);
+    if (found) return found;
+  }
 }
 /* v8 ignore stop */
 
@@ -333,9 +370,15 @@ export const noHardcodedTimeouts = defineCheck({
     });
     const violations: CheckViolation[] = [];
 
-    // Skip files that don't have timeout patterns (strip strings/comments to avoid false positives)
-    const strippedContent = stripStringsAndComments(content);
-    if (!strippedContent.includes('timeout') && !strippedContent.includes('setTimeout')) {
+    // Skip files that don't have timeout patterns (strip strings/comments to
+    // avoid false positives). The prefilter is case-INSENSITIVE to match the
+    // detectors, which lowercase the line before searching: a case-sensitive
+    // 'timeout' test dropped every camelCase-only file (`socketTimeout`,
+    // `connectTimeout`, `readTimeout`) before it was ever scanned. Lowercasing
+    // also subsumes the old separate `setTimeout` test ('settimeout' contains
+    // 'timeout').
+    const strippedContent = stripStringsAndComments(content).toLowerCase();
+    if (!strippedContent.includes('timeout')) {
       return violations;
     }
 

@@ -33,6 +33,8 @@
 
 import { scriptContextJsonBytes } from '../script-context-json.js';
 
+import { boundEdgeFeature } from './bound-edges.js';
+
 import type {
   GraphCatalog,
   GraphFunctionFeatures,
@@ -193,8 +195,17 @@ export function boundGraphCatalog(
     kept[key] = projected;
   }
 
+  // Coupling cells are rendered from `features.edge` but drilled into through
+  // `functions` — so once functions have been dropped, the edge rows have to be
+  // narrowed to the pairs the drilldown can still answer, or a cell counts call
+  // sites the report no longer contains (see `bound-edges.ts`). Untruncated, the
+  // two populations already agree and the engine's rows stand exactly as
+  // authored; the walk is skipped with them.
+  const features =
+    omittedFunctions === 0 ? base.features : { edge: boundEdgeFeature(base.features.edge, kept) };
+
   return {
-    catalog: { ...base, functions: kept },
+    catalog: { ...base, features, functions: kept },
     totalFunctions,
     omittedFunctions,
   };

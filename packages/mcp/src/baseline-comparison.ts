@@ -47,12 +47,31 @@ export function compareSignalsToBaseline(
     else added.push(signal);
   }
 
-  const resolvedRows = input.baselineRows
-    .filter((row) => !currentFingerprints.has(row.fingerprint))
-    .sort((a, b) => compareCodePoint(a.fingerprint, b.fingerprint));
+  // Defence in depth: when NOT ONE current signal carries a fingerprint, the
+  // comparison has no evidence at all — every baseline row would trivially look
+  // resolved ("all N findings were fixed") when nothing actually changed. That
+  // silently-wrong number is worse than no number, so the resolved set is
+  // suppressed and the condition is surfaced as a hard degradation instead.
+  const comparisonUnavailable =
+    input.current.length > 0 && missingFingerprint === input.current.length;
+
+  const resolvedRows = comparisonUnavailable
+    ? []
+    : input.baselineRows
+        .filter((row) => !currentFingerprints.has(row.fingerprint))
+        .sort((a, b) => compareCodePoint(a.fingerprint, b.fingerprint));
   const legacyResolvedRows = resolvedRows.filter((row) => row.payload === null).length;
   const degraded: McpEvidenceDegradation[] = [];
-  if (missingFingerprint > 0) {
+  if (comparisonUnavailable) {
+    degraded.push({
+      code: 'comparison-unavailable',
+      message:
+        `All ${String(missingFingerprint)} current signal(s) lacked a baseline fingerprint, so ` +
+        'this run cannot be compared to the stored baseline. Re-run the tool to persist a ' +
+        'fingerprint-stamped session; resolved counts are reported as 0 rather than guessed.',
+      count: missingFingerprint,
+    });
+  } else if (missingFingerprint > 0) {
     degraded.push({
       code: 'missing-fingerprint',
       message: `${String(missingFingerprint)} current signal(s) lacked a baseline fingerprint.`,

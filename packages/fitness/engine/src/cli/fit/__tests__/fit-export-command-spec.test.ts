@@ -9,6 +9,7 @@
 import { ConfigurationError } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
+import { FITNESS_LAYOUT_KEY } from '../../../identity.js';
 import { fitnessTool } from '../../../tool.js';
 import { fitExportCommandSpec, FIT_EXPORT_FORMATS } from '../fit-aux-command-specs.js';
 
@@ -64,10 +65,15 @@ describe('fit export (canonical) command spec', () => {
     expect(FIT_EXPORT_FORMATS).toContain('baseline');
   });
 
-  it('--format baseline writes the SARIF baseline via the host seam', async () => {
+  it('--format baseline writes the SARIF baseline via the host seam under the SHORT tool id', async () => {
     const { cli, exportBaselineSarif } = makeCli();
     await fitExportCommandSpec.handler({ format: 'baseline', out: OUT_PATH, _args: [] }, cli);
-    expect(exportBaselineSarif).toHaveBeenCalledWith('fitness', OUT_PATH);
+    // Regression: the export must read the SAME baseline namespace the gate
+    // writes — fitness's short id. Exporting under the canonical long name
+    // ('fitness') read an always-empty namespace and emitted an
+    // `opensip-cli-fitness` SARIF driver instead of `opensip-cli-fit`.
+    expect(exportBaselineSarif).toHaveBeenCalledWith('fit', OUT_PATH);
+    expect(FITNESS_LAYOUT_KEY).toBe('fit');
     const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
     expect(out).toContain('Exported fit baseline');
   });

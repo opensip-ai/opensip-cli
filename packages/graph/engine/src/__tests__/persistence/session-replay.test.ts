@@ -7,8 +7,10 @@
  * validation branch directly with malformed payloads.
  */
 
+import { stampFingerprints } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
 
+import { graphFingerprintStrategy } from '../../baseline-strategy.js';
 import { buildGraphSessionPayload } from '../../persistence/session-payload.js';
 import { graphReplayFromSession } from '../../persistence/session-replay.js';
 
@@ -84,6 +86,48 @@ describe('graphReplayFromSession', () => {
     expect(replay.result.type).toBe('run-presentation');
     expect(replay.result.tool).toBe('graph');
     expect(replay.result.envelope).toBe(replay.envelope);
+  });
+
+  /**
+   * Regression: the projected envelope stamps `baselineIdentity` — it CLAIMS the
+   * signals carry the fingerprint identity `--gate-save` captured — but the
+   * payload dropped `signal.fingerprint` on encode and the replay never set it.
+   * Every replayed signal therefore came back unstamped, so
+   * `compare_to_baseline` matched nothing and reported 100% of the stored
+   * baseline as RESOLVED on a run where nothing had changed.
+   *
+   * ADR-0036: the plane never re-fingerprints; only a faithful round-trip of the
+   * construction-time stamp makes a replayed session comparable.
+   */
+  it('preserves the stamped fingerprint on every replayed signal (baseline-comparison round-trip)', () => {
+    const stamped = stampFingerprints(
+      [
+        sig({ ruleId: 'graph:god-file', severity: 'high', filePath: 'a.ts', line: 1, column: 2 }),
+        sig({ ruleId: 'graph:dup-body', severity: 'low', filePath: 'b.ts', line: 7 }),
+      ],
+      graphFingerprintStrategy,
+    );
+    const expected = stamped.map((s) => s.fingerprint);
+    expect(expected).toEqual(['graph:god-file|a.ts|1|2', 'graph:dup-body|b.ts|7|0']);
+
+    // Cloned the way the datastore hands the opaque payload back: a detached
+    // blob, not the in-memory object the builder returned.
+    const replay = graphReplayFromSession(
+      storedSession(structuredClone(buildGraphSessionPayload(stamped))),
+    );
+
+    expect(replay.envelope.signals.map((s) => s.fingerprint)).toEqual(expected);
+    expect(replay.envelope.baselineIdentity?.fingerprintStrategyId).toBe(
+      graphFingerprintStrategy.id,
+    );
+  });
+
+  it('leaves the fingerprint unset for a legacy payload persisted before it was stored', () => {
+    const payload = buildGraphSessionPayload([
+      sig({ ruleId: 'graph:r', severity: 'high', filePath: 'x.ts' }),
+    ]);
+    const replay = graphReplayFromSession(storedSession(payload));
+    expect(replay.envelope.signals[0]?.fingerprint).toBeUndefined();
   });
 
   it('carries recipe onto the envelope when present', () => {

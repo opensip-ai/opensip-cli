@@ -75,3 +75,40 @@ describe('env-var-validation · null-safe forms', () => {
     expect(await findings(src)).toBe(0);
   });
 });
+
+describe('env-var-validation · safe-pattern exemption is match-local', () => {
+  // Every SAFE_PATTERNS entry is env-var-NAME-agnostic (`process.env.\w+ ??`,
+  // `process.env.\w+ ||`, …). Judging them against the 3-line guard window let
+  // an UNRELATED, properly defaulted read exempt a genuinely unguarded one that
+  // happened to sit within two lines of it — so merely reordering two
+  // independent statements flipped the finding count (1 → 0).
+  const unguardedFirst = [
+    'export const secret = process.env.API_SECRET',
+    "export const port = process.env.PORT ?? '3000'",
+  ].join('\n');
+
+  const guardedFirst = [
+    "export const port = process.env.PORT ?? '3000'",
+    'export const secret = process.env.API_SECRET',
+  ].join('\n');
+
+  it('flags the unguarded read even when a defaulted read follows it', async () => {
+    expect(await findings(unguardedFirst)).toBe(1);
+  });
+
+  it('flags the same unguarded read when the defaulted read comes first', async () => {
+    expect(await findings(guardedFirst)).toBe(1);
+  });
+
+  it('is independent of statement order', async () => {
+    expect(await findings(unguardedFirst)).toBe(await findings(guardedFirst));
+  });
+
+  it('names the unguarded variable, not the neighbouring defaulted one', async () => {
+    const run = await runCheckOnFixture(check(), {
+      files: [{ path: 'a.ts', content: unguardedFirst }],
+    });
+    expect(run.findings[0]?.message).toContain('API_SECRET');
+    expect(run.findings[0]?.message).not.toContain('process.env.PORT');
+  });
+});

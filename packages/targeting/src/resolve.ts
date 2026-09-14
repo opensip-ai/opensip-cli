@@ -15,19 +15,11 @@ import { isPathInside } from '@opensip-cli/core';
 import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
 
+import { compileTargetExcludes, excludesFile } from './bounded-resolve-matchers.js';
 import { COMMON_TARGET_IGNORE } from './resolve-common.js';
 
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';
-
-// Mirrors glob 13's platform-derived `nocase` default (path-scurry: Darwin and
-// Windows are case-insensitive filesystems, everything else is case-sensitive;
-// see the identical constant in filesystem-walk.ts / bounded-resolve-matchers.ts).
-// `resolveTargets` feeds a target's `exclude` globs into `globSync`'s `ignore`
-// option, which inherits that platform default. The shared post-glob filter
-// below must use the same default for target excludes so a differently-cased
-// exclude behaves identically regardless of which resolution path evaluates it.
-const PLATFORM_NOCASE = process.platform === 'darwin' || process.platform === 'win32';
 
 // =============================================================================
 // Global excludes
@@ -140,16 +132,29 @@ function filterOneTargetFiles(
   const hasTargetExcludes = targetExclude.length > 0;
   const hasGlobals = compiledGlobalExcludes.length > 0;
   if (hasTargetExcludes || hasGlobals) {
-    // nocase: PLATFORM_NOCASE — target excludes are also fed into globSync's
-    // `ignore` option by resolveTargets, which is nocase on darwin/win32; this
-    // post-filter must match that so preResolveAllTargets (which relies on this
-    // filter alone for target excludes) does not diverge from resolveTargets.
+    // Target excludes are evaluated through the SAME compiled matcher pair the
+    // bounded resolver uses (`compileTargetExcludes`), which reproduces glob
+    // 13's `Ignore` class: it strips a leading `./`, routes an absolute pattern
+    // against the file's absolute path, collapses interior `.` segments
+    // (optimizationLevel 2), and tests both `<relative>` and `<relative>/`.
+    // `resolveTargets` gets those semantics for free by handing `exclude` to
+    // globSync's `ignore`; `preResolveAllTargets` relies on this filter alone,
+    // so a bare Minimatch here silently kept files the other path excluded.
     const compiledTargetExcludes = hasTargetExcludes
-      ? targetExclude.map((ex) => new Minimatch(ex, { dot: true, nocase: PLATFORM_NOCASE }))
-      : [];
-    const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];
+      ? compileTargetExcludes(targetExclude)
+      : undefined;
     return [...files]
-      .filter((filePath) => !allExcludes.some((m) => m.match(relative(rootDir, filePath))))
+      .filter((filePath) => {
+        // minimatch expects POSIX-style relative paths; Windows `relative()` yields `\`.
+        const relativePath = relative(rootDir, filePath).split('\\').join('/');
+        if (
+          compiledTargetExcludes &&
+          excludesFile(compiledTargetExcludes, relativePath, filePath)
+        ) {
+          return false;
+        }
+        return !compiledGlobalExcludes.some((m) => m.match(relativePath));
+      })
       .sort();
   }
   return [...files].sort();

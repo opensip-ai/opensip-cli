@@ -8,8 +8,10 @@
  */
 
 import { buildSignalEnvelope } from '@opensip-cli/contracts';
-import { createSignal, HOST_VERDICT_POLICY_FALLBACK } from '@opensip-cli/core';
+import { createSignal, HOST_VERDICT_POLICY_FALLBACK, stampFingerprints } from '@opensip-cli/core';
 import { describe, expect, it } from 'vitest';
+
+import { fitnessFingerprintStrategy } from '../baseline-strategy.js';
 
 import { buildFitnessSessionPayload } from './session-payload.js';
 import { fitReplayFromSession } from './session-replay.js';
@@ -82,6 +84,72 @@ describe('fitReplayFromSession', () => {
     expect(replay.result.type).toBe('run-presentation');
     expect(replay.result.tool).toBe('fitness');
     expect(replay.result.envelope).toBe(replay.envelope);
+  });
+
+  /**
+   * Regression: the envelope replay stamps `baselineIdentity` — it CLAIMS the
+   * signals carry the fingerprint identity the gate captured — yet the payload
+   * dropped `signal.fingerprint` on encode and the replay never set it, so every
+   * replayed signal came back unstamped. A baseline comparison then matched
+   * nothing and reported 100% of the stored baseline as RESOLVED ("all N
+   * findings were fixed") on a run where nothing had changed.
+   *
+   * ADR-0036: the plane never re-fingerprints, so the ONLY way a replayed
+   * session can be compared is if the round-trip preserves the stamp verbatim.
+   */
+  it('preserves the stamped fingerprint on every replayed signal (baseline-comparison round-trip)', () => {
+    const stamped = stampFingerprints(
+      [
+        createSignal({
+          source: 'a',
+          severity: 'critical',
+          ruleId: 'fit:a',
+          message: 'boom',
+          code: { file: 'src/x.ts', line: 3, column: 5 },
+        }),
+        createSignal({ source: 'a', severity: 'low', ruleId: 'fit:a2', message: 'nit' }),
+      ],
+      fitnessFingerprintStrategy,
+    );
+    const env = buildSignalEnvelope({
+      tool: 'fit',
+      runId: 'RUN_fp',
+      createdAt: '2026-06-08T00:00:00.000Z',
+      units: [{ slug: 'a', passed: false, violationCount: 2, durationMs: 10 }],
+      policy: HOST_VERDICT_POLICY_FALLBACK,
+      runFaulted: false,
+      signals: stamped,
+    });
+    const expected = stamped.map((s) => s.fingerprint);
+    expect(expected.every((fp) => typeof fp === 'string' && fp.length > 0)).toBe(true);
+
+    // Cloned the way the datastore hands the payload back: a detached blob, not
+    // the in-memory object the builder returned.
+    const replay = fitReplayFromSession(
+      storedSession(structuredClone(buildFitnessSessionPayload(env))),
+    );
+
+    expect(replay.envelope.signals.map((s) => s.fingerprint)).toEqual(expected);
+    // The envelope claims fingerprint identity; that claim must now be true.
+    expect(replay.envelope.baselineIdentity?.fingerprintStrategyId).toBe(
+      fitnessFingerprintStrategy.id,
+    );
+  });
+
+  it('leaves the fingerprint unset for a legacy payload persisted before it was stored', () => {
+    const legacy = {
+      summary: { total: 1, passed: 0, failed: 1, errors: 1, warnings: 0 },
+      checks: [
+        {
+          checkSlug: 'a',
+          passed: false,
+          durationMs: 1,
+          findings: [{ ruleId: 'r', message: 'm', severity: 'error', filePath: 'src/a.ts' }],
+        },
+      ],
+    };
+    const replay = fitReplayFromSession(storedSession(legacy));
+    expect(replay.envelope.signals[0]).not.toHaveProperty('fingerprint');
   });
 
   it('carries the recipe onto the envelope when present', () => {

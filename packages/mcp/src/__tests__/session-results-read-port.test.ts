@@ -29,7 +29,13 @@ import {
   type ToolShortId,
 } from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
-import { RunRepo, SessionRepo, type SessionReplayFn } from '@opensip-cli/session-store';
+import {
+  buildReplaySignals,
+  decodeSessionPayload,
+  RunRepo,
+  SessionRepo,
+  type SessionReplayFn,
+} from '@opensip-cli/session-store';
 import { assembleAgentCatalog } from '@opensip-cli/shared-analysis';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -813,6 +819,101 @@ describe('SessionResultsReadPort — compareToBaseline', () => {
       expect(out.value.data.degraded?.[0]?.code).toBe('missing-fingerprint');
     }
     expect(replayCalls).toEqual(['fit']);
+  });
+
+  /**
+   * End-to-end regression over the REAL persisted-session replay chain
+   * (`decodeSessionPayload` → `buildReplaySignals`), not a hand-stamped fixture.
+   *
+   * A tool stamps each signal's fingerprint once at construction time and the
+   * baseline plane only READS it (ADR-0036). The persisted session payload used
+   * to drop that stamp, so every replayed signal came back unfingerprinted and
+   * matched no baseline row — `compare_to_baseline` answered "all N findings
+   * were fixed" for a re-run whose findings were identical.
+   *
+   * Note the envelope is built as a literal here, exactly like the tools'
+   * `*ReplayFromSession` projections do: `buildSignalEnvelope` would re-stamp
+   * fingerprints and hide the very gap under test.
+   */
+  it('reports unchanged (not resolved) when an identical run is replayed from its stored payload', async () => {
+    const storedPayload = {
+      __version: 1,
+      summary: { total: 1, passed: 0, failed: 1, errors: 2, warnings: 0 },
+      checks: [
+        {
+          checkSlug: 'u',
+          passed: false,
+          violationCount: 2,
+          durationMs: 1,
+          findings: [
+            {
+              ruleId: 'r1',
+              message: 'm1',
+              severity: 'error',
+              filePath: 'src/a.ts',
+              fingerprint: 'fp-1',
+            },
+            {
+              ruleId: 'r2',
+              message: 'm2',
+              severity: 'error',
+              filePath: 'src/b.ts',
+              fingerprint: 'fp-2',
+            },
+          ],
+        },
+      ],
+    };
+    new SessionRepo(store).save(makeSession({ id: 'fit-1', tool: 'fit', payload: storedPayload }));
+    new BaselineRepo(store).save(
+      'fit',
+      [
+        { fingerprint: 'fp-1', payload: signal({ ruleId: 'r1', fingerprint: 'fp-1' }) },
+        { fingerprint: 'fp-2', payload: signal({ ruleId: 'r2', fingerprint: 'fp-2' }) },
+      ],
+      DEFAULT_TEST_BASELINE_IDENTITY,
+    );
+
+    const realReplay: SessionReplayFn = (stored) => {
+      const decoded = decodeSessionPayload(stored.payload, { tool: 'fit' });
+      return {
+        result: {} as CommandResult,
+        fidelity: 'projection',
+        envelope: {
+          schemaVersion: 2,
+          tool: 'fit',
+          runId: stored.id,
+          createdAt: stored.startedAt,
+          verdict: { score: stored.score, passed: stored.passed, summary: decoded.summary },
+          units: [{ slug: 'u', passed: false, durationMs: 1 }],
+          signals: buildReplaySignals({
+            stored,
+            checks: decoded.checks,
+            toolPrefix: 'fit',
+            category: 'quality',
+          }),
+          baselineIdentity: DEFAULT_TEST_BASELINE_IDENTITY,
+        },
+      };
+    };
+
+    const out = await new SessionResultsReadPort({
+      store,
+      replayFor: () => realReplay,
+      agentCatalog: AGENT_CATALOG,
+    }).compareToBaseline({ tool: 'fit', includeResolved: true });
+
+    expect(out.ok).toBe(true);
+    if (out.ok) {
+      expect(out.value.data.baseline.available).toBe(true);
+      expect(out.value.data.delta).toEqual({
+        added: 0,
+        resolved: 0,
+        unchanged: 2,
+        missingFingerprint: 0,
+      });
+      expect(out.value.data.degraded).toBeUndefined();
+    }
   });
 
   it('returns degraded baseline metadata when the baseline is missing', async () => {

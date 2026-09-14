@@ -25,6 +25,7 @@
 import { runBaselineExport } from '@opensip-cli/contracts';
 import { createToolLogger, defineNestedCommand } from '@opensip-cli/core';
 
+import { FITNESS_LAYOUT_KEY } from '../../identity.js';
 import { listChecks } from '../fit-list.js';
 import { listRecipes } from '../fit-recipes.js';
 
@@ -113,7 +114,11 @@ async function runFitBaselineExport(
     outPath: opts.out,
     jsonRequested: opts.json === true,
     result: { type: 'fit-baseline-export' as const, outPath: opts.out },
-    exportArtifact: () => cli.exportBaselineSarif('fitness', opts.out),
+    // Same baseline namespace the gate writes (fitness's SHORT id) — exporting
+    // under the canonical long name read an always-empty namespace and, via the
+    // synthetic envelope the seam builds, emitted a `opensip-cli-fitness` SARIF
+    // driver where every other fit SARIF surface emits `opensip-cli-fit`.
+    exportArtifact: () => cli.exportBaselineSarif(FITNESS_LAYOUT_KEY, opts.out),
     writeTextSync: (outPath) => process.stdout.write(`Exported fit baseline to ${outPath}\n`),
     onFailure: ({ message, exitCode }) => {
       log.warn({

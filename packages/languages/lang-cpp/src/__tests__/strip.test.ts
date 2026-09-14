@@ -78,6 +78,29 @@ describe('stripStrings (C/C++)', () => {
   });
 });
 
+describe("C++14 digit separators (bare ' is identifier-anchored)", () => {
+  it('still strips a line comment that follows a digit-separated literal', () => {
+    // Regression: the bare-apostrophe char-literal opener had no
+    // identifier-boundary anchor, so the `'` in `1'000` opened a bogus char
+    // literal. lang-cpp's char scan has no small length cap, so it ran to the
+    // next apostrophe anywhere later on the line and the `//` comment was
+    // never seen.
+    const out = stripComments("int x = 1'000; // it's fine\n");
+    expect(out).not.toContain('fine');
+    expect(out).toContain("int x = 1'000;");
+  });
+
+  it('does not let a digit separator swallow the rest of the line up to a later apostrophe', () => {
+    const out = stripComments("int a = 1'000; /* keep */ int b = 2; // it's\n");
+    expect(out).not.toContain('keep');
+    expect(out).toContain('int b = 2;');
+  });
+
+  it('still recognizes a real char literal after a digit-separated literal', () => {
+    expect(stripStrings("int x = 1'000; char c = '\"';")).toContain("char c = '\"';");
+  });
+});
+
 describe('stripComments (C/C++)', () => {
   it('strips line comments', () => {
     const out = stripComments('int x = 1; // comment');
