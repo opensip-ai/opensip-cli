@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@opensip-cli/core": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.2"
   },
   "peerDependencies": {
     "commander": "^14.0.0 || ^15.0.0"
@@ -49,7 +49,7 @@
     }
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "commander": "^15.0.0",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
