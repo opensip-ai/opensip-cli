@@ -37,11 +37,11 @@
   "dependencies": {
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "minimatch": "^10.2.5",
+    "minimatch": "^10.2.6",
     "yaml": "^2.9.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   }

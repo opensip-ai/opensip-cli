@@ -41,11 +41,11 @@
   "dependencies": {
     "@opensip-cli/contracts": "workspace:*",
     "@opensip-cli/core": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.6.2"
   },
   "devDependencies": {
     "@opensip-cli/output": "workspace:*",
-    "@types/node": "^24.13.3",
+    "@types/node": "^24.13.4",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   }
