@@ -148,7 +148,7 @@ function hasTestAttribute(node: Node): boolean {
     // segment is literally `test`.
     const path = ATTRIBUTE_PATH_RE.exec(a)?.[1];
     const segments = path?.split('::') ?? [];
-    if (segments.length > 1 && segments[segments.length - 1] === 'test') return true;
+    if (segments.length > 1 && segments.at(-1) === 'test') return true;
   }
   return false;
 }
