@@ -132,12 +132,23 @@ function extractAttributes(node: Node): readonly string[] {
   return [...new Set(out)];
 }
 
+// Matches an attribute's macro path up to its first `(`/`]` — e.g. `tokio::test`
+// out of `#[tokio::test]`, or `test` out of `#[test]`.
+const ATTRIBUTE_PATH_RE = /^#!?\[\s*([\w:]+)/;
+
 function hasTestAttribute(node: Node): boolean {
   const attrs = extractAttributes(node);
   for (const a of attrs) {
     if (a.includes('#[test]')) return true;
     /* v8 ignore next */
     if (a.includes('cfg(test)')) return true;
+    // Async test-runner macros (`#[tokio::test]`, `#[async_std::test]`,
+    // `#[actix_rt::test]`, ...) aren't plain `#[test]` — `async fn` can't carry
+    // it directly — but every one of them is a macro path whose last `::`
+    // segment is literally `test`.
+    const path = ATTRIBUTE_PATH_RE.exec(a)?.[1];
+    const segments = path?.split('::') ?? [];
+    if (segments.length > 1 && segments.at(-1) === 'test') return true;
   }
   return false;
 }

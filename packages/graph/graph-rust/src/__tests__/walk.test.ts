@@ -296,6 +296,25 @@ describe('lang-rust walk.ts — function shapes and occurrences', () => {
     expect(helperFn?.inTestFile).toBe(false);
   });
 
+  it('tags `#[tokio::test]`-annotated async functions as inTestFile (not just bare `#[test]`)', () => {
+    mkdirSync(join(dir, 'src'), { recursive: true });
+    writeFileSync(
+      join(dir, 'src/lib.rs'),
+      `pub fn helper() -> i32 { 1 }\n` +
+        `#[tokio::test]\nasync fn it_fetches() {\n    assert_eq!(1, 1);\n}\n` +
+        `#[async_std::test]\nasync fn it_fetches_too() {\n    assert_eq!(1, 1);\n}\n` +
+        `#[allow(unused)]\nfn decorated_prod() -> i32 { 1 }\n`,
+      'utf8',
+    );
+    const walk = run();
+    expect(walk.occurrences.it_fetches?.[0]?.inTestFile).toBe(true);
+    expect(walk.occurrences.it_fetches_too?.[0]?.inTestFile).toBe(true);
+    expect(walk.occurrences.helper?.[0]?.inTestFile).toBe(false);
+    // A bare, non-`::test`-suffixed attribute (`#[allow(unused)]`) must not
+    // false-positive as a test marker.
+    expect(walk.occurrences.decorated_prod?.[0]?.inTestFile).toBe(false);
+  });
+
   it('does NOT leak a preceding item’s attributes onto a later function (contiguous run)', () => {
     mkdirSync(join(dir, 'src'), { recursive: true });
     // `#[test]` and `#[derive]` belong to the items they immediately precede; a
