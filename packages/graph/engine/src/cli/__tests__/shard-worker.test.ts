@@ -11,7 +11,13 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  runWithScope,
+  runWithScopeSync,
+  type RunScope,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 
 import { makeReportFailureMock } from '../../__tests__/report-failure-mock.js';
@@ -32,7 +38,6 @@ import type {
   ShardWorkerOutput,
   ShardWorkerSpec,
 } from '../orchestrate/shard-model.js';
-import type { ToolCliContext } from '@opensip-cli/core';
 
 function fakeAdapter(id = 'typescript', fileExtension = '.ts'): GraphLanguageAdapter {
   return {
@@ -108,9 +113,10 @@ let dir: string;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let stdout = '';
 let stderr = '';
+let scope: RunScope;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope());
+  scope = makeGraphTestScope();
   dir = mkdtempSync(join(tmpdir(), 'shard-worker-'));
   stdout = '';
   stderr = '';
@@ -121,101 +127,107 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  currentAdapterRegistry().clear();
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().clear();
+  });
   stderrSpy.mockRestore();
   rmSync(dir, { recursive: true, force: true });
 });
 
 describe('executeShardWorker', () => {
-  it('builds the shard and emits a ShardBuildResult JSON on stdout, exit 0', async () => {
-    currentAdapterRegistry().register(fakeAdapter());
-    const specPath = join(dir, 'spec.json');
-    const spec: ShardWorkerSpec = {
-      shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.ts'] },
-      projectRoot: dir,
-      resolutionMode: 'exact',
-    };
-    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+  it('builds the shard and emits a ShardBuildResult JSON on stdout, exit 0', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter());
+      const specPath = join(dir, 'spec.json');
+      const spec: ShardWorkerSpec = {
+        shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.ts'] },
+        projectRoot: dir,
+        resolutionMode: 'exact',
+      };
+      writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-    const { cli, setExitCode } = mockCli();
-    await executeShardWorker(specPath, cli);
+      const { cli, setExitCode } = mockCli();
+      await executeShardWorker(specPath, cli);
 
-    expect(setExitCode).toHaveBeenCalledWith(0);
-    const output = JSON.parse(stdout) as ShardWorkerOutput;
-    expect(output.kind).toBe('result');
-    const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
-    expect(result.shardId).toBe('pkg:a');
-    expect(result.fragment.language).toBe('typescript');
-    expect(result.fragment.functions.fn).toHaveLength(1);
-    expect(result.fingerprint).toContain('pkg/a.ts');
-    expect(result.boundaryCalls).toEqual([]);
-    expect(result.parseErrors).toEqual([]);
-  });
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const output = JSON.parse(stdout) as ShardWorkerOutput;
+      expect(output.kind).toBe('result');
+      const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
+      expect(result.shardId).toBe('pkg:a');
+      expect(result.fragment.language).toBe('typescript');
+      expect(result.fragment.functions.fn).toHaveLength(1);
+      expect(result.fingerprint).toContain('pkg/a.ts');
+      expect(result.boundaryCalls).toEqual([]);
+      expect(result.parseErrors).toEqual([]);
+    }));
 
-  it('honors the explicit language in the shard spec when selecting an adapter', async () => {
-    currentAdapterRegistry().register(fakeAdapter('typescript', '.ts'));
-    currentAdapterRegistry().register(fakeAdapter('python', '.py'));
-    const specPath = join(dir, 'spec.json');
-    const spec: ShardWorkerSpec = {
-      shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.py'] },
-      projectRoot: dir,
-      language: 'python',
-      resolutionMode: 'exact',
-    };
-    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+  it('honors the explicit language in the shard spec when selecting an adapter', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter('typescript', '.ts'));
+      currentAdapterRegistry().register(fakeAdapter('python', '.py'));
+      const specPath = join(dir, 'spec.json');
+      const spec: ShardWorkerSpec = {
+        shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.py'] },
+        projectRoot: dir,
+        language: 'python',
+        resolutionMode: 'exact',
+      };
+      writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-    const { cli, setExitCode } = mockCli();
-    await executeShardWorker(specPath, cli);
+      const { cli, setExitCode } = mockCli();
+      await executeShardWorker(specPath, cli);
 
-    expect(setExitCode).toHaveBeenCalledWith(0);
-    const output = JSON.parse(stdout) as ShardWorkerOutput;
-    const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
-    expect(result.fragment.language).toBe('python');
-    expect(result.fragment.cacheKey).toContain('python');
-    expect(result.fingerprint).toContain('pkg/a.py');
-  });
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      const output = JSON.parse(stdout) as ShardWorkerOutput;
+      const result = output.kind === 'result' ? output.result : ({} as ShardBuildResult);
+      expect(result.fragment.language).toBe('python');
+      expect(result.fragment.cacheKey).toContain('python');
+      expect(result.fingerprint).toContain('pkg/a.py');
+    }));
 
-  it('emits a structured read failure without raw stderr and uses its mapped exit', async () => {
-    currentAdapterRegistry().register(fakeAdapter());
-    // Spec file does not exist → readFileSync throws inside the worker.
-    const { cli, setExitCode } = mockCli();
-    await executeShardWorker(join(dir, 'missing.json'), cli);
+  it('emits a structured read failure without raw stderr and uses its mapped exit', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter());
+      // Spec file does not exist → readFileSync throws inside the worker.
+      const { cli, setExitCode } = mockCli();
+      await executeShardWorker(join(dir, 'missing.json'), cli);
 
-    expect(setExitCode).toHaveBeenCalledWith(3);
-    const output = JSON.parse(stdout) as ShardWorkerOutput;
-    expect(output).toMatchObject({
-      kind: 'failure',
-      failure: {
-        wireVersion: 1,
-        code: 'NOT_FOUND',
-      },
-    });
-    expect(output).not.toHaveProperty('failure.stack');
-    expect(output).not.toHaveProperty('failure.cause');
-    expect(stderr).not.toContain('graph-shard-worker');
-  });
+      expect(setExitCode).toHaveBeenCalledWith(3);
+      const output = JSON.parse(stdout) as ShardWorkerOutput;
+      expect(output).toMatchObject({
+        kind: 'failure',
+        failure: {
+          wireVersion: 1,
+          code: 'NOT_FOUND',
+        },
+      });
+      expect(output).not.toHaveProperty('failure.stack');
+      expect(output).not.toHaveProperty('failure.cause');
+      expect(stderr).not.toContain('graph-shard-worker');
+    }));
 
   // Q1 (host-owned-run-timing): a worker command returns NO ToolSessionContribution
   // — one StoredSession per PARENT command, owned by the host. This is a structural
   // guard on that contract, not a behavioural one.
-  it('returns no session contribution and runs as a raw-stream command (Q1)', async () => {
-    currentAdapterRegistry().register(fakeAdapter());
-    const specPath = join(dir, 'spec.json');
-    const spec: ShardWorkerSpec = {
-      shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.ts'] },
-      projectRoot: dir,
-      resolutionMode: 'exact',
-    };
-    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+  it('returns no session contribution and runs as a raw-stream command (Q1)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter());
+      const specPath = join(dir, 'spec.json');
+      const spec: ShardWorkerSpec = {
+        shard: { id: 'pkg:a', rootDir: dir, files: ['pkg/a.ts'] },
+        projectRoot: dir,
+        resolutionMode: 'exact',
+      };
+      writeFileSync(specPath, JSON.stringify(spec), 'utf8');
 
-    const { cli } = mockCli();
-    // The handler resolves to `void` — it never returns a ToolRunCompletion/
-    // ToolSessionContribution the host run plane would stamp + persist.
-    const returned = await executeShardWorker(specPath, cli);
-    expect(returned).toBeUndefined();
+      const { cli } = mockCli();
+      // The handler resolves to `void` — it never returns a ToolRunCompletion/
+      // ToolSessionContribution the host run plane would stamp + persist.
+      const returned = await executeShardWorker(specPath, cli);
+      expect(returned).toBeUndefined();
 
-    // The command spec stays raw-stream (worker IPC), the documented output mode
-    // for a worker that owns its own stdout and contributes no generic session.
-    expect(graphShardWorkerCommandSpec.output).toBe('raw-stream');
-  });
+      // The command spec stays raw-stream (worker IPC), the documented output mode
+      // for a worker that owns its own stdout and contributes no generic session.
+      expect(graphShardWorkerCommandSpec.output).toBe('raw-stream');
+    }));
 });

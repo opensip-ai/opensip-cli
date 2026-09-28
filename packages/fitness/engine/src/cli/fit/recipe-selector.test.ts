@@ -1,9 +1,10 @@
 import { EXIT_CODES } from '@opensip-cli/contracts';
 import {
-  enterScope,
   RunScope,
   applyToolContributeScope,
   createCancelledError,
+  runWithScope,
+  runWithScopeSync,
 } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
@@ -25,91 +26,100 @@ import type { FitOptions } from '@opensip-cli/contracts';
  */
 const base: FitOptions = { cwd: '/tmp' } as FitOptions;
 
+let scope: RunScope;
 beforeEach(() => {
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, fitnessTool);
-  enterScope(scope);
 });
 
 describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
-  it('explicit --recipe wins and resolves a real recipe', () => {
-    expect(selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default' })).toEqual({
-      recipeName: 'backend',
-    });
-  });
+  it('explicit --recipe wins and resolves a real recipe', () =>
+    runWithScopeSync(scope, () => {
+      expect(selectRecipe({ ...base, recipe: 'backend' }, { toolRecipe: 'default' })).toEqual({
+        recipeName: 'backend',
+      });
+    }));
 
-  it('explicit unknown --recipe hard-fails (typo protection)', () => {
-    const r = selectRecipe({ ...base, recipe: 'bogus-typo' });
-    expect('error' in r && r.error.message).toContain("Unknown recipe 'bogus-typo'");
-  });
+  it('explicit unknown --recipe hard-fails (typo protection)', () =>
+    runWithScopeSync(scope, () => {
+      const r = selectRecipe({ ...base, recipe: 'bogus-typo' });
+      expect('error' in r && r.error.message).toContain("Unknown recipe 'bogus-typo'");
+    }));
 
-  it('uses fitness.recipe when no flag', () => {
-    expect(selectRecipe(base, { toolRecipe: 'backend' })).toEqual({
-      recipeName: 'backend',
-    });
-  });
+  it('uses fitness.recipe when no flag', () =>
+    runWithScopeSync(scope, () => {
+      expect(selectRecipe(base, { toolRecipe: 'backend' })).toEqual({
+        recipeName: 'backend',
+      });
+    }));
 
-  it('a config-sourced UNKNOWN recipe tolerantly falls back to default (the leak fix)', () => {
-    // A copied tool-scoped recipe name that is absent from this registry must not
-    // abort — it falls back to default.
-    expect(selectRecipe(base, { toolRecipe: 'also-missing' })).toEqual({
-      recipeName: 'default',
-    });
-  });
+  it('a config-sourced UNKNOWN recipe tolerantly falls back to default (the leak fix)', () =>
+    runWithScopeSync(scope, () => {
+      // A copied tool-scoped recipe name that is absent from this registry must not
+      // abort — it falls back to default.
+      expect(selectRecipe(base, { toolRecipe: 'also-missing' })).toEqual({
+        recipeName: 'default',
+      });
+    }));
 
-  it('--check / --tags force an ad-hoc recipe (recipeName undefined), ignoring config', () => {
-    expect(selectRecipe({ ...base, check: 'some-check' }, { toolRecipe: 'backend' })).toEqual({
-      recipeName: undefined,
-    });
-    expect(selectRecipe({ ...base, tags: ['quality'] }, { toolRecipe: 'backend' })).toEqual({
-      recipeName: undefined,
-    });
-  });
+  it('--check / --tags force an ad-hoc recipe (recipeName undefined), ignoring config', () =>
+    runWithScopeSync(scope, () => {
+      expect(selectRecipe({ ...base, check: 'some-check' }, { toolRecipe: 'backend' })).toEqual({
+        recipeName: undefined,
+      });
+      expect(selectRecipe({ ...base, tags: ['quality'] }, { toolRecipe: 'backend' })).toEqual({
+        recipeName: undefined,
+      });
+    }));
 
-  it('no flag and no config → built-in default', () => {
-    expect(selectRecipe(base)).toEqual({ recipeName: 'default' });
-  });
+  it('no flag and no config → built-in default', () =>
+    runWithScopeSync(scope, () => {
+      expect(selectRecipe(base)).toEqual({ recipeName: 'default' });
+    }));
 
-  it('unknown explicit --check returns a configuration error result', async () => {
-    const service = new FitnessRecipeService({
-      cwd: '/tmp',
-      checkRegistry: new CheckRegistry(),
-      recipeRegistry: new FitnessRecipeRegistry(),
-      prewarmCache: false,
-    });
+  it('unknown explicit --check returns a configuration error result', () =>
+    runWithScope(scope, async () => {
+      const service = new FitnessRecipeService({
+        cwd: '/tmp',
+        checkRegistry: new CheckRegistry(),
+        recipeRegistry: new FitnessRecipeRegistry(),
+        prewarmCache: false,
+      });
 
-    const result = await runRecipeOrAdHoc(service, { ...base, check: 'ghost-check' }, undefined);
+      const result = await runRecipeOrAdHoc(service, { ...base, check: 'ghost-check' }, undefined);
 
-    expect('error' in result && result.error).toMatchObject({
-      message: "Unknown check 'ghost-check'.",
-      exitCode: EXIT_CODES.CONFIGURATION_ERROR,
-    });
-  });
+      expect('error' in result && result.error).toMatchObject({
+        message: "Unknown check 'ghost-check'.",
+        exitCode: EXIT_CODES.CONFIGURATION_ERROR,
+      });
+    }));
 
-  it('preserves not-found classification from the recipe service', async () => {
-    const service = new FitnessRecipeService({
-      cwd: '/tmp',
-      checkRegistry: new CheckRegistry(),
-      recipeRegistry: new FitnessRecipeRegistry(),
-      prewarmCache: false,
-    });
+  it('preserves not-found classification from the recipe service', () =>
+    runWithScope(scope, async () => {
+      const service = new FitnessRecipeService({
+        cwd: '/tmp',
+        checkRegistry: new CheckRegistry(),
+        recipeRegistry: new FitnessRecipeRegistry(),
+        prewarmCache: false,
+      });
 
-    const result = await runRecipeOrAdHoc(service, base, 'ghost-recipe');
+      const result = await runRecipeOrAdHoc(service, base, 'ghost-recipe');
 
-    expect('error' in result && result.error).toMatchObject({
-      exitCode: EXIT_CODES.CHECK_NOT_FOUND,
-    });
-  });
+      expect('error' in result && result.error).toMatchObject({
+        exitCode: EXIT_CODES.CHECK_NOT_FOUND,
+      });
+    }));
 
-  it('preserves cancellation from the recipe service', async () => {
-    const service = {
-      start: () => Promise.reject(createCancelledError('Fitness run cancelled.')),
-    } as unknown as FitnessRecipeService;
+  it('preserves cancellation from the recipe service', () =>
+    runWithScope(scope, async () => {
+      const service = {
+        start: () => Promise.reject(createCancelledError('Fitness run cancelled.')),
+      } as unknown as FitnessRecipeService;
 
-    const result = await runRecipeOrAdHoc(service, base, 'default');
+      const result = await runRecipeOrAdHoc(service, base, 'default');
 
-    expect('error' in result && result.error).toMatchObject({
-      exitCode: EXIT_CODES.CANCELLED,
-    });
-  });
+      expect('error' in result && result.error).toMatchObject({
+        exitCode: EXIT_CODES.CANCELLED,
+      });
+    }));
 });

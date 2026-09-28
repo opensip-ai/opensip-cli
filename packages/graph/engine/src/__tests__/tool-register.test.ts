@@ -17,7 +17,15 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { ConfigurationError, enterScope, LanguageRegistry } from '@opensip-cli/core';
+import {
+  ConfigurationError,
+  LanguageRegistry,
+  runWithScope,
+  runWithScopeSync,
+  type CommandHandler,
+  type RunScope,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { formatSignalSarif } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -37,7 +45,6 @@ import type {
   WalkOutput,
 } from '../lang-adapter/types.js';
 import type { Catalog, FunctionOccurrence } from '../types.js';
-import type { CommandHandler, ToolCliContext } from '@opensip-cli/core';
 
 /**
  * Resolve a graph command-spec handler by command name. Mirrors how the host
@@ -229,143 +236,153 @@ function makeMockCli(datastore?: DataStore): MockCliBag {
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let workDir: string;
+let scope: RunScope;
 
 beforeEach(() => {
   // Item 1: graph adapter + rule registries are per-RunScope.
-  enterScope(makeGraphTestScope());
+  scope = makeGraphTestScope();
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   workDir = mkdtempSync(join(tmpdir(), 'tool-reg-'));
 });
 
 afterEach(() => {
-  currentAdapterRegistry().clear();
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().clear();
+  });
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(workDir, { recursive: true, force: true });
 });
 
 describe('graphTool command surface', () => {
-  it('declares one spec per command, in mount order', () => {
-    const names = (graphTool.commandSpecs ?? []).map((s) => s.name);
-    expect(names).toEqual([
-      'graph',
-      'graph-shard-worker',
-      'graph-run-worker',
-      // Canonical nested export spec — name 'export', parent 'graph'.
-      'export',
-      // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) — name
-      // 'recipes' / 'lookup' / 'index' / 'list', parent 'graph'.
-      'recipes',
-      'lookup',
-      'index',
-      'list',
-      'impact',
-      'graph-equivalence-check',
-      'graph-context-inventory',
-      'graph-context-ensure',
-      'graph-context-select-tests',
-    ]);
-    // The legacy flat-root aliases are gone.
-    expect(names).not.toContain('graph-lookup');
-    expect(names).not.toContain('graph-symbol-index');
-    expect(names).not.toContain('graph-baseline-export');
-    expect(names).not.toContain('catalog-export');
-    expect(names).not.toContain('sarif-export');
-    expect(names).not.toContain('graph-recipes');
-  });
+  it('declares one spec per command, in mount order', () =>
+    runWithScopeSync(scope, () => {
+      const names = (graphTool.commandSpecs ?? []).map((s) => s.name);
+      expect(names).toEqual([
+        'graph',
+        'graph-shard-worker',
+        'graph-run-worker',
+        // Canonical nested export spec — name 'export', parent 'graph'.
+        'export',
+        // Grouped Tier-2 children (the canonical `<tool> <verb>` grammar) — name
+        // 'recipes' / 'lookup' / 'index' / 'list', parent 'graph'.
+        'recipes',
+        'lookup',
+        'index',
+        'list',
+        'impact',
+        'graph-equivalence-check',
+        'graph-context-inventory',
+        'graph-context-ensure',
+        'graph-context-select-tests',
+      ]);
+      // The legacy flat-root aliases are gone.
+      expect(names).not.toContain('graph-lookup');
+      expect(names).not.toContain('graph-symbol-index');
+      expect(names).not.toContain('graph-baseline-export');
+      expect(names).not.toContain('catalog-export');
+      expect(names).not.toContain('sarif-export');
+      expect(names).not.toContain('graph-recipes');
+    }));
 
   describe('graph handler', () => {
-    it('positional path bypasses the live view and routes through executeGraph', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const { cli, renderLive, setExitCode } = makeMockCli(datastore);
-        // `_args[0]` carries the variadic [paths...] array (host convention).
-        await handlerFor('graph')(
-          { cwd: workDir, json: true, _args: [[join(workDir, 'missing')]] },
-          cli,
-        );
-        // Positional path skips heap-preflight and routes to executeGraph
-        // (not the Ink live view).
-        expect(renderLive.mock.calls.length).toBe(0);
-        // The path doesn't exist on disk → exit 2.
-        expect(setExitCode.mock.calls.length).toBeGreaterThan(0);
-      } finally {
-        datastore.close();
-      }
-    });
-
-    it('interactive --exact path registers + routes through cli.renderLive', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const { cli, renderLive, registerLiveView } = makeMockCli(datastore);
-        // Set the sentinel so heap-preflight short-circuits without
-        // touching the file system.
-        const prev = process.env.OPENSIP_HEAP_ELEVATED;
-        process.env.OPENSIP_HEAP_ELEVATED = '1';
-        // The animated live view is taken only on a TTY; vitest's stdout is
-        // not a TTY, so force it for this assertion.
-        const prevTTY = process.stdout.isTTY;
-        Object.defineProperty(process.stdout, 'isTTY', {
-          value: true,
-          configurable: true,
-        });
+    it('positional path bypasses the live view and routes through executeGraph', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
         try {
-          // The Ink live runner drives the EXACT single-program engine, so it is
-          // eligible only under `--exact` (ADR-0032: sharded is the default and
-          // routes to the static path). No positionals: `_args` is the empty
-          // variadic array.
-          await handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli);
+          currentAdapterRegistry().register(fakeAdapter(workDir));
+          const { cli, renderLive, setExitCode } = makeMockCli(datastore);
+          // `_args[0]` carries the variadic [paths...] array (host convention).
+          await handlerFor('graph')(
+            { cwd: workDir, json: true, _args: [[join(workDir, 'missing')]] },
+            cli,
+          );
+          // Positional path skips heap-preflight and routes to executeGraph
+          // (not the Ink live view).
+          expect(renderLive.mock.calls.length).toBe(0);
+          // The path doesn't exist on disk → exit 2.
+          expect(setExitCode.mock.calls.length).toBeGreaterThan(0);
         } finally {
-          if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
-          else process.env.OPENSIP_HEAP_ELEVATED = prev;
+          datastore.close();
+        }
+      }));
+
+    it('interactive --exact path registers + routes through cli.renderLive', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          currentAdapterRegistry().register(fakeAdapter(workDir));
+          const { cli, renderLive, registerLiveView } = makeMockCli(datastore);
+          // Set the sentinel so heap-preflight short-circuits without
+          // touching the file system.
+          const prev = process.env.OPENSIP_HEAP_ELEVATED;
+          process.env.OPENSIP_HEAP_ELEVATED = '1';
+          // The animated live view is taken only on a TTY; vitest's stdout is
+          // not a TTY, so force it for this assertion.
+          const prevTTY = process.stdout.isTTY;
           Object.defineProperty(process.stdout, 'isTTY', {
-            value: prevTTY,
+            value: true,
             configurable: true,
           });
+          try {
+            // The Ink live runner drives the EXACT single-program engine, so it is
+            // eligible only under `--exact` (ADR-0032: sharded is the default and
+            // routes to the static path). No positionals: `_args` is the empty
+            // variadic array.
+            await handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli);
+          } finally {
+            if (prev === undefined) delete process.env.OPENSIP_HEAP_ELEVATED;
+            else process.env.OPENSIP_HEAP_ELEVATED = prev;
+            Object.defineProperty(process.stdout, 'isTTY', {
+              value: prevTTY,
+              configurable: true,
+            });
+          }
+          // Spec-mounted world: the renderer is set up lazily on the interactive
+          // path before the renderLive lookup.
+          expect(registerLiveView.mock.calls[0]?.[0]).toBe('graph');
+          expect(renderLive.mock.calls.length).toBe(1);
+          expect(renderLive.mock.calls[0]?.[0]).toBe('graph');
+        } finally {
+          datastore.close();
         }
-        // Spec-mounted world: the renderer is set up lazily on the interactive
-        // path before the renderLive lookup.
-        expect(registerLiveView.mock.calls[0]?.[0]).toBe('graph');
-        expect(renderLive.mock.calls.length).toBe(1);
-        expect(renderLive.mock.calls[0]?.[0]).toBe('graph');
-      } finally {
-        datastore.close();
-      }
-    });
+      }));
   });
 
   describe('graph lookup handler (nested)', () => {
-    it('returns a graph-status command-result for the host dispatch seam', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
-        const { cli, setExitCode, render } = makeMockCli(datastore);
-        const result = await handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
-        expect(setExitCode).toHaveBeenCalledWith(0);
-        expect(result).toMatchObject({ type: 'graph-status' });
-        expect((result as { lines: readonly string[] }).lines.join('\n')).toContain('saveBaseline');
-        expect(render).not.toHaveBeenCalled();
-      } finally {
-        datastore.close();
-      }
-    });
+    it('returns a graph-status command-result for the host dispatch seam', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          seedCatalog(datastore, [makeOcc({ simpleName: 'saveBaseline', bodyHash: 'h1' })]);
+          const { cli, setExitCode, render } = makeMockCli(datastore);
+          const result = await handlerFor('lookup')({ _args: ['saveBaseline'] }, cli);
+          expect(setExitCode).toHaveBeenCalledWith(0);
+          expect(result).toMatchObject({ type: 'graph-status' });
+          expect((result as { lines: readonly string[] }).lines.join('\n')).toContain(
+            'saveBaseline',
+          );
+          expect(render).not.toHaveBeenCalled();
+        } finally {
+          datastore.close();
+        }
+      }));
   });
 
   describe('graph index handler (nested)', () => {
-    it('routes to executeSymbolIndex with cwd + out flags', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        seedCatalog(datastore, [makeOcc({ simpleName: 'fn', bodyHash: 'h1' })]);
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('index')({ cwd: workDir, out: 'idx.json', _args: [] }, cli);
-        expect(setExitCode).toHaveBeenCalledWith(0);
-      } finally {
-        datastore.close();
-      }
-    });
+    it('routes to executeSymbolIndex with cwd + out flags', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          seedCatalog(datastore, [makeOcc({ simpleName: 'fn', bodyHash: 'h1' })]);
+          const { cli, setExitCode } = makeMockCli(datastore);
+          await handlerFor('index')({ cwd: workDir, out: 'idx.json', _args: [] }, cli);
+          expect(setExitCode).toHaveBeenCalledWith(0);
+        } finally {
+          datastore.close();
+        }
+      }));
   });
 
   // Canonical `graph export --format <fmt>` — the single export command (the
@@ -373,113 +390,118 @@ describe('graphTool command surface', () => {
   // aliases were removed). The canonical spec dispatches on --format and
   // validates the per-format required flags.
   describe('graph export handler (canonical, --format dispatch)', () => {
-    it('--format baseline exports the gate fingerprint JSON', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        new BaselineRepo(datastore).save('graph', [], {
-          baselineFormatVersion: 1,
-          fingerprintStrategyId: 'graph.rule-file-line-col',
-          fingerprintStrategyVersion: 1,
-        });
-        const outPath = join(workDir, 'baseline.json');
-        const { cli } = makeMockCli(datastore);
-        await handlerFor('export')({ format: 'baseline', out: outPath, _args: [] }, cli);
-        const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
-        expect(out).toContain('Exported graph baseline');
-      } finally {
-        datastore.close();
-      }
-    });
+    it('--format baseline exports the gate fingerprint JSON', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          new BaselineRepo(datastore).save('graph', [], {
+            baselineFormatVersion: 1,
+            fingerprintStrategyId: 'graph.rule-file-line-col',
+            fingerprintStrategyVersion: 1,
+          });
+          const outPath = join(workDir, 'baseline.json');
+          const { cli } = makeMockCli(datastore);
+          await handlerFor('export')({ format: 'baseline', out: outPath, _args: [] }, cli);
+          const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join('');
+          expect(out).toContain('Exported graph baseline');
+        } finally {
+          datastore.close();
+        }
+      }));
 
-    it('--format catalog runs the pipeline and writes the CatalogExport JSON', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const outPath = join(workDir, 'catalog.json');
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('export')(
-          {
-            format: 'catalog',
-            catalogOutput: outPath,
-            tenantId: 't1',
-            repoId: 'r1',
-            gitSha: 'abc123',
-            runId: 'run-1',
-            cwd: workDir,
-            mode: 'initial',
-            resolution: 'exact',
-            _args: [],
-          },
-          cli,
-        );
-        expect(setExitCode).toHaveBeenCalledWith(0);
-        expect(existsSync(outPath)).toBe(true);
-      } finally {
-        datastore.close();
-      }
-    });
+    it('--format catalog runs the pipeline and writes the CatalogExport JSON', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          currentAdapterRegistry().register(fakeAdapter(workDir));
+          const outPath = join(workDir, 'catalog.json');
+          const { cli, setExitCode } = makeMockCli(datastore);
+          await handlerFor('export')(
+            {
+              format: 'catalog',
+              catalogOutput: outPath,
+              tenantId: 't1',
+              repoId: 'r1',
+              gitSha: 'abc123',
+              runId: 'run-1',
+              cwd: workDir,
+              mode: 'initial',
+              resolution: 'exact',
+              _args: [],
+            },
+            cli,
+          );
+          expect(setExitCode).toHaveBeenCalledWith(0);
+          expect(existsSync(outPath)).toBe(true);
+        } finally {
+          datastore.close();
+        }
+      }));
 
-    it('--format sarif runs the pipeline and writes a SARIF document', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        currentAdapterRegistry().register(fakeAdapter(workDir));
-        const outPath = join(workDir, 'out.sarif');
-        const { cli, setExitCode } = makeMockCli(datastore);
-        await handlerFor('export')(
-          {
-            format: 'sarif',
-            outputSarif: outPath,
-            tenantId: 't1',
-            repoId: 'r1',
-            cwd: workDir,
-            resolution: 'exact',
-            _args: [],
-          },
-          cli,
-        );
-        expect(setExitCode).toHaveBeenCalledWith(0);
-        expect(existsSync(outPath)).toBe(true);
-      } finally {
-        datastore.close();
-      }
-    });
+    it('--format sarif runs the pipeline and writes a SARIF document', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          currentAdapterRegistry().register(fakeAdapter(workDir));
+          const outPath = join(workDir, 'out.sarif');
+          const { cli, setExitCode } = makeMockCli(datastore);
+          await handlerFor('export')(
+            {
+              format: 'sarif',
+              outputSarif: outPath,
+              tenantId: 't1',
+              repoId: 'r1',
+              cwd: workDir,
+              resolution: 'exact',
+              _args: [],
+            },
+            cli,
+          );
+          expect(setExitCode).toHaveBeenCalledWith(0);
+          expect(existsSync(outPath)).toBe(true);
+        } finally {
+          datastore.close();
+        }
+      }));
 
-    it('rejects a missing per-format required flag with exit 2 + stderr', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        const { cli, setExitCode, render } = makeMockCli(datastore);
-        // --format sarif requires --output-sarif/--tenant-id/--repo-id; omit them.
-        await handlerFor('export')({ format: 'sarif', cwd: workDir, _args: [] }, cli);
-        expect(setExitCode).toHaveBeenCalledWith(2);
-        const err = render.mock.calls
-          .map((c) => (c[0] as { message?: string }).message ?? '')
-          .join('\n');
-        expect(err).toContain('requires');
-      } finally {
-        datastore.close();
-      }
-    });
+    it('rejects a missing per-format required flag with exit 2 + stderr', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          const { cli, setExitCode, render } = makeMockCli(datastore);
+          // --format sarif requires --output-sarif/--tenant-id/--repo-id; omit them.
+          await handlerFor('export')({ format: 'sarif', cwd: workDir, _args: [] }, cli);
+          expect(setExitCode).toHaveBeenCalledWith(2);
+          const err = render.mock.calls
+            .map((c) => (c[0] as { message?: string }).message ?? '')
+            .join('\n');
+          expect(err).toContain('requires');
+        } finally {
+          datastore.close();
+        }
+      }));
 
-    it('emits a structured error when --json + missing required flag', async () => {
-      const datastore = DataStoreFactory.open({ backend: 'memory' });
-      try {
-        const { cli, setExitCode } = makeMockCli(datastore);
-        const reportFailure = cli.reportFailure as ReturnType<typeof vi.fn>;
-        await handlerFor('export')(
-          { format: 'baseline', json: true, cwd: workDir, _args: [] },
-          cli,
-        );
-        expect(setExitCode).toHaveBeenCalledWith(2);
-        expect(reportFailure.mock.calls.length).toBe(1);
-        const payload = reportFailure.mock.calls[0]?.[0] as {
-          exitCode?: number;
-          jsonRequested?: boolean;
-        };
-        expect(payload?.exitCode).toBe(2);
-        expect(payload?.jsonRequested).toBe(true);
-      } finally {
-        datastore.close();
-      }
-    });
+    it('emits a structured error when --json + missing required flag', () =>
+      runWithScope(scope, async () => {
+        const datastore = DataStoreFactory.open({ backend: 'memory' });
+        try {
+          const { cli, setExitCode } = makeMockCli(datastore);
+          const reportFailure = cli.reportFailure as ReturnType<typeof vi.fn>;
+          await handlerFor('export')(
+            { format: 'baseline', json: true, cwd: workDir, _args: [] },
+            cli,
+          );
+          expect(setExitCode).toHaveBeenCalledWith(2);
+          expect(reportFailure.mock.calls.length).toBe(1);
+          const payload = reportFailure.mock.calls[0]?.[0] as {
+            exitCode?: number;
+            jsonRequested?: boolean;
+          };
+          expect(payload?.exitCode).toBe(2);
+          expect(payload?.jsonRequested).toBe(true);
+        } finally {
+          datastore.close();
+        }
+      }));
   });
 });

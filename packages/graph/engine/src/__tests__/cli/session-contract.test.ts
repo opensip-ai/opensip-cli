@@ -17,7 +17,17 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, generatePrefixedId, LanguageRegistry } from '@opensip-cli/core';
+import {
+  generatePrefixedId,
+  LanguageRegistry,
+  runWithScope,
+  runWithScopeSync,
+  type LanguageAdapter,
+  type RunScope,
+  type ToolCliContext,
+  type ToolSessionContribution,
+  type WorkspaceUnit,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -35,12 +45,6 @@ import type {
 } from '../../lang-adapter/types.js';
 import type { GraphSessionPayload } from '../../persistence/session-payload.js';
 import type { StoredSession } from '@opensip-cli/contracts';
-import type {
-  LanguageAdapter,
-  ToolCliContext,
-  ToolSessionContribution,
-  WorkspaceUnit,
-} from '@opensip-cli/core';
 
 function fakeAdapter(): GraphLanguageAdapter {
   return {
@@ -162,19 +166,24 @@ let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
 let datastore: DataStore;
+let scope: RunScope;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope());
+  scope = makeGraphTestScope();
   // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-session-')));
   datastore = DataStoreFactory.open({ backend: 'memory' });
-  currentAdapterRegistry().register(fakeAdapter());
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().register(fakeAdapter());
+  });
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 });
 
 afterEach(() => {
-  currentAdapterRegistry().clear();
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().clear();
+  });
   datastore.close();
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
@@ -182,126 +191,134 @@ afterEach(() => {
 });
 
 describe('D12 — one CLI invocation = one session', () => {
-  it('default run contributes exactly one session', async () => {
-    const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
-    expect(outcome?.session).toBeDefined();
-    expect(outcome?.session?.tool).toBe('graph');
-  });
+  it('default run contributes exactly one session', () =>
+    runWithScope(scope, async () => {
+      const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+      expect(outcome?.session).toBeDefined();
+      expect(outcome?.session?.tool).toBe('graph');
+    }));
 
-  it('single positional path contributes exactly one session', async () => {
-    mkdirSync(join(projectDir, 'sub'));
-    const outcome = await executeGraph(
-      { cwd: projectDir, noCache: true, paths: [join(projectDir, 'sub')] },
-      mockCli(datastore),
-    );
-    expect(outcome?.session).toBeDefined();
-  });
+  it('single positional path contributes exactly one session', () =>
+    runWithScope(scope, async () => {
+      mkdirSync(join(projectDir, 'sub'));
+      const outcome = await executeGraph(
+        { cwd: projectDir, noCache: true, paths: [join(projectDir, 'sub')] },
+        mockCli(datastore),
+      );
+      expect(outcome?.session).toBeDefined();
+    }));
 
-  it('multiple positional paths contribute exactly one aggregate session', async () => {
-    mkdirSync(join(projectDir, 'a'));
-    mkdirSync(join(projectDir, 'b'));
-    const outcome = await executeGraph(
-      {
-        cwd: projectDir,
-        noCache: true,
-        paths: [join(projectDir, 'a'), join(projectDir, 'b')],
-      },
-      mockCli(datastore),
-    );
-    // One aggregate contribution for the whole multi-path invocation.
-    expect(outcome?.session).toBeDefined();
-  });
+  it('multiple positional paths contribute exactly one aggregate session', () =>
+    runWithScope(scope, async () => {
+      mkdirSync(join(projectDir, 'a'));
+      mkdirSync(join(projectDir, 'b'));
+      const outcome = await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          paths: [join(projectDir, 'a'), join(projectDir, 'b')],
+        },
+        mockCli(datastore),
+      );
+      // One aggregate contribution for the whole multi-path invocation.
+      expect(outcome?.session).toBeDefined();
+    }));
 
-  it('--workspace contributes exactly one aggregate session (not one per unit)', async () => {
-    const pkgA = join(projectDir, 'packages', 'a');
-    mkdirSync(pkgA, { recursive: true });
-    writeFileSync(join(pkgA, 'tsconfig.json'), '{}');
-    writeFileSync(join(projectDir, 'tsconfig.json'), '{}');
-    const fakeCliPath = join(projectDir, 'fake.cjs');
-    writeFileSync(
-      fakeCliPath,
-      `process.stdout.write(JSON.stringify({version:'1.0',tool:'graph',timestamp:new Date().toISOString(),recipe:'graph',score:100,passed:true,summary:{total:0,passed:0,failed:0,errors:0,warnings:0},checks:[],durationMs:0}));process.exit(0);`,
-    );
-    const units: WorkspaceUnit[] = [
-      { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
-    ];
-    const outcome = await executeGraph(
-      {
-        cwd: projectDir,
-        noCache: true,
-        workspace: true,
-        cliScript: fakeCliPath,
-        concurrency: 1,
-      },
-      mockCli(datastore, workspaceLangRegistry(units)),
-    );
-    // One aggregate contribution, and NO deliverable envelope (audit P1-2).
-    expect(outcome?.session).toBeDefined();
-    expect(outcome?.envelope).toBeUndefined();
-  });
+  it('--workspace contributes exactly one aggregate session (not one per unit)', () =>
+    runWithScope(scope, async () => {
+      const pkgA = join(projectDir, 'packages', 'a');
+      mkdirSync(pkgA, { recursive: true });
+      writeFileSync(join(pkgA, 'tsconfig.json'), '{}');
+      writeFileSync(join(projectDir, 'tsconfig.json'), '{}');
+      const fakeCliPath = join(projectDir, 'fake.cjs');
+      writeFileSync(
+        fakeCliPath,
+        `process.stdout.write(JSON.stringify({version:'1.0',tool:'graph',timestamp:new Date().toISOString(),recipe:'graph',score:100,passed:true,summary:{total:0,passed:0,failed:0,errors:0,warnings:0},checks:[],durationMs:0}));process.exit(0);`,
+      );
+      const units: WorkspaceUnit[] = [
+        { id: 'a', rootDir: pkgA, configPath: join(pkgA, 'tsconfig.json') },
+      ];
+      const outcome = await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          workspace: true,
+          cliScript: fakeCliPath,
+          concurrency: 1,
+        },
+        mockCli(datastore, workspaceLangRegistry(units)),
+      );
+      // One aggregate contribution, and NO deliverable envelope (audit P1-2).
+      expect(outcome?.session).toBeDefined();
+      expect(outcome?.envelope).toBeUndefined();
+    }));
 
-  it('--json contributes exactly one session', async () => {
-    const outcome = await executeGraph(
-      { cwd: projectDir, noCache: true, json: true },
-      mockCli(datastore),
-    );
-    expect(outcome?.kind).toBe('direct');
-    expect(outcome?.envelope).toBeDefined();
-    expect(outcome?.session).toBeDefined();
-  });
+  it('--json contributes exactly one session', () =>
+    runWithScope(scope, async () => {
+      const outcome = await executeGraph(
+        { cwd: projectDir, noCache: true, json: true },
+        mockCli(datastore),
+      );
+      expect(outcome?.kind).toBe('direct');
+      expect(outcome?.envelope).toBeDefined();
+      expect(outcome?.session).toBeDefined();
+    }));
 
-  it('--gate-save contributes exactly one session', async () => {
-    const outcome = await executeGraph(
-      { cwd: projectDir, noCache: true, gateSave: true },
-      mockCli(datastore),
-    );
-    expect(outcome?.kind).toBe('direct');
-    expect(outcome?.envelope).toBeDefined();
-    expect(outcome?.session).toBeDefined();
-  });
+  it('--gate-save contributes exactly one session', () =>
+    runWithScope(scope, async () => {
+      const outcome = await executeGraph(
+        { cwd: projectDir, noCache: true, gateSave: true },
+        mockCli(datastore),
+      );
+      expect(outcome?.kind).toBe('direct');
+      expect(outcome?.envelope).toBeDefined();
+      expect(outcome?.session).toBeDefined();
+    }));
 
-  it('--report-to contributes exactly one session', async () => {
-    const outcome = await executeGraph(
-      { cwd: projectDir, noCache: true, reportTo: 'http://127.0.0.1:1' },
-      mockCli(datastore),
-    );
-    expect(outcome?.kind).toBe('direct');
-    expect(outcome?.envelope).toBeDefined();
-    expect(outcome?.session).toBeDefined();
-  });
+  it('--report-to contributes exactly one session', () =>
+    runWithScope(scope, async () => {
+      const outcome = await executeGraph(
+        { cwd: projectDir, noCache: true, reportTo: 'http://127.0.0.1:1' },
+        mockCli(datastore),
+      );
+      expect(outcome?.kind).toBe('direct');
+      expect(outcome?.envelope).toBeDefined();
+      expect(outcome?.session).toBeDefined();
+    }));
 });
 
 describe('graph session payload — rule-grouped detail is persisted', () => {
-  it('default run contributes a payload with summary + checks (not summary-only)', async () => {
-    const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
-    expect(outcome?.session).toBeDefined();
+  it('default run contributes a payload with summary + checks (not summary-only)', () =>
+    runWithScope(scope, async () => {
+      const outcome = await executeGraph({ cwd: projectDir, noCache: true }, mockCli(datastore));
+      expect(outcome?.session).toBeDefined();
 
-    // Persist the returned contribution exactly as the host run plane would,
-    // then verify it round-trips through the StoredSession contract.
-    hostPersist(datastore, outcome!.session!);
+      // Persist the returned contribution exactly as the host run plane would,
+      // then verify it round-trips through the StoredSession contract.
+      hostPersist(datastore, outcome!.session!);
 
-    const session = new SessionRepo(datastore).latest();
-    expect(session).not.toBeNull();
+      const session = new SessionRepo(datastore).latest();
+      expect(session).not.toBeNull();
 
-    const payload = session?.payload as GraphSessionPayload | undefined;
-    expect(payload).toBeDefined();
+      const payload = session?.payload as GraphSessionPayload | undefined;
+      expect(payload).toBeDefined();
 
-    // The native signal summary is carried verbatim from the run's SignalEnvelope.
-    expect(payload?.summary).toEqual(
-      expect.objectContaining({
-        total: expect.any(Number),
-        passed: expect.any(Number),
-        failed: expect.any(Number),
-        errors: expect.any(Number),
-        warnings: expect.any(Number),
-      }),
-    );
+      // The native signal summary is carried verbatim from the run's SignalEnvelope.
+      expect(payload?.summary).toEqual(
+        expect.objectContaining({
+          total: expect.any(Number),
+          passed: expect.any(Number),
+          failed: expect.any(Number),
+          errors: expect.any(Number),
+          warnings: expect.any(Number),
+        }),
+      );
 
-    // The rule-grouped detail (`checks`) is what the Code Paths → Sessions
-    // panel renders, and the reason the payload is no longer summary-only.
-    // A regression to `{ summary }` (the pre-extension shape) drops this key —
-    // session count stays 1, so only this assertion catches it.
-    expect(payload).toHaveProperty('checks');
-    expect(Array.isArray(payload?.checks)).toBe(true);
-  });
+      // The rule-grouped detail (`checks`) is what the Code Paths → Sessions
+      // panel renders, and the reason the payload is no longer summary-only.
+      // A regression to `{ summary }` (the pre-extension shape) drops this key —
+      // session count stays 1, so only this assertion catches it.
+      expect(payload).toHaveProperty('checks');
+      expect(Array.isArray(payload?.checks)).toBe(true);
+    }));
 });

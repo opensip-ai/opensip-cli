@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
+import * as ts from 'typescript';
 
 /** True when `extends` is a package-style reference (not a relative/absolute path). */
 function isPackageStyleExtends(value: string): boolean {
@@ -95,10 +96,18 @@ export const tsconfigExtendsValidation = defineCheck({
       /* v8 ignore next -- defensive guard */
       if (!content) continue;
 
-      let parsed: Record<string, unknown>;
-      try {
-        parsed = JSON.parse(content) as Record<string, unknown>;
-      } catch {
+      // tsconfig.json is JSONC (TypeScript's own loader strips `//`/`/* */`
+      // comments and tolerates trailing commas before parsing), so a plain
+      // `JSON.parse` false-flags any legitimately commented file as invalid.
+      // `parseConfigFileTextToJson` is the same parser `tsc` itself uses.
+      // Its own typing returns `config?: any`; re-typed to `unknown` here so the
+      // destructure doesn't propagate an unchecked `any` into this function.
+      const parseResult: { config?: unknown; error?: ts.Diagnostic } = ts.parseConfigFileTextToJson(
+        filePath,
+        content,
+      );
+      const { config, error } = parseResult;
+      if (error || typeof config !== 'object' || config === null) {
         violations.push({
           filePath,
           line: 1,
@@ -108,6 +117,7 @@ export const tsconfigExtendsValidation = defineCheck({
         });
         continue;
       }
+      const parsed = config as Record<string, unknown>;
 
       // Root tsconfig doesn't need to extend (works for absolute production paths)
       if (isRootTsconfig(filePath)) {

@@ -10,35 +10,23 @@
  */
 
 import * as fs from 'node:fs';
-import { builtinModules } from 'node:module';
+import { isBuiltin } from 'node:module';
 import * as path from 'node:path';
 
 import { defineCheck, type CheckViolation, type FileAccessor } from '@opensip-cli/fitness';
 import { getSharedSourceFile, walkNodes } from '@opensip-cli/lang-typescript';
 import * as ts from 'typescript';
 
-/** Built-ins that support their historical unprefixed specifier. */
-const PREFIX_OPTIONAL_NODE_BUILTINS = new Set(
-  builtinModules.filter((specifier) => !specifier.startsWith('node:')),
-);
-
-/** Newer built-ins that Node exposes only through the explicit `node:` prefix. */
-const PREFIX_REQUIRED_NODE_BUILTINS = new Set(
-  builtinModules
-    .filter((specifier) => specifier.startsWith('node:'))
-    .map((specifier) => specifier.slice(5)),
-);
-
+/**
+ * `node:module`'s own `isBuiltin` (not the legacy `builtinModules` array, which
+ * omits some `node:`-only built-ins such as `node:test` and `node:sqlite`) is
+ * the correct source of truth: it recognizes both the historical unprefixed
+ * form (`fs`) and prefix-required newer built-ins (`node:test`), including
+ * subpaths (`node:test/reporters`), without the check needing to hand-derive
+ * its own prefix-optional/prefix-required split.
+ */
 function isNodeBuiltinSpecifier(importSpecifier: string): boolean {
-  const hasNodePrefix = importSpecifier.startsWith('node:');
-  const bare = hasNodePrefix ? importSpecifier.slice(5) : importSpecifier;
-  const root = bare.split('/')[0] ?? '';
-  return (
-    PREFIX_OPTIONAL_NODE_BUILTINS.has(bare) ||
-    PREFIX_OPTIONAL_NODE_BUILTINS.has(root) ||
-    (hasNodePrefix &&
-      (PREFIX_REQUIRED_NODE_BUILTINS.has(bare) || PREFIX_REQUIRED_NODE_BUILTINS.has(root)))
-  );
+  return isBuiltin(importSpecifier);
 }
 
 /**

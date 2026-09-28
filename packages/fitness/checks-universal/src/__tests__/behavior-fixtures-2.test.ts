@@ -860,6 +860,45 @@ describe('docker-best-practices', () => {
     });
     expect(result.signals.length).toBeGreaterThan(0);
   });
+
+  it('does not flag `npm ci` as a missing frozen-lockfile violation', async () => {
+    // `npm ci` is inherently reproducible (it always installs strictly from the
+    // lockfile and errors instead of updating it) — it is in fact this rule's own
+    // suggested fix for a bare `npm install`, so it must never be the violation.
+    const dir = makeFixtureDir('docker-npm-ci');
+    writeFixture(
+      dir,
+      'Dockerfile.npm-ci',
+      ['FROM node:20', 'WORKDIR /app', 'COPY . .', 'RUN npm ci', 'USER node'].join('\n'),
+    );
+    try {
+      const result = await findCheck('docker-best-practices').run(dir, {
+        targetFiles: [join(dir, 'Dockerfile.npm-ci')],
+      });
+      const messages = result.signals.map((s) => s.message);
+      expect(messages.some((m) => m.includes('frozen lockfile'))).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('still flags a bare `npm install` as a missing frozen-lockfile violation', async () => {
+    const dir = makeFixtureDir('docker-npm-install-bare');
+    writeFixture(
+      dir,
+      'Dockerfile.npm-install',
+      ['FROM node:20', 'WORKDIR /app', 'COPY . .', 'RUN npm install', 'USER node'].join('\n'),
+    );
+    try {
+      const result = await findCheck('docker-best-practices').run(dir, {
+        targetFiles: [join(dir, 'Dockerfile.npm-install')],
+      });
+      const messages = result.signals.map((s) => s.message);
+      expect(messages.some((m) => m.includes('frozen lockfile'))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // =============================================================================

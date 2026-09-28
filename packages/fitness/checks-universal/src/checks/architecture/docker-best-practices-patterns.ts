@@ -60,8 +60,11 @@ export const SECRET_PATTERNS = [
 ];
 
 const PNPM_INSTALL_PATTERN = /pnpm\s{1,10}install(?!\s{1,10}--frozen-lockfile)/;
+// `npm ci` is intentionally excluded from the match: unlike `npm install`, it always
+// installs strictly from the lockfile and needs no extra flag to be reproducible — it
+// is in fact this rule's own suggested fix, so flagging it would be self-contradictory.
 const NPM_INSTALL_PATTERN =
-  /npm\s{1,10}(?:install|ci)(?!\s{1,10}-g)(?!\s{1,10}--global)(?!\s{1,10}--ci)(?!\s{1,10}--frozen-lockfile)/;
+  /npm\s{1,10}install(?!\s{1,10}-g)(?!\s{1,10}--global)(?!\s{1,10}--ci)(?!\s{1,10}--frozen-lockfile)/;
 const YARN_INSTALL_PATTERN =
   /yarn\s{1,10}install(?!\s{1,10}--frozen-lockfile)(?!\s{1,10}--immutable)/;
 

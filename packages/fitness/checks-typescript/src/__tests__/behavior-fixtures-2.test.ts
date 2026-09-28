@@ -444,6 +444,23 @@ describe('tsconfig-extends-validation — branch coverage', () => {
     expect(result.signals.some((s) => s.metadata?.type === 'TSCONFIG_INVALID_JSON')).toBe(true);
   });
 
+  it('does not flag a tsconfig with JSONC comments as invalid JSON', async () => {
+    // tsconfig.json is JSONC — TypeScript's own loader strips comments before
+    // parsing, and commented tsconfig files are common and valid.
+    fx(
+      'packages/foo/tsconfig.json',
+      [
+        '{',
+        '  // Extends the shared base config',
+        '  "extends": "../../tsconfig.json",',
+        '  "compilerOptions": { "outDir": "dist" }',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('tsconfig-extends-validation');
+    expect(result.signals.some((s) => s.metadata?.type === 'TSCONFIG_INVALID_JSON')).toBe(false);
+  });
+
   it('skips node_modules tsconfig.json', async () => {
     fx(
       'packages/foo/node_modules/dep/tsconfig.json',

@@ -17,7 +17,7 @@
  * the wiring without spinning up a real Ink render host.
  */
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { RunScope, applyToolContributeScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { simulationTool } from '../tool.js';
@@ -45,10 +45,11 @@ vi.mock('../cli/sim-runner.js', () => ({
 
 const { renderSimLive } = await import('../cli/sim-runner.js');
 
+let scope: RunScope;
+
 beforeEach(() => {
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, simulationTool);
-  enterScope(scope);
 });
 
 afterEach(() => {
@@ -119,59 +120,61 @@ describe('simulationTool live-view callback (ADR-0016)', () => {
     process.stdout.isTTY = originalIsTTY;
   });
 
-  it('registers a live view under the `simulation` key and delivers the rendered envelope', async () => {
-    process.stdout.isTTY = true;
-    const cap = makeCtx();
+  it('registers a live view under the `simulation` key and delivers the rendered envelope', () =>
+    runWithScope(scope, async () => {
+      process.stdout.isTTY = true;
+      const cap = makeCtx();
 
-    // The interactive branch registers the live view, so run the handler once
-    // to install it, then exercise the registered callback directly.
-    await simHandler()({ cwd: '/proj' }, cap.ctx);
+      // The interactive branch registers the live view, so run the handler once
+      // to install it, then exercise the registered callback directly.
+      await simHandler()({ cwd: '/proj' }, cap.ctx);
 
-    const callback = cap.liveViews.get('simulation');
-    expect(callback).toBeDefined();
+      const callback = cap.liveViews.get('simulation');
+      expect(callback).toBeDefined();
 
-    // Invoke the live-view callback the dispatcher would call.
-    await callback?.({
-      cwd: '/proj',
-      reportTo: 'https://cloud.example',
-      apiKey: 'k',
-    });
+      // Invoke the live-view callback the dispatcher would call.
+      await callback?.({
+        cwd: '/proj',
+        reportTo: 'https://cloud.example',
+        apiKey: 'k',
+      });
 
-    // The Ink renderer ran with setExitCode wired through (once per run via the
-    // handler's renderLive, once here via the direct callback invocation).
-    expect(renderSimLive).toHaveBeenCalled();
-    // The returned envelope was delivered to the composition root with egress
-    // options derived from the args. ADR-0035: a normal run does NOT pass
-    // `runFailed` — the host derives the findings exit from envelope.verdict.passed.
-    expect(cap.delivered.length).toBeGreaterThanOrEqual(1);
-    const last = cap.delivered.at(-1);
-    expect(last?.envelope).toBe(fakeEnvelope);
-    expect(last?.opts).toMatchObject({
-      cwd: '/proj',
-      reportTo: 'https://cloud.example',
-      apiKey: 'k',
-    });
-    expect(last?.opts).not.toHaveProperty('runFailed');
-  });
+      // The Ink renderer ran with setExitCode wired through (once per run via the
+      // handler's renderLive, once here via the direct callback invocation).
+      expect(renderSimLive).toHaveBeenCalled();
+      // The returned envelope was delivered to the composition root with egress
+      // options derived from the args. ADR-0035: a normal run does NOT pass
+      // `runFailed` — the host derives the findings exit from envelope.verdict.passed.
+      expect(cap.delivered.length).toBeGreaterThanOrEqual(1);
+      const last = cap.delivered.at(-1);
+      expect(last?.envelope).toBe(fakeEnvelope);
+      expect(last?.opts).toMatchObject({
+        cwd: '/proj',
+        reportTo: 'https://cloud.example',
+        apiKey: 'k',
+      });
+      expect(last?.opts).not.toHaveProperty('runFailed');
+    }));
 
-  it('does not deliver when the renderer returns no envelope', async () => {
-    process.stdout.isTTY = true;
-    // The handler's own renderLive (the live view) is dispatched through
-    // cli.renderLive (mocked to a no-op), so it does not invoke renderSimLive;
-    // only the directly-invoked callback below does, returning a completion with
-    // no envelope (host-owned-run-timing Phase 2).
-    (
-      renderSimLive as unknown as {
-        mockResolvedValueOnce: (v: unknown) => void;
-      }
-    ).mockResolvedValueOnce({ envelope: undefined });
-    const cap = makeCtx();
-    await simHandler()({ cwd: '/proj' }, cap.ctx);
+  it('does not deliver when the renderer returns no envelope', () =>
+    runWithScope(scope, async () => {
+      process.stdout.isTTY = true;
+      // The handler's own renderLive (the live view) is dispatched through
+      // cli.renderLive (mocked to a no-op), so it does not invoke renderSimLive;
+      // only the directly-invoked callback below does, returning a completion with
+      // no envelope (host-owned-run-timing Phase 2).
+      (
+        renderSimLive as unknown as {
+          mockResolvedValueOnce: (v: unknown) => void;
+        }
+      ).mockResolvedValueOnce({ envelope: undefined });
+      const cap = makeCtx();
+      await simHandler()({ cwd: '/proj' }, cap.ctx);
 
-    await cap.liveViews.get('simulation')?.({ cwd: '/proj' });
+      await cap.liveViews.get('simulation')?.({ cwd: '/proj' });
 
-    expect(cap.delivered).toHaveLength(0);
-  });
+      expect(cap.delivered).toHaveLength(0);
+    }));
 });
 
 describe('simulationTool action — interactive TTY branch', () => {
@@ -181,20 +184,21 @@ describe('simulationTool action — interactive TTY branch', () => {
     process.stdout.isTTY = originalIsTTY;
   });
 
-  it('routes to renderLive + maybeOpenReport when stdout is a TTY (non-json)', async () => {
-    process.stdout.isTTY = true;
-    const cap = makeCtx();
+  it('routes to renderLive + maybeOpenReport when stdout is a TTY (non-json)', () =>
+    runWithScope(scope, async () => {
+      process.stdout.isTTY = true;
+      const cap = makeCtx();
 
-    await simHandler()({ open: true }, cap.ctx);
+      await simHandler()({ open: true }, cap.ctx);
 
-    // Interactive path: the static executeSim render is bypassed in favour of
-    // the live view, then the report auto-open hook fires.
-    expect(cap.renderLiveCalls).toHaveLength(1);
-    expect(cap.renderLiveCalls[0]?.[0]).toBe('simulation');
-    expect(cap.dashboardCalls).toHaveLength(1);
-    expect(cap.dashboardCalls[0]).toMatchObject({
-      openRequested: true,
-      jsonOutput: false,
-    });
-  });
+      // Interactive path: the static executeSim render is bypassed in favour of
+      // the live view, then the report auto-open hook fires.
+      expect(cap.renderLiveCalls).toHaveLength(1);
+      expect(cap.renderLiveCalls[0]?.[0]).toBe('simulation');
+      expect(cap.dashboardCalls).toHaveLength(1);
+      expect(cap.dashboardCalls[0]).toMatchObject({
+        openRequested: true,
+        jsonOutput: false,
+      });
+    }));
 });

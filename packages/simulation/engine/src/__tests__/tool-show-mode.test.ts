@@ -7,7 +7,7 @@
  * entry point with a fake `ToolCliContext` whose scope carries a datastore.
  */
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { RunScope, applyToolContributeScope, runWithScope } from '@opensip-cli/core';
 import { DataStoreFactory } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -122,10 +122,11 @@ function makeContext(datastore: DataStore | undefined): {
 }
 
 let ds: DataStore;
+let scope: RunScope;
 
 beforeEach(() => {
   ds = DataStoreFactory.open({ backend: 'memory' });
-  enterScope(new RunScope({ datastore: () => ds }));
+  scope = new RunScope({ datastore: () => ds });
 });
 
 afterEach(() => {
@@ -133,63 +134,68 @@ afterEach(() => {
 });
 
 describe('sim --show (runSimShowMode)', () => {
-  it('replays a stored session by id and renders the result (non-JSON)', async () => {
-    new SessionRepo(ds).save(simSession());
-    const { ctx, rendered } = makeContext(ds);
+  it('replays a stored session by id and renders the result (non-JSON)', () =>
+    runWithScope(scope, async () => {
+      new SessionRepo(ds).save(simSession());
+      const { ctx, rendered } = makeContext(ds);
 
-    await simSpec().handler({ cwd: '/repo', show: 'SIM_1' }, ctx);
+      await simSpec().handler({ cwd: '/repo', show: 'SIM_1' }, ctx);
 
-    expect(rendered).toHaveLength(1);
-    // Replays render through the tool-agnostic session-replay view, not sim-done.
-    expect(rendered[0]).toMatchObject({
-      type: 'session-replay',
-      session: { id: 'SIM_1', tool: 'sim' },
-      envelope: { tool: 'sim' },
-    });
-  });
+      expect(rendered).toHaveLength(1);
+      // Replays render through the tool-agnostic session-replay view, not sim-done.
+      expect(rendered[0]).toMatchObject({
+        type: 'session-replay',
+        session: { id: 'SIM_1', tool: 'sim' },
+        envelope: { tool: 'sim' },
+      });
+    }));
 
-  it('emits a JSON replay wrapper when --json is passed', async () => {
-    new SessionRepo(ds).save(simSession());
-    const { ctx, emitted } = makeContext(ds);
+  it('emits a JSON replay wrapper when --json is passed', () =>
+    runWithScope(scope, async () => {
+      new SessionRepo(ds).save(simSession());
+      const { ctx, emitted } = makeContext(ds);
 
-    await simSpec().handler({ cwd: '/repo', show: 'SIM_1', json: true }, ctx);
+      await simSpec().handler({ cwd: '/repo', show: 'SIM_1', json: true }, ctx);
 
-    expect(emitted).toHaveLength(1);
-    expect(emitted[0]).toMatchObject({
-      session: { id: 'SIM_1', tool: 'sim' },
-      fidelity: 'projection',
-      envelope: { tool: 'sim', runId: 'SIM_1' },
-    });
-  });
+      expect(emitted).toHaveLength(1);
+      expect(emitted[0]).toMatchObject({
+        session: { id: 'SIM_1', tool: 'sim' },
+        fidelity: 'projection',
+        envelope: { tool: 'sim', runId: 'SIM_1' },
+      });
+    }));
 
-  it('errors with datastore-unavailable when no datastore is present', async () => {
-    const { ctx, emitted, exitCodes } = makeContext(undefined);
+  it('errors with datastore-unavailable when no datastore is present', () =>
+    runWithScope(scope, async () => {
+      const { ctx, emitted, exitCodes } = makeContext(undefined);
 
-    await simSpec().handler({ cwd: '/repo', show: 'latest', json: true }, ctx);
+      await simSpec().handler({ cwd: '/repo', show: 'latest', json: true }, ctx);
 
-    expect(exitCodes).toContain(2);
-    expect(emitted[0]).toEqual({
-      message: 'session replay requires a datastore',
-      exitCode: 2,
-      code: 'datastore-unavailable',
-    });
-  });
+      expect(exitCodes).toContain(2);
+      expect(emitted[0]).toEqual({
+        message: 'session replay requires a datastore',
+        exitCode: 2,
+        code: 'datastore-unavailable',
+      });
+    }));
 
-  it('errors (non-JSON) with a rendered error result when the session is missing', async () => {
-    const { ctx, rendered, exitCodes } = makeContext(ds);
+  it('errors (non-JSON) with a rendered error result when the session is missing', () =>
+    runWithScope(scope, async () => {
+      const { ctx, rendered, exitCodes } = makeContext(ds);
 
-    await simSpec().handler({ cwd: '/repo', show: 'MISSING' }, ctx);
+      await simSpec().handler({ cwd: '/repo', show: 'MISSING' }, ctx);
 
-    expect(exitCodes).toContain(2);
-    expect(rendered[0]).toMatchObject({ type: 'error' });
-  });
+      expect(exitCodes).toContain(2);
+      expect(rendered[0]).toMatchObject({ type: 'error' });
+    }));
 
-  it('surfaces a decode-error when the stored payload is corrupt', async () => {
-    new SessionRepo(ds).save(simSession({ id: 'SIM_BAD', payload: { not: 'valid' } }));
-    const { ctx, emitted } = makeContext(ds);
+  it('surfaces a decode-error when the stored payload is corrupt', () =>
+    runWithScope(scope, async () => {
+      new SessionRepo(ds).save(simSession({ id: 'SIM_BAD', payload: { not: 'valid' } }));
+      const { ctx, emitted } = makeContext(ds);
 
-    await simSpec().handler({ cwd: '/repo', show: 'SIM_BAD', json: true }, ctx);
+      await simSpec().handler({ cwd: '/repo', show: 'SIM_BAD', json: true }, ctx);
 
-    expect(emitted[0]).toMatchObject({ code: 'decode-error' });
-  });
+      expect(emitted[0]).toMatchObject({ code: 'decode-error' });
+    }));
 });

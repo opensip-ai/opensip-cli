@@ -22,21 +22,42 @@
  * `vitest.config.ts`.
  */
 
-import { enterScope } from '@opensip-cli/core';
+import { enterScope, type RunScope } from '@opensip-cli/core';
 import { beforeEach } from 'vitest';
 
 import { makeFitnessTestScope } from './with-scope.js';
 
 import { fitnessTestFileCache } from './index.js';
 
-beforeEach(() => {
+// A single shared ambient scope, built lazily on first use rather than fresh per
+// test. `enterScope` (AsyncLocalStorage.enterWith) only rejects entering a
+// DIFFERENT scope object while one is already current — constructing a fresh
+// RunScope per test made every test after the first in a file hit that guard,
+// because Vitest does not reliably propagate/clear an `enterWith`-bound store
+// across separate `beforeEach` invocations for sibling tests (it is documented
+// as safe only for a single command's pre-action path, never repeated calls
+// across independent async boundaries like Vitest's per-test hooks). Re-entering
+// the SAME object every time is a no-op for the guard, so it never throws. This
+// is safe here because the ambient scope's only job is exposing the test-only
+// prewarmed `fileCache` singleton below — already deliberately shared across
+// every check-pack test, per the file-level doc comment — not per-test isolated
+// state; tests needing real isolation already shadow this via their own
+// `runWithScope(makeFitnessTestScope(), ...)`.
+let sharedScope: RunScope | undefined;
+
+function ambientScope(): RunScope {
+  if (sharedScope !== undefined) return sharedScope;
   // Start from a full fitness subscope (checks/recipes/load + a fresh cache),
   // then point its fileCache at the test-only module singleton the check-pack
   // tests prewarm — so `currentScope()?.fitness?.fileCache` resolves the cache
-  // they populated. `enterScope` (AsyncLocalStorage.enterWith) sets it as the
-  // ambient scope for the test.
+  // they populated.
   const scope = makeFitnessTestScope();
   // The `fitness` slot is installed by makeFitnessTestScope; override its cache.
   Object.assign(scope.fitness ?? {}, { fileCache: fitnessTestFileCache });
-  enterScope(scope);
+  sharedScope = scope;
+  return scope;
+}
+
+beforeEach(() => {
+  enterScope(ambientScope());
 });

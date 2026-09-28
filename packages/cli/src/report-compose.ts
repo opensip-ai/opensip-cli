@@ -72,10 +72,19 @@ import type { DataStore } from '@opensip-cli/datastore';
 
 /**
  * Host-reserved top-level dashboard-input keys a tool's `collectReportData`
- * must never set. Sessions/runs are durable cross-tool history and selection is
- * host-owned navigation. A tool that returns one is ignored with a warning.
+ * must never set. Sessions/runs are durable cross-tool history, selection is
+ * host-owned navigation, declaredInputs is host provenance, and projectRoot is
+ * the trusted absolute path editor deep-links resolve against. A tool that
+ * returns one is ignored with a warning.
  */
-const RESERVED_DASHBOARD_KEYS = new Set(['runs', 'selection', 'selectionEvidence', 'sessions']);
+const RESERVED_DASHBOARD_KEYS = new Set([
+  'declaredInputs',
+  'projectRoot',
+  'runs',
+  'selection',
+  'selectionEvidence',
+  'sessions',
+]);
 const UNSAFE_DASHBOARD_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const REPORT_MODULE = 'cli:report';
 

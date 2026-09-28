@@ -11,6 +11,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { EXIT_CODES, mapToolErrorToExitCode } from '@opensip-cli/contracts';
 import {
   ConfigurationError,
   RunScope,
@@ -217,5 +218,30 @@ describe('createEnsureArtifactDirSeam (A1/A7)', () => {
     const ensureArtifactDir = createEnsureArtifactDirSeam(makeLogger());
 
     await expect(ensureArtifactDir(artifact)).rejects.toBeInstanceOf(SystemError);
+  });
+
+  // Regression: ensureArtifactDir runs BEFORE the scanner (ADR-0091 A1/A7), so a
+  // failure here means nothing ran. It must surface a non-zero exit code and must
+  // not share writeArtifact's ARTIFACT_WRITE_FAILED code, whose warning/success
+  // axes are only correct for a post-analysis write (D7) — reusing it here would
+  // report a silent false "pass" for a security-scanning tool that never ran.
+  it('maps a mkdir failure to a non-success exit code, distinct from writeArtifact', async () => {
+    dir = mkdtempSync(join(tmpdir(), 'ensure-dir-'));
+    const regularFile = join(dir, 'a-file');
+    writeFileSync(regularFile, 'x');
+    const artifact = join(regularFile, 'sub', 'report.json');
+    const ensureArtifactDir = createEnsureArtifactDirSeam(makeLogger());
+
+    let caught: unknown;
+    try {
+      await ensureArtifactDir(artifact);
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(SystemError);
+    const error = caught as SystemError;
+    expect(error.code).toBe('CLI.HOST.ARTIFACT_DIR_FAILED');
+    expect(error.code).not.toBe('CLI.HOST.ARTIFACT_WRITE_FAILED');
+    expect(mapToolErrorToExitCode(error)).not.toBe(EXIT_CODES.SUCCESS);
   });
 });
