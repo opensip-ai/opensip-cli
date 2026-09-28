@@ -45,12 +45,12 @@
     "@opensip-cli/core": "workspace:*",
     "@opentelemetry/api": "^1.9.1",
     "better-sqlite3": "^12.11.1",
-    "drizzle-orm": "^0.45.2"
+    "drizzle-orm": "^0.45.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^24.13.3",
-    "drizzle-kit": "^0.31.10",
+    "@types/node": "^24.13.6",
+    "drizzle-kit": "^0.31.11",
     "typescript": "~6.0.3",
     "vitest": "^4.1.10"
   }
