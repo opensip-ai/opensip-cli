@@ -1,4 +1,9 @@
-import { createSignal, enterScope, generatePrefixedId } from '@opensip-cli/core';
+import {
+  createSignal,
+  generatePrefixedId,
+  runWithScope,
+  runWithScopeSync,
+} from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { SessionRepo } from '@opensip-cli/session-store';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -13,7 +18,7 @@ import { executeSim } from '../sim.js';
 
 import type { ScenarioExecutorResult } from '../../framework/scenario-executor-result.js';
 import type { ToolOptions } from '@opensip-cli/contracts';
-import type { SignalSeverity } from '@opensip-cli/core';
+import type { RunScope, SignalSeverity } from '@opensip-cli/core';
 
 const args = (overrides: Partial<ToolOptions> = {}): ToolOptions => ({
   json: false,
@@ -51,196 +56,209 @@ const loadResultWithSignal = (
   signals: [createSignal({ source, severity, ruleId: 'sim.test', message })],
 });
 
+let scope: RunScope;
+
 beforeEach(() => {
-  // Item 1: registries are per-RunScope. Enter a fresh scope per test.
-  enterScope(makeSimTestScope());
+  // Item 1: registries are per-RunScope. Build a fresh scope per test.
+  scope = makeSimTestScope();
 });
 
 afterEach(() => {
-  clearScenarioRegistry();
+  // beforeEach only constructs `scope`; it is no longer the ambient scope
+  // outside a test's own runWithScope callback, so re-bind it here too.
+  runWithScopeSync(scope, () => clearScenarioRegistry());
 });
 
 describe('executeSim', () => {
-  it('returns ErrorResult when the recipe name is unknown', async () => {
-    const { result } = await executeSim(args({ recipe: 'does-not-exist' }));
-    expect(result.type).toBe('error');
-    if (result.type === 'error') {
-      expect(result.message).toContain('does-not-exist');
-      expect(result.exitCode).toBe(2);
-    }
-  });
+  it('returns ErrorResult when the recipe name is unknown', () =>
+    runWithScope(scope, async () => {
+      const { result } = await executeSim(args({ recipe: 'does-not-exist' }));
+      expect(result.type).toBe('error');
+      if (result.type === 'error') {
+        expect(result.message).toContain('does-not-exist');
+        expect(result.exitCode).toBe(2);
+      }
+    }));
 
-  it('runs the built-in default recipe when no --recipe is passed', async () => {
-    // Register a scenario so the default recipe has something to run — an
-    // empty selection now fails closed (see the zero-scenario guard tests
-    // below), so this test must supply work to exercise the happy path.
-    currentScenarioRegistry().register(
-      defineLoadScenario({
-        id: 'default-probe',
-        name: 'default-probe',
-        description: 'default-probe',
+  it('runs the built-in default recipe when no --recipe is passed', () =>
+    runWithScope(scope, async () => {
+      // Register a scenario so the default recipe has something to run — an
+      // empty selection now fails closed (see the zero-scenario guard tests
+      // below), so this test must supply work to exercise the happy path.
+      currentScenarioRegistry().register(
+        defineLoadScenario({
+          id: 'default-probe',
+          name: 'default-probe',
+          description: 'default-probe',
+          tags: [],
+          target: noopTarget,
+          workload: { rps: 1 },
+          duration: 1,
+          assertions: [ASSERTIONS.lowErrorRate(1)],
+        }),
+      );
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('run-presentation');
+      if (result.type === 'run-presentation') {
+        expect(result.envelope.recipe).toBe('default');
+      }
+    }));
+
+  it('returns an envelope-backed result with per-scenario outcomes', () =>
+    runWithScope(scope, async () => {
+      currentScenarioRegistry().register(
+        defineLoadScenario({
+          id: 'load-a',
+          name: 'load-a',
+          description: 'load a',
+          tags: ['demo'],
+          target: noopTarget,
+          workload: { rps: 1 },
+          duration: 1,
+          assertions: [ASSERTIONS.lowErrorRate(1)],
+        }),
+      );
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('run-presentation');
+      if (result.type === 'run-presentation') {
+        // ADR-0011: per-scenario facts live on the envelope's `units` sidecar
+        // (one unit per scenario, slug === scenarioId).
+        expect(result.envelope.units).toHaveLength(1);
+        expect(result.envelope.units[0]?.slug).toBe('load-a');
+      }
+    }));
+
+  it('marks the run verdict failed when at least one scenario fails (ADR-0035)', () =>
+    runWithScope(scope, async () => {
+      // A bare RunnableScenario whose run() rejects to force a failure
+      currentScenarioRegistry().register({
+        id: 'crashes',
+        name: 'crashes',
+        description: 'crashes',
+        kind: 'load',
         tags: [],
-        target: noopTarget,
-        workload: { rps: 1 },
-        duration: 1,
-        assertions: [ASSERTIONS.lowErrorRate(1)],
-      }),
-    );
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('run-presentation');
-    if (result.type === 'run-presentation') {
-      expect(result.envelope.recipe).toBe('default');
-    }
-  });
+        run: () => Promise.reject(new Error('boom')),
+      });
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('run-presentation');
+      if (result.type === 'run-presentation') {
+        expect(result.envelope.verdict.summary.failed).toBe(1);
+        // ADR-0035: the single host verdict drives the exit (no `shouldFail` field).
+        // A crashed scenario carries a unit error → the run verdict fails.
+        expect(result.envelope.verdict.passed).toBe(false);
+      }
+    }));
 
-  it('returns an envelope-backed result with per-scenario outcomes', async () => {
-    currentScenarioRegistry().register(
-      defineLoadScenario({
-        id: 'load-a',
-        name: 'load-a',
-        description: 'load a',
-        tags: ['demo'],
-        target: noopTarget,
-        workload: { rps: 1 },
-        duration: 1,
-        assertions: [ASSERTIONS.lowErrorRate(1)],
-      }),
-    );
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('run-presentation');
-    if (result.type === 'run-presentation') {
-      // ADR-0011: per-scenario facts live on the envelope's `units` sidecar
-      // (one unit per scenario, slug === scenarioId).
-      expect(result.envelope.units).toHaveLength(1);
-      expect(result.envelope.units[0]?.slug).toBe('load-a');
-    }
-  });
+  it('fails closed (exit 2) when the scenario registry is empty (audit P1c)', () =>
+    runWithScope(scope, async () => {
+      // "Empty work is not success": with no scenarios registered at all, a run
+      // simulated nothing. That must be a configuration/unavailable error (exit
+      // 2), never a green sim-done pass that masks a misconfig/missing-dep.
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('error');
+      if (result.type === 'error') {
+        expect(result.exitCode).toBe(2);
+        // Registry-empty cause → install/scaffold guidance.
+        expect(result.message).toContain('No scenarios were loaded');
+        expect(result.suggestion).toContain('init');
+      }
+    }));
 
-  it('marks the run verdict failed when at least one scenario fails (ADR-0035)', async () => {
-    // A bare RunnableScenario whose run() rejects to force a failure
-    currentScenarioRegistry().register({
-      id: 'crashes',
-      name: 'crashes',
-      description: 'crashes',
-      kind: 'load',
-      tags: [],
-      run: () => Promise.reject(new Error('boom')),
-    });
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('run-presentation');
-    if (result.type === 'run-presentation') {
-      expect(result.envelope.verdict.summary.failed).toBe(1);
-      // ADR-0035: the single host verdict drives the exit (no `shouldFail` field).
-      // A crashed scenario carries a unit error → the run verdict fails.
-      expect(result.envelope.verdict.passed).toBe(false);
-    }
-  });
+  it('fails closed (exit 2) when simulation plugins failed to load', () =>
+    runWithScope(scope, async () => {
+      // Mirror fitness: a broken plugin must not yield a green/partial run.
+      const registry = await import('../../framework/registry.js');
+      const load = registry.currentSimulationLoadState();
+      load.pluginLoadErrors = ['broken-plugin.mjs: SyntaxError: unexpected token'];
+      load.loadedFor = process.cwd(); // skip re-load so the injected error sticks
 
-  it('fails closed (exit 2) when the scenario registry is empty (audit P1c)', async () => {
-    // "Empty work is not success": with no scenarios registered at all, a run
-    // simulated nothing. That must be a configuration/unavailable error (exit
-    // 2), never a green sim-done pass that masks a misconfig/missing-dep.
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('error');
-    if (result.type === 'error') {
-      expect(result.exitCode).toBe(2);
-      // Registry-empty cause → install/scaffold guidance.
-      expect(result.message).toContain('No scenarios were loaded');
-      expect(result.suggestion).toContain('init');
-    }
-  });
+      currentScenarioRegistry().register(
+        defineLoadScenario({
+          id: 'would-run',
+          name: 'would-run',
+          description: 'registered despite plugin failure',
+          tags: [],
+          target: noopTarget,
+          workload: { rps: 1 },
+          duration: 1,
+          assertions: [ASSERTIONS.lowErrorRate(1)],
+        }),
+      );
 
-  it('fails closed (exit 2) when simulation plugins failed to load', async () => {
-    // Mirror fitness: a broken plugin must not yield a green/partial run.
-    const registry = await import('../../framework/registry.js');
-    const load = registry.currentSimulationLoadState();
-    load.pluginLoadErrors = ['broken-plugin.mjs: SyntaxError: unexpected token'];
-    load.loadedFor = process.cwd(); // skip re-load so the injected error sticks
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('error');
+      if (result.type === 'error') {
+        expect(result.exitCode).toBe(2);
+        expect(result.message).toContain('broken-plugin.mjs');
+        expect(result.suggestion).toMatch(/plugin/i);
+      }
+    }));
 
-    currentScenarioRegistry().register(
-      defineLoadScenario({
-        id: 'would-run',
-        name: 'would-run',
-        description: 'registered despite plugin failure',
+  it('redacts unclassified scenario errors at the public unit boundary', () =>
+    runWithScope(scope, async () => {
+      currentScenarioRegistry().register({
+        id: 'msg',
+        name: 'msg',
+        description: 'msg',
+        kind: 'load',
         tags: [],
-        target: noopTarget,
-        workload: { rps: 1 },
-        duration: 1,
-        assertions: [ASSERTIONS.lowErrorRate(1)],
-      }),
-    );
+        run: () => Promise.reject(new Error('a-specific-message')),
+      });
+      const { result } = await executeSim(args());
+      if (result.type === 'run-presentation') {
+        expect(result.envelope.units[0]?.error).toBe('The operation failed.');
+        expect(result.envelope.units[0]?.error).not.toContain('a-specific-message');
+      }
+    }));
 
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('error');
-    if (result.type === 'error') {
-      expect(result.exitCode).toBe(2);
-      expect(result.message).toContain('broken-plugin.mjs');
-      expect(result.suggestion).toMatch(/plugin/i);
-    }
-  });
+  it('remaps each scenario signal to source = scenarioId in the run envelope', () =>
+    runWithScope(scope, async () => {
+      // A scenario whose result emits a signal with a DIVERGENT `source`; the
+      // envelope assembler must re-attribute it to the scenarioId so the shared
+      // grouped table credits the right unit row (ADR-0011).
+      currentScenarioRegistry().register({
+        id: 'sig-scenario',
+        name: 'sig-scenario',
+        description: 'emits a signal',
+        kind: 'load',
+        tags: [],
+        run: () =>
+          Promise.resolve(loadResultWithSignal('sig-scenario', 'some-other-source', 'low', 'fyi')),
+      });
 
-  it('redacts unclassified scenario errors at the public unit boundary', async () => {
-    currentScenarioRegistry().register({
-      id: 'msg',
-      name: 'msg',
-      description: 'msg',
-      kind: 'load',
-      tags: [],
-      run: () => Promise.reject(new Error('a-specific-message')),
-    });
-    const { result } = await executeSim(args());
-    if (result.type === 'run-presentation') {
-      expect(result.envelope.units[0]?.error).toBe('The operation failed.');
-      expect(result.envelope.units[0]?.error).not.toContain('a-specific-message');
-    }
-  });
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('run-presentation');
+      if (result.type === 'run-presentation') {
+        const sig = result.envelope.signals.find((s) => s.message === 'fyi');
+        expect(sig?.source).toBe('sig-scenario');
+      }
+    }));
 
-  it('remaps each scenario signal to source = scenarioId in the run envelope', async () => {
-    // A scenario whose result emits a signal with a DIVERGENT `source`; the
-    // envelope assembler must re-attribute it to the scenarioId so the shared
-    // grouped table credits the right unit row (ADR-0011).
-    currentScenarioRegistry().register({
-      id: 'sig-scenario',
-      name: 'sig-scenario',
-      description: 'emits a signal',
-      kind: 'load',
-      tags: [],
-      run: () =>
-        Promise.resolve(loadResultWithSignal('sig-scenario', 'some-other-source', 'low', 'fyi')),
-    });
+  it('fails the unit verdict when a scenario emits a critical signal even though it passed', () =>
+    runWithScope(scope, async () => {
+      // scenarioPassed folds the no-critical/high rule into the unit verdict: a
+      // scenario can report passed:true yet still fail because it surfaced a
+      // critical signal.
+      currentScenarioRegistry().register({
+        id: 'crit-scenario',
+        name: 'crit-scenario',
+        description: 'passes but emits a critical signal',
+        kind: 'load',
+        tags: [],
+        run: () =>
+          Promise.resolve(
+            loadResultWithSignal('crit-scenario', 'crit-scenario', 'critical', 'meltdown'),
+          ),
+      });
 
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('run-presentation');
-    if (result.type === 'run-presentation') {
-      const sig = result.envelope.signals.find((s) => s.message === 'fyi');
-      expect(sig?.source).toBe('sig-scenario');
-    }
-  });
-
-  it('fails the unit verdict when a scenario emits a critical signal even though it passed', async () => {
-    // scenarioPassed folds the no-critical/high rule into the unit verdict: a
-    // scenario can report passed:true yet still fail because it surfaced a
-    // critical signal.
-    currentScenarioRegistry().register({
-      id: 'crit-scenario',
-      name: 'crit-scenario',
-      description: 'passes but emits a critical signal',
-      kind: 'load',
-      tags: [],
-      run: () =>
-        Promise.resolve(
-          loadResultWithSignal('crit-scenario', 'crit-scenario', 'critical', 'meltdown'),
-        ),
-    });
-
-    const { result } = await executeSim(args());
-    expect(result.type).toBe('run-presentation');
-    if (result.type === 'run-presentation') {
-      const unit = result.envelope.units.find((u) => u.slug === 'crit-scenario');
-      // passed:true from the executor, but the critical signal flips the unit.
-      expect(unit?.passed).toBe(false);
-    }
-  });
+      const { result } = await executeSim(args());
+      expect(result.type).toBe('run-presentation');
+      if (result.type === 'run-presentation') {
+        const unit = result.envelope.units.find((u) => u.slug === 'crit-scenario');
+        // passed:true from the executor, but the critical signal flips the unit.
+        expect(unit?.passed).toBe(false);
+      }
+    }));
 });
 
 /** Run a minimal sim and return its RunPresentation — the caller persists it.
@@ -267,31 +285,32 @@ async function simDone(): Promise<
 }
 
 describe('sim session contribution → SessionRepo', () => {
-  it('a sim contribution persisted via SessionRepo writes exactly one row', async () => {
-    // host-owned-run-timing Phase 3 removed the production `persistSimSession`
-    // helper — the host run plane owns persistence. This test-only write mirrors
-    // the row the host writes from the sim handler's returned ToolSessionContribution.
-    // (Best-effort persistence semantics are covered by the run-plane tests.)
-    const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const result = await simDone();
-      new SessionRepo(ds).save({
-        id: generatePrefixedId('sim'),
-        tool: 'sim',
-        startedAt: '1970-01-01T00:00:00.000Z',
-        completedAt: '1970-01-01T00:00:00.000Z',
-        cwd: process.cwd(),
-        recipe: result.envelope.recipe,
-        score: result.envelope.verdict.score,
-        passed: result.envelope.verdict.passed,
-        durationMs: 0,
-        payload: buildSimulationSessionPayload(result.envelope),
-      });
-      const sessions = new SessionRepo(ds).list({ tool: 'sim' });
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]?.recipe).toBe('default');
-    } finally {
-      ds.close?.();
-    }
-  });
+  it('a sim contribution persisted via SessionRepo writes exactly one row', () =>
+    runWithScope(scope, async () => {
+      // host-owned-run-timing Phase 3 removed the production `persistSimSession`
+      // helper — the host run plane owns persistence. This test-only write mirrors
+      // the row the host writes from the sim handler's returned ToolSessionContribution.
+      // (Best-effort persistence semantics are covered by the run-plane tests.)
+      const ds: DataStore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const result = await simDone();
+        new SessionRepo(ds).save({
+          id: generatePrefixedId('sim'),
+          tool: 'sim',
+          startedAt: '1970-01-01T00:00:00.000Z',
+          completedAt: '1970-01-01T00:00:00.000Z',
+          cwd: process.cwd(),
+          recipe: result.envelope.recipe,
+          score: result.envelope.verdict.score,
+          passed: result.envelope.verdict.passed,
+          durationMs: 0,
+          payload: buildSimulationSessionPayload(result.envelope),
+        });
+        const sessions = new SessionRepo(ds).list({ tool: 'sim' });
+        expect(sessions).toHaveLength(1);
+        expect(sessions[0]?.recipe).toBe('default');
+      } finally {
+        ds.close?.();
+      }
+    }));
 });

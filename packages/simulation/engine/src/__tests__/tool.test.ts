@@ -16,7 +16,12 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import {
+  RunScope,
+  applyToolContributeScope,
+  runWithScope,
+  runWithScopeSync,
+} from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
@@ -33,18 +38,21 @@ const PKG = JSON.parse(readFileSync(resolve(HERE, '../../package.json'), 'utf8')
   version: string;
 };
 
+let scope: RunScope;
+
 beforeEach(() => {
   // Item 1: scenarioRegistry and recipe registry are per-RunScope.
-  // Construct a fresh scope (with simulation extended) and enter it via
-  // AsyncLocalStorage so the handler resolves them through currentScope()
+  // Construct a fresh scope (with simulation extended); each test binds it
+  // via runWithScope so the handler resolves them through currentScope()
   // while it runs.
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, simulationTool);
-  enterScope(scope);
 });
 
 afterEach(() => {
-  clearScenarioRegistry();
+  // beforeEach only constructs `scope`; it is no longer the ambient scope
+  // outside a test's own runWithScope callback, so re-bind it here too.
+  runWithScopeSync(scope, () => clearScenarioRegistry());
 });
 
 /** The single declarative `sim` command sim now exports. */
@@ -75,7 +83,7 @@ function makeFakeContext(): {
     walkedUp: 0,
     scope: 'none' as const,
   };
-  // The handler uses currentScope() (set by enterScope in beforeEach), not
+  // The handler uses currentScope() (bound per-test via runWithScope), not
   // cli.scope, but ToolCliContext requires a scope value; mirror project
   // into a throwaway scope here.
   const ctxScope = new RunScope({ projectContext: project });
@@ -201,156 +209,168 @@ function registerProbeScenario(): void {
 }
 
 describe('simulationTool metadata', () => {
-  it('exposes name (human), id (stable UUID), version, description', () => {
-    expect(simulationTool.identity).toEqual({
-      name: 'simulation',
-      aliases: ['sim'],
-      layoutKey: 'sim',
-    });
-    expect(simulationTool.metadata.name).toBe('simulation');
-    expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
-    expect(simulationTool.metadata.version).toBe(PKG.version);
-    expect(simulationTool.metadata.description).toContain('simulation');
-    expect(simulationTool.pluginLayout?.domain).toBe('sim');
-  });
+  it('exposes name (human), id (stable UUID), version, description', () =>
+    runWithScopeSync(scope, () => {
+      expect(simulationTool.identity).toEqual({
+        name: 'simulation',
+        aliases: ['sim'],
+        layoutKey: 'sim',
+      });
+      expect(simulationTool.metadata.name).toBe('simulation');
+      expect(simulationTool.metadata.id).toBe('715d32c2-692c-4ed4-985b-a35deaf186aa');
+      expect(simulationTool.metadata.version).toBe(PKG.version);
+      expect(simulationTool.metadata.description).toContain('simulation');
+      expect(simulationTool.pluginLayout?.domain).toBe('sim');
+    }));
 
-  it('declares the user-facing sim subcommand (+ recipes + the internal worker)', () => {
-    const names = (simulationTool.commands ?? []).map((c) => c.name);
-    expect(names).toContain('simulation');
-    // `sim` remains an alias for the canonical `simulation` primary.
-    expect(simulationTool.commands?.[0]?.aliases).toEqual(['sim']);
-    // The `simulation recipes` discoverability child is also reachable through
-    // the primary alias as `sim recipes`.
-    expect(names).toContain('recipes');
-    // The internal off-main-process worker (ADR-0028), forked by the live view.
-    expect(names).toContain('sim-run-worker');
-    expect(simulationTool.commands).toHaveLength(3);
-  });
+  it('declares the user-facing sim subcommand (+ recipes + the internal worker)', () =>
+    runWithScopeSync(scope, () => {
+      const names = (simulationTool.commands ?? []).map((c) => c.name);
+      expect(names).toContain('simulation');
+      // `sim` remains an alias for the canonical `simulation` primary.
+      expect(simulationTool.commands?.[0]?.aliases).toEqual(['sim']);
+      // The `simulation recipes` discoverability child is also reachable through
+      // the primary alias as `sim recipes`.
+      expect(names).toContain('recipes');
+      // The internal off-main-process worker (ADR-0028), forked by the live view.
+      expect(names).toContain('sim-run-worker');
+      expect(simulationTool.commands).toHaveLength(3);
+    }));
 });
 
 describe('simulationTool command surface (Phase 3 — CommandSpec migration)', () => {
-  it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () => {
-    // `simulation` + `simulation recipes` + the internal
-    // `sim-run-worker` (ADR-0028).
-    expect(simulationTool.commandSpecs).toHaveLength(3);
-    // `register` is no longer a Tool member (3.0.0) — its absence is structural,
-    // enforced by the type system, not asserted at runtime.
-  });
+  it('mounts via commandSpecs — the one command surface (register() removed in 3.0.0)', () =>
+    runWithScopeSync(scope, () => {
+      // `simulation` + `simulation recipes` + the internal
+      // `sim-run-worker` (ADR-0028).
+      expect(simulationTool.commandSpecs).toHaveLength(3);
+      // `register` is no longer a Tool member (3.0.0) — its absence is structural,
+      // enforced by the type system, not asserted at runtime.
+    }));
 
-  it('declares the sim command name/description/output/scope', () => {
-    const spec = simSpec();
-    expect(spec.name).toBe('simulation');
-    expect(spec.aliases).toEqual(['sim']);
-    expect(spec.description).toBe('Run simulation scenarios');
-    // The handler owns its full output surface (TTY-vs-static branch + egress).
-    expect(spec.output).toBe('raw-stream');
-    expect(spec.scope).toBe('project');
-    expect(typeof spec.handler).toBe('function');
-  });
+  it('declares the sim command name/description/output/scope', () =>
+    runWithScopeSync(scope, () => {
+      const spec = simSpec();
+      expect(spec.name).toBe('simulation');
+      expect(spec.aliases).toEqual(['sim']);
+      expect(spec.description).toBe('Run simulation scenarios');
+      // The handler owns its full output surface (TTY-vs-static branch + egress).
+      expect(spec.output).toBe('raw-stream');
+      expect(spec.scope).toBe('project');
+      expect(typeof spec.handler).toBe('function');
+    }));
 
-  it('declares the ADR-0021 common flags and the --recipe option', () => {
-    const spec = simSpec();
-    // Cross-tool flags from the single registry (ADR-0021).
-    expect([...spec.commonFlags]).toEqual(
-      expect.arrayContaining([
-        'cwd',
-        'json',
-        'quiet',
-        'verbose',
-        'debug',
-        'reportTo',
-        'apiKey',
-        'open',
-      ]),
-    );
-    const optionFlags = (spec.options ?? []).map((o) => o.flag);
-    expect(optionFlags).toContain('--recipe');
-    const recipe = (spec.options ?? []).find((o) => o.flag === '--recipe');
-    expect(recipe?.value).toBe('<name>');
-  });
+  it('declares the ADR-0021 common flags and the --recipe option', () =>
+    runWithScopeSync(scope, () => {
+      const spec = simSpec();
+      // Cross-tool flags from the single registry (ADR-0021).
+      expect([...spec.commonFlags]).toEqual(
+        expect.arrayContaining([
+          'cwd',
+          'json',
+          'quiet',
+          'verbose',
+          'debug',
+          'reportTo',
+          'apiKey',
+          'open',
+        ]),
+      );
+      const optionFlags = (spec.options ?? []).map((o) => o.flag);
+      expect(optionFlags).toContain('--recipe');
+      const recipe = (spec.options ?? []).find((o) => o.flag === '--recipe');
+      expect(recipe?.value).toBe('<name>');
+    }));
 });
 
 describe('sim command handler', () => {
-  it('runs against the default recipe and renders the result', async () => {
-    const { ctx, rendered } = makeFakeContext();
-    registerProbeScenario();
+  it('runs against the default recipe and renders the result', () =>
+    runWithScope(scope, async () => {
+      const { ctx, rendered } = makeFakeContext();
+      registerProbeScenario();
 
-    // Non-TTY/non-json path: the handler runs the engine and renders statically.
-    await simSpec().handler({ cwd: process.cwd() }, ctx);
+      // Non-TTY/non-json path: the handler runs the engine and renders statically.
+      await simSpec().handler({ cwd: process.cwd() }, ctx);
 
-    expect(rendered).toHaveLength(1);
-    // envelope-first-presentation: the handler renders the render-only
-    // RunPresentation; the recipe rides on `envelope.recipe`, not the result.
-    const result = rendered[0] as {
-      type: string;
-      envelope?: { recipe?: string };
-    };
-    expect(result.type).toBe('run-presentation');
-    expect(result.envelope?.recipe).toBe('default');
-  });
+      expect(rendered).toHaveLength(1);
+      // envelope-first-presentation: the handler renders the render-only
+      // RunPresentation; the recipe rides on `envelope.recipe`, not the result.
+      const result = rendered[0] as {
+        type: string;
+        envelope?: { recipe?: string };
+      };
+      expect(result.type).toBe('run-presentation');
+      expect(result.envelope?.recipe).toBe('default');
+    }));
 
-  it('emits the signal envelope through cli.emitEnvelope when --json is passed', async () => {
-    const { ctx, emitted } = makeFakeContext();
-    registerProbeScenario();
+  it('emits the signal envelope through cli.emitEnvelope when --json is passed', () =>
+    runWithScope(scope, async () => {
+      const { ctx, emitted } = makeFakeContext();
+      registerProbeScenario();
 
-    await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
+      await simSpec().handler({ cwd: process.cwd(), json: true }, ctx);
 
-    // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not a bespoke
-    // per-tool result) through the root's emitEnvelope → formatSignalJson.
-    expect(emitted).toHaveLength(1);
-    const payload = emitted[0] as { schemaVersion?: number; tool?: string };
-    expect(payload.schemaVersion).toBe(2);
-    expect(payload.tool).toBe('sim');
-  });
+      // ADR-0011 (Phase 4): --json routes the SignalEnvelope (not a bespoke
+      // per-tool result) through the root's emitEnvelope → formatSignalJson.
+      expect(emitted).toHaveLength(1);
+      const payload = emitted[0] as { schemaVersion?: number; tool?: string };
+      expect(payload.schemaVersion).toBe(2);
+      expect(payload.tool).toBe('sim');
+    }));
 
-  it('delivers static egress with the requested cwd', async () => {
-    const { ctx, delivered } = makeFakeContext();
-    registerProbeScenario();
+  it('delivers static egress with the requested cwd', () =>
+    runWithScope(scope, async () => {
+      const { ctx, delivered } = makeFakeContext();
+      registerProbeScenario();
 
-    await simSpec().handler({ cwd: HERE, json: true }, ctx);
+      await simSpec().handler({ cwd: HERE, json: true }, ctx);
 
-    expect(delivered).toHaveLength(1);
-    expect(delivered[0]).toMatchObject({ cwd: HERE });
-  });
+      expect(delivered).toHaveLength(1);
+      expect(delivered[0]).toMatchObject({ cwd: HERE });
+    }));
 
   it.each([
     { json: true, presentation: 'emit' },
     { json: false, presentation: 'render' },
-  ])('settles delivery exit status before $presentation output', async ({ json, presentation }) => {
-    const { ctx, callOrder } = makeFakeContext();
-    registerProbeScenario();
+  ])('settles delivery exit status before $presentation output', ({ json, presentation }) =>
+    runWithScope(scope, async () => {
+      const { ctx, callOrder } = makeFakeContext();
+      registerProbeScenario();
 
-    await simSpec().handler({ cwd: process.cwd(), json }, ctx);
+      await simSpec().handler({ cwd: process.cwd(), json }, ctx);
 
-    expect(callOrder).toEqual(['deliver', presentation]);
-  });
+      expect(callOrder).toEqual(['deliver', presentation]);
+    }),
+  );
 
-  it('returns exit code 2 in JSON mode when the recipe is unknown', async () => {
-    const { ctx, exitCodes, emitted } = makeFakeContext();
+  it('returns exit code 2 in JSON mode when the recipe is unknown', () =>
+    runWithScope(scope, async () => {
+      const { ctx, exitCodes, emitted } = makeFakeContext();
 
-    await simSpec().handler({ cwd: process.cwd(), json: true, recipe: 'nope' }, ctx);
+      await simSpec().handler({ cwd: process.cwd(), json: true, recipe: 'nope' }, ctx);
 
-    expect(exitCodes).toContain(2);
-    expect(emitted).toHaveLength(1);
-    // 2.12.0: a failed --json run emits a structured error detail (`message`),
-    // not a bare `{ error }` (the host wraps it in a status:'error' outcome).
-    const payload = emitted[0] as { message?: string };
-    expect(payload.message).toContain('Unknown sim recipe');
-  });
+      expect(exitCodes).toContain(2);
+      expect(emitted).toHaveLength(1);
+      // 2.12.0: a failed --json run emits a structured error detail (`message`),
+      // not a bare `{ error }` (the host wraps it in a status:'error' outcome).
+      const payload = emitted[0] as { message?: string };
+      expect(payload.message).toContain('Unknown sim recipe');
+    }));
 
-  it('returns exit code 2 in non-JSON mode for unknown recipe', async () => {
-    const { ctx, exitCodes, rendered } = makeFakeContext();
+  it('returns exit code 2 in non-JSON mode for unknown recipe', () =>
+    runWithScope(scope, async () => {
+      const { ctx, exitCodes, rendered } = makeFakeContext();
 
-    await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
+      await simSpec().handler({ cwd: process.cwd(), recipe: 'still-nope' }, ctx);
 
-    expect(exitCodes).toContain(2);
-    // envelope-first-presentation (plan Assumption 5): an error-before-envelope
-    // run renders the `error` variant — NEVER a `run-presentation`. A
-    // RunPresentation is constructed only when an envelope exists.
-    expect(rendered).toHaveLength(1);
-    const errResult = rendered[0] as { type: string; message?: string };
-    expect(errResult.type).toBe('error');
-    expect(errResult.type).not.toBe('run-presentation');
-    expect(errResult.message).toContain('still-nope');
-  });
+      expect(exitCodes).toContain(2);
+      // envelope-first-presentation (plan Assumption 5): an error-before-envelope
+      // run renders the `error` variant — NEVER a `run-presentation`. A
+      // RunPresentation is constructed only when an envelope exists.
+      expect(rendered).toHaveLength(1);
+      const errResult = rendered[0] as { type: string; message?: string };
+      expect(errResult.type).toBe('error');
+      expect(errResult.type).not.toBe('run-presentation');
+      expect(errResult.message).toContain('still-nope');
+    }));
 });

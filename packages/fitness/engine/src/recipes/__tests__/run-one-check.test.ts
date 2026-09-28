@@ -11,7 +11,7 @@
  * controller, these tests will catch the regression.
  */
 
-import { applyToolContributeScope, enterScope, runWithScope, RunScope } from '@opensip-cli/core';
+import { applyToolContributeScope, runWithScope, RunScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { defineCheck } from '../../framework/define-check.js';
@@ -31,7 +31,6 @@ let scope: RunScope;
 beforeEach(() => {
   scope = new RunScope();
   applyToolContributeScope(scope, fitnessTool);
-  enterScope(scope);
 });
 afterEach(() => {
   scope.dispose();
@@ -133,227 +132,233 @@ describe('runOneCheck — host OS-interrupt cancellation (Plan 00 Phase 4)', () 
 });
 
 describe('runOneCheck — timeout-detection invariant (audit F7)', () => {
-  it('flags timedOut=true when the per-check timeout fires', async () => {
-    // Check sleeps longer than the recipe timeout; the local setTimeout
-    // aborts the controller, runOneCheck observes signal.aborted, and the
-    // outcome carries `timedOut: true`.
-    const slowAnalyze = vi.fn(async () => {
-      await new Promise((r) => setTimeout(r, 500));
-      return [];
-    });
-    const check = defineCheck({
-      id: uid(),
-      slug: 'slow',
-      description: 'slow',
-      tags: ['quality'],
-      analyzeAll: slowAnalyze,
-    });
+  it('flags timedOut=true when the per-check timeout fires', () =>
+    runWithScope(scope, async () => {
+      // Check sleeps longer than the recipe timeout; the local setTimeout
+      // aborts the controller, runOneCheck observes signal.aborted, and the
+      // outcome carries `timedOut: true`.
+      const slowAnalyze = vi.fn(async () => {
+        await new Promise((r) => setTimeout(r, 500));
+        return [];
+      });
+      const check = defineCheck({
+        id: uid(),
+        slug: 'slow',
+        description: 'slow',
+        tags: ['quality'],
+        analyzeAll: slowAnalyze,
+      });
 
-    const outcome = await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 50,
-        retryEnabled: false,
-        maxRetries: 0,
-      },
-      makeProcessorContext(),
-    );
-
-    expect(outcome.processOutput?.checkResult.timedOut).toBe(true);
-  });
-
-  it('reports a CheckAbortedError (retryResult.result === undefined, not a timeout) as a non-timeout error', async () => {
-    // defineCheck re-throws CheckAbortedError; executeWithRetry surfaces it as
-    // `{ result: undefined, lastError }` WITHOUT aborting runOneCheck's own
-    // controller. So runOneCheck takes the undefined-result error branch with
-    // `signal.aborted === false` → timedOut must be false (the timeout never
-    // fired). This is the branch that distinguishes "errored" from "timed out".
-    const aborting = vi.fn(() => {
-      throw new CheckAbortedError('aborted-check');
-    });
-    const check = defineCheck({
-      id: uid(),
-      slug: 'aborted-check',
-      description: 'throws CheckAbortedError',
-      tags: ['quality'],
-      analyzeAll: aborting,
-    });
-
-    const outcome = await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 5000,
-        retryEnabled: false,
-        maxRetries: 0,
-      },
-      makeProcessorContext(),
-    );
-
-    const cr = outcome.processOutput?.checkResult;
-    expect(cr).toBeDefined();
-    expect(cr?.passed).toBe(false);
-    expect(cr?.timedOut).toBe(false);
-    expect(cr?.error).toBeDefined();
-  });
-
-  it('catches a throw raised while processing a successful result (catch path)', async () => {
-    // The success path calls processSuccessResult, which invokes
-    // onCheckComplete. We make that callback throw ONLY on the success
-    // summary (passed === true); the throw escapes the try block and is
-    // handled by runOneCheck's catch, which re-dispatches to
-    // processErrorResult. Since the controller never aborted, the recovered
-    // result is reported as a non-timeout error.
-    const passing = vi.fn(() => Promise.resolve([]));
-    const check = defineCheck({
-      id: uid(),
-      slug: 'ok-but-callback-throws',
-      description: 'passes',
-      tags: ['quality'],
-      analyzeAll: passing,
-    });
-
-    const outcome = await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 5000,
-        retryEnabled: false,
-        maxRetries: 0,
-      },
-      makeProcessorContext({
-        onCheckComplete: (_slug, summary) => {
-          if (summary.passed) throw new Error('callback exploded');
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 50,
+          retryEnabled: false,
+          maxRetries: 0,
         },
-      }),
-    );
+        makeProcessorContext(),
+      );
 
-    const cr = outcome.processOutput?.checkResult;
-    expect(cr).toBeDefined();
-    // Callback errors raised from onCheckComplete during success processing are now
-    // swallowed inside processSuccessResult (to keep the check as a success for session
-    // counts and avoid double-counting). The error is only logged as a warning
-    // ('fitness.check.callback_error'). The returned processOutput remains the success one.
-    expect(cr?.timedOut).toBeUndefined();
-    expect(cr?.passed).toBe(true);
-    expect(cr?.error).toBeUndefined();
-  });
+      expect(outcome.processOutput?.checkResult.timedOut).toBe(true);
+    }));
 
-  it('does not let a throwing onCheckStart abort the check it announces (catch path)', async () => {
-    // Regression: onCheckStart used to be invoked outside any try/catch, so a
-    // throwing observer callback rejected runOneCheck's own promise entirely —
-    // the check it was announcing never ran, and (at the scheduler level) the
-    // whole session was recoverable only via the top-level executeRecipeInScope
-    // catch, which marks status 'failed' and aborts every remaining check.
-    // Isolating it (mirroring how onCheckComplete failures are recovered in
-    // check-result-processor.ts) means the check still completes normally.
-    const analyze = vi.fn(() => Promise.resolve([]));
-    const check = defineCheck({
-      id: uid(),
-      slug: 'runs-despite-start-callback-throw',
-      description: 'passes',
-      tags: ['quality'],
-      analyzeAll: analyze,
-    });
+  it('reports a CheckAbortedError (retryResult.result === undefined, not a timeout) as a non-timeout error', () =>
+    runWithScope(scope, async () => {
+      // defineCheck re-throws CheckAbortedError; executeWithRetry surfaces it as
+      // `{ result: undefined, lastError }` WITHOUT aborting runOneCheck's own
+      // controller. So runOneCheck takes the undefined-result error branch with
+      // `signal.aborted === false` → timedOut must be false (the timeout never
+      // fired). This is the branch that distinguishes "errored" from "timed out".
+      const aborting = vi.fn(() => {
+        throw new CheckAbortedError('aborted-check');
+      });
+      const check = defineCheck({
+        id: uid(),
+        slug: 'aborted-check',
+        description: 'throws CheckAbortedError',
+        tags: ['quality'],
+        analyzeAll: aborting,
+      });
 
-    const outcome = await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 5000,
-        retryEnabled: false,
-        maxRetries: 0,
-      },
-      makeProcessorContext({
-        onCheckStart: () => {
-          throw new Error('onCheckStart exploded');
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 5000,
+          retryEnabled: false,
+          maxRetries: 0,
         },
-      }),
-    );
+        makeProcessorContext(),
+      );
 
-    expect(analyze).toHaveBeenCalled();
-    const cr = outcome.processOutput?.checkResult;
-    expect(cr).toBeDefined();
-    expect(cr?.passed).toBe(true);
-    expect(cr?.error).toBeUndefined();
-  });
+      const cr = outcome.processOutput?.checkResult;
+      expect(cr).toBeDefined();
+      expect(cr?.passed).toBe(false);
+      expect(cr?.timedOut).toBe(false);
+      expect(cr?.error).toBeDefined();
+    }));
 
-  it('does NOT flag timedOut=true when the check completes well within the timeout', async () => {
-    // Pin the invariant: the only abort source on the per-check
-    // controller is the local setTimeout. A check that finishes promptly
-    // and does NOT abort must surface as a normal pass — never a
-    // timeout. If a future change wires an additional abort source into
-    // `checkAbortController`, an externally-aborted signal during this
-    // run would silently flip timedOut to true and break this test.
-    const fastAnalyze = vi.fn(() => Promise.resolve([]));
-    const check = defineCheck({
-      id: uid(),
-      slug: 'fast',
-      description: 'fast',
-      tags: ['quality'],
-      analyzeAll: fastAnalyze,
-    });
+  it('catches a throw raised while processing a successful result (catch path)', () =>
+    runWithScope(scope, async () => {
+      // The success path calls processSuccessResult, which invokes
+      // onCheckComplete. We make that callback throw ONLY on the success
+      // summary (passed === true); the throw escapes the try block and is
+      // handled by runOneCheck's catch, which re-dispatches to
+      // processErrorResult. Since the controller never aborted, the recovered
+      // result is reported as a non-timeout error.
+      const passing = vi.fn(() => Promise.resolve([]));
+      const check = defineCheck({
+        id: uid(),
+        slug: 'ok-but-callback-throws',
+        description: 'passes',
+        tags: ['quality'],
+        analyzeAll: passing,
+      });
 
-    const outcome = await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 5000,
-        retryEnabled: false,
-        maxRetries: 0,
-      },
-      makeProcessorContext(),
-    );
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 5000,
+          retryEnabled: false,
+          maxRetries: 0,
+        },
+        makeProcessorContext({
+          onCheckComplete: (_slug, summary) => {
+            if (summary.passed) throw new Error('callback exploded');
+          },
+        }),
+      );
 
-    const cr = outcome.processOutput?.checkResult;
-    expect(cr).toBeDefined();
-    expect(cr?.timedOut).not.toBe(true);
-    expect(cr?.passed).toBe(true);
-  });
+      const cr = outcome.processOutput?.checkResult;
+      expect(cr).toBeDefined();
+      // Callback errors raised from onCheckComplete during success processing are now
+      // swallowed inside processSuccessResult (to keep the check as a success for session
+      // counts and avoid double-counting). The error is only logged as a warning
+      // ('fitness.check.callback_error'). The returned processOutput remains the success one.
+      expect(cr?.timedOut).toBeUndefined();
+      expect(cr?.passed).toBe(true);
+      expect(cr?.error).toBeUndefined();
+    }));
 
-  it('resolves pre-targeted files by stable check id before the bare slug', async () => {
-    let receivedTargetFiles: readonly string[] | undefined;
-    const baseCheck = defineCheck({
-      id: uid(),
-      slug: 'shared-slug',
-      description: 'captures target files',
-      tags: ['quality'],
-      analyzeAll: () => Promise.resolve([]),
-    });
-    const check: typeof baseCheck = {
-      ...baseCheck,
-      run: (cwd, options) => {
-        receivedTargetFiles = options?.targetFiles;
-        return baseCheck.run(cwd, options);
-      },
-    };
-    const expectedFiles = ['/project/src/only-this-file.ts'];
+  it('does not let a throwing onCheckStart abort the check it announces (catch path)', () =>
+    runWithScope(scope, async () => {
+      // Regression: onCheckStart used to be invoked outside any try/catch, so a
+      // throwing observer callback rejected runOneCheck's own promise entirely —
+      // the check it was announcing never ran, and (at the scheduler level) the
+      // whole session was recoverable only via the top-level executeRecipeInScope
+      // catch, which marks status 'failed' and aborts every remaining check.
+      // Isolating it (mirroring how onCheckComplete failures are recovered in
+      // check-result-processor.ts) means the check still completes normally.
+      const analyze = vi.fn(() => Promise.resolve([]));
+      const check = defineCheck({
+        id: uid(),
+        slug: 'runs-despite-start-callback-throw',
+        description: 'passes',
+        tags: ['quality'],
+        analyzeAll: analyze,
+      });
 
-    await runOneCheck(
-      check,
-      {
-        cwd: process.cwd(),
-        checkIndex: 1,
-        totalChecks: 1,
-        recipeTimeoutMs: 5000,
-        retryEnabled: false,
-        maxRetries: 0,
-        checkTargetFiles: new Map([[check.config.id, expectedFiles]]),
-      },
-      makeProcessorContext(),
-    );
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 5000,
+          retryEnabled: false,
+          maxRetries: 0,
+        },
+        makeProcessorContext({
+          onCheckStart: () => {
+            throw new Error('onCheckStart exploded');
+          },
+        }),
+      );
 
-    expect(receivedTargetFiles).toEqual(expectedFiles);
-  });
+      expect(analyze).toHaveBeenCalled();
+      const cr = outcome.processOutput?.checkResult;
+      expect(cr).toBeDefined();
+      expect(cr?.passed).toBe(true);
+      expect(cr?.error).toBeUndefined();
+    }));
+
+  it('does NOT flag timedOut=true when the check completes well within the timeout', () =>
+    runWithScope(scope, async () => {
+      // Pin the invariant: the only abort source on the per-check
+      // controller is the local setTimeout. A check that finishes promptly
+      // and does NOT abort must surface as a normal pass — never a
+      // timeout. If a future change wires an additional abort source into
+      // `checkAbortController`, an externally-aborted signal during this
+      // run would silently flip timedOut to true and break this test.
+      const fastAnalyze = vi.fn(() => Promise.resolve([]));
+      const check = defineCheck({
+        id: uid(),
+        slug: 'fast',
+        description: 'fast',
+        tags: ['quality'],
+        analyzeAll: fastAnalyze,
+      });
+
+      const outcome = await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 5000,
+          retryEnabled: false,
+          maxRetries: 0,
+        },
+        makeProcessorContext(),
+      );
+
+      const cr = outcome.processOutput?.checkResult;
+      expect(cr).toBeDefined();
+      expect(cr?.timedOut).not.toBe(true);
+      expect(cr?.passed).toBe(true);
+    }));
+
+  it('resolves pre-targeted files by stable check id before the bare slug', () =>
+    runWithScope(scope, async () => {
+      let receivedTargetFiles: readonly string[] | undefined;
+      const baseCheck = defineCheck({
+        id: uid(),
+        slug: 'shared-slug',
+        description: 'captures target files',
+        tags: ['quality'],
+        analyzeAll: () => Promise.resolve([]),
+      });
+      const check: typeof baseCheck = {
+        ...baseCheck,
+        run: (cwd, options) => {
+          receivedTargetFiles = options?.targetFiles;
+          return baseCheck.run(cwd, options);
+        },
+      };
+      const expectedFiles = ['/project/src/only-this-file.ts'];
+
+      await runOneCheck(
+        check,
+        {
+          cwd: process.cwd(),
+          checkIndex: 1,
+          totalChecks: 1,
+          recipeTimeoutMs: 5000,
+          retryEnabled: false,
+          maxRetries: 0,
+          checkTargetFiles: new Map([[check.config.id, expectedFiles]]),
+        },
+        makeProcessorContext(),
+      );
+
+      expect(receivedTargetFiles).toEqual(expectedFiles);
+    }));
 });

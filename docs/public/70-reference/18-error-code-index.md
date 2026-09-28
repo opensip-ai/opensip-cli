@@ -1,6 +1,6 @@
 ---
 status: current
-last_verified: 2026-07-28
+last_verified: 2026-09-28
 release: v0.8.5
 title: "Error code index"
 audience: [contributors, operators, agents]
@@ -13,7 +13,7 @@ generated: true
 > **Generated.** Do not hand-edit. Run `pnpm docs:error-index` after catalog changes. This lists **registered** definitions only; the set grows as packages register catalogs.
 
 - Catalog sources: **24**
-- Definitions: **252**
+- Definitions: **253**
 
 ## Catalogs
 
@@ -26,7 +26,7 @@ generated: true
 | `@opensip-cli/external-tool-adapter` | `@opensip-cli/external-tool-adapter` | `packages/external-tool-adapter/src/errors/external-tool-error-catalog.ts` | 8 |
 | `@opensip-cli/mcp` | `f313c020-5b48-4e17-a579-e303907b6392` | `packages/mcp/src/errors/mcp-error-catalog.ts` | 5 |
 | `@opensip-cli/codebase` | `@opensip-cli/codebase` | `packages/codebase/src/errors/codebase-error-catalog.ts` | 2 |
-| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 10 |
+| `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/host-wiring.ts` | 11 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/suite-and-runs.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/init-and-policy.ts` | 9 |
 | `opensip-cli` | `opensip-cli` | `packages/cli/src/errors/definitions/uninstall.ts` | 5 |
@@ -52,6 +52,7 @@ generated: true
 | `CLI.CAPABILITY_WORKER.RESOURCE_DENIED` | `opensip-cli` |  | tool-author | security |  |  | plugin-incompatible |  | The capability pack reached for a resource it did not declare. Add it to the pack manifest, or report it to the pack author. |
 | `CLI.GATE.BASELINE_INVALID` | `opensip-cli` |  |  |  |  |  |  |  | Run the tool with --gate-save to capture a baseline before comparing; if the message reports unstamped signals, report it to the tool author. |
 | `CLI.HOST_IDENTITY.RESERVED` | `opensip-cli` | application | tool-author | security | never | error | plugin-incompatible | active | Rename the contribution into a namespace the tool owns; host-reserved identities are refused. |
+| `CLI.HOST.ARTIFACT_DIR_FAILED` | `opensip-cli` |  | environment | I/O | caller-policy |  |  |  | The per-run artifact directory could not be created before the tool ran, so it did not run. Check permissions and free space for the artifact path, then re-run. |
 | `CLI.HOST.ARTIFACT_WRITE_FAILED` | `opensip-cli` |  | environment | I/O | caller-policy | warning | success |  | The artifact could not be written; the run itself succeeded. Check permissions and free space for the output path. |
 | `CLI.HOST.DISPATCH_FAILED` | `opensip-cli` |  | environment | I/O | caller-policy |  |  |  | The command could not be dispatched. Reinstall the tool package and retry; if it persists, capture the run id and report a bug. |
 | `CLI.HOST.OPTION_INVALID` | `opensip-cli` |  |  |  |  |  |  |  | Correct the named option or configuration value and re-run; the message names the field and what was expected. |

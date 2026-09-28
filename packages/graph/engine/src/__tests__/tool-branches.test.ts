@@ -20,11 +20,17 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 import {
-  enterScope,
   isContributionWithDisposer,
   LanguageRegistry,
   currentScope,
   resolveToolHooks,
+  runWithScope,
+  runWithScopeSync,
+  type CommandHandler,
+  type CommandSpec,
+  type RunScope,
+  type ToolCliContext,
+  type ToolScope,
 } from '@opensip-cli/core';
 import { DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -43,7 +49,6 @@ import type {
   ResolveOutput,
   WalkOutput,
 } from '../lang-adapter/types.js';
-import type { CommandHandler, CommandSpec, ToolCliContext, ToolScope } from '@opensip-cli/core';
 
 /** Resolve a graph command-spec by name. */
 function specFor(name: string): CommandSpec<unknown, ToolCliContext> {
@@ -142,9 +147,10 @@ async function withTTY(value: boolean | undefined, fn: () => Promise<unknown>): 
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let workDir: string;
+let scope: RunScope;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope());
+  scope = makeGraphTestScope();
   stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
   // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
@@ -152,260 +158,274 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  currentAdapterRegistry().clear();
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().clear();
+  });
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(workDir, { recursive: true, force: true });
 });
 
 describe('--resolution declaration', () => {
-  it('declares choices exact|fast on every --resolution-bearing command', () => {
-    // `graph` (the primary) and `graph export` (the canonical export command);
-    // the legacy flat-root catalog-export/sarif-export aliases were removed.
-    for (const name of ['graph', 'export']) {
-      const option = (specFor(name).options ?? []).find((o) => o.flag === '--resolution');
-      expect(option?.choices).toEqual(['exact', 'fast']);
-      expect(option?.default).toBe('exact');
-    }
-  });
+  it('declares choices exact|fast on every --resolution-bearing command', () =>
+    runWithScopeSync(scope, () => {
+      // `graph` (the primary) and `graph export` (the canonical export command);
+      // the legacy flat-root catalog-export/sarif-export aliases were removed.
+      for (const name of ['graph', 'export']) {
+        const option = (specFor(name).options ?? []).find((o) => o.flag === '--resolution');
+        expect(option?.choices).toEqual(['exact', 'fast']);
+        expect(option?.default).toBe('exact');
+      }
+    }));
 
-  it('accepts --resolution fast on the `graph export --format sarif` path', async () => {
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const outPath = join(workDir, 'out.sarif');
-    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('export')(
-      {
-        format: 'sarif',
-        outputSarif: outPath,
-        tenantId: 't',
-        repoId: 'r',
-        cwd: workDir,
-        resolution: 'fast',
-        _args: [],
-      },
-      cli,
-    );
-    expect(setExitCode).toHaveBeenCalledWith(0);
-  });
+  it('accepts --resolution fast on the `graph export --format sarif` path', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      const outPath = join(workDir, 'out.sarif');
+      const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+      await handlerFor('export')(
+        {
+          format: 'sarif',
+          outputSarif: outPath,
+          tenantId: 't',
+          repoId: 'r',
+          cwd: workDir,
+          resolution: 'fast',
+          _args: [],
+        },
+        cli,
+      );
+      expect(setExitCode).toHaveBeenCalledWith(0);
+    }));
 });
 
 describe('graph interactive --exact path honors graph config', () => {
-  it('loads opensip-cli.config.yml graph block and forwards it to renderLive (--exact, TTY)', async () => {
-    // Regression: the interactive live-view path used to call runGraph with no
-    // config, silently ignoring the project's `graph:` block — so
-    // `graph --verbose` disagreed with `graph --json`. ADR-0032: the Ink live
-    // view drives the EXACT engine, so it is eligible only under `--exact`
-    // (sharded is the default and routes to the static path).
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    writeFileSync(
-      join(workDir, 'opensip-cli.config.yml'),
-      'graph:\n  minCrossPackageDuplicatePackages: 2\n',
-      'utf8',
-    );
-    Object.assign(currentScope() ?? {}, {
-      configDocument: { graph: { minCrossPackageDuplicatePackages: 2 } },
-    });
-    const { cli, renderLive } = makeMockCli();
+  it('loads opensip-cli.config.yml graph block and forwards it to renderLive (--exact, TTY)', () =>
+    runWithScope(scope, async () => {
+      // Regression: the interactive live-view path used to call runGraph with no
+      // config, silently ignoring the project's `graph:` block — so
+      // `graph --verbose` disagreed with `graph --json`. ADR-0032: the Ink live
+      // view drives the EXACT engine, so it is eligible only under `--exact`
+      // (sharded is the default and routes to the static path).
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      writeFileSync(
+        join(workDir, 'opensip-cli.config.yml'),
+        'graph:\n  minCrossPackageDuplicatePackages: 2\n',
+        'utf8',
+      );
+      Object.assign(currentScope() ?? {}, {
+        configDocument: { graph: { minCrossPackageDuplicatePackages: 2 } },
+      });
+      const { cli, renderLive } = makeMockCli();
 
-    // The animated live view is taken only on a TTY, under --exact.
-    await withTTY(
-      true,
-      () =>
-        handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli) as Promise<unknown>,
-    );
+      // The animated live view is taken only on a TTY, under --exact.
+      await withTTY(
+        true,
+        () =>
+          handlerFor('graph')({ cwd: workDir, exact: true, _args: [[]] }, cli) as Promise<unknown>,
+      );
 
-    expect(renderLive).toHaveBeenCalledTimes(1);
-    const [, args] = renderLive.mock.calls[0] as [
-      string,
-      { config?: { minCrossPackageDuplicatePackages?: number } },
-    ];
-    expect(args.config?.minCrossPackageDuplicatePackages).toBe(2);
-  });
+      expect(renderLive).toHaveBeenCalledTimes(1);
+      const [, args] = renderLive.mock.calls[0] as [
+        string,
+        { config?: { minCrossPackageDuplicatePackages?: number } },
+      ];
+      expect(args.config?.minCrossPackageDuplicatePackages).toBe(2);
+    }));
 
-  it('falls back to the static render seam (not the live view) when stdout is not a TTY', async () => {
-    // Pipe / CI / redirect: the animated Ink live view is TTY-only, so a bare
-    // `graph` run must route through executeGraph and emit its result through
-    // the render seam (dual-rendered as plain text), never renderLive.
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+  it('falls back to the static render seam (not the live view) when stdout is not a TTY', () =>
+    runWithScope(scope, async () => {
+      // Pipe / CI / redirect: the animated Ink live view is TTY-only, so a bare
+      // `graph` run must route through executeGraph and emit its result through
+      // the render seam (dual-rendered as plain text), never renderLive.
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(
-      false,
-      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
-    );
+      await withTTY(
+        false,
+        () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+      );
 
-    expect(renderLive).not.toHaveBeenCalled();
-    expect(render).toHaveBeenCalledTimes(1);
-    const [result] = render.mock.calls[0] as [{ type?: string }];
-    // envelope-first-presentation RP-2: the static render seam now receives a
-    // RunPresentation (envelope-backed) rather than a count-based graph-done.
-    expect(result.type).toBe('run-presentation');
-  });
+      expect(renderLive).not.toHaveBeenCalled();
+      expect(render).toHaveBeenCalledTimes(1);
+      const [result] = render.mock.calls[0] as [{ type?: string }];
+      // envelope-first-presentation RP-2: the static render seam now receives a
+      // RunPresentation (envelope-backed) rather than a count-based graph-done.
+      expect(result.type).toBe('run-presentation');
+    }));
 
-  it('a bare default run takes the live view on a TTY (ADR-0032: the live renderer is engine-agnostic — drives the sharded default too)', async () => {
-    // Regression fix: the live runner is engine-agnostic — it drives WHICHEVER
-    // engine the `--exact` + shardability policy selects (sharded in-process /
-    // exact off-process). So a bare `graph` (sharded default) on a TTY MUST take
-    // the live view — same as `--exact` — restoring the staged "Code Graph"
-    // checklist that the earlier `opts.exact === true` gate had removed. This
-    // pins "TTY selects only the renderer; it never changes the engine" without
-    // tying the renderer to one engine.
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+  it('a bare default run takes the live view on a TTY (ADR-0032: the live renderer is engine-agnostic — drives the sharded default too)', () =>
+    runWithScope(scope, async () => {
+      // Regression fix: the live runner is engine-agnostic — it drives WHICHEVER
+      // engine the `--exact` + shardability policy selects (sharded in-process /
+      // exact off-process). So a bare `graph` (sharded default) on a TTY MUST take
+      // the live view — same as `--exact` — restoring the staged "Code Graph"
+      // checklist that the earlier `opts.exact === true` gate had removed. This
+      // pins "TTY selects only the renderer; it never changes the engine" without
+      // tying the renderer to one engine.
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      const { cli, renderLive, render } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(
-      true,
-      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
-    );
+      await withTTY(
+        true,
+        () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+      );
 
-    expect(renderLive).toHaveBeenCalledTimes(1);
-    expect(render).not.toHaveBeenCalled();
-    // The live args carry the engine selector: `exact` (false here) + the
-    // pre-resolved shard set the runner uses to pick its transport.
-    const [, args] = renderLive.mock.calls[0] as [
-      string,
-      {
-        exact?: boolean;
-        explicitRecipe?: string;
-        recipe?: string;
-        shards?: readonly unknown[];
-      },
-    ];
-    expect(args.exact).toBe(false);
-    expect(args.recipe).toBe('default');
-    expect(args.explicitRecipe).toBeUndefined();
-    expect(Array.isArray(args.shards)).toBe(true);
-  });
+      expect(renderLive).toHaveBeenCalledTimes(1);
+      expect(render).not.toHaveBeenCalled();
+      // The live args carry the engine selector: `exact` (false here) + the
+      // pre-resolved shard set the runner uses to pick its transport.
+      const [, args] = renderLive.mock.calls[0] as [
+        string,
+        {
+          exact?: boolean;
+          explicitRecipe?: string;
+          recipe?: string;
+          shards?: readonly unknown[];
+        },
+      ];
+      expect(args.exact).toBe(false);
+      expect(args.recipe).toBe('default');
+      expect(args.explicitRecipe).toBeUndefined();
+      expect(Array.isArray(args.shards)).toBe(true);
+    }));
 
-  it('does not promote a tolerant config recipe into a strict worker flag', async () => {
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    writeFileSync(
-      join(workDir, 'opensip-cli.config.yml'),
-      'graph:\n  recipe: missing-config-recipe\n',
-      'utf8',
-    );
-    Object.assign(currentScope() ?? {}, {
-      configDocument: { graph: { recipe: 'missing-config-recipe' } },
-    });
-    const { cli, renderLive } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+  it('does not promote a tolerant config recipe into a strict worker flag', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      writeFileSync(
+        join(workDir, 'opensip-cli.config.yml'),
+        'graph:\n  recipe: missing-config-recipe\n',
+        'utf8',
+      );
+      Object.assign(currentScope() ?? {}, {
+        configDocument: { graph: { recipe: 'missing-config-recipe' } },
+      });
+      const { cli, renderLive } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
 
-    await withTTY(
-      true,
-      () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
-    );
+      await withTTY(
+        true,
+        () => handlerFor('graph')({ cwd: workDir, _args: [[]] }, cli) as Promise<unknown>,
+      );
 
-    const [, args] = renderLive.mock.calls[0] as [
-      string,
-      { explicitRecipe?: string; recipe?: string },
-    ];
-    expect(args.recipe).toBe('default');
-    expect(args.explicitRecipe).toBeUndefined();
-  });
+      const [, args] = renderLive.mock.calls[0] as [
+        string,
+        { explicitRecipe?: string; recipe?: string },
+      ];
+      expect(args.recipe).toBe('default');
+      expect(args.explicitRecipe).toBeUndefined();
+    }));
 });
 
 describe('graph-shard-worker handler', () => {
-  it('routes the specPath positional to executeShardWorker (exit 0 on a valid spec)', async () => {
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const specPath = join(workDir, 'spec.json');
-    const spec: ShardWorkerSpec = {
-      shard: {
-        id: 'pkg:a',
-        rootDir: workDir,
-        files: [join(workDir, 'src', 'a.ts')],
-      },
-      projectRoot: workDir,
-      resolutionMode: 'exact',
-    };
-    writeFileSync(specPath, JSON.stringify(spec), 'utf8');
-    const { cli, setExitCode, emitRaw } = makeMockCli();
-    await handlerFor('graph-shard-worker')({ _args: [specPath] }, cli);
-    expect(setExitCode).toHaveBeenCalledWith(0);
-    expect(emitRaw).toHaveBeenCalledTimes(1);
-    const output = emitRaw.mock.calls[0]?.[0] as ShardWorkerOutput;
-    expect(output.kind).toBe('result');
-    expect(output.kind === 'result' ? output.result.shardId : undefined).toBe('pkg:a');
-  });
+  it('routes the specPath positional to executeShardWorker (exit 0 on a valid spec)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      const specPath = join(workDir, 'spec.json');
+      const spec: ShardWorkerSpec = {
+        shard: {
+          id: 'pkg:a',
+          rootDir: workDir,
+          files: [join(workDir, 'src', 'a.ts')],
+        },
+        projectRoot: workDir,
+        resolutionMode: 'exact',
+      };
+      writeFileSync(specPath, JSON.stringify(spec), 'utf8');
+      const { cli, setExitCode, emitRaw } = makeMockCli();
+      await handlerFor('graph-shard-worker')({ _args: [specPath] }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(0);
+      expect(emitRaw).toHaveBeenCalledTimes(1);
+      const output = emitRaw.mock.calls[0]?.[0] as ShardWorkerOutput;
+      expect(output.kind).toBe('result');
+      expect(output.kind === 'result' ? output.result.shardId : undefined).toBe('pkg:a');
+    }));
 });
 
 describe('graph export --format catalog handler branches', () => {
-  it('logs the changed-file advisory on the incremental path and still writes the export', async () => {
-    currentAdapterRegistry().register(fakeAdapter(workDir));
-    const outPath = join(workDir, 'catalog.json');
-    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('export')(
-      {
-        format: 'catalog',
-        catalogOutput: outPath,
-        tenantId: 't',
-        repoId: 'r',
-        gitSha: 'sha1',
-        mode: 'incremental',
-        changedFile: ['src/a.ts', 'src/b.ts'],
-        cwd: workDir,
-        resolution: 'exact',
-        _args: [],
-      },
-      cli,
-    );
-    expect(setExitCode).toHaveBeenCalledWith(0);
-  });
+  it('logs the changed-file advisory on the incremental path and still writes the export', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(fakeAdapter(workDir));
+      const outPath = join(workDir, 'catalog.json');
+      const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+      await handlerFor('export')(
+        {
+          format: 'catalog',
+          catalogOutput: outPath,
+          tenantId: 't',
+          repoId: 'r',
+          gitSha: 'sha1',
+          mode: 'incremental',
+          changedFile: ['src/a.ts', 'src/b.ts'],
+          cwd: workDir,
+          resolution: 'exact',
+          _args: [],
+        },
+        cli,
+      );
+      expect(setExitCode).toHaveBeenCalledWith(0);
+    }));
 
-  it('routes a pipeline failure through handleGraphError (no adapter registered)', async () => {
-    // No adapter registered → runGraph throws a ConfigurationError, which
-    // the handler's catch hands to handleGraphError.
-    const outPath = join(workDir, 'catalog.json');
-    const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
-    await handlerFor('export')(
-      {
-        format: 'catalog',
-        catalogOutput: outPath,
-        tenantId: 't',
-        repoId: 'r',
-        gitSha: 'sha1',
-        cwd: workDir,
-        resolution: 'exact',
-        _args: [],
-      },
-      cli,
-    );
-    // handleGraphError sets a non-zero exit code.
-    const codes = setExitCode.mock.calls.map((c) => c[0]);
-    expect(codes.some((c) => c !== 0)).toBe(true);
-  });
+  it('routes a pipeline failure through handleGraphError (no adapter registered)', () =>
+    runWithScope(scope, async () => {
+      // No adapter registered → runGraph throws a ConfigurationError, which
+      // the handler's catch hands to handleGraphError.
+      const outPath = join(workDir, 'catalog.json');
+      const { cli, setExitCode } = makeMockCli(DataStoreFactory.open({ backend: 'memory' }));
+      await handlerFor('export')(
+        {
+          format: 'catalog',
+          catalogOutput: outPath,
+          tenantId: 't',
+          repoId: 'r',
+          gitSha: 'sha1',
+          cwd: workDir,
+          resolution: 'exact',
+          _args: [],
+        },
+        cli,
+      );
+      // handleGraphError sets a non-zero exit code.
+      const codes = setExitCode.mock.calls.map((c) => c[0]);
+      expect(codes.some((c) => c !== 0)).toBe(true);
+    }));
 });
 
 describe('contributeScope + collectReportData hooks', () => {
-  it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () => {
-    const result = resolveToolHooks(graphTool).contributeScope?.() ?? {};
-    // graph returns the bare ScopeContribution form (no per-run resource to
-    // dispose), so the disposer-wrapper guard must be false here.
-    expect(isContributionWithDisposer(result)).toBe(false);
-    const contribution = isContributionWithDisposer(result) ? result.contribution : result;
-    expect(contribution.graph).toBeDefined();
-    expect(contribution.graph?.adapters).toBeDefined();
-    expect(contribution.graph?.rules).toBeDefined();
-    expect(contribution.graph?.recipes).toBeDefined();
-    expect(contribution.graph?.contextCatalog).toBeDefined();
-    expect(contribution.graph?.contextSnapshots).toBeDefined();
-    expect(contribution.graph?.contextRun).toBeDefined();
-  });
+  it('contributeScope seeds a fresh graph subscope with adapter + rule + recipe registries', () =>
+    runWithScopeSync(scope, () => {
+      const result = resolveToolHooks(graphTool).contributeScope?.() ?? {};
+      // graph returns the bare ScopeContribution form (no per-run resource to
+      // dispose), so the disposer-wrapper guard must be false here.
+      expect(isContributionWithDisposer(result)).toBe(false);
+      const contribution = isContributionWithDisposer(result) ? result.contribution : result;
+      expect(contribution.graph).toBeDefined();
+      expect(contribution.graph?.adapters).toBeDefined();
+      expect(contribution.graph?.rules).toBeDefined();
+      expect(contribution.graph?.recipes).toBeDefined();
+      expect(contribution.graph?.contextCatalog).toBeDefined();
+      expect(contribution.graph?.contextSnapshots).toBeDefined();
+      expect(contribution.graph?.contextRun).toBeDefined();
+    }));
 
-  it('collectReportData returns empty rule/recipe catalogs when no datastore and no graph subscope', () => {
-    const scope = { datastore: () => undefined } as unknown as ToolScope;
-    expect(resolveToolHooks(graphTool).collectReportData?.(scope)).toEqual({
-      graphRuleCatalog: [],
-      graphRecipeCatalog: [],
-    });
-  });
+  it('collectReportData returns empty rule/recipe catalogs when no datastore and no graph subscope', () =>
+    runWithScopeSync(scope, () => {
+      const toolScope = { datastore: () => undefined } as unknown as ToolScope;
+      expect(resolveToolHooks(graphTool).collectReportData?.(toolScope)).toEqual({
+        graphRuleCatalog: [],
+        graphRecipeCatalog: [],
+      });
+    }));
 
-  it('collectReportData returns a graphCatalog key when a datastore is present', () => {
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const scope = { datastore: () => datastore } as unknown as ToolScope;
-      const data = resolveToolHooks(graphTool).collectReportData?.(scope) ?? {};
-      expect('graphCatalog' in data).toBe(true);
-    } finally {
-      datastore.close();
-    }
-  });
+  it('collectReportData returns a graphCatalog key when a datastore is present', () =>
+    runWithScopeSync(scope, () => {
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const toolScope = { datastore: () => datastore } as unknown as ToolScope;
+        const data = resolveToolHooks(graphTool).collectReportData?.(toolScope) ?? {};
+        expect('graphCatalog' in data).toBe(true);
+      } finally {
+        datastore.close();
+      }
+    }));
 });

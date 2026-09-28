@@ -10,7 +10,13 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, LanguageRegistry } from '@opensip-cli/core';
+import {
+  LanguageRegistry,
+  runWithScope,
+  runWithScopeSync,
+  type RunScope,
+  type ToolCliContext,
+} from '@opensip-cli/core';
 import { BaselineRepo, DataStoreFactory, type DataStore } from '@opensip-cli/datastore';
 import { diffBaseline } from '@opensip-cli/output';
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
@@ -29,7 +35,6 @@ import type {
 } from '../../lang-adapter/types.js';
 import type { FunctionOccurrence } from '../../types.js';
 import type { RunPresentation, SignalEnvelope } from '@opensip-cli/contracts';
-import type { ToolCliContext } from '@opensip-cli/core';
 
 function occ(over: Partial<FunctionOccurrence> = {}): FunctionOccurrence {
   return {
@@ -213,9 +218,10 @@ process.exit(0);
 let stdoutSpy: MockInstance<typeof process.stdout.write>;
 let stderrSpy: MockInstance<typeof process.stderr.write>;
 let projectDir: string;
+let scope: RunScope;
 
 beforeEach(() => {
-  enterScope(makeGraphTestScope());
+  scope = makeGraphTestScope();
   // Synthetic adapters must honor DiscoverOutput's realpath-normalized path contract.
   projectDir = realpathSync(mkdtempSync(join(tmpdir(), 'graph-exec-')));
   mkdirSync(join(projectDir, 'src'), { recursive: true });
@@ -227,327 +233,348 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  currentAdapterRegistry().clear();
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().clear();
+  });
   stdoutSpy.mockRestore();
   stderrSpy.mockRestore();
   rmSync(projectDir, { recursive: true, force: true });
 });
 
 describe('executeGraph — mutually-exclusive flags', () => {
-  it('rejects --gate-save together with --gate-compare (exit 2)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode, render } = mockCli();
-    await executeGraph({ cwd: projectDir, noCache: true, gateSave: true, gateCompare: true }, cli);
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(renderedErrorText(render)).toContain('mutually exclusive');
-  });
-
-  it('rejects --workspace together with positional paths (exit 2)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode, render } = mockCli();
-    await executeGraph(
-      { cwd: projectDir, noCache: true, workspace: true, paths: [projectDir] },
-      cli,
-    );
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(renderedErrorText(render)).toContain('mutually exclusive');
-  });
-});
-
-describe('executeGraph — render dispatch', () => {
-  it('emits the signal envelope under --json (exit 0)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const envelope = emitEnvelope.mock.calls[0]?.[0] as {
-        tool: string;
-        schemaVersion: number;
-      };
-      expect(envelope.tool).toBe('graph');
-      expect(envelope.schemaVersion).toBe(2);
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('produces a verbose RunPresentation with the unified report body', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, render } = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const done = render.mock.calls[0]?.[0] as RunPresentation;
-      expect(done.type).toBe('run-presentation');
-      const body = done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
-      expect(body).toContain('== Catalog ==');
-      // envelope-first-presentation RP-2: the PASS/FAIL summary derives from the
-      // carried envelope verdict, not a count-based graph-done summary.
-      expect(typeof done.envelope.verdict.passed).toBe('boolean');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('produces a default (non-verbose) RunPresentation with no verbose body', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, render } = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true }, cli);
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const done = render.mock.calls[0]?.[0] as RunPresentation;
-      expect(done.type).toBe('run-presentation');
-      // The "Use --verbose…" footer is now emitted by the shared resultToView
-      // seam (ADR-0021), not carried on the result.
-      expect(done.verboseDetail).toBeUndefined();
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('uses the SHARDED engine by default for a shardable project (ADR-0032)', async () => {
-    // A bare run (no --exact) on a shardable repo builds with the SHARDED
-    // engine — the default, equivalent to exact within the CI-ratcheted
-    // budget held by the equivalence guardrails (ADR-0032 amendment).
-    registerLargeFlatAdapter(projectDir);
-    const fakeCliPath = writeFakeShardCli(projectDir);
-    const profilePath = join(projectDir, 'profile-default.json');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode } = mockCli(datastore);
+  it('rejects --gate-save together with --gate-compare (exit 2)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const { cli, setExitCode, render } = mockCli();
       await executeGraph(
-        {
-          cwd: projectDir,
-          noCache: true,
-          // No `exact: true` — the default. A working worker script is present so
-          // the sharded build completes.
-          cliScript: fakeCliPath,
-          concurrency: 1,
-          profileOutput: profilePath,
-        },
-        cli,
-      );
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
-        runs: { mode: string; stages: { name: string; detail?: string }[] }[];
-      };
-      expect(profile.runs[0]?.mode).toBe('sharded');
-      expect(profile.runs[0]?.stages).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'sharded-build',
-            detail: '2 shard(s)',
-          }),
-        ]),
-      );
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('uses the EXACT single-program engine when --exact is set, even on a shardable project (ADR-0032)', async () => {
-    // --exact opts OUT of the default sharded engine: a shardable repo with a
-    // working worker script must still build single-process (exact). Proves the
-    // policy keys off the flag, not script availability or file count.
-    registerLargeFlatAdapter(projectDir);
-    const fakeCliPath = writeFakeShardCli(projectDir);
-    const profilePath = join(projectDir, 'profile-exact.json');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph(
-        {
-          cwd: projectDir,
-          noCache: true,
-          exact: true,
-          cliScript: fakeCliPath,
-          profileOutput: profilePath,
-        },
-        cli,
-      );
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
-        runs: { mode: string }[];
-      };
-      expect(profile.runs[0]?.mode).toBe('single-process');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('falls back to the EXACT engine on a NON-shardable project (no worker script, default policy)', async () => {
-    // The natural single-package / small-repo path: even without --exact, a
-    // project that can't shard (here: no cliScript to spawn workers) uses the
-    // exact single-program engine rather than failing.
-    registerLargeFlatAdapter(projectDir);
-    const profilePath = join(projectDir, 'profile-fallback.json');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph(
-        {
-          cwd: projectDir,
-          noCache: true,
-          // No cliScript → resolveShards returns [] → exact fallback. No --exact.
-          cliScript: '',
-          profileOutput: profilePath,
-        },
-        cli,
-      );
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
-        runs: { mode: string }[];
-      };
-      expect(profile.runs[0]?.mode).toBe('single-process');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('engine choice is independent of process.stdout.isTTY (TTY selects only the renderer)', async () => {
-    // executeGraph is the STATIC path; the engine decision is a pure function of
-    // the parsed options + shardability and never reads isTTY. Force isTTY true
-    // and confirm a bare default run still shards (same as the non-TTY case).
-    registerLargeFlatAdapter(projectDir);
-    const fakeCliPath = writeFakeShardCli(projectDir);
-    const original = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, 'isTTY', {
-      value: true,
-      configurable: true,
-    });
-    const profilePath = join(projectDir, 'profile-tty.json');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode } = mockCli(datastore);
-      await executeGraph(
-        {
-          cwd: projectDir,
-          noCache: true,
-          cliScript: fakeCliPath,
-          concurrency: 1,
-          profileOutput: profilePath,
-        },
-        cli,
-      );
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
-        runs: { mode: string }[];
-      };
-      // Sharded regardless of isTTY — the engine is TTY-independent.
-      expect(profile.runs[0]?.mode).toBe('sharded');
-    } finally {
-      Object.defineProperty(process.stdout, 'isTTY', {
-        value: original,
-        configurable: true,
-      });
-      datastore.close();
-    }
-  });
-});
-
-describe('executeGraph — multiple positional paths', () => {
-  it('aggregates signals across paths and dispatches once', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const other = mkdtempSync(join(tmpdir(), 'graph-exec2-'));
-    mkdirSync(join(other, 'src'), { recursive: true });
-    writeFileSync(join(other, 'src', 'a.ts'), 'export const y = 2;\n', 'utf8');
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
-      await executeGraph(
-        {
-          cwd: projectDir,
-          noCache: true,
-          json: true,
-          paths: [projectDir, other],
-        },
-        cli,
-      );
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string };
-      expect(envelope.tool).toBe('graph');
-    } finally {
-      datastore.close();
-      rmSync(other, { recursive: true, force: true });
-    }
-  });
-});
-
-describe('executeGraph — gate dispatch', () => {
-  it('saves the gate baseline under --gate-save (exit 0)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, render } = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, cli);
-      expect(setExitCode).toHaveBeenCalledWith(0);
-      expect(renderedLines(render)).toContain('Graph baseline saved');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('compares against the baseline under --gate-compare (exit 0, no regressions)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const save = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, save.cli);
-      const compare = mockCli(datastore);
-      await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, compare.cli);
-      expect(compare.setExitCode).toHaveBeenCalledWith(0);
-      expect(renderedLines(compare.render)).toContain('Graph gate PASS');
-    } finally {
-      datastore.close();
-    }
-  });
-
-  it('refuses the gate on a fast-resolution catalog (exit 2)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const datastore = DataStoreFactory.open({ backend: 'memory' });
-    try {
-      const { cli, setExitCode, render } = mockCli(datastore);
-      await executeGraph(
-        { cwd: projectDir, noCache: true, gateSave: true, resolution: 'fast' },
+        { cwd: projectDir, noCache: true, gateSave: true, gateCompare: true },
         cli,
       );
       expect(setExitCode).toHaveBeenCalledWith(2);
-      expect(renderedErrorText(render)).toContain('fast');
-    } finally {
-      datastore.close();
-    }
-  });
+      expect(renderedErrorText(render)).toContain('mutually exclusive');
+    }));
+
+  it('rejects --workspace together with positional paths (exit 2)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const { cli, setExitCode, render } = mockCli();
+      await executeGraph(
+        { cwd: projectDir, noCache: true, workspace: true, paths: [projectDir] },
+        cli,
+      );
+      expect(setExitCode).toHaveBeenCalledWith(2);
+      expect(renderedErrorText(render)).toContain('mutually exclusive');
+    }));
+});
+
+describe('executeGraph — render dispatch', () => {
+  it('emits the signal envelope under --json (exit 0)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true, json: true }, cli);
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const envelope = emitEnvelope.mock.calls[0]?.[0] as {
+          tool: string;
+          schemaVersion: number;
+        };
+        expect(envelope.tool).toBe('graph');
+        expect(envelope.schemaVersion).toBe(2);
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('produces a verbose RunPresentation with the unified report body', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, render } = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true, verbose: true }, cli);
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const done = render.mock.calls[0]?.[0] as RunPresentation;
+        expect(done.type).toBe('run-presentation');
+        const body =
+          done.verboseDetail?.kind === 'lines' ? done.verboseDetail.lines.join('\n') : '';
+        expect(body).toContain('== Catalog ==');
+        // envelope-first-presentation RP-2: the PASS/FAIL summary derives from the
+        // carried envelope verdict, not a count-based graph-done summary.
+        expect(typeof done.envelope.verdict.passed).toBe('boolean');
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('produces a default (non-verbose) RunPresentation with no verbose body', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, render } = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true }, cli);
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const done = render.mock.calls[0]?.[0] as RunPresentation;
+        expect(done.type).toBe('run-presentation');
+        // The "Use --verbose…" footer is now emitted by the shared resultToView
+        // seam (ADR-0021), not carried on the result.
+        expect(done.verboseDetail).toBeUndefined();
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('uses the SHARDED engine by default for a shardable project (ADR-0032)', () =>
+    runWithScope(scope, async () => {
+      // A bare run (no --exact) on a shardable repo builds with the SHARDED
+      // engine — the default, equivalent to exact within the CI-ratcheted
+      // budget held by the equivalence guardrails (ADR-0032 amendment).
+      registerLargeFlatAdapter(projectDir);
+      const fakeCliPath = writeFakeShardCli(projectDir);
+      const profilePath = join(projectDir, 'profile-default.json');
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode } = mockCli(datastore);
+        await executeGraph(
+          {
+            cwd: projectDir,
+            noCache: true,
+            // No `exact: true` — the default. A working worker script is present so
+            // the sharded build completes.
+            cliScript: fakeCliPath,
+            concurrency: 1,
+            profileOutput: profilePath,
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+          runs: { mode: string; stages: { name: string; detail?: string }[] }[];
+        };
+        expect(profile.runs[0]?.mode).toBe('sharded');
+        expect(profile.runs[0]?.stages).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              name: 'sharded-build',
+              detail: '2 shard(s)',
+            }),
+          ]),
+        );
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('uses the EXACT single-program engine when --exact is set, even on a shardable project (ADR-0032)', () =>
+    runWithScope(scope, async () => {
+      // --exact opts OUT of the default sharded engine: a shardable repo with a
+      // working worker script must still build single-process (exact). Proves the
+      // policy keys off the flag, not script availability or file count.
+      registerLargeFlatAdapter(projectDir);
+      const fakeCliPath = writeFakeShardCli(projectDir);
+      const profilePath = join(projectDir, 'profile-exact.json');
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode } = mockCli(datastore);
+        await executeGraph(
+          {
+            cwd: projectDir,
+            noCache: true,
+            exact: true,
+            cliScript: fakeCliPath,
+            profileOutput: profilePath,
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+          runs: { mode: string }[];
+        };
+        expect(profile.runs[0]?.mode).toBe('single-process');
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('falls back to the EXACT engine on a NON-shardable project (no worker script, default policy)', () =>
+    runWithScope(scope, async () => {
+      // The natural single-package / small-repo path: even without --exact, a
+      // project that can't shard (here: no cliScript to spawn workers) uses the
+      // exact single-program engine rather than failing.
+      registerLargeFlatAdapter(projectDir);
+      const profilePath = join(projectDir, 'profile-fallback.json');
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode } = mockCli(datastore);
+        await executeGraph(
+          {
+            cwd: projectDir,
+            noCache: true,
+            // No cliScript → resolveShards returns [] → exact fallback. No --exact.
+            cliScript: '',
+            profileOutput: profilePath,
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+          runs: { mode: string }[];
+        };
+        expect(profile.runs[0]?.mode).toBe('single-process');
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('engine choice is independent of process.stdout.isTTY (TTY selects only the renderer)', () =>
+    runWithScope(scope, async () => {
+      // executeGraph is the STATIC path; the engine decision is a pure function of
+      // the parsed options + shardability and never reads isTTY. Force isTTY true
+      // and confirm a bare default run still shards (same as the non-TTY case).
+      registerLargeFlatAdapter(projectDir);
+      const fakeCliPath = writeFakeShardCli(projectDir);
+      const original = process.stdout.isTTY;
+      Object.defineProperty(process.stdout, 'isTTY', {
+        value: true,
+        configurable: true,
+      });
+      const profilePath = join(projectDir, 'profile-tty.json');
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode } = mockCli(datastore);
+        await executeGraph(
+          {
+            cwd: projectDir,
+            noCache: true,
+            cliScript: fakeCliPath,
+            concurrency: 1,
+            profileOutput: profilePath,
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const profile = JSON.parse(readFileSync(profilePath, 'utf8')) as {
+          runs: { mode: string }[];
+        };
+        // Sharded regardless of isTTY — the engine is TTY-independent.
+        expect(profile.runs[0]?.mode).toBe('sharded');
+      } finally {
+        Object.defineProperty(process.stdout, 'isTTY', {
+          value: original,
+          configurable: true,
+        });
+        datastore.close();
+      }
+    }));
+});
+
+describe('executeGraph — multiple positional paths', () => {
+  it('aggregates signals across paths and dispatches once', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const other = mkdtempSync(join(tmpdir(), 'graph-exec2-'));
+      mkdirSync(join(other, 'src'), { recursive: true });
+      writeFileSync(join(other, 'src', 'a.ts'), 'export const y = 2;\n', 'utf8');
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, emitEnvelope } = mockCli(datastore);
+        await executeGraph(
+          {
+            cwd: projectDir,
+            noCache: true,
+            json: true,
+            paths: [projectDir, other],
+          },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        const envelope = emitEnvelope.mock.calls[0]?.[0] as { tool: string };
+        expect(envelope.tool).toBe('graph');
+      } finally {
+        datastore.close();
+        rmSync(other, { recursive: true, force: true });
+      }
+    }));
+});
+
+describe('executeGraph — gate dispatch', () => {
+  it('saves the gate baseline under --gate-save (exit 0)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, render } = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, cli);
+        expect(setExitCode).toHaveBeenCalledWith(0);
+        expect(renderedLines(render)).toContain('Graph baseline saved');
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('compares against the baseline under --gate-compare (exit 0, no regressions)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const save = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true, gateSave: true }, save.cli);
+        const compare = mockCli(datastore);
+        await executeGraph({ cwd: projectDir, noCache: true, gateCompare: true }, compare.cli);
+        expect(compare.setExitCode).toHaveBeenCalledWith(0);
+        expect(renderedLines(compare.render)).toContain('Graph gate PASS');
+      } finally {
+        datastore.close();
+      }
+    }));
+
+  it('refuses the gate on a fast-resolution catalog (exit 2)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const datastore = DataStoreFactory.open({ backend: 'memory' });
+      try {
+        const { cli, setExitCode, render } = mockCli(datastore);
+        await executeGraph(
+          { cwd: projectDir, noCache: true, gateSave: true, resolution: 'fast' },
+          cli,
+        );
+        expect(setExitCode).toHaveBeenCalledWith(2);
+        expect(renderedErrorText(render)).toContain('fast');
+      } finally {
+        datastore.close();
+      }
+    }));
 });
 
 describe('executeGraph — --workspace guards', () => {
-  it('errors when the CLI entry script cannot be determined (exit 2)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode, render } = mockCli();
-    await executeGraph({ cwd: projectDir, noCache: true, workspace: true, cliScript: '' }, cli);
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(renderedErrorText(render)).toContain('CLI entry script');
-  });
+  it('errors when the CLI entry script cannot be determined (exit 2)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const { cli, setExitCode, render } = mockCli();
+      await executeGraph({ cwd: projectDir, noCache: true, workspace: true, cliScript: '' }, cli);
+      expect(setExitCode).toHaveBeenCalledWith(2);
+      expect(renderedErrorText(render)).toContain('CLI entry script');
+    }));
 
-  it('errors when --language names an unregistered adapter (exit 2)', async () => {
-    currentAdapterRegistry().register(populatedAdapter());
-    const { cli, setExitCode, render } = mockCli();
-    // resolveAdaptersForRun reads cli.scope.languages (empty here) → the
-    // language name isn't registered → ConfigurationError.
-    await executeGraph(
-      {
-        cwd: projectDir,
-        noCache: true,
-        workspace: true,
-        cliScript: 'cli.js',
-        language: 'klingon',
-      },
-      cli,
-    );
-    expect(setExitCode).toHaveBeenCalledWith(2);
-    expect(renderedErrorText(render)).toContain('not a registered adapter');
-  });
+  it('errors when --language names an unregistered adapter (exit 2)', () =>
+    runWithScope(scope, async () => {
+      currentAdapterRegistry().register(populatedAdapter());
+      const { cli, setExitCode, render } = mockCli();
+      // resolveAdaptersForRun reads cli.scope.languages (empty here) → the
+      // language name isn't registered → ConfigurationError.
+      await executeGraph(
+        {
+          cwd: projectDir,
+          noCache: true,
+          workspace: true,
+          cliScript: 'cli.js',
+          language: 'klingon',
+        },
+        cli,
+      );
+      expect(setExitCode).toHaveBeenCalledWith(2);
+      expect(renderedErrorText(render)).toContain('not a registered adapter');
+    }));
 });

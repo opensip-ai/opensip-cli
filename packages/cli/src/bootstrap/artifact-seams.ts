@@ -26,6 +26,7 @@ import { resolveStateLockPolicy } from './state-lock-policy.js';
 // Plan 01 clean break: registered host definitions replace bare code literals that only
 // resolved through legacyFamilyCode's head-guessing.
 const ARTIFACT_WRITE_FAILED = hostErrorCatalog.require('CLI.HOST.ARTIFACT_WRITE_FAILED');
+const ARTIFACT_DIR_FAILED = hostErrorCatalog.require('CLI.HOST.ARTIFACT_DIR_FAILED');
 const OPTION_INVALID = hostErrorCatalog.require('CLI.HOST.OPTION_INVALID');
 
 /** Options for {@link createWriteArtifactSeam}. */
@@ -134,11 +135,13 @@ export function createEnsureArtifactDirSeam(
       try {
         mkdirSync(dir, { recursive: true, mode: ARTIFACT_DIR_MODE });
       } catch (error) {
+        // Distinct from writeArtifact's ARTIFACT_WRITE_FAILED (warning/success): this runs
+        // BEFORE the scanner, so failing it means nothing ran — it must not exit 0.
         throw new SystemError(
           `ensureArtifactDir failed for '${dir}': ${error instanceof Error ? error.message : String(error)}`,
           {
-            code: ARTIFACT_WRITE_FAILED.code,
-            definition: ARTIFACT_WRITE_FAILED,
+            code: ARTIFACT_DIR_FAILED.code,
+            definition: ARTIFACT_DIR_FAILED,
             metadata: { condition: 'mkdir' },
           },
         );

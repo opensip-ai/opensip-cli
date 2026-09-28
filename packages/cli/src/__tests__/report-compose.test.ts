@@ -466,6 +466,28 @@ describe('composeAndWriteReport', () => {
     expect(html).toContain('legit');
   });
 
+  it('ignores host-owned declaredInputs and projectRoot returned from collectReportData', async () => {
+    vi.spyOn(openReportMod, 'launchReport').mockResolvedValue(true);
+    // A misbehaving tool tries to override the host-computed project root
+    // (which editor deep-links resolve against) and declared-inputs provenance
+    // panel via collectReportData. Both must be stripped while its legitimate
+    // catalog contribution still merges.
+    const evil = makeTool('evil-root', {
+      projectRoot: '/forged/project/root',
+      declaredInputs: { forged: true },
+      checkCatalog: [{ slug: 'legit' }],
+    });
+
+    const scope = makeScope([evil]);
+    const result = await runWithScope(scope, () => composeAndWriteReport({ open: false }));
+    const html = readFileSync(result.path, 'utf8');
+
+    expect(html).not.toContain('/forged/project/root');
+    expect(html).not.toContain('"forged":true');
+    expect(html).toContain(JSON.stringify(projectRoot));
+    expect(html).toContain('legit');
+  });
+
   it('rejects prototype-mutating contribution keys without inheriting report selection', async () => {
     const warn = vi.fn();
     const contribution = JSON.parse(

@@ -437,6 +437,48 @@ function settleLinkedPublication(lockPath: string, before: BigIntStats): Publica
   }
 }
 
+/** {@link classifyLstatNlink}'s outcome: a terminal snapshot, or a signal to recurse/proceed. */
+type LstatNlinkOutcome =
+  | { readonly next: 'terminal'; readonly snapshot: LockSnapshot }
+  | { readonly next: 'recurse' }
+  | { readonly next: 'proceed' };
+
+/**
+ * Classify an lstat'd lock path by its link count. `'proceed'` only for the
+ * expected single-link owned-regular-file case; `'recurse'` when a settled
+ * publication link should be re-read; otherwise a terminal snapshot.
+ *
+ * Split out of {@link readLockSnapshot} to keep that function's branching (and
+ * its cognitive-complexity budget) to the read path itself.
+ */
+function classifyLstatNlink(lockPath: string, before: BigIntStats): LstatNlinkOutcome {
+  if (before.nlink === 2n) {
+    const settled = settleLinkedPublication(lockPath, before);
+    if (settled === 'settled') return { next: 'recurse' };
+    return {
+      next: 'terminal',
+      snapshot:
+        settled === 'churn'
+          ? { kind: 'churn' }
+          : { kind: 'unsafe', reason: 'unproven-linked-publication' },
+    };
+  }
+  if (before.nlink === 0n) {
+    // A concurrent unlink() of the lock file (a normal release by its owner) can
+    // observe nlink 0 on the still-resolved path in the kernel window before the
+    // directory entry is actually removed — the same Linux coordination hazard
+    // documented and fixed for the sibling mutex-temp path in runtime-lease.ts
+    // (commit 87efc175). Treat it as transient contention, not a malformed
+    // lockfile: readOpenedLockSnapshot already treats this nlink value as benign
+    // churn once past the open() gate; this mirrors that for the initial lstat.
+    return { next: 'terminal', snapshot: { kind: 'churn' } };
+  }
+  if (before.nlink !== 1n) {
+    return { next: 'terminal', snapshot: { kind: 'unsafe', reason: 'not-owned-regular-file' } };
+  }
+  return { next: 'proceed' };
+}
+
 /**
  * Read a bounded regular lock record through a descriptor anchored to the
  * lstat-observed inode. Symlinks, hard links, and non-files fail closed.
@@ -454,16 +496,9 @@ function readLockSnapshot(lockPath: string): LockSnapshot {
   if (!before.isFile()) {
     return { kind: 'unsafe', reason: 'not-owned-regular-file' };
   }
-  if (before.nlink === 2n) {
-    const settled = settleLinkedPublication(lockPath, before);
-    if (settled === 'settled') return readLockSnapshot(lockPath);
-    return settled === 'churn'
-      ? { kind: 'churn' }
-      : { kind: 'unsafe', reason: 'unproven-linked-publication' };
-  }
-  if (before.nlink !== 1n) {
-    return { kind: 'unsafe', reason: 'not-owned-regular-file' };
-  }
+  const nlinkResult = classifyLstatNlink(lockPath, before);
+  if (nlinkResult.next === 'recurse') return readLockSnapshot(lockPath);
+  if (nlinkResult.next === 'terminal') return nlinkResult.snapshot;
 
   const beforeIdentity = identityOf(before);
   if (before.size > BigInt(MAX_LOCKFILE_BYTES)) {

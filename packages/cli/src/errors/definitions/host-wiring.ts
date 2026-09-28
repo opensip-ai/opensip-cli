@@ -130,6 +130,28 @@ export const hostWiringDefinitions = {
   },
 
   /**
+   * The per-run artifact directory could not be created BEFORE a tool ran (ADR-0091;
+   * External Tool Adapter A1/A7's `ensureArtifactDir` seam).
+   *
+   * Deliberately distinct from `CLI.HOST.ARTIFACT_WRITE_FAILED`'s `warning`/`success` axes:
+   * that code's D7 ruling holds only when the analysis already ran and produced a credible
+   * verdict a write failure shouldn't destroy. `ensureArtifactDir` runs before the scanner is
+   * ever invoked, so failing it means nothing ran at all — reporting `success` here would be a
+   * silent false pass for a security-scanning guardrail tool.
+   */
+  'CLI.HOST.ARTIFACT_DIR_FAILED': {
+    ...HOST_WIRING,
+    code: 'CLI.HOST.ARTIFACT_DIR_FAILED',
+    defaultResponsibility: 'environment',
+    kind: 'I/O',
+    retry: 'caller-policy',
+    exposure: 'public',
+    operatorAction:
+      'The per-run artifact directory could not be created before the tool ran, so it did not run. Check permissions and free space for the artifact path, then re-run.',
+    publicMetadataKeys: ['errno', 'condition'],
+  },
+
+  /**
    * A bounded host probe hit its safety limit, or could not open what it needed.
    *
    * `resource`: the bound is an anti-DoS work limit on a path that runs before a scope

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { runWithScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
@@ -22,14 +22,17 @@ const require = createRequire(import.meta.url);
 const FITNESS_URL = pathToFileURL(require.resolve('@opensip-cli/fitness')).href;
 
 let testDir: string;
+let scope: RunScope;
 
 beforeEach(() => {
   // The fit plugin loader registers checks/recipes into the current scope's
   // registries (`currentCheckRegistry()` / `currentRecipeRegistry()`), so each
   // test runs inside a fresh RunScope carrying fitness's contributed subscope.
-  const scope = new RunScope();
+  // `runWithScope` (not `enterScope`/`exitScope`) binds it per-test: `enterWith`
+  // does not reliably propagate/clear across Vitest's beforeEach/afterEach/it
+  // scheduling for sibling tests in one describe block.
+  scope = new RunScope();
   applyToolContributeScope(scope, fitnessTool);
-  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'opensip-loader-test-'));
 });
 
@@ -37,8 +40,14 @@ afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
 });
 
+/** `it()` whose body runs inside this file's per-test `scope` (see beforeEach above). */
+function itScoped(name: string, fn: () => Promise<void>): void {
+  // eslint-disable-next-line sonarjs/assertions-in-tests -- generic wrapper; assertions live in each `fn` passed by callers below.
+  it(name, () => runWithScope(scope, fn));
+}
+
 describe('loadPlugin', () => {
-  it('loads a plugin that exports an empty checks array', async () => {
+  itScoped('loads a plugin that exports an empty checks array', async () => {
     const pluginFile = join(testDir, 'empty-plugin.mjs');
     writeFileSync(
       pluginFile,
@@ -61,7 +70,7 @@ describe('loadPlugin', () => {
     expect(result.namespace).toBe('empty-plugin');
   });
 
-  it('handles plugin that throws on import', async () => {
+  itScoped('handles plugin that throws on import', async () => {
     const pluginFile = join(testDir, 'broken-plugin.mjs');
     writeFileSync(pluginFile, 'throw new Error("plugin init failed")');
 
@@ -78,7 +87,7 @@ describe('loadPlugin', () => {
     expect(result.error).toContain('plugin init failed');
   });
 
-  it('handles plugin with no exports gracefully', async () => {
+  itScoped('handles plugin with no exports gracefully', async () => {
     const pluginFile = join(testDir, 'no-exports.mjs');
     writeFileSync(pluginFile, '// nothing exported');
 
@@ -95,7 +104,7 @@ describe('loadPlugin', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('skips non-Check objects in checks array', async () => {
+  itScoped('skips non-Check objects in checks array', async () => {
     const pluginFile = join(testDir, 'bad-checks.mjs');
     writeFileSync(
       pluginFile,
@@ -121,7 +130,7 @@ describe('loadPlugin', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('registers Check instances exported as named exports (no array wrapper)', async () => {
+  itScoped('registers Check instances exported as named exports (no array wrapper)', async () => {
     const pluginFile = join(testDir, 'named-export-checks.mjs');
     writeFileSync(
       pluginFile,
@@ -164,7 +173,7 @@ describe('loadPlugin', () => {
     expect(result.registered.checks).toBe(2);
   });
 
-  it('registers a Check from default export', async () => {
+  itScoped('registers a Check from default export', async () => {
     const pluginFile = join(testDir, 'default-export-check.mjs');
     writeFileSync(
       pluginFile,
@@ -194,7 +203,7 @@ describe('loadPlugin', () => {
     expect(result.registered.checks).toBe(1);
   });
 
-  it('warns and skips when checks export is not an array', async () => {
+  itScoped('warns and skips when checks export is not an array', async () => {
     const pluginFile = join(testDir, 'non-array-checks.mjs');
     writeFileSync(
       pluginFile,
@@ -216,7 +225,7 @@ describe('loadPlugin', () => {
     expect(result.registered.checks).toBe(0);
   });
 
-  it('registers recipes alongside checks', async () => {
+  itScoped('registers recipes alongside checks', async () => {
     const pluginFile = join(testDir, 'with-recipes.mjs');
     writeFileSync(
       pluginFile,
@@ -247,7 +256,7 @@ describe('loadPlugin', () => {
     expect(result.registered.recipes).toBeGreaterThanOrEqual(1);
   });
 
-  it('warns on malformed recipe entries (missing id/name) without failing', async () => {
+  itScoped('warns on malformed recipe entries (missing id/name) without failing', async () => {
     const pluginFile = join(testDir, 'malformed-recipes.mjs');
     writeFileSync(
       pluginFile,
@@ -271,7 +280,7 @@ describe('loadPlugin', () => {
     expect(result.registered.recipes).toBe(0);
   });
 
-  it('deduplicates checks appearing in both array and named exports', async () => {
+  itScoped('deduplicates checks appearing in both array and named exports', async () => {
     const pluginFile = join(testDir, 'dedup-checks.mjs');
     writeFileSync(
       pluginFile,
@@ -305,14 +314,14 @@ describe('loadPlugin', () => {
 });
 
 describe('loadAllPlugins', () => {
-  it('returns empty result when no plugins found', async () => {
+  itScoped('returns empty result when no plugins found', async () => {
     const result = await loadAllPlugins('fit', join(testDir, 'nonexistent'));
     expect(result.plugins).toEqual([]);
     expect(result.totals).toEqual({});
     expect(result.errors).toEqual([]);
   });
 
-  it('aggregates results from multiple plugins', async () => {
+  itScoped('aggregates results from multiple plugins', async () => {
     // Project layout: opensip-cli/fit/checks/<file>.mjs
     const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
@@ -323,7 +332,7 @@ describe('loadAllPlugins', () => {
     expect(result.plugins).toHaveLength(2);
   });
 
-  it('collects errors from failed plugins', async () => {
+  itScoped('collects errors from failed plugins', async () => {
     const checksDir = join(testDir, 'opensip-cli', 'fit', 'checks');
     mkdirSync(checksDir, { recursive: true });
     writeFileSync(join(checksDir, 'ok.mjs'), 'export const checks = []');

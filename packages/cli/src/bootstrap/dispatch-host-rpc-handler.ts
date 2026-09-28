@@ -79,6 +79,7 @@ const ALLOWED_HOST_RPC_ERROR_CODES = new Set<string>([
   hostErrorCatalog.require('CLI.POLICY.DENIED').code,
   hostErrorCatalog.require('CLI.HOST.OPTION_INVALID').code,
   hostErrorCatalog.require('CLI.HOST.ARTIFACT_WRITE_FAILED').code,
+  hostErrorCatalog.require('CLI.HOST.ARTIFACT_DIR_FAILED').code,
   hostErrorCatalog.require('CLI.HOST_IDENTITY.RESERVED').code,
   datastoreErrorCatalog.require('DATASTORE.WRITE.RECORD_TOO_LARGE').code,
 ]);

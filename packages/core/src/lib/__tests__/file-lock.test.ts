@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import {
+import fs, {
   existsSync,
   linkSync,
   lstatSync,
@@ -11,6 +11,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { syncBuiltinESMExports } from 'node:module';
 import { hostname, tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 
@@ -1298,6 +1299,68 @@ describe('withFileLockAsync', () => {
         ),
       ).rejects.toThrow(SystemError);
       expect(lstatSync(lockPath).isSymbolicLink()).toBe(true);
+    },
+  );
+
+  // Regression: a concurrent unlink() of the lock file by its real owner can be
+  // observed as nlink 0 on the still-resolvable path in the kernel window before
+  // the directory entry is actually removed — the same Linux coordination hazard
+  // fixed for runtime-lease.ts's mutex-temp path (commit 87efc175). Before the
+  // fix, `readLockSnapshot` treated any nlink other than 1 as an unrecoverable
+  // "not-owned-regular-file", so this raced acquisition threw a malformed-lockfile
+  // SystemError instead of retrying — even though the lock file was never actually
+  // malformed, just mid-release.
+  it.runIf(process.platform !== 'win32')(
+    'treats a concurrently unlinked lock file (nlink 0) as retryable contention, not malformed',
+    async () => {
+      dir = mkdtempSync(join(tmpdir(), 'file-lock-'));
+      const lockPath = join(dir, 'async-nlink-churn.lock');
+      // Placeholder for "another process's lock file, about to be released" — its
+      // exact content doesn't matter since the injected nlink-0 snapshot short-
+      // circuits before any content is ever read.
+      writeFileSync(lockPath, 'placeholder');
+      resetTestClock();
+
+      const originalLstatSync = fs.lstatSync;
+      let injected = false;
+      const patchedLstatSync = ((...arguments_: Parameters<typeof fs.lstatSync>) => {
+        const stat = Reflect.apply(originalLstatSync, fs, arguments_) as object;
+        const options = arguments_[1];
+        const isBigintLockPathLstat =
+          String(arguments_[0]) === lockPath &&
+          typeof options === 'object' &&
+          options !== null &&
+          (options as { bigint?: boolean }).bigint === true;
+        if (!injected && isBigintLockPathLstat) {
+          injected = true;
+          // The real owner's release lands in this exact race window: the
+          // directory entry is genuinely gone by the time the caller inspects it.
+          unlinkSync(lockPath);
+          return new Proxy(stat, {
+            get(target, property) {
+              if (property === 'nlink') return 0n;
+              const value = Reflect.get(target, property, target);
+              return typeof value === 'function' ? value.bind(target) : value;
+            },
+          });
+        }
+        return stat;
+      }) as typeof fs.lstatSync;
+      Reflect.set(fs, 'lstatSync', patchedLstatSync);
+      syncBuiltinESMExports();
+
+      try {
+        let acquired = false;
+        await withFileLockAsync(lockPath, { policy: POLICY, resource: 'runtime' }, () => {
+          acquired = true;
+          return Promise.resolve();
+        });
+        expect(injected).toBe(true);
+        expect(acquired).toBe(true);
+      } finally {
+        Reflect.set(fs, 'lstatSync', originalLstatSync);
+        syncBuiltinESMExports();
+      }
     },
   );
 });

@@ -7,7 +7,7 @@
  * dedicated framework/execution and per-kind executor test suites.
  */
 
-import { enterScope, RunScope, runWithScopeSync } from '@opensip-cli/core';
+import { RunScope, runWithScope, runWithScopeSync } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ASSERTIONS } from '../framework/assertions.js';
@@ -24,13 +24,17 @@ import type { ScenarioMetricKey } from '../framework/resolve-metric.js';
 import type { LoadScenarioConfig } from '../kinds/load/config.js';
 import type { SimulationMetrics } from '../types/base-types.js';
 
+let scope: RunScope;
+
 beforeEach(() => {
-  enterScope(makeSimTestScope());
+  scope = makeSimTestScope();
 });
 
 afterEach(() => {
+  // beforeEach only constructs `scope`; it is no longer the ambient scope
+  // outside a test's own runWithScope callback, so re-bind it here too.
   try {
-    clearScenarioRegistry();
+    runWithScopeSync(scope, () => clearScenarioRegistry());
   } catch {
     // some tests deliberately run outside a scope
   }
@@ -53,25 +57,28 @@ const loadConfig = (overrides: Partial<LoadScenarioConfig> = {}): LoadScenarioCo
 // ===========================================================================
 
 describe('scenario/recipe registry scope guards', () => {
-  it('currentScenarioRegistry throws when the active scope has no simulation subscope', () => {
-    // A bare RunScope (no simulationTool.contributeScope applied) is a real
-    // misconfiguration: the tool wasn't registered before a scenario read.
-    runWithScopeSync(new RunScope(), () => {
-      expect(() => currentScenarioRegistry()).toThrow(/scope\.simulation is missing/);
-    });
-  });
+  it('currentScenarioRegistry throws when the active scope has no simulation subscope', () =>
+    runWithScopeSync(scope, () => {
+      // A bare RunScope (no simulationTool.contributeScope applied) is a real
+      // misconfiguration: the tool wasn't registered before a scenario read.
+      runWithScopeSync(new RunScope(), () => {
+        expect(() => currentScenarioRegistry()).toThrow(/scope\.simulation is missing/);
+      });
+    }));
 
-  it('currentSimulationRecipeRegistry throws when the active scope has no simulation subscope', () => {
-    runWithScopeSync(new RunScope(), () => {
-      expect(() => currentSimulationRecipeRegistry()).toThrow(/scope\.simulation is missing/);
-    });
-  });
+  it('currentSimulationRecipeRegistry throws when the active scope has no simulation subscope', () =>
+    runWithScopeSync(scope, () => {
+      runWithScopeSync(new RunScope(), () => {
+        expect(() => currentSimulationRecipeRegistry()).toThrow(/scope\.simulation is missing/);
+      });
+    }));
 
-  it('currentSimulationRecipeRegistry resolves the scope-bound registry inside a sim scope', () => {
-    // Inside the beforeEach sim scope the recipe registry is reachable and has
-    // the built-in default recipe.
-    expect(currentSimulationRecipeRegistry().getByName('default')).toBeDefined();
-  });
+  it('currentSimulationRecipeRegistry resolves the scope-bound registry inside a sim scope', () =>
+    runWithScopeSync(scope, () => {
+      // Inside the beforeEach sim scope the recipe registry is reachable and has
+      // the built-in default recipe.
+      expect(currentSimulationRecipeRegistry().getByName('default')).toBeDefined();
+    }));
 });
 
 // ===========================================================================
@@ -95,17 +102,21 @@ describe('resolveMetric — latency key aliases', () => {
     ['p50_latency', 30],
     ['p95_latency', 70],
     ['p99_latency', 120],
-  ])('resolves the %s alias to the corresponding *_ms field', (key, expected) => {
-    expect(resolveMetric(key, m)).toBe(expected);
-  });
+  ])('resolves the %s alias to the corresponding *_ms field', (key, expected) =>
+    runWithScopeSync(scope, () => {
+      expect(resolveMetric(key, m)).toBe(expected);
+    }),
+  );
 
-  it('resolves requests_per_second using the supplied duration', () => {
-    expect(resolveMetric('requests_per_second', m, 10)).toBeCloseTo(10);
-  });
+  it('resolves requests_per_second using the supplied duration', () =>
+    runWithScopeSync(scope, () => {
+      expect(resolveMetric('requests_per_second', m, 10)).toBeCloseTo(10);
+    }));
 
-  it('returns 0 for errors_generated passthrough when none recorded', () => {
-    expect(resolveMetric('errors_generated', { ...m, errorsGenerated: 0 })).toBe(0);
-  });
+  it('returns 0 for errors_generated passthrough when none recorded', () =>
+    runWithScopeSync(scope, () => {
+      expect(resolveMetric('errors_generated', { ...m, errorsGenerated: 0 })).toBe(0);
+    }));
 });
 
 // ===========================================================================
@@ -113,35 +124,36 @@ describe('resolveMetric — latency key aliases', () => {
 // ===========================================================================
 
 describe('SimulationRecipeService — onProgress', () => {
-  it('fires (0, total) up front then a monotonic completed count per scenario', async () => {
-    currentScenarioRegistry().register(
-      defineLoadScenario(loadConfig({ id: 'prog-a', name: 'prog-a' })),
-    );
-    currentScenarioRegistry().register(
-      defineLoadScenario(loadConfig({ id: 'prog-b', name: 'prog-b' })),
-    );
+  it('fires (0, total) up front then a monotonic completed count per scenario', () =>
+    runWithScope(scope, async () => {
+      currentScenarioRegistry().register(
+        defineLoadScenario(loadConfig({ id: 'prog-a', name: 'prog-a' })),
+      );
+      currentScenarioRegistry().register(
+        defineLoadScenario(loadConfig({ id: 'prog-b', name: 'prog-b' })),
+      );
 
-    const events: [number, number][] = [];
-    const service = new SimulationRecipeService({
-      onProgress: (completed, total) => events.push([completed, total]),
-    });
-    await service.runRecipe({
-      id: 'URCP_prog',
-      name: 'prog',
-      displayName: 'Prog',
-      description: 'progress',
-      scenarios: { type: 'all' },
-      execution: { mode: 'sequential' },
-    });
+      const events: [number, number][] = [];
+      const service = new SimulationRecipeService({
+        onProgress: (completed, total) => events.push([completed, total]),
+      });
+      await service.runRecipe({
+        id: 'URCP_prog',
+        name: 'prog',
+        displayName: 'Prog',
+        description: 'progress',
+        scenarios: { type: 'all' },
+        execution: { mode: 'sequential' },
+      });
 
-    // First event is the (0, total) kickoff.
-    expect(events[0]).toEqual([0, 2]);
-    // Final event reports both scenarios complete.
-    expect(events.at(-1)).toEqual([2, 2]);
-    // The completed counter never decreases.
-    const completedSeq = events.map(([c]) => c);
-    for (let i = 1; i < completedSeq.length; i++) {
-      expect(completedSeq[i]).toBeGreaterThanOrEqual(completedSeq[i - 1] ?? 0);
-    }
-  });
+      // First event is the (0, total) kickoff.
+      expect(events[0]).toEqual([0, 2]);
+      // Final event reports both scenarios complete.
+      expect(events.at(-1)).toEqual([2, 2]);
+      // The completed counter never decreases.
+      const completedSeq = events.map(([c]) => c);
+      for (let i = 1; i < completedSeq.length; i++) {
+        expect(completedSeq[i]).toBeGreaterThanOrEqual(completedSeq[i - 1] ?? 0);
+      }
+    }));
 });

@@ -13,7 +13,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, exitScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { RunScope, applyToolContributeScope, runWithScope } from '@opensip-cli/core';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { currentScenarioRegistry } from '../../framework/registry.js';
@@ -21,17 +21,16 @@ import { simulationTool } from '../../tool.js';
 import { loadAllSimPlugins } from '../loader.js';
 
 let testDir: string;
+let scope: RunScope;
 
 beforeEach(() => {
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, simulationTool);
-  enterScope(scope);
   testDir = mkdtempSync(join(tmpdir(), 'sim-loader-scenarios-'));
 });
 
 afterEach(() => {
   rmSync(testDir, { recursive: true, force: true });
-  exitScope();
 });
 
 function writeScenarioPlugin(body: string): void {
@@ -41,57 +40,61 @@ function writeScenarioPlugin(body: string): void {
 }
 
 describe('loadAllSimPlugins — scenario registration', () => {
-  it('registers well-shaped scenarios from a plugin export into the scope registry', async () => {
-    writeScenarioPlugin(
-      'export const scenarios = [' +
-        '{ id: "plug-load-1", name: "plug-load-1", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-1", passed: true, durationMs: 0, signals: [] }) }' +
-        '];\n',
-    );
+  it('registers well-shaped scenarios from a plugin export into the scope registry', () =>
+    runWithScope(scope, async () => {
+      writeScenarioPlugin(
+        'export const scenarios = [' +
+          '{ id: "plug-load-1", name: "plug-load-1", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-1", passed: true, durationMs: 0, signals: [] }) }' +
+          '];\n',
+      );
 
-    const result = await loadAllSimPlugins(testDir);
+      const result = await loadAllSimPlugins(testDir);
 
-    expect(result.totals.scenarios).toBe(1);
-    expect(currentScenarioRegistry().get('plug-load-1')).toBeDefined();
-  });
+      expect(result.totals.scenarios).toBe(1);
+      expect(currentScenarioRegistry().get('plug-load-1')).toBeDefined();
+    }));
 
-  it('skips malformed scenario items but still registers the valid ones', async () => {
-    writeScenarioPlugin(
-      'export const scenarios = [' +
-        '{ id: "missing-run" },' + // not a valid RunnableScenario (no kind/run) → skipped
-        '{ id: "plug-load-2", name: "plug-load-2", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-2", passed: true, durationMs: 0, signals: [] }) }' +
-        '];\n',
-    );
+  it('skips malformed scenario items but still registers the valid ones', () =>
+    runWithScope(scope, async () => {
+      writeScenarioPlugin(
+        'export const scenarios = [' +
+          '{ id: "missing-run" },' + // not a valid RunnableScenario (no kind/run) → skipped
+          '{ id: "plug-load-2", name: "plug-load-2", kind: "load", tags: [], run: async () => ({ kind: "load", scenarioId: "plug-load-2", passed: true, durationMs: 0, signals: [] }) }' +
+          '];\n',
+      );
 
-    const result = await loadAllSimPlugins(testDir);
+      const result = await loadAllSimPlugins(testDir);
 
-    // Only the well-shaped scenario registers; the malformed item is dropped.
-    expect(result.totals.scenarios).toBe(1);
-    expect(currentScenarioRegistry().get('plug-load-2')).toBeDefined();
-    expect(currentScenarioRegistry().get('missing-run')).toBeUndefined();
-  });
+      // Only the well-shaped scenario registers; the malformed item is dropped.
+      expect(result.totals.scenarios).toBe(1);
+      expect(currentScenarioRegistry().get('plug-load-2')).toBeDefined();
+      expect(currentScenarioRegistry().get('missing-run')).toBeUndefined();
+    }));
 
-  it('rejects a non-array scenarios export without registering anything', async () => {
-    writeScenarioPlugin('export const scenarios = "not-an-array";\n');
+  it('rejects a non-array scenarios export without registering anything', () =>
+    runWithScope(scope, async () => {
+      writeScenarioPlugin('export const scenarios = "not-an-array";\n');
 
-    const result = await loadAllSimPlugins(testDir);
+      const result = await loadAllSimPlugins(testDir);
 
-    expect(result.totals.scenarios ?? 0).toBe(0);
-    expect(currentScenarioRegistry().size).toBe(0);
-  });
+      expect(result.totals.scenarios ?? 0).toBe(0);
+      expect(currentScenarioRegistry().size).toBe(0);
+    }));
 
-  it('reports a scenario name collision as a plugin load failure', async () => {
-    writeScenarioPlugin(
-      'const run = async () => ({ kind: "load", scenarioId: "x", passed: true, durationMs: 0, signals: [] });' +
-        ' export const scenarios = [' +
-        '{ id: "plug-one", name: "same-name", kind: "load", tags: [], run },' +
-        '{ id: "plug-two", name: "same-name", kind: "load", tags: [], run }' +
-        '];\n',
-    );
+  it('reports a scenario name collision as a plugin load failure', () =>
+    runWithScope(scope, async () => {
+      writeScenarioPlugin(
+        'const run = async () => ({ kind: "load", scenarioId: "x", passed: true, durationMs: 0, signals: [] });' +
+          ' export const scenarios = [' +
+          '{ id: "plug-one", name: "same-name", kind: "load", tags: [], run },' +
+          '{ id: "plug-two", name: "same-name", kind: "load", tags: [], run }' +
+          '];\n',
+      );
 
-    const result = await loadAllSimPlugins(testDir);
+      const result = await loadAllSimPlugins(testDir);
 
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors[0]).toContain('name collision');
-    expect(result.totals.scenarios ?? 0).toBe(0);
-  });
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0]).toContain('name collision');
+      expect(result.totals.scenarios ?? 0).toBe(0);
+    }));
 });

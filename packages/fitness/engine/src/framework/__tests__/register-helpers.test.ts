@@ -1,4 +1,4 @@
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import { RunScope, applyToolContributeScope, runWithScopeSync } from '@opensip-cli/core';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { fitnessTool } from '../../tool.js';
@@ -29,33 +29,37 @@ function stub(slug: string): Check {
 // `registerChecks` writes into the current scope's check registry. Each test
 // enters a fresh RunScope with fitness's contributed subscope so the registry
 // starts empty and is isolated from sibling tests.
+let scope: RunScope;
 beforeEach(() => {
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, fitnessTool);
-  enterScope(scope);
 });
 
 describe('registerChecks', () => {
-  it('registers each check and returns the count', () => {
-    const sizeBefore = currentCheckRegistry().size;
-    const count = registerChecks([stub('rc-a'), stub('rc-b')], 'test-ns-a');
-    expect(count).toBe(2);
-    expect(currentCheckRegistry().size).toBe(sizeBefore + 2);
-  });
+  it('registers each check and returns the count', () =>
+    runWithScopeSync(scope, () => {
+      const sizeBefore = currentCheckRegistry().size;
+      const count = registerChecks([stub('rc-a'), stub('rc-b')], 'test-ns-a');
+      expect(count).toBe(2);
+      expect(currentCheckRegistry().size).toBe(sizeBefore + 2);
+    }));
 
-  it('returns 0 for an empty list', () => {
-    expect(registerChecks([], 'test-ns-empty')).toBe(0);
-  });
+  it('returns 0 for an empty list', () =>
+    runWithScopeSync(scope, () => {
+      expect(registerChecks([], 'test-ns-empty')).toBe(0);
+    }));
 
-  it('namespaces checks under the given namespace', () => {
-    registerChecks([stub('rc-hello')], 'test-ns-c');
-    expect(currentCheckRegistry().getBySlug('test-ns-c:rc-hello')).toBeDefined();
-  });
+  it('namespaces checks under the given namespace', () =>
+    runWithScopeSync(scope, () => {
+      registerChecks([stub('rc-hello')], 'test-ns-c');
+      expect(currentCheckRegistry().getBySlug('test-ns-c:rc-hello')).toBeDefined();
+    }));
 
-  it('CheckRegistry can be instantiated standalone', () => {
-    const registry = new CheckRegistry();
-    expect(registry.size).toBe(0);
-    registry.register(stub('standalone'));
-    expect(registry.size).toBe(1);
-  });
+  it('CheckRegistry can be instantiated standalone', () =>
+    runWithScopeSync(scope, () => {
+      const registry = new CheckRegistry();
+      expect(registry.size).toBe(0);
+      registry.register(stub('standalone'));
+      expect(registry.size).toBe(1);
+    }));
 });

@@ -17,7 +17,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { enterScope, RunScope, applyToolContributeScope } from '@opensip-cli/core';
+import {
+  RunScope,
+  applyToolContributeScope,
+  runWithScope,
+  runWithScopeSync,
+} from '@opensip-cli/core';
 import { currentAdapterRegistry, graphTool } from '@opensip-cli/graph';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -37,14 +42,17 @@ function graphHandler(): CommandHandler<unknown, ToolCliContext> {
   return graphSpec('graph').handler;
 }
 
+let scope: RunScope;
+
 beforeEach(() => {
   // Item 1: graph registries are per-RunScope. Construct a scope with the graph
   // subscope and register the typescript adapter into it so the handler reaches
   // pickAdapter() through a live scope.
-  const scope = new RunScope();
+  scope = new RunScope();
   applyToolContributeScope(scope, graphTool);
-  enterScope(scope);
-  currentAdapterRegistry().register(typescriptGraphAdapter);
+  runWithScopeSync(scope, () => {
+    currentAdapterRegistry().register(typescriptGraphAdapter);
+  });
 });
 
 function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
@@ -112,140 +120,145 @@ function makeCli(overrides: Partial<ToolCliContext> = {}): ToolCliContext {
 }
 
 describe('graph command spec', () => {
-  it('declares a `graph` command described as static call-graph analysis', () => {
-    const spec = graphSpec('graph');
-    expect(spec.name).toBe('graph');
-    expect(spec.description).toContain('static call-graph');
-    // The handler owns its full output surface (TTY-vs-static + egress).
-    expect(spec.output).toBe('raw-stream');
-  });
+  it('declares a `graph` command described as static call-graph analysis', () =>
+    runWithScopeSync(scope, () => {
+      const spec = graphSpec('graph');
+      expect(spec.name).toBe('graph');
+      expect(spec.description).toContain('static call-graph');
+      // The handler owns its full output surface (TTY-vs-static + egress).
+      expect(spec.output).toBe('raw-stream');
+    }));
 
-  it('declares the documented option set on the graph command', () => {
-    const spec = graphSpec('graph');
-    // Common flags from the ADR-0021 registry (the CommonFlagKey form).
-    expect([...spec.commonFlags]).toEqual(
-      expect.arrayContaining(['cwd', 'json', 'reportTo', 'debug']),
-    );
-    // Tool-specific options.
-    const optionFlags = (spec.options ?? []).map((o) => o.flag);
-    expect(optionFlags).toContain('--no-cache');
-    expect(optionFlags).toContain('--gate-save');
-    expect(optionFlags).toContain('--gate-compare');
-    // --baseline was removed (audit P1.2): it was mounted + documented but had
-    // zero readers. Guard against re-adding a vestigial no-op flag.
-    expect(optionFlags).not.toContain('--baseline');
-  });
+  it('declares the documented option set on the graph command', () =>
+    runWithScopeSync(scope, () => {
+      const spec = graphSpec('graph');
+      // Common flags from the ADR-0021 registry (the CommonFlagKey form).
+      expect([...spec.commonFlags]).toEqual(
+        expect.arrayContaining(['cwd', 'json', 'reportTo', 'debug']),
+      );
+      // Tool-specific options.
+      const optionFlags = (spec.options ?? []).map((o) => o.flag);
+      expect(optionFlags).toContain('--no-cache');
+      expect(optionFlags).toContain('--gate-save');
+      expect(optionFlags).toContain('--gate-compare');
+      // --baseline was removed (audit P1.2): it was mounted + documented but had
+      // zero readers. Guard against re-adding a vestigial no-op flag.
+      expect(optionFlags).not.toContain('--baseline');
+    }));
 
-  it('--concurrency parses as a number via the declared parse reducer', () => {
-    const spec = graphSpec('graph');
-    const concurrency = (spec.options ?? []).find((o) => o.flag === '--concurrency');
-    expect(concurrency?.parse).toBeTypeOf('function');
-    expect(concurrency?.parse?.('4', undefined)).toBe(4);
-  });
+  it('--concurrency parses as a number via the declared parse reducer', () =>
+    runWithScopeSync(scope, () => {
+      const spec = graphSpec('graph');
+      const concurrency = (spec.options ?? []).find((o) => o.flag === '--concurrency');
+      expect(concurrency?.parse).toBeTypeOf('function');
+      expect(concurrency?.parse?.('4', undefined)).toBe(4);
+    }));
 });
 
 describe('graph handler — end-to-end via the real typescript adapter', () => {
-  it('runs --json against a real fixture without forcing a success exit', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-'));
-    try {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(
-        join(dir, 'tsconfig.json'),
-        JSON.stringify({
-          compilerOptions: {
-            target: 'ES2022',
-            module: 'Node16',
-            moduleResolution: 'Node16',
-            strict: true,
-            esModuleInterop: true,
-            skipLibCheck: true,
-            rootDir: '.',
-          },
-          include: ['**/*.ts'],
-        }),
-        'utf8',
-      );
-      writeFileSync(join(dir, 'index.ts'), `export function x(): number { return 1; }\n`, 'utf8');
-
-      // Capture stdout so we don't pollute test output.
-      let stdout = '';
-      const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-        stdout += typeof chunk === 'string' ? chunk : String(chunk);
-        return true;
-      });
-      const setExitCode = vi.fn();
-      const cli = makeCli({
-        setExitCode,
-        // Mirror the composition root's `emitEnvelope` seam (JSON to stdout).
-        emitError: vi.fn(),
-        emitEnvelope: vi.fn((envelope: unknown) => {
-          process.stdout.write(`${JSON.stringify(envelope)}\n`);
-        }),
-      });
+  it('runs --json against a real fixture without forcing a success exit', () =>
+    runWithScope(scope, async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-'));
       try {
-        // With a positional path, the heap preflight is skipped — important
-        // because preflight could re-exec the test process. The variadic
-        // positional rides on `_args[0]`.
-        await graphHandler()({ cwd: dir, json: true, _args: [[dir]] }, cli);
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, 'tsconfig.json'),
+          JSON.stringify({
+            compilerOptions: {
+              target: 'ES2022',
+              module: 'Node16',
+              moduleResolution: 'Node16',
+              strict: true,
+              esModuleInterop: true,
+              skipLibCheck: true,
+              rootDir: '.',
+            },
+            include: ['**/*.ts'],
+          }),
+          'utf8',
+        );
+        writeFileSync(join(dir, 'index.ts'), `export function x(): number { return 1; }\n`, 'utf8');
+
+        // Capture stdout so we don't pollute test output.
+        let stdout = '';
+        const stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+          stdout += typeof chunk === 'string' ? chunk : String(chunk);
+          return true;
+        });
+        const setExitCode = vi.fn();
+        const cli = makeCli({
+          setExitCode,
+          // Mirror the composition root's `emitEnvelope` seam (JSON to stdout).
+          emitError: vi.fn(),
+          emitEnvelope: vi.fn((envelope: unknown) => {
+            process.stdout.write(`${JSON.stringify(envelope)}\n`);
+          }),
+        });
+        try {
+          // With a positional path, the heap preflight is skipped — important
+          // because preflight could re-exec the test process. The variadic
+          // positional rides on `_args[0]`.
+          await graphHandler()({ cwd: dir, json: true, _args: [[dir]] }, cli);
+        } finally {
+          stdoutSpy.mockRestore();
+        }
+        const parsed = JSON.parse(stdout) as {
+          tool: string;
+          schemaVersion: number;
+          verdict: { passed: boolean };
+        };
+        expect(parsed.tool).toBe('graph');
+        expect(parsed.schemaVersion).toBe(2);
+        expect(parsed.verdict.passed).toBe(true);
+        expect(setExitCode).not.toHaveBeenCalled();
       } finally {
-        stdoutSpy.mockRestore();
+        rmSync(dir, { recursive: true, force: true });
       }
-      const parsed = JSON.parse(stdout) as {
-        tool: string;
-        schemaVersion: number;
-        verdict: { passed: boolean };
-      };
-      expect(parsed.tool).toBe('graph');
-      expect(parsed.schemaVersion).toBe(2);
-      expect(parsed.verdict.passed).toBe(true);
-      expect(setExitCode).not.toHaveBeenCalled();
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
+    }));
 
-  it('interactive --exact path delegates to cli.renderLive', async () => {
-    // The Ink live view drives the EXACT engine, so it is eligible only under
-    // `--exact` on a TTY (ADR-0032: sharded is the default and routes to the
-    // static path). The fixture is tiny so heap preflight no-ops (file count
-    // < 1000).
-    const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-live-'));
-    try {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(
-        join(dir, 'tsconfig.json'),
-        JSON.stringify({
-          compilerOptions: { target: 'ES2022', module: 'Node16' },
-          include: ['**/*.ts'],
-        }),
-        'utf8',
-      );
-      writeFileSync(join(dir, 'index.ts'), 'export function x(): number { return 1; }\n', 'utf8');
-
-      const renderLive = vi.fn(() => Promise.resolve());
-      const cli = makeCli({ renderLive });
-      // --exact (the live view drives the exact engine), no
-      // --json/--gate-*/--report-to/positional: this is the interactive live
-      // path, which delegates to renderLive — but only on a TTY (a non-TTY run
-      // falls back to the static render seam). vitest's stdout is not a TTY, so
-      // force it for this assertion.
-      const prevTTY = process.stdout.isTTY;
-      Object.defineProperty(process.stdout, 'isTTY', {
-        value: true,
-        configurable: true,
-      });
+  it('interactive --exact path delegates to cli.renderLive', () =>
+    runWithScope(scope, async () => {
+      // The Ink live view drives the EXACT engine, so it is eligible only under
+      // `--exact` on a TTY (ADR-0032: sharded is the default and routes to the
+      // static path). The fixture is tiny so heap preflight no-ops (file count
+      // < 1000).
+      const dir = mkdtempSync(join(tmpdir(), 'graph-tool-action-live-'));
       try {
-        await graphHandler()({ cwd: dir, exact: true, _args: [[]] }, cli);
-      } finally {
+        mkdirSync(dir, { recursive: true });
+        writeFileSync(
+          join(dir, 'tsconfig.json'),
+          JSON.stringify({
+            compilerOptions: { target: 'ES2022', module: 'Node16' },
+            include: ['**/*.ts'],
+          }),
+          'utf8',
+        );
+        writeFileSync(join(dir, 'index.ts'), 'export function x(): number { return 1; }\n', 'utf8');
+
+        const renderLive = vi.fn(() => Promise.resolve());
+        const cli = makeCli({ renderLive });
+        // --exact (the live view drives the exact engine), no
+        // --json/--gate-*/--report-to/positional: this is the interactive live
+        // path, which delegates to renderLive — but only on a TTY (a non-TTY run
+        // falls back to the static render seam). vitest's stdout is not a TTY, so
+        // force it for this assertion.
+        const prevTTY = process.stdout.isTTY;
         Object.defineProperty(process.stdout, 'isTTY', {
-          value: prevTTY,
+          value: true,
           configurable: true,
         });
+        try {
+          await graphHandler()({ cwd: dir, exact: true, _args: [[]] }, cli);
+        } finally {
+          Object.defineProperty(process.stdout, 'isTTY', {
+            value: prevTTY,
+            configurable: true,
+          });
+        }
+        expect(renderLive).toHaveBeenCalledOnce();
+        expect(renderLive).toHaveBeenCalledWith('graph', expect.objectContaining({ cwd: dir }));
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
       }
-      expect(renderLive).toHaveBeenCalledOnce();
-      expect(renderLive).toHaveBeenCalledWith('graph', expect.objectContaining({ cwd: dir }));
-    } finally {
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
+    }));
 });
