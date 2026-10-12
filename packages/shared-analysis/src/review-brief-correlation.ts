@@ -10,7 +10,7 @@ import {
   compareCodePoint,
   compareReviewBriefCorrelationGroups,
   compareReviewBriefCorrelationRisks,
-  reviewBriefCorrelationMemberSignature,
+  riskRefSetSignature,
 } from './review-brief-correlation-order.js';
 
 export {
@@ -166,6 +166,13 @@ function nextGroupId(key: ReviewBriefCorrelationKey, usedIds: Map<string, number
   return idCount === 0 ? idBase : `${idBase}-${String(idCount + 1)}`;
 }
 
+interface BuiltCorrelationGroup {
+  readonly group: ReviewBriefCorrelationGroup;
+  // Signature of the bucket's FULL risk set, before truncation to memberLimit —
+  // dedup identity must not depend on display truncation (see dedupeGroupsByMemberSet).
+  readonly fullMemberSignature: string;
+}
+
 function buildGroup(input: {
   readonly key: ReviewBriefCorrelationKey;
   readonly risks: readonly ReviewBriefCorrelationRisk[];
@@ -173,14 +180,14 @@ function buildGroup(input: {
   readonly memberLimit: number;
   readonly entityLimit: number;
   readonly reasonLimit: number;
-}): ReviewBriefCorrelationGroup | undefined {
+}): BuiltCorrelationGroup | undefined {
   if (input.risks.length < 2) return undefined;
   const sorted = [...input.risks];
   sorted.sort(compareReviewBriefCorrelationRisks);
   const primary = sorted[0];
   if (primary === undefined) return undefined;
   const blastRadius = strongestBlastRadius(sorted);
-  return {
+  const group: ReviewBriefCorrelationGroup = {
     id: nextGroupId(input.key, input.usedIds),
     title: titleForKey(input.key),
     severity: primary.severity,
@@ -191,19 +198,25 @@ function buildGroup(input: {
     reasons: [reasonForKey(input.key)].slice(0, input.reasonLimit),
     ...(blastRadius === undefined ? {} : { blastRadius }),
   };
+  return { group, fullMemberSignature: riskRefSetSignature(sorted.map(riskRef)) };
 }
 
+// Two buckets can produce identical *displayed* (memberLimit-truncated) member
+// lists while covering genuinely different full risk sets — e.g. a `package`
+// bucket's severity-sorted top-N happening to equal a smaller, distinct `file`
+// bucket's complete set. Deduping on the truncated `members` would then drop
+// the more-specific, smaller group even though it's not actually a duplicate.
+// Dedup identity is therefore computed from each bucket's full risk set.
 function dedupeGroupsByMemberSet(
-  groups: readonly ReviewBriefCorrelationGroup[],
+  built: readonly BuiltCorrelationGroup[],
 ): readonly ReviewBriefCorrelationGroup[] {
-  const sortedGroups = [...groups];
-  sortedGroups.sort(compareReviewBriefCorrelationGroups);
-  const byMemberSet = new Set<string>();
+  const sorted = [...built];
+  sorted.sort((left, right) => compareReviewBriefCorrelationGroups(left.group, right.group));
+  const seen = new Set<string>();
   const deduped: ReviewBriefCorrelationGroup[] = [];
-  for (const group of sortedGroups) {
-    const signature = reviewBriefCorrelationMemberSignature(group);
-    if (byMemberSet.has(signature)) continue;
-    byMemberSet.add(signature);
+  for (const { group, fullMemberSignature } of sorted) {
+    if (seen.has(fullMemberSignature)) continue;
+    seen.add(fullMemberSignature);
     deduped.push(group);
   }
   return deduped;
@@ -217,7 +230,7 @@ export function buildReviewBriefCorrelations(
   const memberLimit = optionLimit(options.memberLimit, REVIEW_BRIEF_CORRELATION_MEMBER_LIMIT);
   const entityLimit = optionLimit(options.entityLimit, REVIEW_BRIEF_CORRELATION_ENTITY_LIMIT);
   const reasonLimit = optionLimit(options.reasonLimit, REVIEW_BRIEF_CORRELATION_REASON_LIMIT);
-  const groups: ReviewBriefCorrelationGroup[] = [];
+  const built: BuiltCorrelationGroup[] = [];
   const usedIds = new Map<string, number>();
 
   const buckets = [...bucketRisksByKey(risks).values()].sort(compareCorrelatedRiskBuckets);
@@ -230,9 +243,9 @@ export function buildReviewBriefCorrelations(
       entityLimit,
       reasonLimit,
     });
-    if (group !== undefined) groups.push(group);
+    if (group !== undefined) built.push(group);
   }
 
   const groupLimit = optionLimit(options.groupLimit, REVIEW_BRIEF_CORRELATION_GROUP_LIMIT);
-  return dedupeGroupsByMemberSet(groups).slice(0, groupLimit);
+  return dedupeGroupsByMemberSet(built).slice(0, groupLimit);
 }

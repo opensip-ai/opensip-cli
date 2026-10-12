@@ -7,6 +7,7 @@ import {
 import type {
   ReviewBriefCorrelationGroup,
   ReviewBriefCorrelationRisk,
+  ReviewBriefRiskRef,
 } from '@opensip-cli/contracts';
 
 export { compareCodePoint } from '@opensip-cli/contracts';
@@ -47,8 +48,9 @@ function correlationPriority(group: ReviewBriefCorrelationGroup): number {
   return key === undefined ? Number.MAX_SAFE_INTEGER : keyPriority[key.kind];
 }
 
-function groupMemberSignature(group: ReviewBriefCorrelationGroup): string {
-  return group.members
+/** Stable signature for a set of risk refs, order-independent. */
+export function riskRefSetSignature(members: readonly ReviewBriefRiskRef[]): string {
+  return members
     .map((member) => {
       const ref = member.signalRef;
       return [
@@ -79,5 +81,5 @@ export function compareReviewBriefCorrelationGroups(
 }
 
 export function reviewBriefCorrelationMemberSignature(group: ReviewBriefCorrelationGroup): string {
-  return groupMemberSignature(group);
+  return riskRefSetSignature(group.members);
 }

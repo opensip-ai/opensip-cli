@@ -39,7 +39,7 @@ export interface ToolIdentity {
 
 const IDENTITY_NAME_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
-function validateIdentityName(value: string, field: 'name' | 'layoutKey'): void {
+function validateIdentityName(value: string, field: 'name' | 'layoutKey' | 'alias'): void {
   if (value.trim() === '' || !IDENTITY_NAME_PATTERN.test(value)) {
     throw new ValidationError(
       `Tool identity ${field} '${value}' must be a non-empty kebab-case or single lowercase word.`,
@@ -86,7 +86,7 @@ export function validateToolIdentity(identity: ToolIdentity): {
         definition: IDENTITY_DUPLICATE_ALIAS,
       });
     }
-    validateIdentityName(alias, 'name');
+    validateIdentityName(alias, 'alias');
     if (alias === name) {
       throw new ValidationError(`Tool identity name '${name}' must not appear in aliases.`, {
         code: IDENTITY_NAME_IN_ALIASES.code,

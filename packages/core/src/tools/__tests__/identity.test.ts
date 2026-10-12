@@ -46,6 +46,12 @@ describe('validateToolIdentity', () => {
     expect(() => validateToolIdentity({ name: 'fit', aliases: ['f', 'f'] })).toThrow(/Duplicate/);
     expect(() => validateToolIdentity({ name: 'fit', layoutKey: 1 as never })).toThrow(/layoutKey/);
   });
+
+  it('blames the alias field, not name, for a malformed alias', () => {
+    expect(() => validateToolIdentity({ name: 'fit', aliases: ['BadAlias'] })).toThrow(
+      /Tool identity alias 'BadAlias' must be/,
+    );
+  });
 });
 
 describe('tool identity index', () => {

@@ -101,6 +101,21 @@ describe('lang-python walk.ts — function/param shapes', () => {
     expect(m?.enclosingClass).toBe('C');
   });
 
+  it('composes a dotted enclosingClass chain for a class nested inside another class', () => {
+    writeFileSync(
+      join(dir, 'main.py'),
+      `class A:\n    class Meta:\n        def validate(self):\n            return 1\n\nclass B:\n    class Meta:\n        def validate(self):\n            return 2\n`,
+      'utf8',
+    );
+    const walk = runWalk(dir);
+    const validates = walk.occurrences.validate ?? [];
+    expect(validates).toHaveLength(2);
+    const enclosingClasses = validates.map((occ) => occ.enclosingClass).sort();
+    expect(enclosingClasses).toEqual(['A.Meta', 'B.Meta']);
+    const qualifiedNames = validates.map((occ) => occ.qualifiedName).sort();
+    expect(qualifiedNames).toEqual(['main.A.Meta.validate', 'main.B.Meta.validate']);
+  });
+
   it('marks names starting with underscore as module-local visibility', () => {
     writeFileSync(
       join(dir, 'main.py'),

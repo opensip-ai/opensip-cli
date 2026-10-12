@@ -76,4 +76,16 @@ func main() {
   it('returns an empty list for content without fmt.Print*', () => {
     expect(analyzeFmtPrint('package main\nfunc main() {}')).toEqual([]);
   });
+
+  it('flags a selector split across lines after a trailing dot (legal Go — no ASI after `.`)', () => {
+    const src = `package main
+
+func main() {
+    fmt.
+        Println("leaked")
+}`;
+    const violations = analyzeFmtPrint(src);
+    expect(violations.length).toBe(1);
+    expect(violations[0]?.message).toContain('fmt.Println');
+  });
 });

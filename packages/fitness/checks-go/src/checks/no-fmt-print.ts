@@ -22,20 +22,24 @@ const FMT_PRINT_PATTERN = /(?<![\p{L}\p{Nd}_.])fmt\s*\.\s*(Print|Println|Printf)
  */
 export function analyzeFmtPrint(content: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
-  const lines = content.split('\n');
-  for (const [i, line_] of lines.entries()) {
-    const line = line_;
-    let match: RegExpExecArray | null;
-    FMT_PRINT_PATTERN.lastIndex = 0;
-    while ((match = FMT_PRINT_PATTERN.exec(line)) !== null) {
-      const method = match[1];
-      violations.push({
-        message: `fmt.${method} bypasses the structured logger and shouldn't ship`,
-        severity: 'warning',
-        line: i + 1,
-        suggestion: 'Use the structured logger (slog, zap, zerolog) instead of fmt.Print*',
-      });
+  let line = 1;
+  let lineCursor = 0;
+  FMT_PRINT_PATTERN.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = FMT_PRINT_PATTERN.exec(content)) !== null) {
+    let newline = content.indexOf('\n', lineCursor);
+    while (newline !== -1 && newline < match.index) {
+      line++;
+      lineCursor = newline + 1;
+      newline = content.indexOf('\n', lineCursor);
     }
+    const method = match[1];
+    violations.push({
+      message: `fmt.${method} bypasses the structured logger and shouldn't ship`,
+      severity: 'warning',
+      line,
+      suggestion: 'Use the structured logger (slog, zap, zerolog) instead of fmt.Print*',
+    });
   }
   return violations;
 }
