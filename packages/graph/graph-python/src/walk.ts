@@ -163,8 +163,13 @@ function visitClass(node: Node, frame: Frame, ctx: WalkCtx, depth: number): void
   // Don't emit a function for the class itself — Python classes are
   // declarations whose top-level statements run at module load. Keep
   // the module-init as the owner; descend with class context for
-  // nested function_definitions to be tagged as methods.
-  const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass: className };
+  // nested function_definitions to be tagged as methods. Compose with
+  // any already-enclosing class so a class nested inside another class
+  // (e.g. a `class Meta:` inner class) keeps a distinguishable chain —
+  // otherwise two distinct `Outer.Meta`/`Other.Meta` methods collapse to
+  // the same enclosingClass/qualifiedName and derive colliding symbol ids.
+  const enclosingClass = frame.enclosingClass ? `${frame.enclosingClass}.${className}` : className;
+  const childFrame: Frame = { ownerHash: frame.ownerHash, enclosingClass };
   for (const child of childrenOf(node)) visit(child, childFrame, ctx, depth + 1);
 }
 

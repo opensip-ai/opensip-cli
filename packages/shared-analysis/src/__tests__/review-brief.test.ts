@@ -745,6 +745,47 @@ describe('buildReviewBriefCorrelations', () => {
     expect(groups[0]?.severity).toBe('high');
   });
 
+  it('keeps distinct correlation groups even when their truncated member lists coincide', () => {
+    const r1 = risk({
+      severity: 'high',
+      file: 'src/file-a.ts',
+      ruleId: 'rule-1',
+      signalRef: { tool: 'fit', suiteRunId: 'suite_1', stepIndex: 0, signalIndex: 0 },
+      correlationKeys: [
+        { kind: 'file', value: 'src/file-a.ts', confidence: 'high' },
+        { kind: 'package', value: 'pkg-a', confidence: 'high' },
+      ],
+    });
+    const r2 = risk({
+      severity: 'high',
+      file: 'src/file-a.ts',
+      ruleId: 'rule-2',
+      signalRef: { tool: 'fit', suiteRunId: 'suite_1', stepIndex: 1, signalIndex: 0 },
+      correlationKeys: [
+        { kind: 'file', value: 'src/file-a.ts', confidence: 'high' },
+        { kind: 'package', value: 'pkg-a', confidence: 'high' },
+      ],
+    });
+    const r3 = risk({
+      severity: 'low',
+      file: 'src/file-b.ts',
+      ruleId: 'rule-3',
+      signalRef: { tool: 'fit', suiteRunId: 'suite_1', stepIndex: 2, signalIndex: 0 },
+      correlationKeys: [{ kind: 'package', value: 'pkg-a', confidence: 'high' }],
+    });
+
+    // `package` bucket = {r1, r2, r3}, display-truncated (memberLimit: 2) to its
+    // top-2-by-severity {r1, r2}. `file` bucket = {r1, r2} exactly, its full set.
+    // The two buckets are genuinely distinct risk sets, but their *displayed*
+    // member lists are identical — both groups must still survive dedup.
+    const groups = buildReviewBriefCorrelations([r1, r2, r3], { memberLimit: 2 });
+
+    expect(groups.map((group) => group.reasons[0]?.kind).sort()).toEqual([
+      'same-file',
+      'same-package',
+    ]);
+  });
+
   it('orders equal-priority groups by member count and explains specialized keys', () => {
     const risks = [
       keyedCorrelationRisk('symbol', 'src/b.handler', 0),
