@@ -456,7 +456,7 @@ jobs:
       # attempt's bytes. stage-release independently revalidates every byte.
       - name: Upload immutable staging bundle
         id: release-bundle
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.identity.outputs.release-bundle-artifact }}
           path: /tmp/tarballs/
@@ -761,7 +761,7 @@ jobs:
       # Downstream jobs need only bounded release metadata, never the full
       # staging bundle or a credential-bearing workspace.
       - name: Upload release metadata (manifest, checksums, SBOM)
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.identity.outputs.release-metadata-artifact }}
           path: |
@@ -1103,7 +1103,7 @@ jobs:
 
       - name: Upload macOS qualification evidence
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.evidence.outputs.evidence-artifact || format('macos-release-qualification-run{0}', github.run_attempt) }}
           path: |
@@ -1499,7 +1499,7 @@ jobs:
 
       - name: Upload Linux qualification evidence
         if: always()
-        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ steps.evidence.outputs.evidence-artifact || format('linux-release-qualification-run{0}', github.run_attempt) }}
           path: |
