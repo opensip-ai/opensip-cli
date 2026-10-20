@@ -181,7 +181,7 @@
     "commander": "^15.0.0",
     "minimatch": "^10.2.5",
     "react": "^19.2.7",
-    "typescript": "~6.0.3",
+    "typescript": "~7.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
