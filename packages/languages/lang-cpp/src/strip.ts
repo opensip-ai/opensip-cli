@@ -175,11 +175,22 @@ function matchStringPrefix(src: string, i: number): number {
  * Anchored against identifier boundaries (lang-cpp F12): a non-bare
  * apostrophe candidate (i.e. one preceded by `L`/`u`/`U`/`u8`) only
  * counts if the character before `i` is not an identifier character.
- * The bare-apostrophe case (`src[i] === "'"`) is unaffected — `'` is
- * never an identifier character.
+ *
+ * The bare-apostrophe case (`src[i] === "'"`) is additionally guarded
+ * against the C++14 digit-separator form (e.g. `1'000'000`): an
+ * apostrophe immediately preceded by a digit is never a char-literal
+ * opener in valid C++ (a numeric literal can never be followed
+ * directly by a char literal without an intervening operator or
+ * whitespace), so treating it as one would greedily consume the rest
+ * of the line via `scanCharLiteral` looking for a closing `'` —
+ * swallowing any real string literal that happens to contain an
+ * apostrophe later on the same line (e.g. an English contraction).
  */
 function matchCharLiteralPrefix(src: string, i: number): number {
-  if (src[i] === "'") return 0;
+  if (src[i] === "'") {
+    if (i > 0 && /\d/.test(src[i - 1] ?? '')) return -1;
+    return 0;
+  }
   if (i > 0 && isIdentChar(src[i - 1])) return -1;
   if (src[i] === 'u' && src[i + 1] === '8' && src[i + 2] === "'") return 2;
   if ((src[i] === 'L' || src[i] === 'u' || src[i] === 'U') && src[i + 1] === "'") return 1;
