@@ -64,6 +64,21 @@ describe('stripStrings (C/C++)', () => {
     expect(stripStrings(String.raw`char c = '\n';`)).toContain(String.raw`'\n'`);
   });
 
+  it('does not mistake a digit-separator apostrophe for a char-literal opener', () => {
+    // 1'000 is a C++14 digit-grouped numeric literal; the apostrophe is not
+    // a char-literal opener. A prior bug let `matchCharLiteralPrefix` treat
+    // it as one, which made `scanCharLiteral` greedily search the rest of
+    // the line for the next apostrophe to use as a "closing quote" — here,
+    // the one inside "it's ok" — swallowing that real string's opening
+    // quote and corrupting everything stripped after it.
+    const src = 'printf("count=%d", 1\'000); std::string s = "it\'s ok"; foo();';
+    const out = stripStrings(src);
+    expect(out).not.toContain('count=%d');
+    expect(out).not.toContain("it's ok");
+    expect(out).toContain("1'000");
+    expect(out).toContain('foo();');
+  });
+
   it('handles u8R, uR, UR, LR raw-string prefixes', () => {
     const variants = [
       'auto s = u8R"foo(payload)foo";',
