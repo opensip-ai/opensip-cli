@@ -8,7 +8,6 @@ import {
   isTestFile,
   type CheckViolation,
 } from '@opensip-cli/fitness';
-import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
 
 /**
  * Pattern for detecting hardcoded correlationId string literal assignments.
@@ -16,6 +15,49 @@ import { countUnescapedBackticks } from '@opensip-cli/lang-typescript';
  * Only matches single/double quotes, not backtick template literals.
  */
 const HARDCODED_CORR_ID_PATTERN = /correlationId\s{0,5}:\s{0,5}['"]([a-zA-Z0-9_-]{1,100})['"]/g;
+
+/**
+ * Split a line into the substrings that are real code — i.e. outside any
+ * backtick template literal — carrying `insideTemplate` across lines for
+ * multi-line templates. Each segment keeps its original offset into `line` so
+ * callers can report accurate columns.
+ *
+ * A line can open AND close a template in the same scan (a self-contained
+ * single-line template, or several templates on one line); naive
+ * odd/even-backtick-count toggling per *line* (the prior implementation) only
+ * catches a line made entirely of template body with zero backticks — it
+ * still scans the literal text of a line that opens, closes, or fully
+ * contains a template, which is exactly where a correlationId-shaped
+ * substring inside SQL/template text produces a false positive.
+ */
+function codeSegmentsOutsideTemplateLiterals(
+  line: string,
+  insideTemplate: boolean,
+): { readonly segments: readonly { text: string; offset: number }[]; readonly insideTemplate: boolean } {
+  const segments: { text: string; offset: number }[] = [];
+  let inside = insideTemplate;
+  let segmentStart = inside ? -1 : 0;
+
+  for (let ci = 0; ci < line.length; ci++) {
+    if (line[ci] !== '`') continue;
+    let backslashes = 0;
+    for (let j = ci - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+    if (backslashes % 2 !== 0) continue; // escaped backtick, not a delimiter
+
+    if (inside) {
+      inside = false;
+      segmentStart = ci + 1; // code resumes right after the closing backtick
+    } else {
+      if (segmentStart !== -1) segments.push({ text: line.slice(segmentStart, ci), offset: segmentStart });
+      inside = true;
+      segmentStart = -1;
+    }
+  }
+  if (!inside && segmentStart !== -1) {
+    segments.push({ text: line.slice(segmentStart), offset: segmentStart });
+  }
+  return { segments, insideTemplate: inside };
+}
 
 function findHardcodedCorrelationIds(content: string, filePath: string): CheckViolation[] {
   const violations: CheckViolation[] = [];
@@ -26,27 +68,28 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
     /* v8 ignore next -- defensive guard */
     if (!line) continue;
 
-    const backtickCount = countUnescapedBackticks(line);
-    if (backtickCount % 2 === 1) inTemplateLiteral = !inTemplateLiteral;
-    if (inTemplateLiteral && backtickCount % 2 === 0) continue;
-
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
-    HARDCODED_CORR_ID_PATTERN.lastIndex = 0;
-    let match;
-    while ((match = HARDCODED_CORR_ID_PATTERN.exec(line)) !== null) {
-      violations.push({
-        line: i + 1,
-        column: match.index + 1,
-        message: `Hardcoded correlationId '${match[1]}' — use generateCorrelationId() instead`,
-        severity: 'warning',
-        suggestion:
-          'Use a correlation ID generator function (e.g., uuid or nanoid) to create unique IDs for each operation',
-        match: match[0],
-        type: 'hardcoded-correlation-id',
-        filePath,
-      });
+    const { segments, insideTemplate } = codeSegmentsOutsideTemplateLiterals(line, inTemplateLiteral);
+    inTemplateLiteral = insideTemplate;
+
+    for (const segment of segments) {
+      HARDCODED_CORR_ID_PATTERN.lastIndex = 0;
+      let match;
+      while ((match = HARDCODED_CORR_ID_PATTERN.exec(segment.text)) !== null) {
+        violations.push({
+          line: i + 1,
+          column: segment.offset + match.index + 1,
+          message: `Hardcoded correlationId '${match[1]}' — use generateCorrelationId() instead`,
+          severity: 'warning',
+          suggestion:
+            'Use a correlation ID generator function (e.g., uuid or nanoid) to create unique IDs for each operation',
+          match: match[0],
+          type: 'hardcoded-correlation-id',
+          filePath,
+        });
+      }
     }
   }
 

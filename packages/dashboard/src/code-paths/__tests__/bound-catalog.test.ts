@@ -175,6 +175,61 @@ describe('boundGraphCatalog', () => {
     expect(kept).not.toContain('h0000');
   });
 
+  it('stops at the first function that does not fit — a smaller, less important function later must not fill the gap', () => {
+    const makeCatalog = (
+      functions: Record<string, unknown[]>,
+      metrics: Record<string, unknown>,
+    ): GraphCatalog =>
+      ({
+        version: '2.0',
+        language: 'typescript',
+        builtAt: '2026-07-14T00:00:00.000Z',
+        functions,
+        features: { function: metrics, package: {}, edge: [] },
+      }) as unknown as GraphCatalog;
+
+    const trivialOnly = makeCatalog(
+      { trivial: [occurrence('trivial')] },
+      { trivial: { bodyLines: 10, blast: { score: 1 } } },
+    );
+
+    // Binary-search the minimal budget that keeps `trivial` when it is the
+    // only function in the catalog — avoids hard-coding the cost formula.
+    let lo = 0;
+    let hi = 4096;
+    while (lo < hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      const kept = Object.keys(boundGraphCatalog(trivialOnly, mid).catalog?.functions ?? {});
+      if (kept.includes('trivial')) hi = mid;
+      else lo = mid + 1;
+    }
+    const minBudgetForTrivialAlone = lo;
+
+    // `big` is far more important (higher blast) than `trivial` but far too
+    // large to fit in a budget sized only for `trivial` alone.
+    const both = makeCatalog(
+      {
+        big: [occurrence('big', { calls: Array.from({ length: 200 }, () => 'x'.repeat(50)) })],
+        trivial: [occurrence('trivial')],
+      },
+      {
+        big: { bodyLines: 10, blast: { score: 4 } },
+        trivial: { bodyLines: 10, blast: { score: 1 } },
+      },
+    );
+
+    const bounded = boundGraphCatalog(both, minBudgetForTrivialAlone);
+    const kept = Object.keys(bounded.catalog?.functions ?? {});
+
+    expect(kept).not.toContain('big');
+    // `trivial` would fit on its own, but `big` (more important) did not —
+    // keeping `trivial` anyway would ship a less-important function while a
+    // more important one was dropped, violating "drop the least important
+    // first". The old `continue`-based loop kept it; the fix must not.
+    expect(kept).not.toContain('trivial');
+    expect(bounded.omittedFunctions).toBe(2);
+  });
+
   it('truncates deterministically — the same catalog bounds identically twice', () => {
     const first = boundGraphCatalog(catalog(80, { blast: (i) => i % 7 }), 3000);
     const second = boundGraphCatalog(catalog(80, { blast: (i) => i % 7 }), 3000);

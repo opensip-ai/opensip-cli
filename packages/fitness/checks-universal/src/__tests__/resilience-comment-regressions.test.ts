@@ -77,6 +77,36 @@ describe('unbounded-memory bounded-collection directive', () => {
   });
 });
 
+describe('readline-cleanup comment lookalikes', () => {
+  it('does not treat a comment mentioning "using"/"close" as real cleanup', async () => {
+    fixture(
+      'src/prompt.ts',
+      [
+        '// Read a line using the stdin stream; we will close it eventually.',
+        'const rl = readline.createInterface({ input: process.stdin });',
+        'rl.question("foo?", (answer) => console.log(answer));',
+      ].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain(
+      'readline-no-cleanup',
+    );
+  });
+
+  it('still recognizes a real `using` declaration as cleanup', async () => {
+    fixture(
+      'src/prompt.ts',
+      ['using rl = readline.createInterface({ input: process.stdin });'].join('\n'),
+    );
+
+    const result = await runCheck('readline-cleanup');
+    expect(result.signals.map((signal) => signal.metadata?.type)).not.toContain(
+      'readline-no-cleanup',
+    );
+  });
+});
+
 describe('transaction callback comments', () => {
   it('recognizes a callback-managed transaction after an inline comment', async () => {
     fixture('src/transaction.ts', 'db.transaction(/* managed */ async(tx) => tx.insert(record));');

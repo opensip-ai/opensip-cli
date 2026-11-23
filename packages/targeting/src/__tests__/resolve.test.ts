@@ -97,6 +97,17 @@ describe('resolveTargets', () => {
     );
     expect(rel(out)).toEqual(['src/keep.ts']);
   });
+
+  it('honors a `./`-prefixed target exclude (glob strips the leading ./ on its own ignore option)', () => {
+    fixture('src/keep.ts');
+    fixture('generated/drop.ts');
+    const out = resolveTargets(
+      [makeTarget('all', { include: ['**/*.ts'], exclude: ['./generated/**'] })],
+      testDir,
+      [],
+    );
+    expect(rel(out)).toEqual(['src/keep.ts']);
+  });
 });
 
 describe('resolveTargetsBounded with the real glob walker', () => {
@@ -143,6 +154,27 @@ describe('preResolveAllTargets', () => {
     const map = preResolveAllTargets(new TargetRegistry(), [], testDir);
     expect(map.size).toBe(0);
   });
+
+  it('honors a `./`-prefixed target exclude, matching resolveTargets (the shared post-filter must strip it too)', () => {
+    // preResolveAllTargets does ONE cross-target glob with no per-target
+    // `ignore` option (targets can share an include pattern with different
+    // excludes), so target excludes are applied ENTIRELY by the bare-Minimatch
+    // post-filter here — unlike resolveTargets, which also feeds `exclude`
+    // into glob's own `ignore` option (which strips a leading `./` itself).
+    // A `./`-prefixed exclude that relies only on the post-filter must still
+    // be honored, or this path silently diverges from resolveTargets.
+    fixture('src/keep.ts');
+    fixture('generated/drop.ts');
+    const target = makeTarget('all', { include: ['**/*.ts'], exclude: ['./generated/**'] });
+    const reg = new TargetRegistry();
+    reg.register(target);
+
+    const map = preResolveAllTargets(reg, [], testDir);
+    const direct = resolveTargets([target], testDir, []);
+
+    expect(rel(map.get('all') ?? [])).toEqual(['src/keep.ts']);
+    expect(rel(map.get('all') ?? [])).toEqual(rel(direct));
+  });
 });
 
 describe('applyGlobalExcludes', () => {
@@ -162,6 +194,13 @@ describe('applyGlobalExcludes', () => {
     fixture('.hidden/b.ts'); // would be kept without the global exclude, but we test drop by pattern
     const files = [join(testDir, 'src/a.ts'), join(testDir, '.hidden/b.ts')];
     expect(rel(applyGlobalExcludes(files, testDir, ['.hidden/**']))).toEqual(['src/a.ts']);
+  });
+
+  it('honors a `./`-prefixed exclude pattern', () => {
+    fixture('src/a.ts');
+    fixture('generated/b.ts');
+    const files = [join(testDir, 'src/a.ts'), join(testDir, 'generated/b.ts')];
+    expect(rel(applyGlobalExcludes(files, testDir, ['./generated/**']))).toEqual(['src/a.ts']);
   });
 
   it('drops paths that are not inside the rootDir even if no globalExcludes (symlink/escape guard)', () => {

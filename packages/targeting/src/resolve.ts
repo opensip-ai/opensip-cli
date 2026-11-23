@@ -15,7 +15,7 @@ import { isPathInside } from '@opensip-cli/core';
 import { globSync } from 'glob';
 import { minimatch, Minimatch } from 'minimatch';
 
-import { COMMON_TARGET_IGNORE } from './resolve-common.js';
+import { COMMON_TARGET_IGNORE, stripLeadingDotSegments } from './resolve-common.js';
 
 import type { TargetRegistry } from './target-registry.js';
 import type { Target } from '@opensip-cli/config';
@@ -50,7 +50,9 @@ export function applyGlobalExcludes(
     if (globalExcludes.length === 0) return true;
     // minimatch expects POSIX-style relative paths; Windows `relative()` yields `\`.
     const relativePath = relative(rootDir, filePath).split('\\').join('/');
-    return !globalExcludes.some((pattern) => minimatch(relativePath, pattern, { dot: true }));
+    return !globalExcludes.some((pattern) =>
+      minimatch(relativePath, stripLeadingDotSegments(pattern), { dot: true }),
+    );
   });
 }
 
@@ -81,7 +83,7 @@ export function resolveTargets(
 
   // Pre-compile globals once for the whole call (mirrors preResolveAllTargets).
   const compiledGlobalExcludes = globalExcludes.map(
-    (pattern) => new Minimatch(pattern, { dot: true }),
+    (pattern) => new Minimatch(stripLeadingDotSegments(pattern), { dot: true }),
   );
 
   for (const target of targets) {
@@ -145,7 +147,9 @@ function filterOneTargetFiles(
     // post-filter must match that so preResolveAllTargets (which relies on this
     // filter alone for target excludes) does not diverge from resolveTargets.
     const compiledTargetExcludes = hasTargetExcludes
-      ? targetExclude.map((ex) => new Minimatch(ex, { dot: true, nocase: PLATFORM_NOCASE }))
+      ? targetExclude.map(
+          (ex) => new Minimatch(stripLeadingDotSegments(ex), { dot: true, nocase: PLATFORM_NOCASE }),
+        )
       : [];
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];
     return [...files]
@@ -222,7 +226,9 @@ export function preResolveAllTargets(
   }
 
   // Pre-compile globalExcludes matchers for reuse across all targets
-  const compiledExcludes = globalExcludes.map((pattern) => new Minimatch(pattern, { dot: true }));
+  const compiledExcludes = globalExcludes.map(
+    (pattern) => new Minimatch(stripLeadingDotSegments(pattern), { dot: true }),
+  );
 
   // Assemble per-target file lists by combining pattern results and filtering excludes.
   // Both target-specific excludes AND globalExcludes are applied here so that

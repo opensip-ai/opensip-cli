@@ -70,6 +70,17 @@ describe('selectRecipe (ADR-0022 tool-scoped + tolerant)', () => {
     expect(selectRecipe(base)).toEqual({ recipeName: 'default' });
   });
 
+  it('an empty-string --check is treated as absent, not an ad-hoc selector', () => {
+    // runRecipeOrAdHoc and createAdHocRecipe both treat `args.check` as unset
+    // when it is falsy (`if (args.check)`); selectRecipe must agree, or an
+    // empty `--check ""` makes selectRecipe return recipeName: undefined while
+    // runRecipeOrAdHoc then refuses to treat the (falsy) check as ad-hoc,
+    // tripping its "recipeName must be defined" internal invariant.
+    expect(selectRecipe({ ...base, check: '' }, { toolRecipe: 'backend' })).toEqual({
+      recipeName: 'backend',
+    });
+  });
+
   it('unknown explicit --check returns a configuration error result', async () => {
     const service = new FitnessRecipeService({
       cwd: '/tmp',

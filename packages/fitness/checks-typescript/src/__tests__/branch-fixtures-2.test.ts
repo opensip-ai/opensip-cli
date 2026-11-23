@@ -1344,6 +1344,32 @@ describe('no-hardcoded-correlation-id — additional branches', () => {
     const result = await runCheck('no-hardcoded-correlation-id');
     expect(result).toBeDefined();
   });
+
+  it('does not flag correlationId-shaped text that lives inside a template literal', async () => {
+    fx(
+      'src/svc/sql.ts',
+      [
+        // The template literal opens on this line — everything after the
+        // backtick is SQL text, not a real `correlationId:` assignment.
+        'export function query() {',
+        '  const sql = `SELECT * FROM audit WHERE correlationId: "abc-123-def"',
+        "    AND status = 'active'`;",
+        '  return sql;',
+        '}',
+      ].join('\n'),
+    );
+    const result = await runCheck('no-hardcoded-correlation-id');
+    expect(result?.warnings).toBe(0);
+  });
+
+  it('still flags a real hardcoded correlationId assignment outside any template literal', async () => {
+    fx(
+      'src/svc/real.ts',
+      ['export function bad() { return { correlationId: "fixed-id-123" } }'].join('\n'),
+    );
+    const result = await runCheck('no-hardcoded-correlation-id');
+    expect(result?.warnings).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
