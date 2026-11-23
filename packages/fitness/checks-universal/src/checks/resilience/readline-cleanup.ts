@@ -39,7 +39,12 @@ export const readlineCleanup = defineCheck({
     languages: ['typescript'],
     concerns: ['backend', 'frontend', 'cli'],
   },
-  contentFilter: 'strip-strings',
+  // 'strip-strings' alone leaves comments intact, so a comment merely
+  // containing the word "using" or "finally" in prose (e.g. "using the stdin
+  // stream") satisfies CLEANUP_PATTERNS' unanchored match and silently
+  // suppresses every real violation in the file. Comments carry no cleanup
+  // guarantee, so they must not count as evidence of one.
+  contentFilter: 'strip-strings-and-comments',
 
   confidence: 'medium',
   description: 'Detect readline usage without proper cleanup (close/finally)',

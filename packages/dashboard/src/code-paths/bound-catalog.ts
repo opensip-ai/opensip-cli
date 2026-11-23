@@ -180,14 +180,20 @@ export function boundGraphCatalog(
 
   const kept: FunctionMap = {};
   let omittedFunctions = 0;
-  for (const [key, occurrences] of ranked) {
+  for (let i = 0; i < ranked.length; i++) {
+    const [key, occurrences] = ranked[i];
     const projected = occurrences.map((occurrence) => projectOccurrence(occurrence));
     // `+ key.length + 8` approximates the map-entry overhead (quotes, colon,
     // comma) so the budget is not silently overrun by tens of thousands of keys.
     const cost = scriptContextJsonBytes(projected) + key.length + 8;
     if (cost > budget) {
-      omittedFunctions += occurrences.length;
-      continue;
+      // `ranked` is importance-descending, so once one function doesn't fit the
+      // remaining budget, every function after it is less important and must be
+      // dropped too (not just this one) — `continue`ing here would let a later,
+      // smaller, LESS important function fill the gap while a more important one
+      // stays dropped, breaking the "least important first" contract.
+      omittedFunctions += ranked.slice(i).reduce((total, [, occs]) => total + occs.length, 0);
+      break;
     }
     budget -= cost;
     kept[key] = projected;

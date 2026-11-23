@@ -70,6 +70,33 @@ describe('filterContent', () => {
       // The identifier `c` inside the innermost expression is code and must survive
       expect(code).toContain('${c}');
     });
+
+    // Regression: an ordinary brace pair INSIDE a substitution (an object
+    // literal, a block, an arrow body) is not the template's own delimiter.
+    // `templateDepth` alone can't tell the two apart — a `}` closing
+    // `JSON.stringify({a: 1})` was mistaken for the template's closing brace,
+    // triggering `reScanTemplateToken` early and wiping the real `)` and `}`
+    // that follow to whitespace.
+    it('does not mistake an object literal brace inside ${} for the template delimiter', () => {
+      const src = 'const x = `data: ${JSON.stringify({a: 1})}`;';
+      const { code } = filterContent(src);
+      expect(code).toContain('JSON.stringify({a: 1})');
+      // Only the literal text before `${` is masked.
+      expect(code).toBe('const x = `      ${JSON.stringify({a: 1})}`;');
+    });
+
+    it('does not mistake a block/arrow-body brace inside ${} for the template delimiter', () => {
+      const src = 'const y = `value: ${ (() => { return 1; })() }`;';
+      const { code } = filterContent(src);
+      expect(code).toContain('(() => { return 1; })()');
+    });
+
+    it('handles several substitutions with object-literal braces on one line', () => {
+      const src = 'const z = `a${({x:1}).x}b${({y:2}).y}c`;';
+      const { code } = filterContent(src);
+      expect(code).toContain('({x:1}).x');
+      expect(code).toContain('({y:2}).y');
+    });
   });
 
   describe('codeNoComments — strings AND comments masked', () => {

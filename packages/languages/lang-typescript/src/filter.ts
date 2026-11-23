@@ -364,6 +364,15 @@ function filterContentImpl(
   // and desync the scanner for the rest of the file (which silently wipes real
   // code to whitespace). Incremented at TemplateHead, decremented at TemplateTail.
   let templateDepth = 0;
+  // One entry per currently-open template substitution (pushed at
+  // TemplateHead/TemplateMiddle, popped when that substitution's own `}` is
+  // found), counting ordinary `{`/`}` seen inside it that have not yet
+  // balanced. `${ JSON.stringify({a: 1}) }` opens an object literal INSIDE
+  // the substitution — that `}` is ordinary code, not the template's own
+  // delimiter, and must not be rescanned as template text. Only a
+  // CloseBraceToken seen when the innermost substitution's balance is
+  // already 0 is the real template-closing brace.
+  const substitutionBraceDepth: number[] = [];
   // Previous non-trivia token — used to decide whether `/` starts a regex
   // (reScanSlashToken) vs division. Without this, `/.../` is never emitted as
   // RegularExpressionLiteral and quote/slash chars inside patterns desync the
@@ -375,10 +384,30 @@ function filterContentImpl(
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.EndOfFileToken) break;
 
-    // After a CloseBraceToken inside ANY template expression, rescan to get TemplateMiddle/TemplateTail
+    // An ordinary `{` opened while inside a template substitution (e.g. an
+    // object literal or block body in `${ ... }`) belongs to that
+    // substitution's own brace balance, not the template delimiter.
+    // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
+    if (token === ts.SyntaxKind.OpenBraceToken && substitutionBraceDepth.length > 0) {
+      const topIndex = substitutionBraceDepth.length - 1;
+      substitutionBraceDepth[topIndex]++;
+    }
+
+    // A CloseBraceToken inside a template expression closes the template's
+    // own `${...}` delimiter ONLY when the innermost substitution's ordinary
+    // brace balance is already 0 — otherwise it closes an ordinary brace
+    // nested inside that substitution (object literal, block, arrow body)
+    // and must be left as real code, not rescanned as template text.
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
-      token = scanner.reScanTemplateToken(false);
+      const topIndex = substitutionBraceDepth.length - 1;
+      const innerBalance = substitutionBraceDepth[topIndex] ?? 0;
+      if (innerBalance > 0) {
+        substitutionBraceDepth[topIndex] = innerBalance - 1;
+      } else {
+        substitutionBraceDepth.pop();
+        token = scanner.reScanTemplateToken(false);
+      }
     }
 
     // Bare scanner emits SlashToken for `/`; only reScanSlashToken yields regex.
@@ -405,12 +434,14 @@ function filterContentImpl(
       case ts.SyntaxKind.TemplateHead: {
         // `text ${ — replace text between ` and ${
         templateDepth++;
+        substitutionBraceDepth.push(0);
         replaceCharsInRange(chars, start + 1, end - 2, stringRegions);
         break;
       }
 
       case ts.SyntaxKind.TemplateMiddle: {
         // }text ${ — replace text between } and ${
+        substitutionBraceDepth.push(0);
         replaceCharsInRange(chars, start + 1, end - 2, stringRegions);
         break;
       }

@@ -61,7 +61,7 @@ export function selectRecipe(
   args: FitOptions,
   defaults: FitRecipeDefaults = {},
 ): { recipeName: string | undefined } | { error: ErrorResult } {
-  const useAdHoc = args.check != null || tagFiltersFrom(args.tags).length > 0;
+  const useAdHoc = Boolean(args.check) || tagFiltersFrom(args.tags).length > 0;
   if (useAdHoc) return { recipeName: undefined };
 
   const resolved = resolveToolRecipeName({
