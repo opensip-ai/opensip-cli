@@ -148,7 +148,8 @@ function filterOneTargetFiles(
     // filter alone for target excludes) does not diverge from resolveTargets.
     const compiledTargetExcludes = hasTargetExcludes
       ? targetExclude.map(
-          (ex) => new Minimatch(stripLeadingDotSegments(ex), { dot: true, nocase: PLATFORM_NOCASE }),
+          (ex) =>
+            new Minimatch(stripLeadingDotSegments(ex), { dot: true, nocase: PLATFORM_NOCASE }),
         )
       : [];
     const allExcludes = [...compiledTargetExcludes, ...compiledGlobalExcludes];

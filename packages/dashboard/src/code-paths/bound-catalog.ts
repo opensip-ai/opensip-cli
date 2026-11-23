@@ -192,9 +192,7 @@ export function boundGraphCatalog(
       // dropped too (not just this one) — `continue`ing here would let a later,
       // smaller, LESS important function fill the gap while a more important one
       // stays dropped, breaking the "least important first" contract.
-      omittedFunctions += ranked
-        .slice(i)
-        .reduce((total, [, occs]) => total + occs.length, 0);
+      omittedFunctions += ranked.slice(i).reduce((total, [, occs]) => total + occs.length, 0);
       break;
     }
     budget -= cost;

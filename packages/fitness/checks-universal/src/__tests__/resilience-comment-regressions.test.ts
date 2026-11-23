@@ -89,9 +89,7 @@ describe('readline-cleanup comment lookalikes', () => {
     );
 
     const result = await runCheck('readline-cleanup');
-    expect(result.signals.map((signal) => signal.metadata?.type)).toContain(
-      'readline-no-cleanup',
-    );
+    expect(result.signals.map((signal) => signal.metadata?.type)).toContain('readline-no-cleanup');
   });
 
   it('still recognizes a real `using` declaration as cleanup', async () => {

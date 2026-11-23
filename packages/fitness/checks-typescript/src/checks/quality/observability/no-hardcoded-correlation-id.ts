@@ -33,7 +33,10 @@ const HARDCODED_CORR_ID_PATTERN = /correlationId\s{0,5}:\s{0,5}['"]([a-zA-Z0-9_-
 function codeSegmentsOutsideTemplateLiterals(
   line: string,
   insideTemplate: boolean,
-): { readonly segments: readonly { text: string; offset: number }[]; readonly insideTemplate: boolean } {
+): {
+  readonly segments: readonly { text: string; offset: number }[];
+  readonly insideTemplate: boolean;
+} {
   const segments: { text: string; offset: number }[] = [];
   let inside = insideTemplate;
   let segmentStart = inside ? -1 : 0;
@@ -48,7 +51,8 @@ function codeSegmentsOutsideTemplateLiterals(
       inside = false;
       segmentStart = ci + 1; // code resumes right after the closing backtick
     } else {
-      if (segmentStart !== -1) segments.push({ text: line.slice(segmentStart, ci), offset: segmentStart });
+      if (segmentStart !== -1)
+        segments.push({ text: line.slice(segmentStart, ci), offset: segmentStart });
       inside = true;
       segmentStart = -1;
     }
@@ -71,7 +75,10 @@ function findHardcodedCorrelationIds(content: string, filePath: string): CheckVi
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
 
-    const { segments, insideTemplate } = codeSegmentsOutsideTemplateLiterals(line, inTemplateLiteral);
+    const { segments, insideTemplate } = codeSegmentsOutsideTemplateLiterals(
+      line,
+      inTemplateLiteral,
+    );
     inTemplateLiteral = insideTemplate;
 
     for (const segment of segments) {
