@@ -389,7 +389,8 @@ function filterContentImpl(
     // substitution's own brace balance, not the template delimiter.
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.OpenBraceToken && substitutionBraceDepth.length > 0) {
-      substitutionBraceDepth[substitutionBraceDepth.length - 1]++;
+      const topIndex = substitutionBraceDepth.length - 1;
+      substitutionBraceDepth[topIndex]++;
     }
 
     // A CloseBraceToken inside a template expression closes the template's
@@ -399,9 +400,10 @@ function filterContentImpl(
     // and must be left as real code, not rescanned as template text.
     // @fitness-ignore-next-line unsafe-secret-comparison -- comparing TypeScript SyntaxKind enum, not a secret
     if (token === ts.SyntaxKind.CloseBraceToken && templateDepth > 0) {
-      const innerBalance = substitutionBraceDepth[substitutionBraceDepth.length - 1] ?? 0;
+      const topIndex = substitutionBraceDepth.length - 1;
+      const innerBalance = substitutionBraceDepth[topIndex] ?? 0;
       if (innerBalance > 0) {
-        substitutionBraceDepth[substitutionBraceDepth.length - 1] = innerBalance - 1;
+        substitutionBraceDepth[topIndex] = innerBalance - 1;
       } else {
         substitutionBraceDepth.pop();
         token = scanner.reScanTemplateToken(false);

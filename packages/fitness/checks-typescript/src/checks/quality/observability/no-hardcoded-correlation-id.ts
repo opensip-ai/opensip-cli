@@ -16,6 +16,13 @@ import {
  */
 const HARDCODED_CORR_ID_PATTERN = /correlationId\s{0,5}:\s{0,5}['"]([a-zA-Z0-9_-]{1,100})['"]/g;
 
+/** A backtick at `index` is a template delimiter only when it isn't `\`-escaped. */
+function isUnescapedBacktick(line: string, index: number): boolean {
+  let backslashes = 0;
+  for (let j = index - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
+  return backslashes % 2 === 0;
+}
+
 /**
  * Split a line into the substrings that are real code — i.e. outside any
  * backtick template literal — carrying `insideTemplate` across lines for
@@ -42,17 +49,15 @@ function codeSegmentsOutsideTemplateLiterals(
   let segmentStart = inside ? -1 : 0;
 
   for (let ci = 0; ci < line.length; ci++) {
-    if (line[ci] !== '`') continue;
-    let backslashes = 0;
-    for (let j = ci - 1; j >= 0 && line[j] === '\\'; j--) backslashes++;
-    if (backslashes % 2 !== 0) continue; // escaped backtick, not a delimiter
+    if (line[ci] !== '`' || !isUnescapedBacktick(line, ci)) continue;
 
     if (inside) {
       inside = false;
       segmentStart = ci + 1; // code resumes right after the closing backtick
     } else {
-      if (segmentStart !== -1)
+      if (segmentStart !== -1) {
         segments.push({ text: line.slice(segmentStart, ci), offset: segmentStart });
+      }
       inside = true;
       segmentStart = -1;
     }
